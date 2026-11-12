@@ -43,9 +43,8 @@ import lombok.RequiredArgsConstructor;
  * ({@link ConnectorCatalog}) groupé par catégorie, dans l'ordre du registre, avec l'état de la connexion qu'elle
  * utilise (la sienne d'abord, sinon celle que l'espace partage), puis les serveurs MCP ajoutés à la main.
  *
- * <p>Un préréglage jamais essayé n'y figure que pour qui l'a connecté (TF-J1-3, {@link ConnectorCatalog#isShown}).
- * Cortex lit ce même catalogue ({@code find_integration}) : il ne propose pas non plus un outil que l'écran ne montre
- * pas.</p>
+ * <p>Chaque outil du catalogue y figure, essayé ou non (décision de la Présidence, 12/11/2026). Cortex lit ce même
+ * catalogue ({@code find_integration}) : il ne propose pas un outil que l'écran ne montre pas.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -81,8 +80,7 @@ public class IntegrationCatalogService {
         Set<String> companyApps = connectorApps.findByWorkspaceId(ws.getId()).stream()
             .map(a -> a.getConnectorKey()).collect(Collectors.toSet());
 
-        // Groupement par catégorie, dans l'ordre du registre, sans les préréglages jamais essayés que cette personne
-        // ne voit pas connectés.
+        // Groupement par catégorie, dans l'ordre du registre : chaque outil du catalogue.
         Map<ConnectorCategory, List<ConnectorView>> groups = new EnumMap<>(ConnectorCategory.class);
         int shown = 0;
         int connected = 0;
@@ -90,7 +88,6 @@ public class IntegrationCatalogService {
             ConnectedServer server = d.preset() == null ? null : used.get(d.key());
             boolean isConnected = d.preset() == null ? natives.contains(d.key())
                 : server != null && server.state() == ConnectionState.CONNECTED;
-            if (!catalog.isShown(d.key(), isConnected || server != null)) continue;
             shown++;
             if (isConnected) connected++;
             groups.computeIfAbsent(d.category(), k -> new ArrayList<>())

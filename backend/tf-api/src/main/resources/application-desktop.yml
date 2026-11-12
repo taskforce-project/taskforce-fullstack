@@ -163,9 +163,6 @@ integrations:
       app-base: ${TF_DESKTOP_UI_URL:http://127.0.0.1}
       application-type: native
       cimd-url: ${TF_DESKTOP_HOSTED_API_URL:https://api.taskforce-project.fr}/api/mcp/oauth/desktop-client.json
-  # Les préréglages pas encore essayés de bout en bout se montrent sur une instance d'essai seulement (R15, R153).
-  catalog:
-    show-untried: ${TF_CATALOG_SHOW_UNTRIED:false}
 
 taskforce:
   signup:

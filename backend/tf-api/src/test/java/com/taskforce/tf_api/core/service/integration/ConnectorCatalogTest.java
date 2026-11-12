@@ -218,7 +218,6 @@ class ConnectorCatalogTest {
         assertThat(catalogue.byKey(cle)).isEmpty();
         assertThat(catalogue.isMcpPreset(cle)).isFalse();
         assertThat(catalogue.isTriedPreset(cle)).isFalse();
-        assertThat(catalogue.isShown(cle, true)).isFalse();
     }
 
     // ── Préréglages essayés (TF-J1-3) ────────────────────────────────────────
@@ -237,23 +236,6 @@ class ConnectorCatalogTest {
     @DisplayName("isTriedPreset : vrai pour un préréglage essayé seulement, jamais pour une native ou une clé inconnue")
     void isTriedPreset(String cle, boolean attendu) {
         assertThat(catalogue.isTriedPreset(cle)).isEqualTo(attendu);
-    }
-
-    @ParameterizedTest(name = "{0}, connecté ici = {1} -> montré = {2}")
-    @CsvSource({
-        "plane,      false, true",
-        "github,     false, true",
-        "slack,      false, true",
-        "linear,     false, true",
-        "jira,       false, false",
-        "cloudflare, false, false",
-        "cloudflare, true,  true",
-        "zapier,     true,  true",
-        "trello,     true,  false",
-    })
-    @DisplayName("isShown : natives et préréglage essayé pour tous ; un préréglage jamais essayé pour l'espace qui l'a connecté")
-    void isShown(String cle, boolean connecteIci, boolean attendu) {
-        assertThat(catalogue.isShown(cle, connecteIci)).isEqualTo(attendu);
     }
 
     // ── Intégrations natives ─────────────────────────────────────────────────
@@ -285,7 +267,6 @@ class ConnectorCatalogTest {
         ConnectorDescriptor d = catalogue.byKey(cle).orElseThrow();
 
         assertThat(d.description()).isEqualTo(ligne);
-        assertThat(catalogue.isShown(cle, false)).isTrue();
     }
 
     @ParameterizedTest(name = "{0}")

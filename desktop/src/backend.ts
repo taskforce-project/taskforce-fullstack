@@ -34,9 +34,9 @@ const PRE_REGISTERED = /^TF_MCP_[A-Z0-9_]+_CLIENT_(ID|SECRET)$/;
 
 /**
  * Ce que le backend local sait des connexions aux outils (séance n°22, R154) : l'adresse de retour fixe de la coque, et
- * l'API hébergée qui publie le document de métadonnées client de l'app desktop. L'essai d'un catalogue élargi
- * (`TF_CATALOG_SHOW_UNTRIED`) et les clients enregistrés d'avance (`TF_MCP_<CLÉ>_CLIENT_ID`, `..._CLIENT_SECRET`) passent
- * de l'environnement de la personne à celui du backend : ils restent sur sa machine.
+ * l'API hébergée qui publie le document de métadonnées client de l'app desktop. Les clients enregistrés
+ * d'avance (`TF_MCP_<CLÉ>_CLIENT_ID`, `..._CLIENT_SECRET`) passent de l'environnement de la personne à celui du
+ * backend : ils restent sur sa machine.
  */
 export function connectorEnvironment(mcpRedirectUri: string, hostedApi: string = API_URL,
                                      shell: NodeJS.ProcessEnv = process.env): Record<string, string> {
@@ -45,7 +45,7 @@ export function connectorEnvironment(mcpRedirectUri: string, hostedApi: string =
     TF_DESKTOP_HOSTED_API_URL: hostedApi,
   };
   for (const [name, value] of Object.entries(shell)) {
-    if (value && (name === "TF_CATALOG_SHOW_UNTRIED" || PRE_REGISTERED.test(name))) env[name] = value;
+    if (value && PRE_REGISTERED.test(name)) env[name] = value;
   }
   return env;
 }
