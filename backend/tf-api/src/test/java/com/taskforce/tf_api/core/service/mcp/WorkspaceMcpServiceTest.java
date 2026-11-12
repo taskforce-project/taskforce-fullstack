@@ -469,7 +469,7 @@ class WorkspaceMcpServiceTest {
     // ── Serveurs personnalisés (ADR-020) ────────────────────────────────────
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"github", "slack", "plane", "trello", "custom-", "custom-Docs", "custom--x", "docs"})
+    @ValueSource(strings = {"github", "slack", "plane", "docker", "custom-", "custom-Docs", "custom--x", "docs"})
     @NullSource
     @DisplayName("resolveServer refuse une native, une clé inconnue ou mal formée")
     void resolve_refuses_other_keys(String key) {

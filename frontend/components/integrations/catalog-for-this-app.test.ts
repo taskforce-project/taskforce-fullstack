@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { catalogForThisApp, connectionOf } from "./integrations-catalog"
+import { catalogForThisApp, connectionOf, filterCatalog, folds, FOLDED_COUNT } from "./integrations-catalog"
 
 const t = CONSTANTS_EN.integrations
 
@@ -73,5 +73,49 @@ describe("connectionOf", () => {
 
   it("dit où vit la connexion GitHub de l'app desktop", () => {
     expect(connectionOf(tool("github", false), t, true).help).toBe(t.githubCliHelp)
+  })
+
+  it("un outil que l'éditeur ferme encore ne se connecte pas", () => {
+    const figma = { ...tool("figma", false, "MCP"), connection: "our-app", blocked: "Waitlist." } as ConnectorView
+    expect(connectionOf(figma, t, false, CONSTANTS_EN.connect)).toMatchObject({ label: "One click", canConnect: false })
+  })
+})
+
+describe("filterCatalog et folds (plus de cent outils, R153)", () => {
+  const all = { query: "", category: "all", status: "all" } as const
+
+  it("sans filtre : chaque catégorie, chaque outil", () => {
+    expect(filterCatalog(catalog, all).map((g) => g.tools.length)).toEqual([2, 1, 1])
+  })
+
+  it("la recherche lit le nom, la description et l'intitulé de la catégorie", () => {
+    expect(filterCatalog(catalog, { ...all, query: "SLACK" }).flatMap((g) => g.tools.map((x) => x.key))).toEqual(["slack"])
+    expect(filterCatalog(catalog, { ...all, query: "plane on the web" }).flatMap((g) => g.tools.map((x) => x.key))).toEqual(["plane"])
+    expect(filterCatalog(catalog, { ...all, query: "development" }).flatMap((g) => g.tools.map((x) => x.key)))
+      .toEqual(["github", "plane"])
+  })
+
+  it("une catégorie, un état : les catégories vides disparaissent", () => {
+    expect(filterCatalog(catalog, { ...all, category: "chat" }).map((g) => g.category)).toEqual(["chat"])
+    expect(filterCatalog(catalog, { ...all, status: "connected" }).flatMap((g) => g.tools.map((x) => x.key)))
+      .toEqual(["github", "slack"])
+    expect(filterCatalog(catalog, { ...all, status: "disconnected" }).map((g) => g.category)).toEqual(["dev", "mcp"])
+    expect(filterCatalog(catalog, { ...all, query: "nothing like this" })).toEqual([])
+  })
+
+  it("dans une catégorie, ce qui se connecte vient avant ce que l'éditeur ferme encore", () => {
+    const closed = { ...tool("figma", false, "MCP"), blocked: "Waitlist." } as ConnectorView
+    const design = { total: 3, connected: 0, categories: [
+      { category: "DESIGN", label: "Design", tools: [closed, tool("miro", false, "MCP"), tool("lucid", false, "MCP")] },
+    ] } as IntegrationCatalog
+    expect(filterCatalog(design, all)[0].tools.map((x) => x.key)).toEqual(["miro", "lucid", "figma"])
+  })
+
+  it("une catégorie se replie seulement sans recherche ni filtre, au-delà de ses premiers outils", () => {
+    expect(folds(all, FOLDED_COUNT + 1)).toBe(true)
+    expect(folds(all, FOLDED_COUNT)).toBe(false)
+    expect(folds({ ...all, query: "data" }, 40)).toBe(false)
+    expect(folds({ ...all, category: "DATA" }, 40)).toBe(false)
+    expect(folds({ ...all, status: "connected" }, 40)).toBe(false)
   })
 })

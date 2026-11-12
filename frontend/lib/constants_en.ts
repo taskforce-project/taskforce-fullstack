@@ -787,6 +787,12 @@ export const CONSTANTS_EN = {
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
   },
 
+  // The catalog of tools (R153, Claude's connectors directory): with more than a hundred tools, each category
+  // shows its first ones when nothing is searched or filtered
+  catalog: {
+    showAll: "Show all {count}",
+  },
+
   // Connecting a tool (TF-J2-12, session 22 R154): one gesture for the person, the vendor's path behind it.
   connect: {
     // What a connection gives, in one sentence
@@ -808,6 +814,7 @@ export const CONSTANTS_EN = {
     pathOneClick: "One click",
     pathAdminFirst: "Admin first",
     pathKey: "Key",
+    pathAddress: "Server address",
     pathOpen: "No sign-in",
     // Options before connecting
     shareWithWorkspace: "Share with the workspace",

@@ -1,5 +1,8 @@
 package com.taskforce.tf_api.core.service.integration;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +13,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.dto.response.ConnectorDescriptor;
 import com.taskforce.tf_api.core.dto.response.ConnectorField;
 import com.taskforce.tf_api.core.enums.ConnectionPath;
@@ -20,8 +25,10 @@ import com.taskforce.tf_api.core.enums.ToolClass;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests unitaires de {@link ConnectorCatalog} : trois intégrations natives et 31 préréglages de serveurs MCP
- * (ADR-020), lus dans le fichier des préréglages (R99), dont un seul essayé de bout en bout et montré à tous (TF-J1-3).
+ * Tests unitaires de {@link ConnectorCatalog} : trois intégrations natives et les préréglages de serveurs MCP
+ * (ADR-020), lus dans le fichier des préréglages (R99), dont un seul essayé de bout en bout ; chacun se montre à tous
+ * (décision de la Présidence, 12/11/2026). Les comptes viennent du fichier, jamais d'un nombre écrit ici : ajouter un
+ * outil au registre ne demande pas de toucher aux tests.
  *
  * <p>Le catalogue est déclaratif : une erreur de déclaration ne casse rien à la compilation et ne se voit qu'à
  * l'écran (tuile sans URL, catégorie vide) ou en base (champ de secret oublié en clair). D'où des tests
@@ -39,16 +46,30 @@ class ConnectorCatalogTest {
         catalogue.build();
     }
 
+    /** Les préréglages tels que le fichier les écrit, lus sans le catalogue : la source des comptes. */
+    private static JsonNode fichier() throws IOException {
+        try (InputStream in = ConnectorCatalogTest.class.getClassLoader().getResourceAsStream(ConnectorCatalog.PRESETS)) {
+            return new ObjectMapper().readTree(in).path("presets");
+        }
+    }
+
     // ── Intégrité globale ────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("trois natives et 31 préréglages MCP, rien d'autre")
-    void troisNativesEtTrenteEtUnPrereglages() {
+    @DisplayName("trois natives et chaque préréglage du fichier, rien d'autre")
+    void troisNativesEtLesPrereglagesDuFichier() throws IOException {
         assertThat(catalogue.all())
             .filteredOn(d -> d.authType() != ConnectorAuthType.MCP)
             .extracting(ConnectorDescriptor::key)
             .containsExactly("plane", "github", "slack");
-        assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP).hasSize(31);
+        assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP).hasSize(fichier().size());
+    }
+
+    @Test
+    @DisplayName("chaque catégorie du registre a au moins un outil (l'écran n'a pas de rubrique vide)")
+    void chaqueCategorieAUnOutil() {
+        assertThat(Arrays.stream(ConnectorCategory.values()).filter(c -> c != ConnectorCategory.CUSTOM_MCP))
+            .allSatisfy(c -> assertThat(catalogue.all()).as(c.name()).anyMatch(d -> d.category() == c));
     }
 
     @Test
@@ -123,18 +144,64 @@ class ConnectorCatalogTest {
         });
     }
 
+    @Test
+    @DisplayName("chaque préréglage cite ses sources, des pages HTTPS lues (registre, R153)")
+    void chaquePrereglageCiteSesSources() {
+        assertThat(catalogue.all()).filteredOn(d -> d.preset() != null).allSatisfy(d ->
+            assertThat(d.preset().sources()).as(d.key()).isNotEmpty().allMatch(s -> s.startsWith("https://")));
+    }
+
+    @Test
+    @DisplayName("un chemin par application dit l'étape de l'administrateur ; un outil fermé dit pourquoi")
+    void cheminParApplicationOuFerme() {
+        assertThat(catalogue.all()).filteredOn(d -> d.preset() != null).allSatisfy(d -> {
+            ConnectorPreset p = d.preset();
+            if (p.blocked() == null && (p.connection() == ConnectionPath.OUR_APP || p.connection() == ConnectionPath.COMPANY_APP)) {
+                assertThat(p.admin()).as(d.key()).isNotNull();
+            }
+            if (p.blocked() != null) assertThat(p.blocked()).as(d.key()).isNotBlank();
+            // Une clé, ou l'adresse que l'entreprise crée, se guide : où la créer (sauf chez un outil fermé).
+            if (p.blocked() == null && (p.connection() == ConnectionPath.API_KEY || p.connection() == ConnectionPath.SERVER_URL)) {
+                assertThat(p.apiKey()).as(d.key()).isNotNull();
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("une adresse est celle de tout client : ni propre à Claude, ni un ancien point SSE sauf outil fermé")
+    void adressesPourToutClient() {
+        assertThat(catalogue.all()).filteredOn(d -> d.preset() != null && d.preset().mcpUrl() != null).allSatisfy(d -> {
+            String url = d.preset().mcpUrl();
+            assertThat(url).as(d.key()).doesNotContainIgnoringCase("anthropic").doesNotContainIgnoringCase("claude");
+            if (d.preset().blocked() == null) assertThat(url).as(d.key()).doesNotEndWith("/sse");
+        });
+    }
+
     @ParameterizedTest(name = "{0} -> {1}")
     @CsvSource({
         "jira,           TICKETS_PROJECTS",
+        "trello,         TICKETS_PROJECTS",
         "confluence,     KNOWLEDGE",
         "notion,         KNOWLEDGE",
+        "box,            FILES_STORAGE",
         "gitlab,         CODE",
         "github-mcp,     CODE",
+        "netlify,        CODE",
+        "sentry,         MONITORING",
+        "datadog,        MONITORING",
+        "pagerduty,      MONITORING",
+        "amplitude,      DATA",
+        "posthog,        DATA",
+        "vanta,          SECURITY",
         "slack-mcp,      CHAT_MAIL",
+        "zoom,           CHAT_MAIL",
         "stripe,         FINANCE_HR",
+        "qonto,          FINANCE_HR",
         "zoho,           SALES",
+        "pipedrive,      SALES",
         "intercom,       SUPPORT",
         "excalidraw,     DESIGN",
+        "miro,           DESIGN",
         "airtable,       OTHER",
     })
     @DisplayName("les catégories sont celles du registre des outils")
@@ -189,23 +256,25 @@ class ConnectorCatalogTest {
         "notion,   https://mcp.notion.com/mcp",
         "stripe,   https://mcp.stripe.com",
         "attio,    https://mcp.attio.com/mcp",
-        "square,   https://mcp.squareup.com/sse",
-        "zapier,   https://mcp.zapier.com/api/mcp/mcp",
+        "square,   https://mcp.squareup.com/mcp",
+        "neon,     https://mcp.neon.tech/mcp",
+        "trello,   https://mcp.trello.com/v1",
+        "datadog,  https://mcp.datadoghq.com/v1/mcp",
     })
-    @DisplayName("l'URL préremplie est celle du serveur officiel vérifié")
+    @DisplayName("l'URL préremplie est celle du serveur officiel vérifié (répertoire de Claude, 12/11/2026)")
     void urlPrerempliesVerifiees(String cle, String url) {
         assertThat(catalogue.byKey(cle).orElseThrow().mcpSuggestedUrl()).isEqualTo(url);
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"docker", "ollama", "trello", "shadcn"})
-    @DisplayName("les tuiles retirées au lot 6 ne sont plus au catalogue")
+    @ValueSource(strings = {"docker", "ollama", "shadcn"})
+    @DisplayName("les tuiles retirées au lot 6 ne sont plus au catalogue (Trello y revient par son serveur officiel)")
     void tuilesRetirees(String cle) {
         assertThat(catalogue.byKey(cle)).isEmpty();
     }
 
     @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({"linear, true", "zapier, true", "github, false", "plane, false", "trello, false"})
+    @CsvSource({"linear, true", "zapier, true", "github, false", "plane, false", "docker, false"})
     @DisplayName("isMcpPreset distingue un préréglage d'une native et d'une clé inconnue")
     void isMcpPreset(String cle, boolean attendu) {
         assertThat(catalogue.isMcpPreset(cle)).isEqualTo(attendu);
@@ -223,16 +292,18 @@ class ConnectorCatalogTest {
     // ── Préréglages essayés (TF-J1-3) ────────────────────────────────────────
 
     @Test
-    @DisplayName("un seul préréglage essayé de bout en bout : Linear ; les 30 autres restent déclarés")
-    void unSeulPrereglageEssaye() {
+    @DisplayName("un seul préréglage essayé de bout en bout : Linear ; chaque autre préréglage du fichier reste à essayer")
+    void unSeulPrereglageEssaye() throws IOException {
+        int essayes = 0;
+        for (JsonNode p : fichier()) if (p.path("tried").isObject()) essayes++;
         assertThat(catalogue.all()).filteredOn(d -> catalogue.isTriedPreset(d.key()))
             .extracting(ConnectorDescriptor::key).containsExactly("linear");
         assertThat(catalogue.all()).filteredOn(d -> d.authType() == ConnectorAuthType.MCP)
-            .filteredOn(d -> !catalogue.isTriedPreset(d.key())).hasSize(30);
+            .filteredOn(d -> !catalogue.isTriedPreset(d.key())).hasSize(fichier().size() - essayes);
     }
 
     @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({"linear, true", "jira, false", "cloudflare, false", "github, false", "plane, false", "trello, false"})
+    @CsvSource({"linear, true", "jira, false", "cloudflare, false", "github, false", "plane, false", "docker, false"})
     @DisplayName("isTriedPreset : vrai pour un préréglage essayé seulement, jamais pour une native ou une clé inconnue")
     void isTriedPreset(String cle, boolean attendu) {
         assertThat(catalogue.isTriedPreset(cle)).isEqualTo(attendu);
