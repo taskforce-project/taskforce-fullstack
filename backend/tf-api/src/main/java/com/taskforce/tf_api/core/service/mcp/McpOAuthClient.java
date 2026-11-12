@@ -43,7 +43,12 @@ public class McpOAuthClient {
         private final int status;
 
         public OAuthError(String message, String error, int status) {
-            super(message);
+            this("BUSINESS_ERROR", message, error, status);
+        }
+
+        /** Une erreur OAuth qui dit aussi pourquoi la connexion n'a pas abouti ({@link ConnectFailure}). */
+        public OAuthError(String code, String message, String error, int status) {
+            super(code, message);
             this.error = error;
             this.status = status;
         }
@@ -116,12 +121,14 @@ public class McpOAuthClient {
                     .header("Content-Type", "application/json"),
                 url, "application/json");
             JsonNode node = readJson(r);
-            requireSuccess(r, node, "DCR " + url);
+            requireSuccess(r, node, "DCR " + url, ConnectFailure.REGISTRATION_REFUSED);
             return node;
         } catch (BusinessException be) {
             throw be;
+        } catch (IllegalArgumentException e) {
+            throw ConnectFailure.of(ConnectFailure.ADDRESS_NOT_ALLOWED, "OAuth DCR " + url + " refused: " + e.getMessage());
         } catch (Exception e) {
-            throw new BusinessException("OAuth DCR " + url + " echoue : " + e.getMessage());
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNREACHABLE, "OAuth DCR " + url + " failed: " + e.getMessage());
         }
     }
 
@@ -130,12 +137,12 @@ public class McpOAuthClient {
         try {
             HttpResponse<String> r = sendForm(url, form);
             JsonNode node = readJson(r);
-            requireSuccess(r, node, "token " + url);
+            requireSuccess(r, node, "token " + url, "BUSINESS_ERROR");
             return node;
         } catch (BusinessException be) {
             throw be;
         } catch (Exception e) {
-            throw new BusinessException("OAuth token " + url + " echoue : " + e.getMessage());
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNREACHABLE, "OAuth token " + url + " failed: " + e.getMessage());
         }
     }
 
@@ -220,12 +227,12 @@ public class McpOAuthClient {
         return out;
     }
 
-    private void requireSuccess(HttpResponse<String> r, JsonNode node, String ctx) {
+    private void requireSuccess(HttpResponse<String> r, JsonNode node, String ctx, String code) {
         // Un 200 qui porte une erreur OAuth (GitHub rend ainsi un code perime) reste un echec.
         String error = node.path("error").asText("");
         if (r.statusCode() / 100 != 2 || !error.isBlank()) {
             String err = error.isBlank() ? node.path("error_description").asText("") : error;
-            throw new OAuthError("OAuth " + ctx + " : HTTP " + r.statusCode() + (err.isBlank() ? "" : " (" + err + ")"),
+            throw new OAuthError(code, "OAuth " + ctx + " : HTTP " + r.statusCode() + (err.isBlank() ? "" : " (" + err + ")"),
                 error.isBlank() ? null : error, r.statusCode());
         }
     }

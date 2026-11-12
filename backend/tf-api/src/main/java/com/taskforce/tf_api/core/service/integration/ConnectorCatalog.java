@@ -21,7 +21,7 @@ import com.taskforce.tf_api.core.enums.ConnectionPath;
 import com.taskforce.tf_api.core.enums.ConnectorAuthType;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
 import com.taskforce.tf_api.core.enums.ToolClass;
-import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.core.service.mcp.ConnectFailure;
 
 import jakarta.annotation.PostConstruct;
 
@@ -145,10 +145,11 @@ public class ConnectorCatalog {
     private static void assertAddress(ConnectorPreset preset, String url) {
         if (url == null) return;
         if (preset.api() != null) {
-            throw new BusinessException(preset.name() + " connects through its own sign-in, not by an address.");
+            throw ConnectFailure.of(ConnectFailure.OFFICIAL_SERVER_ONLY,
+                preset.name() + " connects through its own sign-in, not by an address.");
         }
         if (preset.hasOfficialServer() && !preset.serves(url)) {
-            throw new BusinessException(preset.name() + " connects only to its official server ("
+            throw ConnectFailure.of(ConnectFailure.OFFICIAL_SERVER_ONLY, preset.name() + " connects only to its official server ("
                 + java.net.URI.create(preset.mcpUrl()).getHost() + ").");
         }
     }

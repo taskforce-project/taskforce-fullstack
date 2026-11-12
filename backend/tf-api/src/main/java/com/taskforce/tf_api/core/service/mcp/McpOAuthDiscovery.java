@@ -42,7 +42,7 @@ public class McpOAuthDiscovery {
     /** Le serveur ne publie aucun flux OAuth : il se connecte par une clé, ou il est public. */
     public static class NoOAuth extends BusinessException {
         public NoOAuth(String mcpUrl) {
-            super("OAuth metadata not found for " + mcpUrl + " (the server exposes no OAuth flow?)");
+            super(ConnectFailure.NO_SIGN_IN, "OAuth metadata not found for " + mcpUrl + " (the server exposes no OAuth flow?)");
         }
     }
 
@@ -89,16 +89,16 @@ public class McpOAuthDiscovery {
         if (as == null) throw new NoOAuth(mcpUrl);
         String issuer = text(as, "issuer");
         if (issuer == null || !sameIssuer(issuer, asUrl)) {
-            throw new BusinessException("The sign-in server of " + mcpUrl + " does not identify itself as " + asUrl
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "The sign-in server of " + mcpUrl + " does not identify itself as " + asUrl
                 + ": TaskForce does not connect to it.");
         }
         String authEp = text(as, "authorization_endpoint");
         String tokenEp = text(as, "token_endpoint");
         if (authEp == null || tokenEp == null) {
-            throw new BusinessException("Incomplete OAuth endpoints for " + mcpUrl);
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNSUPPORTED, "Incomplete OAuth endpoints for " + mcpUrl);
         }
         if (!supportsS256(as)) {
-            throw new BusinessException("The sign-in server of " + mcpUrl + " does not announce PKCE (S256): "
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNSUPPORTED, "The sign-in server of " + mcpUrl + " does not announce PKCE (S256): "
                 + "TaskForce can't sign in to it safely.");
         }
         return new DiscoveredAuth(issuer, authEp, tokenEp, text(as, "registration_endpoint"), scopes(prm, as),
@@ -123,20 +123,20 @@ public class McpOAuthDiscovery {
         String issuer = text(as, "issuer");
         boolean entra = entra(issuerUrl) && issuer != null && entraIssuerMatches(issuer, issuerUrl);
         if (issuer == null || !(sameIssuer(issuer, issuerUrl) || entra)) {
-            throw new BusinessException("The sign-in server " + issuerUrl + " does not identify itself as such: "
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "The sign-in server " + issuerUrl + " does not identify itself as such: "
                 + "TaskForce does not connect to it.");
         }
         String authEp = text(as, "authorization_endpoint");
         String tokenEp = text(as, "token_endpoint");
         if (authEp == null || tokenEp == null) {
-            throw new BusinessException("Incomplete OAuth endpoints for " + issuerUrl);
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNSUPPORTED, "Incomplete OAuth endpoints for " + issuerUrl);
         }
         // Entra accepte S256 sans l'annoncer dans sa metadata : admis pour ses seuls émetteurs, et seulement quand la
         // metadata se tait (une metadata qui annonce d'autres méthodes sans S256 reste refusée).
         boolean entraSilentOnPkce = entra && !as.has("code_challenge_methods_supported") && sameHost(authEp, issuerUrl)
             && sameHost(tokenEp, issuerUrl);
         if (!supportsS256(as) && !entraSilentOnPkce) {
-            throw new BusinessException("The sign-in server " + issuerUrl + " does not announce PKCE (S256): "
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNSUPPORTED, "The sign-in server " + issuerUrl + " does not announce PKCE (S256): "
                 + "TaskForce can't sign in to it safely.");
         }
         return new DiscoveredAuth(issuer, authEp, tokenEp, null, null, null, null, text(as, "revocation_endpoint"),
@@ -224,7 +224,7 @@ public class McpOAuthDiscovery {
         String a = strip(declared);
         String b = strip(mcpUrl);
         if (!origin(a).equalsIgnoreCase(origin(b)) || !(b.equals(a) || b.startsWith(a + "/") || a.equals(origin(a)))) {
-            throw new BusinessException("The server at " + mcpUrl + " describes another server (" + declared
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "The server at " + mcpUrl + " describes another server (" + declared
                 + "): TaskForce does not connect to it.");
         }
         return declared;

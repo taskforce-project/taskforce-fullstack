@@ -34,7 +34,6 @@ import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.util.LogSafe;
-import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +80,7 @@ public class McpOAuthService {
     private final SecureRandom random = new SecureRandom();
 
     /** La garde anti-SSRF des adresses du flux : toujours levée, sauf dans les essais de contrat (faux serveur local). */
-    private java.util.function.Consumer<String> urlGuard = SsrfGuard::assertPublicHttpUrl;
+    private java.util.function.Consumer<String> urlGuard = ConnectFailure::assertPublicAddress;
 
     /** Essais de contrat seulement : le faux serveur d'autorisation écoute sur 127.0.0.1. */
     void allowLocalServersForContractTests() {
