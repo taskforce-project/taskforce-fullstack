@@ -1,5 +1,5 @@
 {
-  "$comment": "Les préréglages MCP du catalogue (R99, séance n°22 R153, R154, R158) : des données, pas du code. Chaque outil : sa catégorie, son serveur MCP officiel, son chemin de connexion, les portées strictement utiles (lecture par défaut), l'étape de l'administrateur, et la classe de chaque outil connu (read ou write). Un outil absent des listes est une écriture : TaskForce demande, quoi qu'en dise le serveur. Un préréglage n'est montré qu'avec `tried` (date et preuve de l'essai de bout en bout) ; les autres restent connectables par l'API et par leur adresse. Faits vérifiés le 11/11/2026 (sondes et pages des éditeurs, `sources`) ; ce qui n'a pas pu l'être est dans `unverified`. {redirectUri} et {redirectHost} sont remplacés par l'adresse de retour de l'instance.",
+  "$comment": "Les préréglages MCP du catalogue (R99, séance n°22 R153, R154, R158) : des données, pas du code. Chaque outil : sa catégorie, son serveur MCP officiel, son chemin de connexion, les portées strictement utiles (lecture par défaut), l'étape de l'administrateur, et la classe de chaque outil connu (read ou write). Un outil absent des listes est une écriture : TaskForce demande, quoi qu'en dise le serveur. Chaque préréglage se montre (décision de la Présidence, 12/11/2026) ; `tried` note seulement la date et la preuve de l'essai de bout en bout. Faits vérifiés le 11/11/2026 pour la première vague, le 12/11/2026 pour les outils d'entreprise du répertoire des connecteurs de Claude (pages des éditeurs et métadonnées OAuth publiques, `sources`) ; ce qui n'a pas pu l'être est dans `unverified`. {redirectUri} et {redirectHost} sont remplacés par l'adresse de retour de l'instance.",
   "version": 1,
   "presets": [
     {
@@ -106,7 +106,9 @@
       "website": "https://clickup.com",
       "mcpUrl": "https://mcp.clickup.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://developer.clickup.com/docs/connect-an-ai-assistant-to-clickups-mcp-server.md", "https://mcp.clickup.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the vetted-client allowlist ClickUp's blog mentions", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "monday",
@@ -121,7 +123,9 @@
         "text": "A monday.com account admin approves each new connector, and allows locally hosted connectors for the desktop app.",
         "link": "https://developer.monday.com/api-reference/docs/mcp-dynamic-client-registration"
       },
-      "tried": null
+      "tried": null,
+      "sources": ["https://developer.monday.com/api-reference/docs/mcp-dynamic-client-registration", "https://auth.monday.com/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "gitlab",
@@ -175,22 +179,32 @@
     {
       "key": "sentry",
       "name": "Sentry",
-      "category": "CODE",
+      "category": "MONITORING",
       "description": "Error & performance tracking",
       "website": "https://sentry.io",
       "mcpUrl": "https://mcp.sentry.dev/mcp",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://mcp.sentry.dev/", "https://mcp.sentry.dev/.well-known/oauth-authorization-server"],
+      "unverified": ["a read-only mode (Sentry documents none)", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "grafana",
       "name": "Grafana",
-      "category": "CODE",
-      "description": "Dashboards & metrics",
+      "category": "MONITORING",
+      "description": "Dashboards, metrics, logs and alerts",
       "website": "https://grafana.com",
       "mcpUrl": "https://mcp.grafana.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "scopes": { "read": ["grafana:read"], "write": ["grafana:read", "grafana:query", "grafana:write"] },
+      "admin": {
+        "required": false,
+        "text": "A Grafana Cloud admin sets the most access people may grant TaskForce: Assistant, Settings, Connectors, MCP clients. Writing needs the Assistant Admin role.",
+        "link": "https://grafana.com/docs/grafana-cloud/ai-tools/mcp-servers/cloud-mcp/"
+      },
+      "tried": null,
+      "sources": ["https://grafana.com/docs/grafana-cloud/ai-tools/mcp-servers/cloud-mcp/", "https://mcp.grafana.com/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["metric and log queries need Grafana's Query access, granted here with the changes", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "vercel",
@@ -200,17 +214,25 @@
       "website": "https://vercel.com",
       "mcpUrl": "https://mcp.vercel.com",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://vercel.com/docs/agent-resources/vercel-mcp", "https://vercel.com/changelog/vercel-mcp-now-supports-client-id-metadata-documents", "https://vercel.com/.well-known/oauth-authorization-server"],
+      "unverified": ["that Vercel admits TaskForce's client metadata document (its dynamic registration is for clients Vercel reviewed)", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "cloudflare",
       "name": "Cloudflare",
       "category": "CODE",
-      "description": "DNS, CDN, WAF",
+      "description": "DNS, Workers and the rest of the Cloudflare API",
       "website": "https://www.cloudflare.com",
       "mcpUrl": "https://mcp.cloudflare.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "apiKey": {
+        "hint": "Create an API token in Cloudflare (My Profile, API Tokens) with only the permissions TaskForce may use, and paste it here.",
+        "link": "https://dash.cloudflare.com/profile/api-tokens"
+      },
+      "tried": null,
+      "sources": ["https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/", "https://blog.cloudflare.com/code-mode-mcp/", "https://mcp.cloudflare.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "supabase",
@@ -219,8 +241,11 @@
       "description": "Postgres, auth, storage",
       "website": "https://supabase.com",
       "mcpUrl": "https://mcp.supabase.com/mcp",
+      "readUrl": "https://mcp.supabase.com/mcp?read_only=true",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://supabase.com/docs/guides/ai-tools/mcp", "https://api.supabase.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether read_only also hides the tools that change projects (it runs queries as a read-only role)", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "neon",
@@ -228,10 +253,13 @@
       "category": "CODE",
       "description": "Serverless Postgres",
       "website": "https://neon.tech",
-      "mcpUrl": "https://mcp.neon.tech/sse",
+      "mcpUrl": "https://mcp.neon.tech/mcp",
+      "readUrl": "https://mcp.neon.tech/mcp?readonly=true",
       "connection": "self-registration",
+      "scopes": { "read": ["read"], "write": ["read", "write"] },
       "tried": null,
-      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+      "sources": ["https://neon.com/docs/ai/neon-mcp-server", "https://mcp.neon.tech/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "slack-mcp",
@@ -311,7 +339,9 @@
       "website": "https://www.paypal.com",
       "mcpUrl": "https://mcp.paypal.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://developer.paypal.com/ai-tools/mcp-server/", "https://mcp.paypal.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the sandbox server (mcp.sandbox.paypal.com), not offered here", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "square",
@@ -319,10 +349,12 @@
       "category": "FINANCE_HR",
       "description": "Payments & POS",
       "website": "https://squareup.com",
-      "mcpUrl": "https://mcp.squareup.com/sse",
+      "mcpUrl": "https://mcp.squareup.com/mcp",
       "connection": "self-registration",
+      "blocked": "Square admits only the MCP clients on its allowlist, and TaskForce isn't on it yet.",
       "tried": null,
-      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+      "sources": ["https://developer.squareup.com/docs/mcp", "https://mcp.squareup.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether Square's allowlist also covers loopback addresses for the desktop app"]
     },
     {
       "key": "zoho",
@@ -347,9 +379,16 @@
       "category": "SALES",
       "description": "CRM, deals, marketing",
       "website": "https://www.hubspot.com",
-      "mcpUrl": "https://mcp.hubspot.com/anthropic",
+      "mcpUrl": "https://mcp.hubspot.com",
       "connection": "our-app",
-      "tried": null
+      "admin": {
+        "required": true,
+        "text": "Create an MCP auth app in a HubSpot developer account (Development, MCP Auth Apps) with the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, HubSpot.",
+        "link": "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://developers.hubspot.com/docs/apps/developer-platform/build-apps/integrate-with-the-remote-hubspot-mcp-server", "https://developers.hubspot.com/changelog/public-beta-self-service-mcp-auth-apps-for-the-hubspot-remote-mcp-server", "https://mcp.hubspot.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether the token exchange needs the client secret (the desktop app has none)", "whether a HubSpot account admin must connect first", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "attio",
@@ -359,7 +398,9 @@
       "website": "https://attio.com",
       "mcpUrl": "https://mcp.attio.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://docs.attio.com/mcp/overview", "https://app.attio.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "intercom",
@@ -369,7 +410,9 @@
       "website": "https://www.intercom.com",
       "mcpUrl": "https://mcp.intercom.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "tried": null,
+      "sources": ["https://developers.intercom.com/docs/guides/mcp", "https://mcp.intercom.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the web app's redirect address needs Intercom's allowlist (loopback addresses are accepted)", "EU workspaces use mcp.eu.intercom.com: add it by its address", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "figma",
@@ -436,7 +479,14 @@
       "website": "https://www.canva.com",
       "mcpUrl": "https://mcp.canva.com/mcp",
       "connection": "our-app",
-      "tried": null
+      "admin": {
+        "required": true,
+        "text": "Create an app in the Canva Developer Portal, turn on Canva MCP under Outside Canva, add the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, Canva.",
+        "link": "https://www.canva.dev/docs/mcp/troubleshooting/"
+      },
+      "tried": null,
+      "sources": ["https://www.canva.dev/blog/developers/canva-mcp-ga/", "https://www.canva.dev/docs/mcp/troubleshooting/", "https://mcp.canva.com/.well-known/oauth-authorization-server"],
+      "unverified": ["clients without a secret (the desktop app) join Canva's waitlist", "which address is current: mcp.canva.com/mcp or api.canva.com/connect/v1/mcp", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "webflow",
@@ -444,10 +494,11 @@
       "category": "DESIGN",
       "description": "Sites & CMS",
       "website": "https://webflow.com",
-      "mcpUrl": "https://mcp.webflow.com/sse",
+      "mcpUrl": "https://mcp.webflow.com/mcp",
       "connection": "self-registration",
       "tried": null,
-      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+      "sources": ["https://mcp.webflow.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "wix",
@@ -455,10 +506,11 @@
       "category": "DESIGN",
       "description": "Sites & CMS",
       "website": "https://www.wix.com",
-      "mcpUrl": "https://mcp.wix.com/sse",
+      "mcpUrl": "https://mcp.wix.com/mcp",
       "connection": "self-registration",
       "tried": null,
-      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+      "sources": ["https://mcp.wix.com/.well-known/oauth-authorization-server"],
+      "unverified": ["Wix's own page on its MCP server (only the server's metadata was read)", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "airtable",
@@ -468,7 +520,14 @@
       "website": "https://airtable.com",
       "mcpUrl": "https://mcp.airtable.com/mcp",
       "connection": "self-registration",
-      "tried": null
+      "admin": {
+        "required": false,
+        "text": "On Airtable Enterprise, an admin may allow MCP clients by their client ID: if Airtable refuses the connection, your admin allows TaskForce.",
+        "link": "https://support.airtable.com/docs/using-the-airtable-mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://support.airtable.com/docs/using-the-airtable-mcp-server", "https://airtable.com/.well-known/oauth-authorization-server/oauth2/v1"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "zapier",
@@ -476,9 +535,1120 @@
       "category": "OTHER",
       "description": "No-code automations",
       "website": "https://zapier.com",
-      "mcpUrl": "https://mcp.zapier.com/api/mcp/mcp",
+      "mcpUrl": "https://mcp.zapier.com/api/v1/connect",
       "connection": "self-registration",
-      "tried": null
+      "apiKey": {
+        "hint": "Create a server at mcp.zapier.com, generate its connection token, and paste the token here.",
+        "link": "https://docs.zapier.com/mcp/get-started/connect"
+      },
+      "tried": null,
+      "sources": ["https://docs.zapier.com/mcp/get-started/connect", "https://mcp.zapier.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "box",
+      "name": "Box",
+      "category": "FILES_STORAGE",
+      "description": "Files, folders and Box AI",
+      "website": "https://www.box.com",
+      "mcpUrl": "https://mcp.box.com",
+      "connection": "company-app",
+      "admin": {
+        "required": true,
+        "text": "A Box admin enables the Box MCP server integration (Admin Console, Integrations), turns it on, chooses its access scopes and adds the redirect address {redirectUri}, then enters its client ID and client secret in TaskForce: Settings, Integrations, Box.",
+        "link": "https://developer.box.com/guides/box-mcp/remote/"
+      },
+      "tried": null,
+      "sources": ["https://developer.box.com/guides/box-mcp/remote/", "https://api.box.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan (Box says only Doc Gen needs Enterprise Advanced)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "dropbox",
+      "name": "Dropbox",
+      "category": "FILES_STORAGE",
+      "description": "Files, folders and sharing",
+      "website": "https://www.dropbox.com",
+      "mcpUrl": "https://mcp.dropbox.com/mcp",
+      "connection": "our-app",
+      "scopes": {
+        "read": ["account_info.read", "files.metadata.read", "files.content.read", "sharing.read", "file_requests.read"],
+        "write": ["account_info.read", "files.metadata.read", "files.content.read", "sharing.read", "file_requests.read", "files.metadata.write", "files.content.write", "sharing.write", "file_requests.write"]
+      },
+      "admin": {
+        "required": true,
+        "text": "Create a Dropbox app in the App Console (scoped access) with the redirect address {redirectUri} and the files and sharing permissions, then enter its app key and app secret in TaskForce: Settings, Integrations, Dropbox. A team admin may have to allow app creation.",
+        "link": "https://www.dropbox.com/developers/apps"
+      },
+      "tried": null,
+      "sources": ["https://help.dropbox.com/integrations/connect-dropbox-mcp-server", "https://docs.dropboxapi.com/dropbox-api/docs/developer-resources/developer-guide", "https://www.dropbox.com/.well-known/oauth-authorization-server"],
+      "unverified": ["Dropbox's registration endpoint answers only the clients it trusts (Claude, ChatGPT, Cursor)", "a loopback redirect address for the desktop app", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "guru",
+      "name": "Guru",
+      "category": "KNOWLEDGE",
+      "description": "Company knowledge cards",
+      "website": "https://www.getguru.com",
+      "mcpUrl": "https://mcp.api.getguru.com/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://help.getguru.com/docs/connecting-gurus-mcp-server", "https://mcp.api.getguru.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether Guru's sign-in admits a client it has not pre-approved", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "glean",
+      "name": "Glean",
+      "category": "KNOWLEDGE",
+      "description": "Search across your company's apps",
+      "website": "https://www.glean.com",
+      "connection": "server-url",
+      "admin": {
+        "required": false,
+        "text": "MCP is on by default for eligible Glean tenants. If Glean refuses the connection, a Glean admin checks that an MCP server is enabled, or registers TaskForce as a static OAuth client.",
+        "link": "https://developers.glean.com/guides/mcp"
+      },
+      "apiKey": {
+        "hint": "Copy your Glean MCP server's address from Glean's MCP Configurator and paste it here, then sign in to Glean.",
+        "link": "https://developers.glean.com/guides/mcp"
+      },
+      "tried": null,
+      "sources": ["https://developers.glean.com/guides/mcp"],
+      "unverified": ["the plan that includes MCP", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "trello",
+      "name": "Trello",
+      "category": "TICKETS_PROJECTS",
+      "description": "Boards, lists and cards (Atlassian)",
+      "website": "https://trello.com",
+      "mcpUrl": "https://mcp.trello.com/v1",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["offline_access", "read:me", "read:account", "read:board:trello", "read:organization:trello", "read:member:trello", "read:member.inbox:trello", "read:member.planner:trello"],
+        "write": ["offline_access", "read:me", "read:account", "read:board:trello", "write:board:trello", "read:organization:trello", "write:organization:trello", "read:member:trello", "read:member.inbox:trello", "write:member.inbox:trello", "read:member.planner:trello", "write:member.planner:trello"]
+      },
+      "admin": {
+        "required": false,
+        "text": "An admin of your Atlassian organization allows TaskForce in Atlassian Administration: Connectors, Atlassian MCP server, add the domain {redirectHost}/** (the desktop app's 127.0.0.1 address is allowed by default).",
+        "link": "https://support.atlassian.com/security-and-access-policies/docs/control-atlassian-rovo-mcp-server-settings/"
+      },
+      "tried": null,
+      "sources": ["https://github.com/atlassian/trello-mcp-server", "https://auth.atlassian.com/.well-known/oauth-authorization-server/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3"],
+      "unverified": ["Atlassian's page on Trello's MCP settings (read through a search summary)", "the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "wrike",
+      "name": "Wrike",
+      "category": "TICKETS_PROJECTS",
+      "description": "Projects, tasks and requests",
+      "website": "https://www.wrike.com",
+      "mcpUrl": "https://mcp.wrike.com/v2",
+      "connection": "company-app",
+      "admin": {
+        "required": true,
+        "text": "A Wrike admin creates an OAuth app for TaskForce in Wrike's app console with the redirect address {redirectUri}, then enters its client ID and client secret in TaskForce: Settings, Integrations, Wrike.",
+        "link": "https://developers.wrike.com/docs/wrike-mcp-server-overview"
+      },
+      "apiKey": {
+        "hint": "Create a permanent access token in Wrike's app console and paste it here.",
+        "link": "https://developers.wrike.com/docs/wrike-mcp-server-overview"
+      },
+      "tried": null,
+      "sources": ["https://developers.wrike.com/docs/wrike-mcp-server-overview", "https://login.wrike.com/.well-known/oauth-authorization-server/oauth2"],
+      "unverified": ["the menu of Wrike's app console", "the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "smartsheet",
+      "name": "Smartsheet",
+      "category": "TICKETS_PROJECTS",
+      "description": "Sheets, projects and reports",
+      "website": "https://www.smartsheet.com",
+      "mcpUrl": "https://mcp.smartsheet.com",
+      "connection": "api-key",
+      "apiKey": {
+        "hint": "Create an API access token in your Smartsheet account settings and paste it here.",
+        "link": "https://developers.smartsheet.com/ai-mcp/smartsheet/install-the-smartsheet-mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://developers.smartsheet.com/ai-mcp/smartsheet/install-the-smartsheet-mcp-server", "https://www.smartsheet.com/content-center/smartsheet-mcp-server-now-generally-available", "https://mcp.smartsheet.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU and Australian accounts use mcp.smartsheet.eu and mcp.smartsheet.au", "Smartsheet's OAuth for MCP (an app with a secret, HTTPS redirects only)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "productboard",
+      "name": "Productboard",
+      "category": "TICKETS_PROJECTS",
+      "description": "Feedback, features and roadmaps",
+      "website": "https://www.productboard.com",
+      "mcpUrl": "https://mcp.productboard.com",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Productboard admin turns MCP on for the workspace and chooses who may use it: Settings, Integrations, MCP server.",
+        "link": "https://productboard.com/integrations/mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://productboard.com/integrations/mcp-server", "https://mcp.productboard.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "plane-mcp",
+      "name": "Plane",
+      "category": "TICKETS_PROJECTS",
+      "description": "Work items and cycles: live tools for Cortex",
+      "website": "https://plane.so",
+      "mcpUrl": "https://mcp.plane.so/http/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["read"], "write": ["read", "write"] },
+      "tried": null,
+      "sources": ["https://docs.plane.so/ai/mcp-server", "https://mcp.plane.so/.well-known/oauth-authorization-server/http"],
+      "unverified": ["Plane Cloud only: a self-hosted Plane runs its own server", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "zoom",
+      "name": "Zoom",
+      "category": "CHAT_MAIL",
+      "description": "Meetings, recordings and notes",
+      "website": "https://www.zoom.com",
+      "mcpUrl": "https://mcp.zoom.us/mcp/zoom/streamable",
+      "connection": "company-app",
+      "admin": {
+        "required": true,
+        "text": "A Zoom admin creates a General app in the Zoom App Marketplace (Develop, Build app) with the redirect address {redirectUri} and the meeting scopes TaskForce may read, then enters its client ID and client secret in TaskForce: Settings, Integrations, Zoom.",
+        "link": "https://developers.zoom.us/docs/mcp/servers/connect-to-zoom-mcp-servers/"
+      },
+      "tried": null,
+      "sources": ["https://developers.zoom.us/docs/mcp/servers/connect-to-zoom-mcp-servers/", "https://developers.zoom.us/docs/distribute/"],
+      "unverified": ["whether an app used only in its own Zoom account skips Zoom's review", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "fireflies",
+      "name": "Fireflies",
+      "category": "CHAT_MAIL",
+      "description": "Meeting transcripts and summaries",
+      "website": "https://fireflies.ai",
+      "mcpUrl": "https://api.fireflies.ai/mcp",
+      "connection": "self-registration",
+      "apiKey": {
+        "hint": "Copy your API key from your Fireflies settings and paste it here.",
+        "link": "https://docs.fireflies.ai/getting-started/mcp-configuration"
+      },
+      "tried": null,
+      "sources": ["https://docs.fireflies.ai/getting-started/mcp-configuration", "https://api.fireflies.ai/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan (Fireflies asks for an active account)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "fathom",
+      "name": "Fathom",
+      "category": "CHAT_MAIL",
+      "description": "Meeting notes and transcripts",
+      "website": "https://fathom.ai",
+      "mcpUrl": "https://api.fathom.ai/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://api.fathom.ai/.well-known/oauth-authorization-server"],
+      "unverified": ["Fathom's own page on its MCP server (only the server's metadata was read)", "the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "granola",
+      "name": "Granola",
+      "category": "CHAT_MAIL",
+      "description": "Meeting notes and transcripts",
+      "website": "https://www.granola.ai",
+      "mcpUrl": "https://mcp.granola.ai/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "On Granola Enterprise, a workspace admin chooses which notes members may reach over MCP: Settings, Workspace, General, MCP access.",
+        "link": "https://docs.granola.ai/help-center/sharing/integrations/mcp"
+      },
+      "tried": null,
+      "sources": ["https://docs.granola.ai/help-center/sharing/integrations/mcp", "https://mcp-auth.granola.ai/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "otter",
+      "name": "Otter.ai",
+      "category": "CHAT_MAIL",
+      "description": "Meeting transcripts and summaries",
+      "website": "https://otter.ai",
+      "mcpUrl": "https://mcp.otter.ai/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["profile:read", "conversations:read"], "write": ["profile:read", "conversations:read"] },
+      "tried": null,
+      "sources": ["https://help.otter.ai/hc/en-us/articles/35287607569687-Otter-MCP-Server", "https://otter.ai/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan: Otter's help center says Enterprise, its blog says every plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "tldv",
+      "name": "tl;dv",
+      "category": "CHAT_MAIL",
+      "description": "Meeting recordings, notes and transcripts",
+      "website": "https://tldv.io",
+      "mcpUrl": "https://mcp.tldv.io/mcp",
+      "connection": "self-registration",
+      "tools": {
+        "read": ["get-meeting-metadata", "get-meeting-notes", "get-meeting-transcript", "get-user-profile", "search-meetings"],
+        "write": []
+      },
+      "tried": null,
+      "sources": ["https://tldv.io/blog/how-to-connect-meeting-notes-to-claude-with-mcp/", "https://tldv.io/blog/model-context-protocol/", "https://keycloak.tldv.io/.well-known/oauth-authorization-server/realms/mcp.tldv.io"],
+      "unverified": ["the tool names come from Anthropic's connectors directory (tl;dv says the server only reads)"]
+    },
+    {
+      "key": "calendly",
+      "name": "Calendly",
+      "category": "CHAT_MAIL",
+      "description": "Scheduling and meeting recaps",
+      "website": "https://calendly.com",
+      "mcpUrl": "https://mcp.calendly.com",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["mcp:scheduling:read", "mcp:notetaker:read"],
+        "write": ["mcp:scheduling:read", "mcp:notetaker:read", "mcp:scheduling:write"]
+      },
+      "tried": null,
+      "sources": ["https://developer.calendly.com/calendly-mcp-server", "https://calendly.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "netlify",
+      "name": "Netlify",
+      "category": "CODE",
+      "description": "Sites, deploys and forms",
+      "website": "https://www.netlify.com",
+      "mcpUrl": "https://mcp.netlify.com/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://docs.netlify.com/build/build-with-ai/netlify-mcp-server/", "https://mcp.netlify.com/.well-known/oauth-authorization-server"],
+      "unverified": ["what Netlify's read and write scopes cover (TaskForce asks for its default)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "render",
+      "name": "Render",
+      "category": "CODE",
+      "description": "Services, deploys and logs",
+      "website": "https://render.com",
+      "mcpUrl": "https://mcp.render.com/mcp",
+      "connection": "api-key",
+      "apiKey": {
+        "hint": "Create an API key in Render (Account settings, API keys) and paste it here. It reaches every workspace of your account.",
+        "link": "https://render.com/docs/mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://render.com/docs/mcp-server", "https://api.render.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the OAuth client of Render's own plugins, not open to other clients", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "railway",
+      "name": "Railway",
+      "category": "CODE",
+      "description": "Projects, deploys and logs",
+      "website": "https://railway.com",
+      "mcpUrl": "https://mcp.railway.com",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://docs.railway.com/ai/mcp-server", "https://railway.com/changelog/2026-04-17-remote-mcp", "https://backboard.railway.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the remote server was in public testing when announced (17/04/2026)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "circleci",
+      "name": "CircleCI",
+      "category": "CODE",
+      "description": "Pipelines, jobs and test results",
+      "website": "https://circleci.com",
+      "mcpUrl": "https://mcp.circleci.com/v1/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://circleci.com/docs/guides/toolkit/connecting-to-the-circleci-mcp-server/", "https://app.circleci.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "postman",
+      "name": "Postman",
+      "category": "CODE",
+      "description": "API collections and workspaces",
+      "website": "https://www.postman.com",
+      "mcpUrl": "https://mcp.postman.com/minimal",
+      "connection": "self-registration",
+      "apiKey": {
+        "hint": "Create a Postman API key (Settings, API keys) and paste it here.",
+        "link": "https://learning.postman.com/docs/reference/postman-api/postman-mcp-server/postman-mcp-remote-server"
+      },
+      "tried": null,
+      "sources": ["https://learning.postman.com/docs/reference/postman-api/postman-mcp-server/postman-mcp-remote-server", "https://mcp.postman.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU workspaces use mcp.eu.postman.com, by key only", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "mongodb-atlas",
+      "name": "MongoDB Atlas",
+      "category": "CODE",
+      "description": "Clusters, databases and queries",
+      "website": "https://www.mongodb.com/atlas",
+      "mcpUrl": "https://mcp.mongodb.com",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "An owner of your Atlas organization turns on access for AI clients, and chooses read only or full access.",
+        "link": "https://www.mongodb.com/docs/mcp-server/remote-mcp/access-models/"
+      },
+      "tried": null,
+      "sources": ["https://www.mongodb.com/docs/mcp-server/remote-mcp/access-models/", "https://www.mongodb.com/products/updates/now-ga-mongodb-atlas-managed-mcp-server/", "https://authorize.mongodb.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "planetscale",
+      "name": "PlanetScale",
+      "category": "CODE",
+      "description": "Postgres and MySQL databases",
+      "website": "https://planetscale.com",
+      "mcpUrl": "https://mcp.pscale.dev/mcp/planetscale",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A PlanetScale organization admin can cap what members grant over MCP, for example read-only queries.",
+        "link": "https://planetscale.com/docs/mcp-server"
+      },
+      "tools": { "read": ["planetscale_execute_read_query"], "write": [] },
+      "tried": null,
+      "sources": ["https://planetscale.com/docs/mcp-server", "https://api.planetscale.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "jam",
+      "name": "Jam",
+      "category": "CODE",
+      "description": "Bug reports with console and network logs",
+      "website": "https://jam.dev",
+      "mcpUrl": "https://mcp.jam.dev/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["mcp:read"], "write": ["mcp:read", "mcp:write"] },
+      "apiKey": {
+        "hint": "Create a personal access token in Jam (Settings, MCP) and paste it here.",
+        "link": "https://jam.dev/docs/debug-a-jam/mcp/personal-access-tokens"
+      },
+      "tried": null,
+      "sources": ["https://jam.dev/docs/debug-a-jam/mcp", "https://jam.dev/docs/debug-a-jam/mcp/personal-access-tokens", "https://api.jam.dev/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "datadog",
+      "name": "Datadog",
+      "category": "MONITORING",
+      "description": "Logs, metrics, traces and monitors",
+      "website": "https://www.datadoghq.com",
+      "mcpUrl": "https://mcp.datadoghq.com/v1/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "If Datadog refuses the connection, an admin of your Datadog organization adds the redirect address {redirectUri}: Organization Settings, MCP OAuth Redirect URLs.",
+        "link": "https://docs.datadoghq.com/mcp_server/setup/"
+      },
+      "tried": null,
+      "sources": ["https://docs.datadoghq.com/mcp_server/setup/", "https://mcp.datadoghq.com/.well-known/oauth-authorization-server/v1/mcp"],
+      "unverified": ["other Datadog sites use their own address (mcp.datadoghq.eu/v1/mcp for EU1): add it by its address", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "new-relic",
+      "name": "New Relic",
+      "category": "MONITORING",
+      "description": "Observability data, alerts and dashboards",
+      "website": "https://newrelic.com",
+      "mcpUrl": "https://mcp.newrelic.com/mcp/",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["observability:read", "offline_access"],
+        "write": ["observability:read", "offline_access", "dashboards:modify", "alerts:modify"]
+      },
+      "admin": {
+        "required": false,
+        "text": "If New Relic refuses the connection, an administrator of your New Relic organization allows MCP access in the feature control manager.",
+        "link": "https://docs.newrelic.com/docs/agentic-ai/mcp/setup/"
+      },
+      "tried": null,
+      "sources": ["https://docs.newrelic.com/docs/agentic-ai/mcp/setup/", "https://oauth2.service.newrelic.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU accounts use mcp.eu.newrelic.com/mcp/: add it by its address", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "honeycomb",
+      "name": "Honeycomb",
+      "category": "MONITORING",
+      "description": "Traces, queries and SLOs",
+      "website": "https://www.honeycomb.io",
+      "mcpUrl": "https://mcp.honeycomb.io/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["mcp:read"], "write": ["mcp:read", "mcp:write"] },
+      "admin": {
+        "required": false,
+        "text": "MCP comes with Honeycomb Intelligence: a team owner enrols the team first.",
+        "link": "https://docs.honeycomb.io/integrations/mcp/configuration-guide"
+      },
+      "tried": null,
+      "sources": ["https://docs.honeycomb.io/integrations/mcp", "https://docs.honeycomb.io/integrations/mcp/configuration-guide", "https://ui.honeycomb.io/.well-known/oauth-authorization-server"],
+      "unverified": ["EU teams use mcp.eu1.honeycomb.io/mcp: add it by its address", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "pagerduty",
+      "name": "PagerDuty",
+      "category": "MONITORING",
+      "description": "Incidents, services and on-call",
+      "website": "https://www.pagerduty.com",
+      "mcpUrl": "https://mcp.pagerduty.com/mcp",
+      "connection": "company-app",
+      "admin": {
+        "required": true,
+        "text": "A PagerDuty admin registers an app with Scoped OAuth in PagerDuty with the redirect address {redirectUri}, then enters its client ID and client secret in TaskForce: Settings, Integrations, PagerDuty.",
+        "link": "https://developer.pagerduty.com/docs/register-an-app"
+      },
+      "apiKey": {
+        "hint": "Create a user API token in PagerDuty (My Profile, User Settings) and paste it here.",
+        "link": "https://support.pagerduty.com/main/docs/pagerduty-mcp-server-integration-guide"
+      },
+      "tried": null,
+      "sources": ["https://support.pagerduty.com/main/docs/pagerduty-mcp-server-integration-guide", "https://developer.pagerduty.com/docs/register-an-app", "https://app.pagerduty.com/.well-known/oauth-authorization-server/global/oauth/anonymous"],
+      "unverified": ["EU accounts use mcp.eu.pagerduty.com/mcp", "whether PagerDuty takes a user token as a bearer token", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "incident-io",
+      "name": "incident.io",
+      "category": "MONITORING",
+      "description": "Incidents, alerts and on-call",
+      "website": "https://incident.io",
+      "mcpUrl": "https://mcp.incident.io/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://docs.incident.io/ai/remote-mcp", "https://mcp.incident.io/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["incident.io's screen offers read only or read and write; a read-only connection still lists every tool", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "rootly",
+      "name": "Rootly",
+      "category": "MONITORING",
+      "description": "Incidents, on-call and retrospectives",
+      "website": "https://rootly.com",
+      "mcpUrl": "https://mcp.rootly.com/mcp",
+      "connection": "self-registration",
+      "apiKey": {
+        "hint": "Create an API token in Rootly and paste it here.",
+        "link": "https://docs.rootly.com/integrations/mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://docs.rootly.com/integrations/mcp-server", "https://rootly.com/changelog/oauth-2-0-for-mcp", "https://rootly.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "better-stack",
+      "name": "Better Stack",
+      "category": "MONITORING",
+      "description": "Logs, uptime and incidents",
+      "website": "https://betterstack.com",
+      "mcpUrl": "https://mcp.betterstack.com",
+      "connection": "self-registration",
+      "scopes": { "read": ["read"], "write": ["read", "write"] },
+      "tried": null,
+      "sources": ["https://betterstack.com/docs/ai-sre/mcp-server-comparison/", "https://betterstack.com/.well-known/oauth-authorization-server"],
+      "unverified": ["that reading needs only the read scope", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "amplitude",
+      "name": "Amplitude",
+      "category": "DATA",
+      "description": "Product analytics, charts and experiments",
+      "website": "https://amplitude.com",
+      "mcpUrl": "https://mcp.amplitude.com/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["all:read"], "write": ["all:read", "all:write"] },
+      "tried": null,
+      "sources": ["https://amplitude.com/docs/amplitude-ai/amplitude-mcp", "https://mcp.amplitude.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU data uses mcp.eu.amplitude.com/mcp: add it by its address", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "mixpanel",
+      "name": "Mixpanel",
+      "category": "DATA",
+      "description": "Product analytics and reports",
+      "website": "https://mixpanel.com",
+      "mcpUrl": "https://mcp.mixpanel.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "Unless MCP is on by default in your Mixpanel account, an organization admin turns it on: Settings, Organization, AI Settings.",
+        "link": "https://docs.mixpanel.com/docs/mcp"
+      },
+      "tried": null,
+      "sources": ["https://docs.mixpanel.com/docs/mcp", "https://auth.mixpanel.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU and India projects use mcp-eu.mixpanel.com and mcp-in.mixpanel.com", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "posthog",
+      "name": "PostHog",
+      "category": "DATA",
+      "description": "Product analytics, flags and replays",
+      "website": "https://posthog.com",
+      "mcpUrl": "https://mcp.posthog.com/mcp",
+      "readUrl": "https://mcp.posthog.com/mcp?readonly=true",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://posthog.com/docs/model-context-protocol", "https://posthog.com/docs/model-context-protocol/faq", "https://oauth.posthog.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether read-only mode is enforced by the token's scopes or only by the tool list", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "hex",
+      "name": "Hex",
+      "category": "DATA",
+      "description": "Data projects and the Hex agent",
+      "website": "https://hex.tech",
+      "mcpUrl": "https://app.hex.tech/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://learn.hex.tech/docs/api-integrations/mcp-server", "https://auth.app.hex.tech/.well-known/oauth-authorization-server"],
+      "unverified": ["workspaces on another address (eu.hex.tech) connect by that address", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "metabase",
+      "name": "Metabase",
+      "category": "DATA",
+      "description": "Questions and dashboards on your data",
+      "website": "https://www.metabase.com",
+      "connection": "server-url",
+      "admin": {
+        "required": false,
+        "text": "A Metabase admin turns the MCP server on: Admin, AI, MCP. AI features must be on.",
+        "link": "https://www.metabase.com/docs/latest/ai/mcp"
+      },
+      "apiKey": {
+        "hint": "Paste your Metabase's MCP address, then sign in to Metabase.",
+        "link": "https://www.metabase.com/docs/latest/ai/mcp"
+      },
+      "tried": null,
+      "sources": ["https://www.metabase.com/docs/latest/ai/mcp"],
+      "unverified": ["the Metabase plan or version that includes MCP", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "chartmogul",
+      "name": "ChartMogul",
+      "category": "DATA",
+      "description": "Subscription revenue and churn",
+      "website": "https://chartmogul.com",
+      "mcpUrl": "https://mcp.chartmogul.com",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "MCP access is on by default. If ChartMogul refuses the connection, an admin or owner allows it: Settings, Admin, Security, Allow MCP server access.",
+        "link": "https://help.chartmogul.com/article/348-chartmogul-mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://help.chartmogul.com/article/348-chartmogul-mcp-server", "https://dev.chartmogul.com/docs/chartmogul-mcp-server/", "https://mcp.chartmogul.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (ChartMogul describes the access as read only)"]
+    },
+    {
+      "key": "supermetrics",
+      "name": "Supermetrics",
+      "category": "DATA",
+      "description": "Marketing and ads data",
+      "website": "https://supermetrics.com",
+      "mcpUrl": "https://mcp.supermetrics.com/mcp",
+      "connection": "self-registration",
+      "apiKey": {
+        "hint": "Create a Supermetrics API key and paste it here.",
+        "link": "https://supermetrics.com/products/supermetrics-mcp"
+      },
+      "tried": null,
+      "sources": ["https://supermetrics.com/products/supermetrics-mcp", "https://api.supermetrics.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the scopes (TaskForce asks for the server's default)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "snowflake",
+      "name": "Snowflake",
+      "category": "DATA",
+      "description": "Data warehouse and Cortex agents",
+      "website": "https://www.snowflake.com",
+      "connection": "server-url",
+      "blocked": "Snowflake needs both the address of the MCP server your company creates and an OAuth integration your admin creates. TaskForce can't take both yet.",
+      "tried": null,
+      "sources": ["https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp"]
+    },
+    {
+      "key": "databricks",
+      "name": "Databricks",
+      "category": "DATA",
+      "description": "Genie spaces and lakehouse data",
+      "website": "https://www.databricks.com",
+      "connection": "server-url",
+      "blocked": "Databricks needs both your workspace's MCP address and an app connection your account admin creates. TaskForce can't take both yet.",
+      "tried": null,
+      "sources": ["https://docs.databricks.com/aws/en/generative-ai/mcp/connect-external-services", "https://docs.databricks.com/aws/en/agents/mcp-tools/managed-mcp"]
+    },
+    {
+      "key": "salesforce",
+      "name": "Salesforce",
+      "category": "SALES",
+      "description": "CRM: accounts, opportunities and cases",
+      "website": "https://www.salesforce.com",
+      "connection": "server-url",
+      "blocked": "Salesforce needs an External Client App your admin creates and the address of each MCP server your admin activates. TaskForce can't take both yet.",
+      "tried": null,
+      "sources": ["https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html", "https://developer.salesforce.com/blogs/2026/04/salesforce-hosted-mcp-servers-are-now-generally-available"]
+    },
+    {
+      "key": "pipedrive",
+      "name": "Pipedrive",
+      "category": "SALES",
+      "description": "CRM: deals, contacts and activities",
+      "website": "https://www.pipedrive.com",
+      "mcpUrl": "https://mcp.pipedrive.ai/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://www.pipedrive.com/en/features/mcp-server", "https://devcommunity.pipedrive.com/t/mcp-server-allow-redirect-uri-and-approve-cimd-client-for-our-mcp-client-meeting-ai/20888", "https://oauth.pipedrive.com/.well-known/oauth-authorization-server"],
+      "unverified": ["Pipedrive accepts a web redirect address only once it allows it (a loopback address works)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "close",
+      "name": "Close",
+      "category": "SALES",
+      "description": "CRM: leads, calls and emails",
+      "website": "https://www.close.com",
+      "mcpUrl": "https://mcp.close.com/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["mcp.read", "offline_access"], "write": ["mcp.read", "mcp.write_safe", "offline_access"] },
+      "tried": null,
+      "sources": ["https://help.close.com/docs/mcp-server", "https://developer.close.com/mcp", "https://api.close.com/.well-known/oauth-authorization-server"],
+      "unverified": ["deleting needs mcp.write_destructive, which TaskForce doesn't ask for", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "apollo",
+      "name": "Apollo.io",
+      "category": "SALES",
+      "description": "Prospects, enrichment and sequences",
+      "website": "https://www.apollo.io",
+      "mcpUrl": "https://mcp.apollo.io/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://docs.apollo.io/docs/apollo-mcp", "https://knowledge.apollo.io/hc/en-us/articles/45119679436557-Use-Apollo-MCP-with-AI-Tools-to-Run-Your-GTM-Workflow", "https://mcp.apollo.io/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (enrichment spends Apollo credits)"]
+    },
+    {
+      "key": "clay",
+      "name": "Clay",
+      "category": "SALES",
+      "description": "Prospect research and enrichment",
+      "website": "https://www.clay.com",
+      "mcpUrl": "https://api.clay.com/v3/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Clay member with the Viewer role can't connect: a workspace admin gives the Sales Rep or Editor role.",
+        "link": "https://university.clay.com/docs/connect-to-clay-mcp"
+      },
+      "tried": null,
+      "sources": ["https://university.clay.com/docs/connect-to-clay-mcp", "https://university.clay.com/docs/mcp-settings", "https://api.clay.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan", "the tool names (work spends the workspace's Clay credits)"]
+    },
+    {
+      "key": "zoominfo",
+      "name": "ZoomInfo",
+      "category": "SALES",
+      "description": "B2B contacts and company data",
+      "website": "https://www.zoominfo.com",
+      "mcpUrl": "https://mcp.zoominfo.com/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://pipeline.zoominfo.com/operations/zoominfo-mcp-server", "https://mcp.zoominfo.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the plan: ZoomInfo's pages differ (bulk data credits, a SalesOS or Copilot subscription)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "gong",
+      "name": "Gong",
+      "category": "SALES",
+      "description": "Calls, deals and account briefs",
+      "website": "https://www.gong.io",
+      "mcpUrl": "https://mcp.gong.io/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["mcp:read"], "write": ["mcp:read"] },
+      "admin": {
+        "required": false,
+        "text": "A Gong technical admin creates an MCP integration for TaskForce with automatic registration: Admin center, Settings, Ecosystem, MCP, MCP servers.",
+        "link": "https://help.gong.io/docs/enable-supported-ai-tools-for-gong"
+      },
+      "tools": { "read": ["ask_account", "ask_deal", "generate_brief"], "write": [] },
+      "tried": null,
+      "sources": ["https://help.gong.io/docs/enable-supported-ai-tools-for-gong", "https://mcp.gong.io/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names come from Anthropic's connectors directory (Gong says the integration only reads)"]
+    },
+    {
+      "key": "brevo",
+      "name": "Brevo",
+      "category": "SALES",
+      "description": "Email campaigns, contacts and CRM",
+      "website": "https://www.brevo.com",
+      "mcpUrl": "https://mcp.brevo.com/v1/brevo/mcp",
+      "connection": "api-key",
+      "apiKey": {
+        "hint": "Create an API key in Brevo with its MCP option on (SMTP and API, API keys) and paste it here. It acts with the full rights of the account.",
+        "link": "https://developers.brevo.com/docs/mcp-protocol"
+      },
+      "tried": null,
+      "sources": ["https://developers.brevo.com/docs/mcp-protocol"],
+      "unverified": ["Brevo's sign-in by browser serves its own Claude and ChatGPT connectors", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "klaviyo",
+      "name": "Klaviyo",
+      "category": "SALES",
+      "description": "Email and SMS marketing",
+      "website": "https://www.klaviyo.com",
+      "mcpUrl": "https://mcp.klaviyo.com/mcp",
+      "readUrl": "https://mcp.klaviyo.com/mcp?read-only=true",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://developers.klaviyo.com/en/docs/connect_to_the_klaviyo_mcp_server", "https://mcp.klaviyo.com/.well-known/oauth-authorization-server"],
+      "unverified": ["read-only mode hides the writes, not the profile data", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "ramp",
+      "name": "Ramp",
+      "category": "FINANCE_HR",
+      "description": "Cards, spend and bills",
+      "website": "https://ramp.com",
+      "mcpUrl": "https://mcp.ramp.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Ramp admin can limit who connects AI tools: Integrations, Ramp MCP, Manage access.",
+        "link": "https://support.ramp.com/ramp-mcp"
+      },
+      "tried": null,
+      "sources": ["https://support.ramp.com/ramp-mcp", "https://docs.ramp.com/llms-guides/ramp-mcp.txt", "https://mcp.ramp.com/.well-known/oauth-authorization-server"],
+      "unverified": ["Ramp's screen offers read only or full access", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "brex",
+      "name": "Brex",
+      "category": "FINANCE_HR",
+      "description": "Cards, expenses and budgets",
+      "website": "https://www.brex.com",
+      "mcpUrl": "https://api.brex.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Brex account or card admin accepts the Developer API agreement (Settings, Developer) and turns on Brex in AI assistants (Settings, Beta features).",
+        "link": "https://developer.brex.com/docs/mcp"
+      },
+      "tried": null,
+      "sources": ["https://developer.brex.com/docs/mcp", "https://www.brex.com/support/using-brex-in-ai-apps", "https://api.brex.com/.well-known/oauth-authorization-server"],
+      "unverified": ["Brex's pages name the switch differently (Beta features or Early access)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "mercury",
+      "name": "Mercury",
+      "category": "FINANCE_HR",
+      "description": "Business banking and transactions",
+      "website": "https://mercury.com",
+      "mcpUrl": "https://mcp.mercury.com/mcp",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["read", "offline_access"],
+        "write": ["read", "offline_access", "transactions:update", "categories:create", "categories:edit", "receipts:manage"]
+      },
+      "tried": null,
+      "sources": ["https://docs.mercury.com/docs/connecting-mercury-mcp", "https://docs.mercury.com/docs/supported-tools-on-mercury-mcp", "https://mcp.mercury.com/.well-known/oauth-authorization-server"],
+      "unverified": ["payment and transfer requests (transactions:request, transfers:request) are left out on purpose", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "xero",
+      "name": "Xero",
+      "category": "FINANCE_HR",
+      "description": "Accounting: invoices, bills and reports",
+      "website": "https://www.xero.com",
+      "mcpUrl": "https://api.xero.com/mcp/v1",
+      "connection": "our-app",
+      "scopes": {
+        "read": ["openid", "profile", "email", "offline_access", "accounting.invoices.read", "accounting.banktransactions.read", "accounting.contacts.read", "accounting.reports.profitandloss.read", "accounting.reports.trialbalance.read", "accounting.reports.balancesheet.read", "accounting.reports.aged.read", "accounting.settings.read", "accounting.payments.read", "accounting.manualjournals.read"],
+        "write": ["openid", "profile", "email", "offline_access", "accounting.invoices", "accounting.banktransactions", "accounting.contacts", "accounting.reports.profitandloss.read", "accounting.reports.trialbalance.read", "accounting.reports.balancesheet.read", "accounting.reports.aged.read", "accounting.settings.read", "accounting.payments", "accounting.manualjournals"]
+      },
+      "admin": {
+        "required": true,
+        "text": "Create a PKCE app in the Xero Developer portal with the redirect address {redirectUri}, then enter its client ID in TaskForce: Settings, Integrations, Xero. It needs no client secret.",
+        "link": "https://developer.xero.com/documentation/guides/remote-mcp/overview/"
+      },
+      "tried": null,
+      "sources": ["https://developer.xero.com/documentation/guides/remote-mcp/overview/", "https://developer.xero.com/faq/remote-mcp", "https://identity.xero.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the address in Anthropic's directory (mcp.xero.com) differs from Xero's documentation", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "qonto",
+      "name": "Qonto",
+      "category": "FINANCE_HR",
+      "description": "Business account, cards and invoices",
+      "website": "https://qonto.com",
+      "mcpUrl": "https://mcp.qonto.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "Owners, admins and accountants connect by default. For managers and employees, an owner or admin turns Qonto MCP on for the organization.",
+        "link": "https://support-nl.qonto.com/hc/en-us/articles/47636766575889-How-do-I-connect-and-use-the-Qonto-MCP-server"
+      },
+      "tried": null,
+      "sources": ["https://docs.qonto.com/mcp/overview", "https://support-nl.qonto.com/hc/en-us/articles/47636766575889-How-do-I-connect-and-use-the-Qonto-MCP-server", "https://mcp.qonto.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "expensify",
+      "name": "Expensify",
+      "category": "FINANCE_HR",
+      "description": "Expenses and reports, read only",
+      "website": "https://www.expensify.com",
+      "mcpUrl": "https://www.expensify.com/mcp",
+      "connection": "self-registration",
+      "tools": { "read": ["GetCurrentUser", "GetWorkspaceList", "Search"], "write": [] },
+      "tried": null,
+      "sources": ["https://help.expensify.com/articles/new-expensify/connections/connect-ai-assistants/Use-the-Expensify-MCP-Server-With-AI-Assistants", "https://www.expensify.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names come from Anthropic's connectors directory (Expensify says the access only reads)"]
+    },
+    {
+      "key": "freshbooks",
+      "name": "FreshBooks",
+      "category": "FINANCE_HR",
+      "description": "Invoices, expenses and reports",
+      "website": "https://www.freshbooks.com",
+      "mcpUrl": "https://mcp.freshbooks.com/v1",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["mcp:all:read", "offline_access"],
+        "write": ["mcp:all:read", "offline_access", "mcp:revenue:write", "mcp:payables:write", "mcp:operations:write", "mcp:books:write"]
+      },
+      "tried": null,
+      "sources": ["https://support.freshbooks.com/hc/en-us/articles/47907329443597", "https://auth.freshbooks.com/.well-known/oauth-authorization-server"],
+      "unverified": ["FreshBooks lists its write permissions as coming soon", "the plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "airwallex",
+      "name": "Airwallex",
+      "category": "FINANCE_HR",
+      "description": "Global accounts, cards and transfers",
+      "website": "https://www.airwallex.com",
+      "mcpUrl": "https://mcp.airwallex.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "Only an Owner, Admin or Finance Admin of your Airwallex account can authorize the connection.",
+        "link": "https://www.airwallex.com/docs/developer-tools/ai/agentos"
+      },
+      "tried": null,
+      "sources": ["https://www.airwallex.com/docs/developer-tools/ai/agentos", "https://www.airwallex.com/docs/developer-tools/partner-connections/oauth-permissions", "https://mcp.airwallex.com/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["the scopes (Airwallex asks for them on its own screen)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "deel",
+      "name": "Deel",
+      "category": "FINANCE_HR",
+      "description": "Global payroll, contracts and HR",
+      "website": "https://www.deel.com",
+      "mcpUrl": "https://api.letsdeel.com/mcp",
+      "connection": "self-registration",
+      "apiKey": {
+        "hint": "Create a personal access token in Deel's Developer Center and paste it here.",
+        "link": "https://developer.deel.com/mcp/authorization"
+      },
+      "tried": null,
+      "sources": ["https://developer.deel.com/mcp/introduction", "https://developer.deel.com/mcp/authorization", "https://api.letsdeel.com/.well-known/oauth-authorization-server"],
+      "unverified": ["how a Deel account gets the API access the server needs", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "gusto",
+      "name": "Gusto",
+      "category": "FINANCE_HR",
+      "description": "Payroll, benefits and time",
+      "website": "https://gusto.com",
+      "mcpUrl": "https://mcp.api.gusto.com",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "Only a primary or full admin of your Gusto company can connect.",
+        "link": "https://gusto.com/product/integrations/gusto-mcp"
+      },
+      "tried": null,
+      "sources": ["https://gusto.com/product/integrations/gusto-mcp", "https://support.gusto.com/article/250715155353740/connect-gusto-to-chatgpt-claude-and-slack", "https://mcp.api.gusto.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether Gusto ties the employer tools to a plan", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "remote",
+      "name": "Remote",
+      "category": "FINANCE_HR",
+      "description": "Global employment, payroll and time off",
+      "website": "https://remote.com",
+      "mcpUrl": "https://mcp.remote.com/mcp",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["mcp:remote_admin:read", "mcp:employer:read", "mcp:employee:read"],
+        "write": ["mcp:remote_admin:read", "mcp:remote_admin:write", "mcp:employer:read", "mcp:employer:write", "mcp:employee:read", "mcp:employee:write"]
+      },
+      "tried": null,
+      "sources": ["https://developer.remote.com/docs/introduction-to-remote-mcp", "https://api.employ.remote.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "greenhouse",
+      "name": "Greenhouse",
+      "category": "FINANCE_HR",
+      "description": "Hiring: candidates, jobs and interviews",
+      "website": "https://www.greenhouse.com",
+      "mcpUrl": "https://mcp.greenhouse.io/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Greenhouse Site Admin chooses the scopes people may grant: Dev Center, MCP Access. The default scopes only read.",
+        "link": "https://support.greenhouse.io/hc/en-us/articles/52096319906971-Set-up-Greenhouse-MCP-with-supported-AI-tools"
+      },
+      "tried": null,
+      "sources": ["https://support.greenhouse.io/hc/en-us/articles/52096319906971-Set-up-Greenhouse-MCP-with-supported-AI-tools", "https://auth.greenhouse.io/.well-known/oauth-authorization-server"],
+      "unverified": ["Greenhouse MCP is in open beta, by subscription tier", "the US address mcp.us.greenhouse.io one Greenhouse page gives", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "workable",
+      "name": "Workable",
+      "category": "FINANCE_HR",
+      "description": "Hiring and HR records",
+      "website": "https://www.workable.com",
+      "mcpUrl": "https://mcp.workable.com/mcp",
+      "connection": "self-registration",
+      "blocked": "Workable accepts only the redirect addresses on its list, and TaskForce's aren't on it yet.",
+      "tried": null,
+      "sources": ["https://help.workable.com/hc/en-us/articles/39415735712407-Using-the-Workable-MCP-server-to-connect-to-AI-assistant", "https://resources.workable.com/backstage-at-workable/workable-agent-and-workable-mcp-server-a-complete-support-guide/", "https://mcp.workable.com/.well-known/oauth-authorization-server"]
+    },
+    {
+      "key": "miro",
+      "name": "Miro",
+      "category": "DESIGN",
+      "description": "Boards, diagrams and docs",
+      "website": "https://miro.com",
+      "mcpUrl": "https://mcp.miro.com",
+      "connection": "self-registration",
+      "scopes": { "read": ["boards:read"], "write": ["boards:read", "boards:write"] },
+      "admin": {
+        "required": false,
+        "text": "On Miro Enterprise, MCP may be off until a company admin turns it on.",
+        "link": "https://developers.miro.com/docs/miro-mcp-server-frequently-asked-questions"
+      },
+      "tried": null,
+      "sources": ["https://developers.miro.com/docs/miro-mcp-server-frequently-asked-questions", "https://developers.miro.com/docs/connecting-to-miro-mcp", "https://mcp.miro.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "lucid",
+      "name": "Lucid",
+      "category": "DESIGN",
+      "description": "Diagrams, whiteboards and docs",
+      "website": "https://lucid.co",
+      "mcpUrl": "https://mcp.lucid.app/mcp",
+      "readUrl": "https://mcp.lucid.app/mcp/readonly",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "On Lucid Team and Enterprise accounts, an admin allows MCP: Admin, Security, AI controls, MCP access.",
+        "link": "https://help.lucid.co/hc/en-us/articles/53780064823188-For-admins-Lucid-MCP-server-security-and-authorization"
+      },
+      "tried": null,
+      "sources": ["https://help.lucid.co/hc/en-us/articles/42578801807508-Integrate-Lucid-with-AI-tools-using-the-Lucid-MCP-server", "https://help.lucid.co/hc/en-us/articles/51290793390740-View-and-search-Lucid-content-with-AI-tools-using-the-Lucid-read-only-MCP-server", "https://mcp.lucid.app/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "framer",
+      "name": "Framer",
+      "category": "DESIGN",
+      "description": "Websites, CMS and components",
+      "website": "https://www.framer.com",
+      "mcpUrl": "https://mcp.framer.com/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://www.framer.com/help/articles/getting-started-with-framer-mcp/", "https://api.framer.com/.well-known/oauth-authorization-server/auth/oauth"],
+      "unverified": ["the plan once Framer's preview ends", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "contentful",
+      "name": "Contentful",
+      "category": "DESIGN",
+      "description": "Structured content and CMS",
+      "website": "https://www.contentful.com",
+      "mcpUrl": "https://mcp.contentful.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Contentful space admin installs the Contentful MCP app in each space and environment, and sets each tool group to read only or read and write.",
+        "link": "https://www.contentful.com/developers/docs/tools/mcp-server/"
+      },
+      "tried": null,
+      "sources": ["https://www.contentful.com/developers/docs/tools/mcp-server/", "https://www.contentful.com/blog/remote-mcp-now-generally-available/", "https://mcp.contentful.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU organizations use mcp.eu.contentful.com/mcp", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "vanta",
+      "name": "Vanta",
+      "category": "SECURITY",
+      "description": "Compliance: controls, tests and evidence",
+      "website": "https://www.vanta.com",
+      "mcpUrl": "https://mcp.vanta.com/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://developer.vanta.com/docs/vanta-mcp", "https://help.vanta.com/en/articles/14094979-connecting-to-vanta-mcp", "https://api.vanta.com/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["EU and Australian accounts use mcp.eu.vanta.com and mcp.aus.vanta.com", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "drata",
+      "name": "Drata",
+      "category": "SECURITY",
+      "description": "Compliance: controls, risks and vendors",
+      "website": "https://drata.com",
+      "mcpUrl": "https://mcp.drata.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A Drata admin creates an MCP OAuth configuration and chooses its scopes: Settings, MCP Configuration.",
+        "link": "https://help.drata.com/en/articles/13379899-mcp-setup"
+      },
+      "tried": null,
+      "sources": ["https://help.drata.com/en/articles/13379899-mcp-setup", "https://mcp.drata.com/.well-known/oauth-authorization-server"],
+      "unverified": ["Drata's pages name the menu differently (MCP Configuration or MCP OAuth Configuration)", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "make",
+      "name": "Make",
+      "category": "OTHER",
+      "description": "Automation scenarios",
+      "website": "https://www.make.com",
+      "mcpUrl": "https://mcp.make.com",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://developers.make.com/mcp-server", "https://help.make.com/make-mcp-server", "https://www.make.com/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "docusign",
+      "name": "Docusign",
+      "category": "OTHER",
+      "description": "Agreements and envelopes",
+      "website": "https://www.docusign.com",
+      "mcpUrl": "https://mcp.docusign.com/mcp",
+      "connection": "our-app",
+      "admin": {
+        "required": true,
+        "text": "Create an integration key in Docusign (Apps and Keys) with the redirect address {redirectUri}, have it allowed for MCP through Docusign's form, then enter it in TaskForce: Settings, Integrations, Docusign.",
+        "link": "https://developers.docusign.com/platform/mcp-server"
+      },
+      "tried": null,
+      "sources": ["https://developers.docusign.com/platform/mcp-server", "https://www.docusign.com/blog/developers/docusign-mcp-server-general-availability", "https://mcp.docusign.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether one allowed key serves every customer's account", "whether Docusign's Partner Program is required", "the tool names (every tool asks until they are classified)"]
+    },
+    {
+      "key": "pandadoc",
+      "name": "PandaDoc",
+      "category": "OTHER",
+      "description": "Proposals, quotes and contracts",
+      "website": "https://www.pandadoc.com",
+      "mcpUrl": "https://mcp.pandadoc.com/v1/mcp",
+      "connection": "self-registration",
+      "tried": null,
+      "sources": ["https://developers.pandadoc.com/docs/getting-started-with-mcp", "https://support.pandadoc.com/en/articles/15206200-pandadoc-claude-connector", "https://mcp.pandadoc.com/.well-known/oauth-authorization-server"],
+      "unverified": ["EU accounts use mcp.pandadoc.eu/v1/mcp", "the tool names (every tool asks until they are classified)"]
     }
   ]
 }

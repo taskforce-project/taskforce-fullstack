@@ -137,10 +137,26 @@ class IntegrationCatalogServiceTest {
             .doesNotHaveDuplicates();
         assertThat(catalog.categories()).extracting(CategoryGroup::category, CategoryGroup::label)
             .contains(tuple("KNOWLEDGE", "Knowledge"), tuple("TICKETS_PROJECTS", "Tickets and projects"),
-                tuple("CHAT_MAIL", "Chat and mail"), tuple("CODE", "Code"));
+                tuple("CHAT_MAIL", "Chat, mail and meetings"), tuple("CODE", "Code and deploy"),
+                tuple("MONITORING", "Monitoring"), tuple("DATA", "Data and analytics"),
+                tuple("SECURITY", "Security and compliance"));
         assertThat(catalog.categories()).extracting(g -> ConnectorCategory.valueOf(g.category()).ordinal()).isSorted();
         assertThat(catalog.total()).isEqualTo(this.catalog.all().size());
         assertThat(catalog.connected()).isZero();
+    }
+
+    @Test
+    @DisplayName("chaque rubrique compte les outils que le fichier y range, et la somme fait le total")
+    void each_category_counts_the_tools_of_the_file() {
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of());
+
+        IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
+
+        assertThat(catalog.categories()).allSatisfy(g -> assertThat(g.tools()).as(g.category())
+            .hasSize((int) this.catalog.all().stream().filter(d -> d.category().name().equals(g.category())).count()));
+        assertThat(catalog.categories().stream().mapToInt(g -> g.tools().size()).sum()).isEqualTo(catalog.total());
     }
 
     @Test
@@ -193,10 +209,10 @@ class IntegrationCatalogServiceTest {
     void lists_custom_servers_last() {
         when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
         when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
-        // « trello » : connexion MCP héritée d'une tuile retirée au lot 6, sans nom enregistré.
+        // « docker » : connexion MCP héritée d'une tuile retirée au lot 6, sans nom enregistré.
         when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of(
             new ConnectedServer("custom-team-docs", "Team docs", "https://docs.example.com/mcp"),
-            new ConnectedServer("trello", null, "https://mcp.trello.example/sse")));
+            new ConnectedServer("docker", null, "https://mcp.docker.example/sse")));
 
         IntegrationCatalogResponse catalog = service.getCatalog("acme", 7L);
 
@@ -206,7 +222,7 @@ class IntegrationCatalogServiceTest {
         assertThat(last.tools()).extracting(ConnectorView::key, ConnectorView::name, ConnectorView::description)
             .containsExactly(
                 tuple("custom-team-docs", "Team docs", "docs.example.com"),
-                tuple("trello", "trello", "mcp.trello.example"));
+                tuple("docker", "docker", "mcp.docker.example"));
         assertThat(last.tools()).allSatisfy(t -> {
             assertThat(t.connected()).isTrue();
             assertThat(t.authType()).isEqualTo("MCP");
