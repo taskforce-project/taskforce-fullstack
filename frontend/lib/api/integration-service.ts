@@ -302,6 +302,42 @@ export interface ConnectorView {
   websiteUrl: string | null;
   /** URL du serveur MCP officiel d'un préréglage, préremplie (modifiable) dans le dialogue de connexion. */
   mcpSuggestedUrl: string | null;
+  /** L'état de la connexion que la personne utilise (séance n°22, R154) ; absent d'une réponse ancienne. */
+  state?: ConnectionState;
+  /** Le compte chez l'éditeur : « Connected as … » ; null quand l'éditeur ne le dit pas. */
+  accountLabel?: string | null;
+  /** PERSONAL : sa connexion ; WORKSPACE : une source partagée avec l'espace ; null sans connexion. */
+  scope?: ConnectionScope | null;
+  /** Le chemin de connexion que l'éditeur permet ; null pour une native. */
+  connection?: ConnectionPath | null;
+  /** L'étape de l'administrateur : la phrase à lui envoyer, et le lien de sa page. */
+  admin?: AdminStep | null;
+  /** La clé guidée : où la créer. */
+  apiKey?: KeyGuide | null;
+  /** L'application de l'entreprise est saisie pour cet outil. */
+  companyApp?: boolean;
+  /** L'éditeur sépare la lecture de l'écriture : la personne peut n'accorder que la lecture. */
+  writeChoice?: boolean;
+  /** Pourquoi l'éditeur ferme la porte aujourd'hui ; null sinon. */
+  blocked?: string | null;
+  /** Essayé de bout en bout ; faux sur une instance d'essai, qui montre aussi les autres. */
+  tried?: boolean;
+}
+
+export type ConnectionState = "CONNECTED" | "NEEDS_RECONNECT" | "WAITING_FOR_ADMIN" | "NOT_CONNECTED";
+export type ConnectionScope = "PERSONAL" | "WORKSPACE";
+export type ConnectionPath = "self-registration" | "our-app" | "company-app" | "api-key" | "server-url" | "open";
+
+export interface AdminStep {
+  text: string;
+  link: string | null;
+  /** Rien ne se connecte avant elle. */
+  required: boolean;
+}
+
+export interface KeyGuide {
+  hint: string;
+  link: string | null;
 }
 
 export interface CategoryGroup {
@@ -328,15 +364,96 @@ export async function getIntegrationCatalog(slug: string): Promise<IntegrationCa
 // MCP (serveur MCP externe → outils live dans Cortex, écritures validées)
 // ---------------------------------------------------------------------------
 
-/** Statut d'un serveur MCP connecté : joignabilité + outils exposés (après allow-list). */
+/**
+ * Statut d'une connexion à un serveur MCP, pour la personne qui la regarde : joignabilité, outils servis (après
+ * allow-list), outils changés depuis la connexion (en attente d'un nouvel accord), portée, état et compte.
+ */
 export interface McpServerStatus {
   connectorKey: string;
   /** Nom d'un serveur ajouté à la main ; null pour un préréglage. */
   name: string | null;
-  url: string;
+  /** L'hôte du serveur, jamais son adresse entière (elle peut valoir une clé). */
+  host: string | null;
+  scope: ConnectionScope;
+  state: Exclude<ConnectionState, "NOT_CONNECTED">;
+  accountLabel: string | null;
   reachable: boolean;
   tools: string[];
+  changedTools: string[];
   error: string | null;
+}
+
+/**
+ * La suite du geste « Connect », que le serveur choisit : ouvrir le navigateur, c'est branché, l'étape de
+ * l'administrateur (la personne lui écrit, ou l'administrateur saisit l'application de l'entreprise), la clé guidée,
+ * ou l'accord d'un serveur local.
+ */
+export interface ConnectOutcome {
+  next: "browser" | "connected" | "admin" | "company-app" | "key" | "local";
+  authorizeUrl: string | null;
+  message: string | null;
+}
+
+export interface ConnectPayload {
+  /** L'adresse d'un serveur ajouté à la main, ou celle que l'entreprise a créée chez l'éditeur (Zoho). */
+  mcpUrl?: string;
+  /** Un serveur ajouté à la main porte un nom. */
+  name?: string;
+  /** La clé guidée, envoyée en `Authorization: Bearer` ou dans `headerName`. */
+  mcpToken?: string;
+  headerName?: string;
+  /** Partager la connexion avec l'espace (propriétaires et administrateurs). */
+  shared?: boolean;
+  /** Accorder aussi l'écriture : sinon la lecture seule. */
+  allowWrites?: boolean;
+  /** La personne a vu l'adresse d'un serveur local et l'accepte. */
+  localApproved?: boolean;
+  /** Chemin applicatif de retour après le navigateur (retour fluide). */
+  returnTo?: string;
+}
+
+/** Le geste « Connect » d'un outil : le serveur choisit le chemin et dit la suite. */
+export async function connectTool(slug: string, connectorKey: string, payload: ConnectPayload): Promise<ConnectOutcome> {
+  const res = await apiClient.post<{ data: ConnectOutcome }>(INTEGRATION_ROUTES.MCP_CONNECT(slug, connectorKey), payload);
+  return res.data.data;
+}
+
+/** Redonne l'accord aux outils qui ont changé depuis la connexion ; renvoie les statuts frais. */
+export async function approveMcpTools(slug: string, connectorKey: string, shared = false): Promise<McpServerStatus[]> {
+  const res = await apiClient.post<{ data: McpServerStatus[] }>(
+    `${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(slug, connectorKey)}?shared=${shared}`,
+  );
+  return res.data.data;
+}
+
+/** L'application de l'entreprise chez un éditeur : jamais son secret, seulement s'il y en a un. */
+export interface CompanyApp {
+  connectorKey: string;
+  clientId: string;
+  hasSecret: boolean;
+}
+
+export async function getCompanyApps(slug: string): Promise<CompanyApp[]> {
+  const res = await apiClient.get<{ data: CompanyApp[] }>(INTEGRATION_ROUTES.MCP_APPS(slug));
+  return res.data.data;
+}
+
+/** Enregistre l'application de l'entreprise ; un secret vide garde celui déjà saisi. */
+export async function saveCompanyApp(
+  slug: string,
+  connectorKey: string,
+  clientId: string,
+  clientSecret: string,
+): Promise<CompanyApp> {
+  const res = await apiClient.put<{ data: CompanyApp }>(INTEGRATION_ROUTES.MCP_APP(slug, connectorKey), {
+    clientId,
+    clientSecret,
+  });
+  return res.data.data;
+}
+
+export async function removeCompanyApp(slug: string, connectorKey: string): Promise<void> {
+  await apiClient.delete(INTEGRATION_ROUTES.MCP_APP(slug, connectorKey));
 }
 
 /** Clé à envoyer pour un nouveau serveur ajouté à la main : le backend en dérive `custom-<slug>` du nom. */
@@ -352,6 +469,17 @@ export interface McpServerPayload {
   mcpToken?: string;
   headerName?: string;
   mcpAllow?: string;
+  /** Partager la connexion avec l'espace (propriétaires et administrateurs). */
+  shared?: boolean;
+  /** La personne a vu l'adresse d'un serveur local et l'accepte. */
+  localApproved?: boolean;
+}
+
+/** Ce que la déconnexion a fait chez l'éditeur : révoqué, ou pas de révocation possible. */
+export interface DisconnectResult {
+  revoked: boolean;
+  revocable: boolean;
+  servers: McpServerStatus[];
 }
 
 /** Statut des serveurs MCP connectés sur le workspace. */
@@ -366,9 +494,14 @@ export async function connectMcpServer(slug: string, payload: McpServerPayload):
   return res.data.data;
 }
 
-/** Déconnecte un serveur MCP externe ; renvoie le statut frais. */
-export async function disconnectMcpServer(slug: string, connectorKey: string): Promise<McpServerStatus[]> {
-  const res = await apiClient.delete<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey));
+/**
+ * Déconnecte la connexion de la personne à un serveur MCP, ou celle de l'espace (`shared`) : le jeton est révoqué chez
+ * l'éditeur quand il le permet, et la réponse le dit.
+ */
+export async function disconnectMcpServer(slug: string, connectorKey: string, shared = false): Promise<DisconnectResult> {
+  const res = await apiClient.delete<{ data: DisconnectResult }>(
+    `${INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey)}?shared=${shared}`,
+  );
   return res.data.data;
 }
 
@@ -388,12 +521,24 @@ export interface JsonSchema {
   required?: string[];
 }
 
-/** Outil MCP riche : nom, description, schéma d'arguments et lecture seule (écriture = confirmation). */
+/**
+ * Outil MCP riche : nom, description, schéma d'arguments ; `readOnly` est la classe que TaskForce lui donne (une
+ * écriture demande confirmation) ; `changed` : l'outil a changé depuis la connexion et ne se lance pas.
+ */
 export interface McpToolInfo {
   name: string;
   description: string;
   inputSchema: JsonSchema | null;
   readOnly: boolean;
+  changed?: boolean;
+}
+
+/** Ce que la console a fait : `confirm` quand les règles demandent la confirmation de la personne. */
+export interface McpActionResult {
+  toolRef: string;
+  status: "success" | "refused" | "confirm" | "error";
+  output: string | null;
+  reason: string | null;
 }
 
 /** Outils (schéma d'arguments inclus) d'un serveur MCP connecté — alimente la console d'actions. */
@@ -402,17 +547,22 @@ export async function getMcpServerTools(slug: string, connectorKey: string): Pro
   return res.data.data;
 }
 
-/** Exécute un outil MCP externe directement (hors Cortex). `toolRef` = `<connectorKey>__<tool>`. */
+/**
+ * Lance un outil d'un serveur MCP connecté (la console d'actions) : le serveur le juge par les règles de l'espace et le
+ * garde au dossier. `confirmed` : la personne a confirmé une action que les règles demandent. `toolRef` =
+ * `<connectorKey>__<tool>`.
+ */
 export async function executeMcpAction(
   slug: string,
   toolRef: string,
   args: Record<string, unknown>,
-): Promise<string> {
-  const res = await apiClient.post<{ data: { toolRef: string; output: string } }>(
+  confirmed = false,
+): Promise<McpActionResult> {
+  const res = await apiClient.post<{ data: McpActionResult }>(
     INTEGRATION_ROUTES.MCP_ACTION_EXECUTE(slug),
-    { toolRef, arguments: args },
+    { toolRef, arguments: args, confirmed },
   );
-  return res.data.data.output;
+  return res.data.data;
 }
 
 /**

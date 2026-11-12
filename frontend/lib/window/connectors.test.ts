@@ -12,7 +12,8 @@ function tool(key: string, name: string, connected: boolean): ConnectorView {
 }
 
 const server = (connectorKey: string, reachable: boolean): McpServerStatus => ({
-  connectorKey, name: null, url: "https://mcp.example.com", reachable, tools: [], error: reachable ? null : "timeout",
+  connectorKey, name: null, host: "mcp.example.com", scope: "PERSONAL", state: "CONNECTED", accountLabel: null,
+  reachable, tools: [], changedTools: [], error: reachable ? null : "timeout",
 })
 
 /** « Connectors » (R122) : les connecteurs connectés, ceux à reconnecter d'abord. */
@@ -31,6 +32,13 @@ describe("connectorLines", () => {
       { key: "github", name: "GitHub", reconnect: false },
       { key: "linear", name: "Linear", reconnect: false },
     ])
+  })
+
+  it("montre à reconnecter un outil dont l'éditeur refuse désormais le jeton", () => {
+    const stale: ConnectorView = { ...tool("notion", "Notion", false), state: "NEEDS_RECONNECT" }
+    const catalog: IntegrationCatalog = { total: 1, connected: 0, categories: [{ category: "KNOWLEDGE", label: "Knowledge", tools: [stale] }] }
+
+    expect(connectorLines(catalog, [])).toEqual([{ key: "notion", name: "Notion", reconnect: true }])
   })
 
   it("ne montre rien sans connecteur connecté", () => {

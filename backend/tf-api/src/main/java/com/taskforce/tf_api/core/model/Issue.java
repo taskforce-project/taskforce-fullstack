@@ -141,6 +141,14 @@ public class Issue {
     @Column(name = "story_points")
     private Integer storyPoints;
 
+    /**
+     * L'outil de l'entreprise d'où l'import a tiré l'issue (la clé de son connecteur), null pour une issue écrite dans
+     * TaskForce. Son texte a été écrit par n'importe qui dans cet outil : Cortex le lit comme un contenu du dehors
+     * (séance n°22, R158).
+     */
+    @Column(name = "imported_from", length = 64)
+    private String importedFrom;
+
     /** Renseigné quand le statut passe en catégorie COMPLETED */
     @Column(name = "completed_at")
     private LocalDateTime completedAt;

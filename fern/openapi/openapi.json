@@ -654,6 +654,90 @@
         }
       }
     },
+    "/api/workspaces/{slug}/mcp/apps/{connectorKey}": {
+      "put": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "saveApp",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectorKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyAppRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCompanyApp"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "removeApp",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectorKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/evals/settings": {
       "put": {
         "tags": [
@@ -3627,6 +3711,53 @@
         }
       }
     },
+    "/api/workspaces/{slug}/mcp/servers/{connectorKey}/tools/approve": {
+      "post": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "approveTools",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectorKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "shared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListMcpServerStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/mcp/servers/{connectorKey}/oauth/start": {
       "post": {
         "tags": [
@@ -3668,6 +3799,54 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/mcp/servers/{connectorKey}/connect": {
+      "post": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "connectTool",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "connectorKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseConnectOutcome"
                 }
               }
             }
@@ -3747,7 +3926,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseMcpActionResult"
+                  "$ref": "#/components/schemas/ApiResponseActionResult"
                 }
               }
             }
@@ -9094,6 +9273,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/mcp/apps": {
+      "get": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "apps",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListCompanyApp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/issues/search": {
       "get": {
         "tags": [
@@ -11436,6 +11645,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "shared",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -11444,7 +11662,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseListMcpServerStatus"
+                  "$ref": "#/components/schemas/ApiResponseDisconnectResponse"
                 }
               }
             }
@@ -12256,6 +12474,56 @@
           },
           "updatedAt": {
             "type": "string"
+          }
+        }
+      },
+      "CompanyAppRequest": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0
+          },
+          "clientSecret": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "clientId"
+        ]
+      },
+      "ApiResponseCompanyApp": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CompanyApp"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CompanyApp": {
+        "type": "object",
+        "properties": {
+          "connectorKey": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "hasSecret": {
+            "type": "boolean"
           }
         }
       },
@@ -15530,6 +15798,12 @@
           },
           "mcpAllow": {
             "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "localApproved": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -15567,13 +15841,37 @@
           "name": {
             "type": "string"
           },
-          "url": {
+          "host": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "PERSONAL",
+              "WORKSPACE"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "CONNECTED",
+              "NEEDS_RECONNECT",
+              "WAITING_FOR_ADMIN"
+            ]
+          },
+          "accountLabel": {
             "type": "string"
           },
           "reachable": {
             "type": "boolean"
           },
           "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "changedTools": {
             "type": "array",
             "items": {
               "type": "string"
@@ -15598,6 +15896,12 @@
           },
           "returnTo": {
             "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "allowWrites": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -15622,6 +15926,77 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "McpConnectRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 0
+          },
+          "mcpUrl": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          },
+          "mcpToken": {
+            "type": "string",
+            "maxLength": 8000,
+            "minLength": 0
+          },
+          "headerName": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "allowWrites": {
+            "type": "boolean"
+          },
+          "localApproved": {
+            "type": "boolean"
+          },
+          "returnTo": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        }
+      },
+      "ApiResponseConnectOutcome": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConnectOutcome"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ConnectOutcome": {
+        "type": "object",
+        "properties": {
+          "next": {
+            "type": "string"
+          },
+          "authorizeUrl": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
@@ -15693,13 +16068,33 @@
           "arguments": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "confirmed": {
+            "type": "boolean"
           }
         },
         "required": [
           "toolRef"
         ]
       },
-      "ApiResponseMcpActionResult": {
+      "ActionResult": {
+        "type": "object",
+        "properties": {
+          "toolRef": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "output": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ApiResponseActionResult": {
         "type": "object",
         "properties": {
           "success": {
@@ -15709,22 +16104,11 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/McpActionResult"
+            "$ref": "#/components/schemas/ActionResult"
           },
           "timestamp": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "McpActionResult": {
-        "type": "object",
-        "properties": {
-          "toolRef": {
-            "type": "string"
-          },
-          "output": {
-            "type": "string"
           }
         }
       },
@@ -21351,6 +21735,30 @@
           },
           "readOnly": {
             "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseListCompanyApp": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyApp"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -21697,6 +22105,20 @@
           }
         }
       },
+      "AdminStep": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
       "ApiResponseIntegrationCatalogResponse": {
         "type": "object",
         "properties": {
@@ -21793,6 +22215,36 @@
           },
           "mcpSuggestedUrl": {
             "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "accountLabel": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "connection": {
+            "type": "string"
+          },
+          "admin": {
+            "$ref": "#/components/schemas/AdminStep"
+          },
+          "apiKey": {
+            "$ref": "#/components/schemas/KeyGuide"
+          },
+          "companyApp": {
+            "type": "boolean"
+          },
+          "writeChoice": {
+            "type": "boolean"
+          },
+          "blocked": {
+            "type": "string"
+          },
+          "tried": {
+            "type": "boolean"
           }
         }
       },
@@ -21812,6 +22264,17 @@
             "items": {
               "$ref": "#/components/schemas/CategoryGroup"
             }
+          }
+        }
+      },
+      "KeyGuide": {
+        "type": "object",
+        "properties": {
+          "hint": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
           }
         }
       },
@@ -23580,6 +24043,41 @@
           },
           "templated": {
             "type": "boolean"
+          }
+        }
+      },
+      "ApiResponseDisconnectResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DisconnectResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DisconnectResponse": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "boolean"
+          },
+          "revocable": {
+            "type": "boolean"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpServerStatus"
+            }
           }
         }
       }

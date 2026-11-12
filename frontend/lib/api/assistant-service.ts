@@ -304,8 +304,12 @@ export async function approveAction(slug: string, call: AssistantToolCall): Prom
     )
     return res.data.data
   }
+  // La carte accordée vaut la confirmation de la personne ; le serveur juge encore par les règles et garde au dossier.
   const args = call.input ? (JSON.parse(call.input) as Record<string, unknown>) : {}
-  return { tool: call.name, status: "success", output: await executeMcpAction(slug, call.name, args) }
+  const res = await executeMcpAction(slug, call.name, args, true)
+  // Confirmée, une action ne revient jamais « confirm » ; si c'était le cas, rien n'a tourné : c'est un refus.
+  const status = res.status === "confirm" ? "refused" : res.status
+  return { tool: call.name, status, output: res.output ?? res.reason ?? "" }
 }
 
 /**

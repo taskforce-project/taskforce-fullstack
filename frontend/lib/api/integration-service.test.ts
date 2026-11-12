@@ -30,6 +30,13 @@ import {
   disconnectMcpServer,
   startMcpOAuth,
   NEW_CUSTOM_MCP_KEY,
+  connectTool,
+  approveMcpTools,
+  getCompanyApps,
+  saveCompanyApp,
+  removeCompanyApp,
+  executeMcpAction,
+  getMcpServerTools,
 } from './integration-service';
 import { apiClient } from './client';
 import { INTEGRATION_ROUTES } from '../config/api-routes';
@@ -347,7 +354,10 @@ describe('integration-service', () => {
   });
 
   describe('serveurs MCP', () => {
-    const status = { connectorKey: 'custom-docs', name: 'Docs', url: 'https://docs.example.com/mcp', reachable: true, tools: ['search'], error: null };
+    const status = {
+      connectorKey: 'custom-docs', name: 'Docs', host: 'docs.example.com', scope: 'PERSONAL', state: 'CONNECTED',
+      accountLabel: null, reachable: true, tools: ['search'], changedTools: [], error: null,
+    };
 
     it('GET les statuts', async () => {
       vi.mocked(apiClient.get).mockResolvedValue(envelope([status]));
@@ -365,11 +375,64 @@ describe('integration-service', () => {
       expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVERS(SLUG), payload);
     });
 
-    it('DELETE un serveur par sa clé', async () => {
-      vi.mocked(apiClient.delete).mockResolvedValue(envelope([]));
+    it('DELETE sa connexion par la clé, et dit si l\'éditeur a révoqué l\'accès', async () => {
+      const result = { revoked: true, revocable: true, servers: [] };
+      vi.mocked(apiClient.delete).mockResolvedValue(envelope(result));
 
-      expect(await disconnectMcpServer(SLUG, 'custom-docs')).toEqual([]);
-      expect(apiClient.delete).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'custom-docs'));
+      expect(await disconnectMcpServer(SLUG, 'custom-docs')).toEqual(result);
+      expect(apiClient.delete).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'custom-docs')}?shared=false`);
+    });
+
+    it('DELETE la connexion de l\'espace avec shared=true', async () => {
+      vi.mocked(apiClient.delete).mockResolvedValue(envelope({ revoked: false, revocable: false, servers: [] }));
+
+      await disconnectMcpServer(SLUG, 'notion', true);
+      expect(apiClient.delete).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'notion')}?shared=true`);
+    });
+
+    it('POST le geste « Connect » et rend la suite choisie par le serveur', async () => {
+      const outcome = { next: 'browser', authorizeUrl: 'https://vendor.example/authorize', message: null };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(outcome));
+
+      expect(await connectTool(SLUG, 'notion', { allowWrites: false, shared: false })).toEqual(outcome);
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_CONNECT(SLUG, 'notion'),
+        { allowWrites: false, shared: false });
+    });
+
+    it('POST l\'accord redonné aux outils changés', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(envelope([status]));
+
+      expect(await approveMcpTools(SLUG, 'notion')).toEqual([status]);
+      expect(apiClient.post).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(SLUG, 'notion')}?shared=false`);
+    });
+
+    it('lit, enregistre et retire l\'application de l\'entreprise, jamais son secret en retour', async () => {
+      const app = { connectorKey: 'slack-mcp', clientId: 'c-1', hasSecret: true };
+      vi.mocked(apiClient.get).mockResolvedValue(envelope([app]));
+      vi.mocked(apiClient.put).mockResolvedValue(envelope(app));
+      vi.mocked(apiClient.delete).mockResolvedValue(envelope(null));
+
+      expect(await getCompanyApps(SLUG)).toEqual([app]);
+      expect(await saveCompanyApp(SLUG, 'slack-mcp', 'c-1', 's-1')).toEqual(app);
+      expect(apiClient.put).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_APP(SLUG, 'slack-mcp'), { clientId: 'c-1', clientSecret: 's-1' });
+      await removeCompanyApp(SLUG, 'slack-mcp');
+      expect(apiClient.delete).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_APP(SLUG, 'slack-mcp'));
+    });
+
+    it('POST une action de la console, avec la confirmation de la personne', async () => {
+      const result = { toolRef: 'notion__notion-search', status: 'success', output: '[]', reason: null };
+      vi.mocked(apiClient.post).mockResolvedValue(envelope(result));
+
+      expect(await executeMcpAction(SLUG, 'notion__notion-search', { q: 'x' }, true)).toEqual(result);
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_ACTION_EXECUTE(SLUG),
+        { toolRef: 'notion__notion-search', arguments: { q: 'x' }, confirmed: true });
+    });
+
+    it('GET les outils d\'une connexion pour la console', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue(envelope([{ name: 'search', description: '', inputSchema: null, readOnly: true }]));
+
+      expect(await getMcpServerTools(SLUG, 'notion')).toHaveLength(1);
+      expect(apiClient.get).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVER_TOOLS(SLUG, 'notion'));
     });
 
     it("démarre l'OAuth avec le nom d'un serveur ajouté à la main et renvoie l'URL d'autorisation", async () => {

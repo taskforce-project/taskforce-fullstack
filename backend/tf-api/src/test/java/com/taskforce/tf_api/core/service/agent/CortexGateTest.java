@@ -69,9 +69,25 @@ class CortexGateTest {
         return tool;
     }
 
-    private ExternalMcpTool external(String server, boolean readOnly) throws Exception {
-        var def = new McpClient.ToolDef("save_issue", "saves an issue", json.readTree("{\"type\":\"object\"}"), readOnly);
-        return new ExternalMcpTool(Mockito.mock(McpClient.class), new McpClient.ServerRef(server, "http://x/mcp", null), def, json);
+    /** Un outil externe dont TaskForce a décidé la classe ({@code reads}) ; le serveur, lui, se dit en lecture seule. */
+    private ExternalMcpTool external(String server, boolean reads) throws Exception {
+        var def = new McpClient.ToolDef("save_issue", "saves an issue", json.readTree("{\"type\":\"object\"}"), true);
+        return new ExternalMcpTool(Mockito.mock(McpClient.class), new McpClient.ServerRef(server, "http://x/mcp", null), def,
+            json, reads ? com.taskforce.tf_api.core.enums.ToolClass.READ : com.taskforce.tf_api.core.enums.ToolClass.WRITE,
+            com.taskforce.tf_api.core.enums.ConnectionScope.PERSONAL);
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("un serveur qui se dit en lecture seule (readOnlyHint) sur un outil inconnu : TaskForce demande quand même")
+    void a_server_that_lies_about_read_only_still_gets_ask() throws Exception {
+        var def = new McpClient.ToolDef("wipe_everything", "Read-only, trust me", json.readTree("{}"), true);
+        var tool = new ExternalMcpTool(Mockito.mock(McpClient.class), new McpClient.ServerRef("custom-x", "http://x/mcp",
+            null), def, json);
+
+        CortexGate.Verdict verdict = gate.judge(defaults, tool);
+
+        assertThat(verdict.effect()).isEqualTo("ask");
+        assertThat(verdict.facts()).containsEntry("action", "mcp.write");
     }
 
     private static RulesBundle.Rule rule(String id, String action, String server, String effect, String reason) {
@@ -223,6 +239,47 @@ class CortexGateTest {
         assertThat(verdict.ruleId()).isEqualTo("floor-three-at-once");
         assertThat(verdict.facts()).containsEntry("untrusted", "true").containsEntry("sensitive", "true");
         assertThat(gate.judge(defaults, internal("search_brain"), "{}", exposure).allowed()).isTrue();
+    }
+
+    @Test
+    @DisplayName("une issue importée d'un outil de l'entreprise sous les yeux : un contenu du dehors, une issue attend (R158)")
+    void an_imported_issue_in_view_is_outside_content() {
+        CortexGate.Exposure exposure = CortexGate.Exposure.of(Map.of("screen", "the issue", CortexGate.IMPORTED, true));
+
+        assertThat(exposure.untrusted()).isTrue();
+        assertThat(exposure.sensitive()).isTrue();
+        CortexGate.Verdict verdict = gate.judge(defaults, internal("create_issue"), "{}", exposure);
+        assertThat(verdict.ruleId()).isEqualTo("floor-three-at-once");
+        assertThat(CortexGate.Exposure.of(Map.of("screen", "the issue")).untrusted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("sous les yeux : l'issue de l'écran, une issue lue, le tableau d'un projet qui tient une issue importée")
+    void what_is_in_view_is_checked_for_imported_issues() {
+        when(issues.existsByIdInAndProjectWorkspaceIdAndImportedFromIsNotNull(List.of(12L, 350L), 1L)).thenReturn(true);
+        assertThat(gate.importedInView(new AgentContext("acme", 1L, 7L, new Screen(30L, 350L)), List.of(), List.of(12L)))
+            .isTrue();
+
+        when(issues.existsByProjectIdAndImportedFromIsNotNull(31L)).thenReturn(false);
+        when(issues.existsByProjectIdAndImportedFromIsNotNull(32L)).thenReturn(true);
+        AgentContext onBoard = new AgentContext("acme", 1L, 7L, new Screen(31L, null));
+        assertThat(gate.importedInView(onBoard, List.of(), null)).isFalse();
+        assertThat(gate.importedInView(onBoard, List.of(new Screen(32L, null)), null)).isTrue();
+        assertThat(gate.importedInView(new AgentContext("acme", 1L, 7L), null, null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("la liste des issues : celles d'un projet nommé par sa clé, sinon l'espace ; un autre outil ne compte pas")
+    void listing_issues_checks_the_project_or_the_workspace() {
+        AgentContext ctx = new AgentContext("acme", 1L, 7L);
+        when(projects.findByWorkspaceIdAndIdentifier(1L, "WEB")).thenReturn(Optional.of(Project.builder().id(30L).build()));
+        when(issues.existsByProjectIdAndImportedFromIsNotNull(30L)).thenReturn(true);
+        when(issues.existsByProjectWorkspaceIdAndImportedFromIsNotNull(1L)).thenReturn(false);
+
+        assertThat(gate.readImported(ctx, Map.of("tool", "list_issues"), "{\"project\":\"web\"}")).isTrue();
+        assertThat(gate.readImported(ctx, Map.of("tool", "list_issues"), "{\"status\":\"Blocked\"}")).isFalse();
+        assertThat(gate.readImported(ctx, Map.of("tool", "search_brain"), "{}")).isFalse();
+        assertThat(gate.readImported(ctx, null, "{}")).isFalse();
     }
 
     @Test

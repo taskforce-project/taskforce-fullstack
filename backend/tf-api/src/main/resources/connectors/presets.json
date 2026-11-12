@@ -1,0 +1,484 @@
+{
+  "$comment": "Les préréglages MCP du catalogue (R99, séance n°22 R153, R154, R158) : des données, pas du code. Chaque outil : sa catégorie, son serveur MCP officiel, son chemin de connexion, les portées strictement utiles (lecture par défaut), l'étape de l'administrateur, et la classe de chaque outil connu (read ou write). Un outil absent des listes est une écriture : TaskForce demande, quoi qu'en dise le serveur. Un préréglage n'est montré qu'avec `tried` (date et preuve de l'essai de bout en bout) ; les autres restent connectables par l'API et par leur adresse. Faits vérifiés le 11/11/2026 (sondes et pages des éditeurs, `sources`) ; ce qui n'a pas pu l'être est dans `unverified`. {redirectUri} et {redirectHost} sont remplacés par l'adresse de retour de l'instance.",
+  "version": 1,
+  "presets": [
+    {
+      "key": "linear",
+      "name": "Linear",
+      "category": "TICKETS_PROJECTS",
+      "description": "Issues & projects",
+      "website": "https://linear.app",
+      "mcpUrl": "https://mcp.linear.app/mcp",
+      "readUrl": "https://mcp.linear.app/mcp/readonly",
+      "connection": "self-registration",
+      "scopes": { "read": ["read"], "write": ["read", "write"] },
+      "admin": {
+        "required": false,
+        "text": "If your Linear workspace approves third-party applications, an admin approves TaskForce in Linear: Settings, Administration, Security, Third-party application approvals.",
+        "link": "https://linear.app/docs/third-party-application-approvals"
+      },
+      "apiKey": {
+        "hint": "Create a personal API key in Linear (Settings, Security and access) and paste it here.",
+        "link": "https://linear.app/settings/account/security"
+      },
+      "tools": {
+        "read": ["whoami", "get_workspace", "get_user", "list_users", "get_team", "list_teams", "get_issue", "list_issues", "get_issue_status", "list_issue_statuses", "list_issue_labels", "get_project", "list_projects", "list_project_labels", "get_milestone", "list_milestones", "list_cycles", "get_document", "list_documents", "list_comments", "list_custom_views", "get_template", "list_templates", "get_status_updates", "get_notifications", "get_triage_responsibility", "get_attachment", "extract_images", "get_diff", "list_diffs", "get_diff_threads", "get_release", "list_releases", "get_release_note", "list_release_notes", "list_release_pipelines", "list_agent_skills", "get_agent_skill", "search_documentation"],
+        "write": ["save_issue", "save_comment", "save_document", "save_project", "save_milestone", "save_status_update", "save_issue_label", "save_project_label", "save_release", "save_release_note", "create_issue_label", "create_attachment", "create_attachment_from_upload", "prepare_attachment_upload", "prepare_file_upload", "delete_attachment", "delete_comment", "delete_status_update", "retire_issue_label", "restore_issue_label", "retire_project_label", "restore_project_label", "share_issue", "unshare_issue", "mark_notification", "save_diff_comment", "delete_diff_comment", "resolve_diff_thread", "submit_diff_review", "update_diff", "merge_diff"]
+      },
+      "tried": { "date": "2026-09-03", "proof": "OAuth en un clic contre le vrai serveur (TF-MCP-02, 02/09/2026), connecté en prod avec serverInfo « Linear MCP » (TF-MCP-02b, 03/09/2026), outils servis à Cortex (05/09/2026), rejoué au lot 6 (18-19/10/2026)." },
+      "sources": ["https://linear.app/docs/mcp", "https://mcp.linear.app/.well-known/oauth-authorization-server"],
+      "unverified": ["loopback redirects on any port", "the official tool list (taken from a live connection, not a vendor page)"]
+    },
+    {
+      "key": "jira",
+      "name": "Jira",
+      "category": "TICKETS_PROJECTS",
+      "description": "Issues & sprints (Atlassian)",
+      "website": "https://www.atlassian.com/software/jira",
+      "mcpUrl": "https://mcp.atlassian.com/v2/mcp",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["read:jira:agent-interface", "search:jira:agent-interface", "read:me", "offline_access"],
+        "write": ["read:jira:agent-interface", "search:jira:agent-interface", "write:jira:agent-interface", "read:me", "offline_access"]
+      },
+      "admin": {
+        "required": false,
+        "text": "An admin of your Atlassian organization allows TaskForce in Atlassian Administration: Connectors, Atlassian MCP server, add the domain {redirectHost}/** (the desktop app's 127.0.0.1 address is allowed by default).",
+        "link": "https://support.atlassian.com/security-and-access-policies/docs/control-atlassian-rovo-mcp-server-settings/"
+      },
+      "tools": {
+        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "executeRead", "getContentFormatGuide", "search", "getJiraIssue", "listJiraProjects", "listJiraProjectIssueTypesMetadata", "getJiraIssueTypeMetaWithFields", "listJiraIssueTransitions", "listJiraIssueLinkTypes", "listJiraIssueRemoteIssueLinks", "listJiraIssueWorklogs", "lookupJiraAccountId", "listJiraIssueAssignableUsers", "listJiraIssueComments", "listJiraIssueChangelogs", "getJiraCurrentUser", "getJiraUser", "listJiraStatuses", "listJiraProjectComponents", "getJiraProjectVersions", "getJiraProjectVersionRelatedWork", "listJiraBoards", "getJiraBoardConfig", "getJiraBoardIssueData", "getJiraBoardSprintData", "listJiraBoardSprints", "listJiraFilters", "listJiraDashboards", "getJiraEntityProperty", "downloadJiraIssueAttachment", "searchJiraIssuesUsingJql", "getJiraWorkflows", "getJiraWorkflowEditorLink", "getJiraScreen"],
+        "write": ["executeWrite", "executeDestructive", "createJiraIssue", "editJiraIssue", "transitionJiraIssue", "addOrEditJiraIssueComment", "addOrEditJiraIssueWorklog", "createJiraIssueLink", "manageJiraProjectVersion", "manageJiraProjectVersionRelatedWork", "manageJiraSprint", "createJiraBoard", "watchJiraIssue", "uploadAttachmentToJiraIssue", "editJiraEntityProperty", "createJiraIssueRemoteIssueLink", "convertJiraIssueHierarchy", "deleteJiraIssue", "deleteJiraComment", "deleteJiraIssueAttachment", "createJiraProject", "updateJiraProject", "updateJiraScreen"]
+      },
+      "tried": null,
+      "sources": ["https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/", "https://auth.atlassian.com/.well-known/oauth-authorization-server/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3", "https://support.atlassian.com/security-and-access-policies/docs/available-atlassian-mcp-server-domains/"],
+      "unverified": ["whether the default 127.0.0.1 entry covers every port", "a first consent by a site admin, reported only by the community"]
+    },
+    {
+      "key": "confluence",
+      "name": "Confluence",
+      "category": "KNOWLEDGE",
+      "description": "Pages & spaces (Atlassian)",
+      "website": "https://www.atlassian.com/software/confluence",
+      "mcpUrl": "https://mcp.atlassian.com/v2/mcp",
+      "connection": "self-registration",
+      "scopes": {
+        "read": ["read:confluence:agent-interface", "search:confluence:agent-interface", "read:me", "offline_access"],
+        "write": ["read:confluence:agent-interface", "search:confluence:agent-interface", "write:confluence:agent-interface", "read:me", "offline_access"]
+      },
+      "admin": {
+        "required": false,
+        "text": "An admin of your Atlassian organization allows TaskForce in Atlassian Administration: Connectors, Atlassian MCP server, add the domain {redirectHost}/** (the desktop app's 127.0.0.1 address is allowed by default).",
+        "link": "https://support.atlassian.com/security-and-access-policies/docs/control-atlassian-rovo-mcp-server-settings/"
+      },
+      "tools": {
+        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "executeRead", "getContentFormatGuide", "search", "getConfluenceContent", "listConfluenceContent", "listConfluenceSpaces", "getConfluenceSpace", "getConfluenceSpaceInstructions", "getConfluencePersonalSpace", "listConfluenceComments", "getConfluenceComment", "getConfluenceContentSuggestions", "listConfluenceContentVersions", "getConfluenceContentVersion", "diffConfluenceContentVersions", "listConfluenceAttachments", "getConfluenceAttachment", "downloadConfluenceAttachment", "exportConfluenceContent", "getConfluenceContentPermissions", "getConfluenceContentRestrictionState", "getConfluencePublicLinkStatus", "getConfluenceReactions", "getConfluenceTask", "listConfluenceTasks", "listConfluenceTemplates", "getConfluenceTemplate", "resolveConfluenceContentMacros", "getConfluenceMauiApp", "searchConfluence"],
+        "write": ["executeWrite", "executeDestructive", "createConfluenceContent", "updateConfluenceContent", "createConfluenceSpace", "setConfluenceSpaceInstructions", "copyConfluenceContent", "moveConfluenceContent", "archiveConfluenceContent", "unarchiveConfluenceContent", "restoreConfluenceContentVersion", "convertConfluenceContentMode", "setConfluenceContentStatus", "createConfluenceComment", "updateConfluenceComment", "updateConfluenceCommentResolution", "addConfluenceContentSuggestions", "createConfluenceAttachment", "addLabelsToConfluenceContent", "addConfluenceReaction", "addConfluenceContentPermissions", "removeConfluenceContentPermissions", "replaceConfluenceContentPermissions", "setConfluenceContentRestrictionState", "enableConfluencePublicLink", "disableConfluencePublicLink", "completeConfluenceTask", "reopenConfluenceTask", "starConfluenceContent", "unstarConfluenceContent", "starConfluenceSpace", "unstarConfluenceSpace", "watchConfluenceContent", "unwatchConfluenceContent", "watchConfluenceSpace", "unwatchConfluenceSpace", "watchConfluenceLabel", "unwatchConfluenceLabel", "createConfluenceInfographicForPage", "editConfluenceInfographicForPage", "createConfluenceMauiApp", "editConfluenceMauiApp"]
+      },
+      "tried": null,
+      "sources": ["https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/", "https://auth.atlassian.com/.well-known/oauth-authorization-server/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3"],
+      "unverified": ["whether the default 127.0.0.1 entry covers every port"]
+    },
+    {
+      "key": "asana",
+      "name": "Asana",
+      "category": "TICKETS_PROJECTS",
+      "description": "Tasks & projects",
+      "website": "https://asana.com",
+      "mcpUrl": "https://mcp.asana.com/v2/mcp",
+      "connection": "our-app",
+      "scopes": { "read": ["default"], "write": ["default"] },
+      "admin": {
+        "required": true,
+        "text": "Register an MCP app in the Asana developer console (distributed to any workspace) with the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, Asana. On Enterprise, an Asana admin also allows the app.",
+        "link": "https://developers.asana.com/docs/integrating-with-asanas-mcp-server"
+      },
+      "tools": { "read": [], "write": [] },
+      "tried": null,
+      "sources": ["https://developers.asana.com/docs/integrating-with-asanas-mcp-server", "https://developers.asana.com/docs/oauth", "https://mcp.asana.com/.well-known/oauth-protected-resource/v2"],
+      "unverified": ["the tool names (Asana does not publish them: every tool asks until they are classified)", "whether PKCE spares the client secret"]
+    },
+    {
+      "key": "clickup",
+      "name": "ClickUp",
+      "category": "TICKETS_PROJECTS",
+      "description": "Tasks, docs, goals",
+      "website": "https://clickup.com",
+      "mcpUrl": "https://mcp.clickup.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "monday",
+      "name": "monday.com",
+      "category": "TICKETS_PROJECTS",
+      "description": "Work OS & boards",
+      "website": "https://monday.com",
+      "mcpUrl": "https://mcp.monday.com/mcp",
+      "connection": "self-registration",
+      "admin": {
+        "required": false,
+        "text": "A monday.com account admin approves each new connector, and allows locally hosted connectors for the desktop app.",
+        "link": "https://developer.monday.com/api-reference/docs/mcp-dynamic-client-registration"
+      },
+      "tried": null
+    },
+    {
+      "key": "gitlab",
+      "name": "GitLab",
+      "category": "CODE",
+      "description": "Repos, merge requests, CI pipelines",
+      "website": "https://gitlab.com",
+      "mcpUrl": "https://gitlab.com/api/v4/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["mcp"], "write": ["mcp"] },
+      "admin": {
+        "required": false,
+        "text": "If GitLab refuses the connection, the owner of your top-level group allows it: Settings, General, Permissions and group features, MCP client access, Allow connection to GitLab.",
+        "link": "https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server/"
+      },
+      "tools": {
+        "read": ["get_mcp_server_version", "get_project", "get_user", "list_groups", "list_projects", "list_project_members", "list_todos", "list_user_events", "search", "search_labels", "semantic_search", "semantic_code_search", "get_pages_content", "get_merge_request", "list_merge_requests", "get_work_item", "get_work_item_types", "get_saved_view_work_items", "list_work_item_saved_views", "list_work_items", "list_branches", "get_repository_file", "list_repository_tree", "get_commit", "list_commits", "list_releases", "list_tags", "get_pipeline", "get_job", "get_artifact_file", "list_pipelines", "list_duo_agents_and_flows", "list_duo_sessions", "get_duo_session", "list_wiki_pages", "list_vulnerabilities", "get_vulnerability", "get_merge_request_commits", "get_merge_request_diffs", "get_merge_request_pipelines", "get_merge_request_conflicts", "get_merge_request_notes", "get_workitem_notes", "get_issue", "get_pipeline_jobs"],
+        "write": ["save_project", "save_note", "save_merge_request", "save_merge_request_review", "accept_merge_request", "link_work_items", "save_work_item", "create_work_item", "update_work_item", "add_branch", "fork_repository", "add_commit", "save_pipeline", "start_duo_session", "send_duo_session_input", "save_vulnerability", "attach_scan_profile", "create_issue", "manage_pipeline"]
+      },
+      "tried": null,
+      "sources": ["https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server/", "https://docs.gitlab.com/user/gitlab_duo/model_context_protocol/mcp_server_tools/", "https://gitlab.com/.well-known/oauth-authorization-server"],
+      "unverified": ["whether dynamic registration hands out a public client or a confidential one", "the loopback port rule"]
+    },
+    {
+      "key": "github-mcp",
+      "name": "GitHub",
+      "category": "CODE",
+      "description": "Repositories, issues, pull requests: live tools for Cortex",
+      "website": "https://github.com",
+      "mcpUrl": "https://api.githubcopilot.com/mcp/",
+      "readUrl": "https://api.githubcopilot.com/mcp/readonly",
+      "connection": "our-app",
+      "scopes": { "read": ["repo", "read:org", "read:user"], "write": ["repo", "read:org", "read:user", "project"] },
+      "admin": {
+        "required": true,
+        "text": "Register a GitHub OAuth app (Settings, Developer settings, OAuth apps) with the callback {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, GitHub. If your organization restricts OAuth apps, its owner approves it.",
+        "link": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+      },
+      "apiKey": {
+        "hint": "Create a fine-grained personal access token in GitHub (Settings, Developer settings), with read access to the repositories TaskForce may read, and paste it here.",
+        "link": "https://github.com/settings/personal-access-tokens/new"
+      },
+      "tools": {
+        "read": ["actions_get", "actions_list", "get_job_logs", "get_code_quality_finding", "get_code_scanning_alert", "list_code_scanning_alerts", "get_me", "get_team_members", "get_teams", "ui_get", "get_dependabot_alert", "list_dependabot_alerts", "get_discussion", "get_discussion_comments", "list_discussion_categories", "list_discussions", "get_gist", "list_gists", "get_repository_tree", "custom_properties_read", "repository_ruleset_read", "get_label", "issue_read", "list_issue_fields", "list_issue_types", "list_issues", "search_issues", "list_label", "get_notification_details", "list_notifications", "search_orgs", "projects_get", "projects_list", "list_pull_requests", "pull_request_read", "search_pull_requests", "get_commit", "get_file_contents", "get_latest_release", "get_release_by_tag", "get_tag", "list_branches", "list_commits", "list_releases", "list_repository_collaborators", "list_tags", "search_code", "search_commits", "search_repositories", "get_secret_scanning_alert", "list_secret_scanning_alerts", "get_global_security_advisory", "list_global_security_advisories", "list_org_repository_security_advisories", "list_repository_security_advisories", "list_starred_repositories", "search_users", "get_copilot_space", "list_copilot_spaces", "github_support_docs_search"],
+        "write": ["actions_run_trigger", "assign_copilot_to_issue", "assign_copilot_to_issue_with_intent", "request_copilot_review", "create_pull_request_with_copilot", "discussion_comment_write", "create_gist", "update_gist", "create_repository_ruleset", "custom_properties_write", "add_issue_comment", "issue_write", "sub_issue_write", "update_issue_comment", "label_write", "dismiss_notification", "manage_notification_subscription", "manage_repository_notification_subscription", "mark_all_notifications_read", "projects_write", "add_comment_to_pending_review", "add_reply_to_pull_request_comment", "create_pull_request", "merge_pull_request", "pull_request_review_write", "update_pull_request", "update_pull_request_branch", "create_branch", "create_or_update_file", "create_repository", "delete_file", "delete_repository", "fork_repository", "push_files", "star_repository", "unstar_repository"]
+      },
+      "tried": null,
+      "sources": ["https://github.com/github/github-mcp-server", "https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md", "https://github.com/.well-known/oauth-authorization-server/login/oauth", "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps"],
+      "unverified": ["the loopback rule for GitHub Apps (OAuth apps accept any port)"]
+    },
+    {
+      "key": "sentry",
+      "name": "Sentry",
+      "category": "CODE",
+      "description": "Error & performance tracking",
+      "website": "https://sentry.io",
+      "mcpUrl": "https://mcp.sentry.dev/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "grafana",
+      "name": "Grafana",
+      "category": "CODE",
+      "description": "Dashboards & metrics",
+      "website": "https://grafana.com",
+      "mcpUrl": "https://mcp.grafana.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "vercel",
+      "name": "Vercel",
+      "category": "CODE",
+      "description": "Frontend deploys & logs",
+      "website": "https://vercel.com",
+      "mcpUrl": "https://mcp.vercel.com",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "cloudflare",
+      "name": "Cloudflare",
+      "category": "CODE",
+      "description": "DNS, CDN, WAF",
+      "website": "https://www.cloudflare.com",
+      "mcpUrl": "https://mcp.cloudflare.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "supabase",
+      "name": "Supabase",
+      "category": "CODE",
+      "description": "Postgres, auth, storage",
+      "website": "https://supabase.com",
+      "mcpUrl": "https://mcp.supabase.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "neon",
+      "name": "Neon",
+      "category": "CODE",
+      "description": "Serverless Postgres",
+      "website": "https://neon.tech",
+      "mcpUrl": "https://mcp.neon.tech/sse",
+      "connection": "self-registration",
+      "tried": null,
+      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+    },
+    {
+      "key": "slack-mcp",
+      "name": "Slack",
+      "category": "CHAT_MAIL",
+      "description": "Search and read your channels and messages: live tools for Cortex",
+      "website": "https://slack.com",
+      "mcpUrl": "https://mcp.slack.com/mcp",
+      "connection": "company-app",
+      "scopes": {
+        "read": ["search:read.public", "search:read.private", "search:read.mpim", "search:read.im", "search:read.files", "search:read.users", "channels:history", "groups:history", "mpim:history", "im:history", "channels:read", "groups:read", "im:read", "mpim:read", "users:read", "files:read", "canvases:read", "lists:read", "reactions:read", "emoji:read"],
+        "write": ["search:read.public", "search:read.private", "search:read.mpim", "search:read.im", "search:read.files", "search:read.users", "channels:history", "groups:history", "mpim:history", "im:history", "channels:read", "groups:read", "im:read", "mpim:read", "users:read", "files:read", "canvases:read", "lists:read", "reactions:read", "emoji:read", "chat:write", "reactions:write", "canvases:write", "files:write"]
+      },
+      "admin": {
+        "required": true,
+        "text": "Create an internal Slack app for TaskForce at api.slack.com/apps: turn on its MCP access (is_mcp_enabled), add the redirect address {redirectUri} and the read user scopes, install it in your workspace, then enter its client ID and client secret in TaskForce: Settings, Integrations, Slack.",
+        "link": "https://docs.slack.dev/ai/slack-mcp-server/"
+      },
+      "tools": { "read": [], "write": ["slack_get_file_upload_url", "slack_complete_file_upload"] },
+      "tried": null,
+      "sources": ["https://docs.slack.dev/ai/slack-mcp-server/", "https://mcp.slack.com/.well-known/oauth-authorization-server"],
+      "unverified": ["the tool names (Slack does not publish them: every tool asks until they are classified)", "whether a 127.0.0.1 redirect is accepted (Slack documents localhost)"]
+    },
+    {
+      "key": "notion",
+      "name": "Notion",
+      "category": "KNOWLEDGE",
+      "description": "Docs & knowledge bases",
+      "website": "https://www.notion.so",
+      "mcpUrl": "https://mcp.notion.com/mcp",
+      "connection": "self-registration",
+      "scopes": { "read": ["default"], "write": ["default"] },
+      "admin": {
+        "required": false,
+        "text": "On Notion Enterprise, if your workspace accepts approved MCP clients only, a workspace owner approves TaskForce: Settings, Notion MCP, Manage workspace clients.",
+        "link": "https://www.notion.com/help/notion-mcp"
+      },
+      "tools": {
+        "read": ["notion-ai-search", "notion-connector-search", "notion-search", "notion-fetch", "notion-get-async-task", "notion-get-comments", "notion-get-suggested-edit", "notion-get-version-changes", "notion-view-version", "notion-get-self", "notion-get-users", "notion-get-groups", "notion-get-teams", "notion-get-tool-access", "notion-list-favorite-pages", "notion-list-private-pages", "notion-list-recent-pages", "notion-list-shared-pages", "notion-list-page-backlinks", "notion-query-data-sources", "notion-query-multiple-data-sources", "notion-query-meeting-notes", "notion-download-attachment", "notion-get-file-download-urls", "notion-download-skill", "notion-get-enabled-skills", "notion-memory-search", "notion-search-agents", "notion-search-sessions", "notion-query-sessions", "notion-get-session-status", "notion-list-session-events", "notion-read-session-event", "notion-wait-session", "notion-calendar-list-calendars", "notion-calendar-list-events", "notion-calendar-list-coworkers-events", "notion-calendar-list-contacts", "notion-calendar-list-calendar-resources", "notion-page-view"],
+        "write": ["notion-create-pages", "notion-update-page", "notion-move-pages", "notion-duplicate-page", "notion-delete-pages", "notion-restore-pages", "notion-restore-version", "notion-create-database", "notion-delete-databases", "notion-update-data-source", "notion-create-view", "notion-update-view", "notion-create-comment", "notion-update-comment", "notion-delete-comment", "notion-set-comment-reaction", "notion-set-discussion-resolved", "notion-create-suggested-edit", "notion-resolve-suggested-edit", "notion-create-attachment", "notion-create-file-upload", "notion-create-folder", "notion-update-folder", "notion-convert-page-to-skill", "notion-upload-skill", "notion-update-enabled-skills", "notion-spawn-session", "notion-send-message-to-session", "notion-stop-session", "notion-calendar-create-events", "notion-calendar-update-events", "notion-calendar-cancel-events", "notion-create-meeting-note", "notion-update-sidebar-tabs"]
+      },
+      "tried": null,
+      "sources": ["https://developers.notion.com/guides/mcp/build-mcp-client", "https://developers.notion.com/guides/mcp/tools-faqs", "https://mcp.notion.com/.well-known/oauth-authorization-server"],
+      "unverified": ["loopback redirects (Notion asks for HTTPS in production)", "general availability (the metadata says Beta)"]
+    },
+    {
+      "key": "stripe",
+      "name": "Stripe",
+      "category": "FINANCE_HR",
+      "description": "Customers, invoices, revenue",
+      "website": "https://stripe.com",
+      "mcpUrl": "https://mcp.stripe.com",
+      "connection": "self-registration",
+      "scopes": { "read": ["mcp"], "write": ["mcp"] },
+      "admin": {
+        "required": false,
+        "text": "A Stripe admin turns on MCP access for the team in the Stripe dashboard (Settings, MCP and CLI access), for live and test mode separately.",
+        "link": "https://dashboard.stripe.com/settings/mcp-and-cli-access"
+      },
+      "apiKey": {
+        "hint": "Create a restricted Agent key in Stripe with read permissions only, and paste it here.",
+        "link": "https://docs.stripe.com/mcp"
+      },
+      "tools": {
+        "read": ["stripe_api_search", "stripe_api_details", "stripe_api_read", "get_stripe_account_info", "stripe_analytics", "get_balance_summary", "search_stripe_documentation", "stripe_implementation_planner"],
+        "write": ["stripe_api_write", "atlas_company_formation", "convert_currency", "send_money", "transfer_money", "setup_recipient", "send_stripe_feedback"]
+      },
+      "tried": null,
+      "sources": ["https://docs.stripe.com/mcp", "https://access.stripe.com/.well-known/oauth-authorization-server/mcp"],
+      "unverified": ["an allowlist of client redirect addresses mentioned on a Stripe marketplace listing, absent from docs.stripe.com/mcp", "a read-only choice on Stripe's consent screen"]
+    },
+    {
+      "key": "paypal",
+      "name": "PayPal",
+      "category": "FINANCE_HR",
+      "description": "Payments & payouts",
+      "website": "https://www.paypal.com",
+      "mcpUrl": "https://mcp.paypal.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "square",
+      "name": "Square",
+      "category": "FINANCE_HR",
+      "description": "Payments & POS",
+      "website": "https://squareup.com",
+      "mcpUrl": "https://mcp.squareup.com/sse",
+      "connection": "self-registration",
+      "tried": null,
+      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+    },
+    {
+      "key": "zoho",
+      "name": "Zoho",
+      "category": "SALES",
+      "description": "CRM, projects, mail: the MCP server your company creates in Zoho",
+      "website": "https://www.zoho.com/mcp/",
+      "mcpUrl": null,
+      "connection": "server-url",
+      "apiKey": {
+        "hint": "Create your server in the Zoho MCP console, choose its tools, and paste its address here. The address works like a password: TaskForce keeps it encrypted and never shows it again.",
+        "link": "https://help.zoho.com/portal/en/kb/mcp/implementation-guide/articles/zoho-mcp-implementation-guide"
+      },
+      "tools": { "read": [], "write": [] },
+      "tried": null,
+      "sources": ["https://help.zoho.com/portal/en/kb/mcp/implementation-guide/articles/zoho-mcp-implementation-guide", "https://www.zoho.com/crm/developer/docs/mcp/overview.html"],
+      "unverified": ["the tool names (each company chooses them: every tool asks until classified)", "servers outside Zoho's IN data center"]
+    },
+    {
+      "key": "hubspot",
+      "name": "HubSpot",
+      "category": "SALES",
+      "description": "CRM, deals, marketing",
+      "website": "https://www.hubspot.com",
+      "mcpUrl": "https://mcp.hubspot.com/anthropic",
+      "connection": "our-app",
+      "tried": null
+    },
+    {
+      "key": "attio",
+      "name": "Attio",
+      "category": "SALES",
+      "description": "Modern data-driven CRM",
+      "website": "https://attio.com",
+      "mcpUrl": "https://mcp.attio.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "intercom",
+      "name": "Intercom",
+      "category": "SUPPORT",
+      "description": "Support & customer conversations",
+      "website": "https://www.intercom.com",
+      "mcpUrl": "https://mcp.intercom.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "figma",
+      "name": "Figma",
+      "category": "DESIGN",
+      "description": "Files & design system",
+      "website": "https://www.figma.com",
+      "mcpUrl": "https://mcp.figma.com/mcp",
+      "connection": "our-app",
+      "blocked": "Figma's remote server only admits the clients of its MCP catalog; new clients join a waitlist. On the desktop app, Figma's local server (http://127.0.0.1:3845/mcp) connects by its address.",
+      "tools": {
+        "read": ["download_assets", "get_code_connect_map", "get_code_connect_suggestions", "get_context_for_code_connect", "get_design_context", "get_figjam", "get_generative_plugin", "get_libraries", "get_metadata", "get_motion_context", "get_screenshot", "get_shader", "get_variable_defs", "list_file_shaders", "list_generative_plugins", "list_shaders", "search_design_system", "whoami"],
+        "write": ["add_code_connect_map", "send_code_connect_mappings", "create_generative_plugin", "update_generative_plugin", "create_new_file", "create_shader", "update_shader", "generate_diagram", "generate_figma_design", "generate_image", "html_to_figma", "send_code_to_figma", "upload_assets", "use_figma"]
+      },
+      "tried": null,
+      "sources": ["https://developers.figma.com/docs/figma-mcp-server/remote-server-installation/", "https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/"]
+    },
+    {
+      "key": "excalidraw",
+      "name": "Excalidraw",
+      "category": "DESIGN",
+      "description": "Diagrams drawn by Cortex",
+      "website": "https://excalidraw.com",
+      "mcpUrl": "https://mcp.excalidraw.com/mcp",
+      "connection": "open",
+      "tools": {
+        "read": ["read_me", "create_view", "read_checkpoint"],
+        "write": ["export_to_excalidraw", "save_checkpoint"]
+      },
+      "tried": null,
+      "sources": ["https://github.com/excalidraw/excalidraw-mcp"],
+      "unverified": ["what create_view returns to a client without the MCP Apps interface"]
+    },
+    {
+      "key": "excalidraw-plus",
+      "name": "Excalidraw+",
+      "category": "DESIGN",
+      "description": "Your Excalidraw+ scenes and collections",
+      "website": "https://plus.excalidraw.com",
+      "mcpUrl": "https://api.excalidraw.com/api/v1/mcp",
+      "connection": "api-key",
+      "admin": {
+        "required": false,
+        "text": "A workspace admin of Excalidraw+ allows personal MCP keys.",
+        "link": "https://plus.excalidraw.com/docs/mcp/mcp-api-key-types"
+      },
+      "apiKey": {
+        "hint": "Create a personal MCP key in Excalidraw+ and paste it here.",
+        "link": "https://plus.excalidraw.com/docs/mcp/getting-started"
+      },
+      "tools": {
+        "read": ["list_scenes", "get_scene", "search_scene_content", "get_scene_content", "read_diagram_format", "read_presentation_format", "read_freeform_format", "get_diagram", "list_slides", "check_scene_layout", "take_screenshot", "list_collections", "get_collection", "list_collection_scenes", "get_workspace", "list_workspace_users", "get_workspace_user", "list_invites", "get_invite", "list_logs"],
+        "write": ["create_scene", "update_scene", "delete_scene", "edit_scene_content", "create_mermaid_diagram", "create_diagram", "create_chart", "create_table", "transform_elements", "compose_slide", "compose_slides", "create_slide", "update_slide", "duplicate_slide", "delete_slide", "set_slide_animations", "create_sticky_notes", "share_scene", "share_presentation", "add_image", "create_collection", "update_collection", "delete_collection", "create_collection_scene", "update_workspace", "update_workspace_user", "remove_workspace_user", "create_email_invite", "create_invite_link", "update_invite", "delete_invite"]
+      },
+      "tried": null,
+      "sources": ["https://plus.excalidraw.com/docs/mcp/getting-started", "https://plus.excalidraw.com/docs/mcp/tools"],
+      "unverified": ["the Excalidraw+ plan required", "a read-only key"]
+    },
+    {
+      "key": "canva",
+      "name": "Canva",
+      "category": "DESIGN",
+      "description": "Designs & assets",
+      "website": "https://www.canva.com",
+      "mcpUrl": "https://mcp.canva.com/mcp",
+      "connection": "our-app",
+      "tried": null
+    },
+    {
+      "key": "webflow",
+      "name": "Webflow",
+      "category": "DESIGN",
+      "description": "Sites & CMS",
+      "website": "https://webflow.com",
+      "mcpUrl": "https://mcp.webflow.com/sse",
+      "connection": "self-registration",
+      "tried": null,
+      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+    },
+    {
+      "key": "wix",
+      "name": "Wix",
+      "category": "DESIGN",
+      "description": "Sites & CMS",
+      "website": "https://www.wix.com",
+      "mcpUrl": "https://mcp.wix.com/sse",
+      "connection": "self-registration",
+      "tried": null,
+      "unverified": ["the address points at a legacy SSE endpoint, which TaskForce's client does not speak"]
+    },
+    {
+      "key": "airtable",
+      "name": "Airtable",
+      "category": "OTHER",
+      "description": "No-code bases & tables",
+      "website": "https://airtable.com",
+      "mcpUrl": "https://mcp.airtable.com/mcp",
+      "connection": "self-registration",
+      "tried": null
+    },
+    {
+      "key": "zapier",
+      "name": "Zapier",
+      "category": "OTHER",
+      "description": "No-code automations",
+      "website": "https://zapier.com",
+      "mcpUrl": "https://mcp.zapier.com/api/mcp/mcp",
+      "connection": "self-registration",
+      "tried": null
+    }
+  ]
+}

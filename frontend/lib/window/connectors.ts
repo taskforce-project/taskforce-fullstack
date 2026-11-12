@@ -23,12 +23,19 @@ export function connectorsSummary(lines: readonly ConnectorLine[], t: ConnectorT
   return fillText(t.more, { first: lines[0].name, second: lines[1].name, count: lines.length - 2 })
 }
 
-/** Les connecteurs connectés du catalogue, ceux à reconnecter d'abord, puis par nom. */
+/**
+ * Les connecteurs connectés du catalogue, ceux à reconnecter d'abord (injoignables, ou dont l'éditeur refuse désormais
+ * le jeton : « Needs reconnecting »), puis par nom.
+ */
 export function connectorLines(catalog: IntegrationCatalog, servers: readonly McpServerStatus[]): ConnectorLine[] {
   const unreachable = new Set(servers.filter((server) => !server.reachable).map((server) => server.connectorKey))
   return catalog.categories
     .flatMap((group) => group.tools)
-    .filter((tool) => tool.connected)
-    .map((tool) => ({ key: tool.key, name: tool.name, reconnect: unreachable.has(tool.key) }))
+    .filter((tool) => tool.connected || tool.state === "NEEDS_RECONNECT")
+    .map((tool) => ({
+      key: tool.key,
+      name: tool.name,
+      reconnect: unreachable.has(tool.key) || tool.state === "NEEDS_RECONNECT",
+    }))
     .sort((a, b) => Number(b.reconnect) - Number(a.reconnect) || a.name.localeCompare(b.name))
 }

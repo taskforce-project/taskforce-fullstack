@@ -1,8 +1,13 @@
 package com.taskforce.tf_api.core.service.agent;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -65,6 +70,12 @@ public class CortexGate {
 
     private static final String NO_RULE = "No rule of this workspace covers this action, so it waits for the person.";
 
+    /** La clé de l'origine d'une réponse qui a sous les yeux une issue importée d'un outil de l'entreprise (R158). */
+    public static final String IMPORTED = "imported";
+
+    /** L'outil de l'espace qui rend le texte des issues. */
+    private static final String LISTS_ISSUES = "list_issues";
+
     private final HarnessRulesService rules;
     private final WorkspaceRepository workspaces;
     private final ProjectRepository projects;
@@ -105,7 +116,11 @@ public class CortexGate {
             return new Exposure();
         }
 
-        /** Ce que la réponse a reçu avant le premier outil : des notes, l'écran, une issue jointe sont des données de l'espace. */
+        /**
+         * Ce que la réponse a reçu avant le premier outil : des notes, l'écran, une issue jointe sont des données de
+         * l'espace ; une issue importée d'un outil de l'entreprise sous ses yeux ({@link CortexGate#IMPORTED}) est un
+         * contenu du dehors (séance n°22, R158).
+         */
         public static Exposure of(Map<String, Object> origin) {
             Exposure exposure = new Exposure();
             if (origin != null) {
@@ -113,6 +128,9 @@ public class CortexGate {
                 boolean notes = served instanceof java.util.Collection<?> c && !c.isEmpty();
                 exposure.sensitive = notes || origin.containsKey("screen") || origin.containsKey("issue")
                     || origin.containsKey("attached");
+                if (Boolean.TRUE.equals(origin.get(IMPORTED))) {
+                    exposure.outside();
+                }
             }
             return exposure;
         }
@@ -128,6 +146,15 @@ public class CortexGate {
             } else if (facts != null && WORKSPACE_READS.contains(facts.get("action"))) {
                 sensitive = true;
             }
+        }
+
+        /**
+         * Un contenu importé d'un outil de l'entreprise est entré dans la réponse (séance n°22, R158) : écrit par
+         * n'importe qui dans cet outil, il vient du dehors, et ce sont des données de l'entreprise.
+         */
+        public void outside() {
+            untrusted = true;
+            sensitive = true;
         }
 
         public boolean untrusted() {
@@ -185,6 +212,51 @@ public class CortexGate {
         return Optional.empty();
     }
 
+    /**
+     * Si ce que la réponse a sous les yeux tient une issue importée d'un outil de l'entreprise (séance n°22, R158) :
+     * l'issue de l'écran, une issue jointe ou lue pour elle ; le tableau d'un projet, à l'écran ou joint, qui en tient une.
+     */
+    @Transactional(readOnly = true)
+    public boolean importedInView(AgentContext ctx, List<Screen> attached, Collection<Long> issuesRead) {
+        List<Screen> seen = new ArrayList<>();
+        if (!ctx.screen().isEmpty()) {
+            seen.add(ctx.screen());
+        }
+        if (attached != null) {
+            seen.addAll(attached);
+        }
+        List<Long> ids = new ArrayList<>(issuesRead == null ? List.of() : issuesRead);
+        seen.stream().map(Screen::issueId).forEach(ids::add);
+        List<Long> wanted = ids.stream().filter(Objects::nonNull).distinct().toList();
+        if (!wanted.isEmpty() && issues.existsByIdInAndProjectWorkspaceIdAndImportedFromIsNotNull(wanted, ctx.workspaceId())) {
+            return true;
+        }
+        return seen.stream().filter(s -> s.issueId() == null).map(Screen::projectId).filter(Objects::nonNull).distinct()
+            .anyMatch(issues::existsByProjectIdAndImportedFromIsNotNull);
+    }
+
+    /**
+     * Si l'outil de l'espace qui vient de lire a pu rendre une issue importée d'un outil de l'entreprise (R158) : la liste
+     * des issues d'un projet nommé par sa clé, ce projet ; sans projet, ou d'un projet nommé autrement, l'espace (dans le
+     * doute, un contenu du dehors).
+     */
+    @Transactional(readOnly = true)
+    public boolean readImported(AgentContext ctx, Map<String, String> facts, String argsJson) {
+        if (facts == null || !LISTS_ISSUES.equals(facts.get("tool"))) {
+            return false;
+        }
+        JsonNode args = args(argsJson);
+        JsonNode named = args == null ? null : args.get("project");
+        if (named != null && named.isTextual() && !named.asText().isBlank()) {
+            Optional<Long> project = projects.findByWorkspaceIdAndIdentifier(ctx.workspaceId(),
+                named.asText().strip().toUpperCase(Locale.ROOT)).map(p -> p.getId());
+            if (project.isPresent()) {
+                return issues.existsByProjectIdAndImportedFromIsNotNull(project.get());
+            }
+        }
+        return issues.existsByProjectWorkspaceIdAndImportedFromIsNotNull(ctx.workspaceId());
+    }
+
     /** Juge un outil : ses faits, puis la règle la plus stricte qui les couvre. */
     public Verdict judge(RulesBundle bundle, AgentTool tool) {
         return judge(bundle, tool, null, Exposure.none());
@@ -197,6 +269,15 @@ public class CortexGate {
     public Verdict judge(RulesBundle bundle, AgentTool tool, String argsJson, Exposure exposure) {
         Map<String, String> facts = facts(tool);
         facts.putAll(floorFacts(tool, argsJson, exposure));
+        return judge(bundle, facts);
+    }
+
+    /**
+     * Juge un geste par ses faits, quand il n'est pas un outil de Cortex : un outil lancé par la personne depuis la
+     * console, l'import d'un projet qui crée un projet et ses issues (séance n°22, R158 : la console et l'import passent
+     * par le moteur comme tout autre geste). Ceux qui l'appellent disent l'acteur ({@link #personFacts}).
+     */
+    public Verdict judge(RulesBundle bundle, Map<String, String> facts) {
         RulesEngine.Decision decision = RulesEngine.decide(bundle, facts);
         RulesBundle.Rule rule = decision.rule();
         return new Verdict(decision.effect(), rule == null ? null : rule.id(), rule == null ? NO_RULE : reasonOf(rule),
@@ -211,8 +292,11 @@ public class CortexGate {
     /**
      * Les faits d'un outil : son action, son nom et, pour un outil externe, le serveur qui le porte. Un geste du MCP
      * TaskForce porte son action lui-même (ADR-024) : la même que la table juge quand un agent extérieur le fait.
+     *
+     * <p>La classe d'un outil externe est celle que TaskForce lui donne (séance n°22, R158) : celle du préréglage de son
+     * serveur, une écriture pour un outil inconnu, quoi que le serveur déclare de lui-même ({@code readOnlyHint}).</p>
      */
-    static Map<String, String> facts(AgentTool tool) {
+    public static Map<String, String> facts(AgentTool tool) {
         String name = tool.name() == null ? "" : tool.name();
         Map<String, String> facts = new LinkedHashMap<>();
         if (tool instanceof ExternalMcpTool external) {
@@ -224,6 +308,18 @@ public class CortexGate {
             facts.put("action", ACTIONS.get(name));
         }
         facts.put("tool", name);
+        return facts;
+    }
+
+    /**
+     * Les faits d'un geste que la personne fait elle-même, depuis la console d'actions ou l'import d'un projet (séance
+     * n°22, R158) : ceux de l'outil, ce que le socle lit encore pour elle (un secret dans les arguments, les arguments
+     * simples qu'un seuil peut lire), et l'acteur, une personne (R157).
+     */
+    public Map<String, String> personFacts(AgentTool tool, String argsJson) {
+        Map<String, String> facts = facts(tool);
+        facts.putAll(floorFacts(tool, argsJson, Exposure.none()));
+        facts.put("actor", "person");
         return facts;
     }
 

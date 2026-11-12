@@ -15,16 +15,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Decouverte OAuth 2.1 d'un serveur MCP (TF-MCP-02) : trouve le serveur d'autorisation et ses
+ * Decouverte OAuth 2.1 d'un serveur MCP (TF-MCP-02, norme MCP du 28/07/2026) : trouve le serveur d'autorisation et ses
  * endpoints sans rien coder de specifique au service.
  *
  * <ol>
- *   <li>probe non authentifie du serveur MCP -> {@code 401} + en-tete {@code WWW-Authenticate}
- *       pointant la <b>Protected Resource Metadata</b> (RFC 9728), sinon le well-known standard ;</li>
- *   <li>la PRM donne le(s) <b>authorization server(s)</b> ; a defaut, on suppose que le serveur MCP
- *       est son propre AS ;</li>
- *   <li>la <b>Authorization Server Metadata</b> (RFC 8414, sinon OpenID Connect) donne
- *       {@code authorization_endpoint} / {@code token_endpoint} / {@code registration_endpoint}.</li>
+ *   <li>probe non authentifie du serveur MCP -> {@code 401} + en-tete {@code WWW-Authenticate} pointant la
+ *       <b>Protected Resource Metadata</b> (RFC 9728) et, parfois, les portees qu'il demande ; sinon les emplacements
+ *       standard, avec le chemin du serveur puis a la racine ;</li>
+ *   <li>la PRM donne le serveur d'autorisation et l'identifiant du serveur ({@code resource}), qui doit designer le
+ *       serveur appele ; a defaut, le serveur MCP est son propre serveur d'autorisation ;</li>
+ *   <li>la <b>Authorization Server Metadata</b> (RFC 8414 avec insertion du chemin, sinon OpenID Connect) donne les
+ *       endpoints ; son {@code issuer} doit etre celui qui a servi a la trouver, et elle doit annoncer PKCE S256 :
+ *       sinon TaskForce refuse de s'y connecter.</li>
  * </ol>
  */
 @Service
@@ -32,10 +34,17 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class McpOAuthDiscovery {
 
-    private static final Pattern RESOURCE_METADATA =
-        Pattern.compile("resource_metadata=\"?([^\",\\s]+)\"?");
+    private static final Pattern RESOURCE_METADATA = Pattern.compile("resource_metadata=\"?([^\",\\s]+)\"?");
+    private static final Pattern SCOPE = Pattern.compile("(?:^|[\\s,])scope=\"([^\"]*)\"");
 
     private final McpOAuthClient client;
+
+    /** Le serveur ne publie aucun flux OAuth : il se connecte par une clé, ou il est public. */
+    public static class NoOAuth extends BusinessException {
+        public NoOAuth(String mcpUrl) {
+            super("OAuth metadata not found for " + mcpUrl + " (the server exposes no OAuth flow?)");
+        }
+    }
 
     /** Endpoints resolus du serveur d'autorisation d'un serveur MCP. */
     public record DiscoveredAuth(
@@ -43,37 +52,64 @@ public class McpOAuthDiscovery {
         String authorizationEndpoint,
         String tokenEndpoint,
         String registrationEndpoint,
-        String scopesSupported
-    ) {}
+        String scopesSupported,
+        /** L'identifiant du serveur MCP a envoyer en {@code resource} (RFC 8707). */
+        String resource,
+        /** Les portees que le serveur demande dans son 401 ; nulles s'il n'en dit rien. */
+        String challengeScope,
+        String revocationEndpoint,
+        /** Le serveur d'autorisation accepte un document de metadonnees comme identifiant de client (CIMD). */
+        boolean cimdSupported,
+        /** Le serveur d'autorisation rend {@code iss} au retour (RFC 9207) : il est alors exige. */
+        boolean issParameterSupported
+    ) {
+        /** Forme courte des essais : un serveur sans PRM, sans CIMD ni {@code iss}. */
+        public DiscoveredAuth(String issuer, String authorizationEndpoint, String tokenEndpoint,
+                              String registrationEndpoint, String scopesSupported) {
+            this(issuer, authorizationEndpoint, tokenEndpoint, registrationEndpoint, scopesSupported, null, null, null,
+                false, false);
+        }
+    }
 
     public DiscoveredAuth discover(String mcpUrl) {
-        // 1. Protected Resource Metadata
-        JsonNode prm = fetchPrm(mcpUrl);
+        // 1. Protected Resource Metadata (et les portees du 401)
+        String header = client.probeWwwAuthenticate(mcpUrl);
+        JsonNode prm = fetchPrm(mcpUrl, header);
+        String resource = resource(prm, mcpUrl);
         // 2. Serveur d'autorisation (sinon le serveur MCP est son propre AS)
-        String asBase = authServerFromPrm(prm);
-        if (asBase == null || asBase.isBlank()) asBase = origin(mcpUrl);
-        // 3. Authorization Server Metadata (RFC 8414, sinon OIDC)
-        JsonNode as = client.getJsonOrNull(wellKnown(asBase, "oauth-authorization-server"));
-        if (as == null) as = client.getJsonOrNull(wellKnown(asBase, "openid-configuration"));
-        if (as == null) {
-            throw new BusinessException("OAuth metadata not found for " + mcpUrl
-                + " (the server exposes no OAuth flow?)");
+        String asUrl = authServerFromPrm(prm);
+        if (asUrl == null || asUrl.isBlank()) asUrl = origin(mcpUrl);
+        // 3. Authorization Server Metadata (RFC 8414, sinon OIDC), avec le chemin de l'emetteur
+        JsonNode as = null;
+        for (String candidate : asMetadataUrls(asUrl)) {
+            as = client.getJsonOrNull(candidate);
+            if (as != null && as.isObject()) break;
+            as = null;
+        }
+        if (as == null) throw new NoOAuth(mcpUrl);
+        String issuer = text(as, "issuer");
+        if (issuer == null || !sameIssuer(issuer, asUrl)) {
+            throw new BusinessException("The sign-in server of " + mcpUrl + " does not identify itself as " + asUrl
+                + ": TaskForce does not connect to it.");
         }
         String authEp = text(as, "authorization_endpoint");
         String tokenEp = text(as, "token_endpoint");
         if (authEp == null || tokenEp == null) {
             throw new BusinessException("Incomplete OAuth endpoints for " + mcpUrl);
         }
-        return new DiscoveredAuth(
-            as.path("issuer").asText(asBase),
-            authEp, tokenEp, text(as, "registration_endpoint"),
-            scopes(prm, as));
+        if (!supportsS256(as)) {
+            throw new BusinessException("The sign-in server of " + mcpUrl + " does not announce PKCE (S256): "
+                + "TaskForce can't sign in to it safely.");
+        }
+        return new DiscoveredAuth(issuer, authEp, tokenEp, text(as, "registration_endpoint"), scopes(prm, as),
+            resource, challengeScope(header), text(as, "revocation_endpoint"),
+            as.path("client_id_metadata_document_supported").asBoolean(false),
+            as.path("authorization_response_iss_parameter_supported").asBoolean(false));
     }
 
     // -------------------------------------------------------------------------
 
-    private JsonNode fetchPrm(String mcpUrl) {
-        String header = client.probeWwwAuthenticate(mcpUrl);
+    private JsonNode fetchPrm(String mcpUrl, String header) {
         if (header != null) {
             Matcher m = RESOURCE_METADATA.matcher(header);
             if (m.find()) {
@@ -81,14 +117,68 @@ public class McpOAuthDiscovery {
                 if (prm != null) return prm;
             }
         }
-        // Fallback : emplacement standard de la PRM.
-        return client.getJsonOrNull(wellKnown(mcpUrl, "oauth-protected-resource"));
+        // Emplacements standard de la PRM : avec le chemin du serveur, puis a la racine (RFC 9728, §3.1).
+        String path = path(mcpUrl);
+        if (!path.isEmpty()) {
+            JsonNode prm = client.getJsonOrNull(origin(mcpUrl) + "/.well-known/oauth-protected-resource" + path);
+            if (prm != null) return prm;
+        }
+        return client.getJsonOrNull(origin(mcpUrl) + "/.well-known/oauth-protected-resource");
+    }
+
+    /**
+     * L'identifiant que la PRM donne au serveur : il doit designer le serveur appele (meme origine, et un chemin qui
+     * le contient), sinon c'est la metadata d'un autre serveur. Sans PRM, l'adresse appelee.
+     */
+    static String resource(JsonNode prm, String mcpUrl) {
+        String declared = prm == null ? null : text(prm, "resource");
+        if (declared == null) return mcpUrl;
+        String a = strip(declared);
+        String b = strip(mcpUrl);
+        if (!origin(a).equalsIgnoreCase(origin(b)) || !(b.equals(a) || b.startsWith(a + "/") || a.equals(origin(a)))) {
+            throw new BusinessException("The server at " + mcpUrl + " describes another server (" + declared
+                + "): TaskForce does not connect to it.");
+        }
+        return declared;
     }
 
     private String authServerFromPrm(JsonNode prm) {
         if (prm == null) return null;
         JsonNode servers = prm.path("authorization_servers");
         return (servers.isArray() && !servers.isEmpty()) ? servers.get(0).asText(null) : null;
+    }
+
+    /**
+     * Les adresses de la metadata d'un emetteur (RFC 8414, §3.1 ; norme MCP) : pour {@code https://h/p},
+     * {@code /.well-known/oauth-authorization-server/p}, {@code /.well-known/openid-configuration/p}, puis
+     * {@code /p/.well-known/openid-configuration} ; sans chemin, les deux documents a la racine.
+     */
+    static List<String> asMetadataUrls(String issuer) {
+        String origin = origin(issuer);
+        String path = path(issuer);
+        List<String> out = new ArrayList<>();
+        if (path.isEmpty()) {
+            out.add(origin + "/.well-known/oauth-authorization-server");
+            out.add(origin + "/.well-known/openid-configuration");
+        } else {
+            out.add(origin + "/.well-known/oauth-authorization-server" + path);
+            out.add(origin + "/.well-known/openid-configuration" + path);
+            out.add(origin + path + "/.well-known/openid-configuration");
+        }
+        return out;
+    }
+
+    private static boolean supportsS256(JsonNode as) {
+        JsonNode methods = as.path("code_challenge_methods_supported");
+        if (!methods.isArray()) return false;
+        for (JsonNode m : methods) if ("S256".equals(m.asText())) return true;
+        return false;
+    }
+
+    private static String challengeScope(String header) {
+        if (header == null) return null;
+        Matcher m = SCOPE.matcher(header);
+        return m.find() && !m.group(1).isBlank() ? m.group(1).trim() : null;
     }
 
     private String scopes(JsonNode prm, JsonNode as) {
@@ -102,14 +192,27 @@ public class McpOAuthDiscovery {
         return null;
     }
 
+    private static boolean sameIssuer(String a, String b) {
+        return strip(a).equals(strip(b));
+    }
+
+    private static String strip(String url) {
+        String v = url.trim();
+        while (v.endsWith("/")) v = v.substring(0, v.length() - 1);
+        return v;
+    }
+
     private static String text(JsonNode node, String field) {
         String v = node.path(field).asText(null);
         return (v == null || v.isBlank()) ? null : v;
     }
 
-    /** Well-known a l'origine (schema://host[:port]) - couvre les AS hebergees a la racine. */
-    private static String wellKnown(String base, String doc) {
-        return origin(base) + "/.well-known/" + doc;
+    /** Le chemin d'une URL, sans barre finale ({@code ""} a la racine). */
+    private static String path(String url) {
+        String p = URI.create(url.trim()).getRawPath();
+        if (p == null) return "";
+        while (p.endsWith("/")) p = p.substring(0, p.length() - 1);
+        return p;
     }
 
     private static String origin(String url) {

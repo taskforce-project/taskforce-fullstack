@@ -157,8 +157,12 @@ public class AgentService {
         if (tool == null) {
             throw new BusinessException("This action is no longer available.");
         }
-        if (tool instanceof ExternalMcpTool && !authorization.isManager(ws.getId(), userId)) {
-            throw new BusinessException("Only workspace owners and admins can approve a change in an external tool.");
+        // Une écriture par la connexion de la personne, elle l'accorde ; par une connexion partagée avec l'espace, un
+        // propriétaire ou un administrateur (séance n°22, R154 ; OSS-1.5). Ses outils sont ceux de sa connexion.
+        if (tool instanceof ExternalMcpTool external && !external.isReadOnly() && external.shared()
+                && !authorization.isManager(ws.getId(), userId)) {
+            throw new BusinessException("Only workspace owners and admins can approve a change through a connection "
+                + "shared with the workspace.");
         }
         // Les règles du projet qui avait jugé la proposition (R157), relues : elles ont pu changer depuis.
         Long project = gate.projectOf(ctx, argsJson).orElseGet(() -> proposedProject(record, toolName));
@@ -955,6 +959,9 @@ public class AgentService {
         if (!issue.isEmpty()) origin.put("issue", CortexRecordService.shorten(issue));
         if (!files.isEmpty()) origin.put("files", files.stream().map(AttachedFile::name).toList());
         if (plan != null) origin.put("plan", plan.id());
+        // Une issue importée d'un outil de l'entreprise sous les yeux de la réponse (séance n°22, R158) : un contenu du
+        // dehors, que le socle compte avant une écriture ou une sortie, et que le dossier garde.
+        if (gate.importedInView(ctx, joined, read == null ? List.of() : read.ids())) origin.put(CortexGate.IMPORTED, true);
         Kernel kernel = new Kernel(ctx, message, origin);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
             reading, loopFit);
@@ -1421,16 +1428,19 @@ public class AgentService {
                     result = refusedText(verdict);
                     status = "refused";
                 } else if (!verdict.allowed()) {
-                    // Demandé : jamais exécuté par le modèle. Une écriture externe ne se propose qu'à qui peut la valider
-                    // (propriétaire ou administrateur, OSS-1.5) ; les autres l'apprennent d'emblée. Une règle de
-                    // l'entreprise qui désigne qui accorde (R98) : la carte de la conversation ne se répond que par la
-                    // personne qui demande ; si elle ne suffit pas seule, rien ne se propose, et Cortex dit qui accorde.
+                    // Demandé : jamais exécuté par le modèle. Une règle de l'entreprise qui désigne qui accorde (R98) : la
+                    // carte de la conversation ne se répond que par la personne qui demande ; si elle ne suffit pas seule,
+                    // rien ne se propose, et Cortex dit qui accorde. Une écriture externe ne se propose qu'à qui peut la
+                    // valider : la personne pour sa connexion ; un propriétaire ou un administrateur pour une connexion
+                    // partagée (séance n°22, R154 ; OSS-1.5) ; les autres l'apprennent d'emblée.
                     if (!approvers.aloneSuffices(verdict.require(), ctx.workspaceId(), judgedProject, ctx.userId())) {
                         result = waitsForOthers(verdict, ctx.workspaceId());
                         status = "refused";
-                    } else if (tool instanceof ExternalMcpTool && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
-                        result = "Not run: only workspace owners and admins can approve a change in an external "
-                            + "tool. Tell the user that an owner or admin has to make this change.";
+                    } else if (tool instanceof ExternalMcpTool external && external.shared()
+                            && !authorization.isManager(ctx.workspaceId(), ctx.userId())) {
+                        result = "Not run: only workspace owners and admins can approve a change through a connection "
+                            + "shared with the workspace. Tell the user that an owner or admin has to make this "
+                            + "change, or that she can connect the tool with her own account.";
                         status = "error";
                     } else {
                         // La carte dit ce que la personne accorde : l'issue qu'on supprimerait, ce qui partirait avec elle.
@@ -1485,6 +1495,7 @@ public class AgentService {
             }
             // Ce que l'outil a lu entre dans la réponse (R158) : les gestes suivants le portent dans leurs faits.
             exposure.after(tool, judgedFacts, status);
+            if ("success".equals(status) && gate.readImported(ctx, judgedFacts, argsJson)) exposure.outside();
             if (asked != null) {
                 return new ToolOutcome(status, result, null, asked(name, argsJson, result, asked), null, asked);
             }
