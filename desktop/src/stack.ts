@@ -54,7 +54,7 @@ function accountSecret(subject: string, name: "databasePassword" | "encryptionKe
  * de temps) ; le relais enfin, qui ouvre l'origine de la fenêtre, et le runner de Claude Code.
  */
 export async function startStack(account: Account, onStep: (step: string) => void,
-                                 onConnected: () => void = () => undefined): Promise<Stack> {
+                                 onConnected: (path: string | null) => void = () => undefined): Promise<Stack> {
   const dataDir = accountDataDir(account.subject);
   const launchToken = randomToken("tfd_");
   const database = new EmbeddedPostgres(dataDir, accountSecret(account.subject, "databasePassword"));
@@ -67,7 +67,8 @@ export async function startStack(account: Account, onStep: (step: string) => voi
   const ai = new BackendAi(() => backend.port, launchToken, shellSecret);
   const aiChoice = settings.aiSettings(account.subject);
   const github = new GitHubRelay();
-  const mcpCallback = new McpCallback(onConnected);
+  // Le retour d'une connexion à un outil : la fenêtre revient au premier plan, sur la page où l'app finit la connexion.
+  const mcpCallback = new McpCallback((_outcome, path) => onConnected(path));
 
   // Le runner d'abord : il rend au backend le résultat d'un run interrompu avant que celui-ci s'arrête. Chaque étape a un
   // délai : une étape bloquée ne doit jamais empêcher l'arrêt propre de la base.

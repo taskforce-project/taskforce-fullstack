@@ -26,7 +26,7 @@ import { DeleteConfirmDialog } from "@/components/dialogs/delete-confirm-dialog"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { getAuditLogs, type AuditLogEntry } from "@/lib/api/workspace-service"
 import { useIntegrationStore } from "@/lib/store/integration-store"
-import { getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
+import { finishMcpReturn, getGitHubRepos, getGitHubRepoIssues, syncGitHub, syncSlack, type GitHubRepo, type GitHubRepoIssue } from "@/lib/api/integration-service"
 import { IntegrationsCatalog } from "@/components/integrations/integrations-catalog"
 import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
 import { WebhooksPanel } from "@/components/settings/webhooks-panel"
@@ -1978,9 +1978,15 @@ export default function SettingsPage() {
     if (github === "error") toast.error("GitHub wasn't connected. Try again, and accept the access on GitHub.", { id: "oauth-github" })
     if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
     if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
-    if (mcp === "connected") toast.success(CONSTANTS_EN.connect.returnedConnected.replace("{name}", tool), { id: "oauth-mcp" })
-    if (mcp === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
-    if (mcp === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
+    const said = (outcome: string | null) => {
+      if (outcome === "connected") toast.success(CONSTANTS_EN.connect.returnedConnected.replace("{name}", tool), { id: "oauth-mcp" })
+      if (outcome === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
+      if (outcome === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
+    }
+    // Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée.
+    const finishing = finishMcpReturn(new URLSearchParams(searchParams.toString()))
+    if (finishing) void finishing.then(({ outcome }) => said(outcome))
+    else said(mcp)
     const target = github || slack || mcp
       ? "integrations"
       : section && SECTIONS.some((s) => s.key === section)

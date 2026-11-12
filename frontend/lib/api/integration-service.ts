@@ -584,6 +584,44 @@ export async function startMcpOAuth(
   return res.data.data.authorizeUrl;
 }
 
+/** Comment une connexion à un outil a fini : branchée, en attente de l'administrateur, ou pas faite. */
+export type McpReturnOutcome = "connected" | "admin" | "error";
+
+/** Ce que la fin d'une connexion rend : son issue, et l'outil, pour le message. */
+export interface McpOAuthCompletion {
+  outcome: McpReturnOutcome;
+  connectorKey: string | null;
+}
+
+/**
+ * Finit une connexion revenue du navigateur : le retour a gardé le code avec son `state`, et seule la personne qui a
+ * lancé la connexion, connectée, la finit. `finish` est le jeton à usage unique que seul ce navigateur a reçu.
+ */
+export async function completeMcpOAuth(state: string, finish: string): Promise<McpOAuthCompletion> {
+  const res = await apiClient.post<{ data: McpOAuthCompletion }>(INTEGRATION_ROUTES.MCP_OAUTH_COMPLETE, { state, finish });
+  return res.data.data;
+}
+
+/** Les fins déjà lancées, par jeton : une page qui relit son adresse ne finit la connexion qu'une fois. */
+const finishing = new Map<string, Promise<McpOAuthCompletion>>();
+
+/**
+ * Le retour d'une connexion à un outil (`?mcp=finish&state=…&finish=…`), lu dans l'adresse de la page : la fin de la
+ * connexion, une seule fois par retour ; `null` quand l'adresse n'en porte pas. Un échec se dit `error`, sans lever.
+ */
+export function finishMcpReturn(params: URLSearchParams): Promise<McpOAuthCompletion> | null {
+  if (params.get("mcp") !== "finish") return null;
+  const connectorKey = params.get("connector");
+  const state = params.get("state");
+  const finish = params.get("finish");
+  if (!state || !finish) return Promise.resolve({ outcome: "error", connectorKey });
+  const known = finishing.get(finish);
+  if (known) return known;
+  const done = completeMcpOAuth(state, finish).catch((): McpOAuthCompletion => ({ outcome: "error", connectorKey }));
+  finishing.set(finish, done);
+  return done;
+}
+
 /** Résultat d'un import de projet externe : le projet natif créé + le nombre d'issues importées. */
 export interface McpImportResult {
   projectId: number;

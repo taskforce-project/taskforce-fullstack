@@ -29,6 +29,8 @@ import {
   connectMcpServer,
   disconnectMcpServer,
   startMcpOAuth,
+  completeMcpOAuth,
+  finishMcpReturn,
   NEW_CUSTOM_MCP_KEY,
   connectTool,
   approveMcpTools,
@@ -445,6 +447,40 @@ describe('integration-service', () => {
         INTEGRATION_ROUTES.MCP_OAUTH_START(SLUG, 'custom'),
         { mcpUrl: 'https://docs.example.com/mcp', returnTo: undefined, name: 'Docs' },
       );
+    });
+  });
+
+  // --- Le retour d'une connexion : l'app, connectée, la finit ---
+  describe('finishMcpReturn', () => {
+    it("finit la connexion avec le state et le jeton du retour, une seule fois par retour", async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(envelope({ outcome: 'connected', connectorKey: 'linear' }));
+      const params = new URLSearchParams('section=integrations&mcp=finish&connector=linear&state=st-1&finish=fin-1');
+
+      const first = await finishMcpReturn(params);
+      const again = await finishMcpReturn(new URLSearchParams(params.toString()));
+
+      expect(first).toEqual({ outcome: 'connected', connectorKey: 'linear' });
+      expect(again).toEqual(first);
+      expect(apiClient.post).toHaveBeenCalledTimes(1);
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_OAUTH_COMPLETE, { state: 'st-1', finish: 'fin-1' });
+    });
+
+    it("rien à finir sans retour ; un retour incomplet ou refusé se dit error, sans lever", async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('403'));
+
+      expect(finishMcpReturn(new URLSearchParams('mcp=connected'))).toBeNull();
+      await expect(finishMcpReturn(new URLSearchParams('mcp=finish&connector=linear')))
+        .resolves.toEqual({ outcome: 'error', connectorKey: 'linear' });
+      await expect(finishMcpReturn(new URLSearchParams('mcp=finish&connector=notion&state=st-2&finish=fin-2')))
+        .resolves.toEqual({ outcome: 'error', connectorKey: 'notion' });
+      expect(apiClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it("completeMcpOAuth : POST du state et du jeton, rend l'issue", async () => {
+      vi.mocked(apiClient.post).mockResolvedValue(envelope({ outcome: 'admin', connectorKey: 'slack-mcp' }));
+
+      await expect(completeMcpOAuth('st-3', 'fin-3')).resolves.toEqual({ outcome: 'admin', connectorKey: 'slack-mcp' });
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_OAUTH_COMPLETE, { state: 'st-3', finish: 'fin-3' });
     });
   });
 

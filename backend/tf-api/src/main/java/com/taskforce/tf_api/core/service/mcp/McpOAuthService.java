@@ -28,6 +28,7 @@ import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
 import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
@@ -47,9 +48,10 @@ import lombok.extern.slf4j.Slf4j;
  * <p>Securite : SsrfGuard sur l'URL fournie et sur chaque endpoint découvert ; PKCE S256 ; {@code state} anti-CSRF
  * resolvant la connexion au callback ; {@code iss} vérifié au retour (RFC 9207) ; seules les portées strictement utiles
  * (la lecture par défaut) ; tokens chiffres (via {@link McpTokenService}) et rangés avec leur émetteur. Le callback
- * <b>redirige toujours</b> vers l'UI (succes ou erreur), jamais une erreur brute au navigateur. Sur l'app desktop, le
- * navigateur revient sur la coque (127.0.0.1, port fixe) qui remet le code au backend local : aucun jeton ne passe par
- * notre serveur.</p>
+ * garde le code avec son {@code state} et <b>redirige toujours</b> vers l'UI (succes ou erreur), jamais une erreur brute
+ * au navigateur ; l'app, connectée, finit l'échange, et seule la personne qui a lancé le flux le peut
+ * ({@link #complete}). Sur l'app desktop, le navigateur revient sur la coque (127.0.0.1, port fixe) qui remet le code au
+ * backend local puis ramène l'app, qui finit de même : aucun jeton ne passe par notre serveur.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -74,6 +76,7 @@ public class McpOAuthService {
     private final ConnectorAppRepository apps;
     private final ConnectorConnectionRepository connections;
     private final ObjectMapper objectMapper;
+    private final AuthorizationService authorization;
 
     private final SecureRandom random = new SecureRandom();
 
@@ -303,9 +306,8 @@ public class McpOAuthService {
     }
 
     /**
-     * Callback OAuth (endpoint public) : resout tout depuis le {@code state} (jamais l'URL), vérifie l'émetteur,
-     * echange le code, stocke les tokens sur la connexion de la personne (ou de l'espace), fige la liste des outils,
-     * invalide le cache, et renvoie l'URL de retour vers l'UI.
+     * Callback OAuth (endpoint public) : resout tout depuis le {@code state} (jamais l'URL), vérifie l'émetteur, garde
+     * le code avec le {@code state}, et renvoie vers l'UI, où l'app, connectée, finit l'échange ({@link #complete}).
      */
     @Transactional
     public String callback(String state, String code, String error, String iss) {
@@ -315,12 +317,17 @@ public class McpOAuthService {
     /**
      * Le retour, avec la description de l'erreur que l'éditeur donne : chez Microsoft, le code {@code AADSTS} dit si
      * c'est l'administrateur de l'entreprise qui doit accorder d'abord (TF-J2-14). Jamais montrée à la personne.
+     *
+     * <p>Le code n'est pas échangé ici : il est gardé avec son {@code state}, et l'adresse de retour porte un jeton à
+     * usage unique que seul ce navigateur reçoit ({@code finish}). L'app, connectée, le présente pour finir ; seule la
+     * personne qui a lancé le flux le peut.</p>
      */
     @Transactional
     public String callback(String state, String code, String error, String iss, String errorDescription) {
         McpOAuthState row = (state == null || state.isBlank()) ? null
             : stateRepository.findById(state).orElse(null);
         if (row == null) return settings.appBase() + "/?mcp=error"; // state inconnu/expire : retour generique
+        boolean kept = false;
         try {
             if (error != null && !error.isBlank()) {
                 if (ADMIN_ERRORS.contains(error) || adminRequired(row.getConnectorKey())
@@ -332,13 +339,58 @@ public class McpOAuthService {
             }
             if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
             if (code == null || code.isBlank()) throw new BusinessException("code manquant");
+            // Un state ne revient qu'une fois.
+            if (row.getCode() != null || row.getFinishHash() != null) throw new BusinessException("retour deja recu");
             // RFC 9207 : le retour doit venir de l'émetteur attendu (attaque par mélange de serveurs).
             if (iss != null && !iss.isBlank() && !sameIssuer(iss, row.getIssuer())) {
                 throw new BusinessException("emetteur inattendu");
             }
             if (row.isIssRequired() && (iss == null || iss.isBlank())) throw new BusinessException("emetteur absent");
 
-            JsonNode tok = client.postForm(row.getTokenEndpoint(), exchangeForm(row, code));
+            String finish = urlSafe(24);
+            row.setCode(code);
+            row.setFinishHash(sha256Hex(finish));
+            stateRepository.save(row);
+            kept = true;
+            return appRedirect(row, "finish") + "&state=" + enc(row.getState()) + "&finish=" + enc(finish);
+        } catch (Exception e) {
+            log.warn("Callback OAuth MCP echoue (connector={}) : {}", LogSafe.of(row.getConnectorKey()), LogSafe.of(e.getMessage()));
+            return appRedirect(row, "error");
+        } finally {
+            if (!kept) stateRepository.deleteById(row.getState()); // usage unique
+        }
+    }
+
+    /** Comment l'app a fini une connexion : {@code connected} ou {@code error}, et l'outil, pour son message. */
+    public record Completion(String outcome, String connectorKey) {}
+
+    /**
+     * L'app, connectée, finit la connexion revenue du navigateur : seulement avec le jeton que ce navigateur a reçu,
+     * seulement pour la personne qui a créé le {@code state}, encore membre de l'espace (et gestionnaire pour une
+     * connexion partagée). Puis l'échange du code, les jetons sur sa connexion (ou celle de l'espace), la liste des outils
+     * figée, le cache invalidé. Usage unique : réussi ou non, le flux s'efface.
+     */
+    @Transactional
+    public Completion complete(Long userId, String state, String finish) {
+        McpOAuthState row = (state == null || state.isBlank()) ? null
+            : stateRepository.findById(state).orElse(null);
+        if (row == null) return new Completion("error", null);
+        try {
+            if (row.getCode() == null || row.getFinishHash() == null || finish == null || finish.isBlank()
+                    || !MessageDigest.isEqual(sha256Hex(finish).getBytes(StandardCharsets.US_ASCII),
+                        row.getFinishHash().getBytes(StandardCharsets.US_ASCII))) {
+                throw new BusinessException("retour inconnu");
+            }
+            if (userId == null || !userId.equals(row.getUserId())) {
+                throw new BusinessException("le flux a ete lance par une autre personne");
+            }
+            if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
+            if (!authorization.isMember(row.getWorkspaceId(), userId)
+                    || (row.isShared() && !authorization.isManager(row.getWorkspaceId(), userId))) {
+                throw new BusinessException("la personne n'a plus acces a l'espace");
+            }
+
+            JsonNode tok = client.postForm(row.getTokenEndpoint(), exchangeForm(row, row.getCode()));
 
             ConnectorConnection conn = connectionFor(row);
             conn.setAccountLabel(accountLabel(tok));
@@ -351,10 +403,11 @@ public class McpOAuthService {
             conn.setToolsPin(null);
             workspaceMcp.pinQuietly(conn);
             workspaceMcp.invalidate(row.getWorkspaceId());
-            return appRedirect(row, "connected");
+            return new Completion("connected", row.getConnectorKey());
         } catch (Exception e) {
-            log.warn("Callback OAuth MCP echoue (connector={}) : {}", LogSafe.of(row.getConnectorKey()), LogSafe.of(e.getMessage()));
-            return appRedirect(row, "error");
+            log.warn("Fin de connexion MCP echouee (connector={}) : {}", LogSafe.of(row.getConnectorKey()),
+                LogSafe.of(e.getMessage()));
+            return new Completion("error", row.getConnectorKey());
         } finally {
             stateRepository.deleteById(row.getState()); // usage unique
         }
@@ -540,6 +593,16 @@ public class McpOAuthService {
             return Base64.getUrlEncoder().withoutPadding().encodeToString(d);
         } catch (Exception e) {
             throw new BusinessException("PKCE indisponible : " + e.getMessage());
+        }
+    }
+
+    /** L'empreinte SHA-256 d'un jeton, en hexadécimal : seule elle est gardée. */
+    private static String sha256Hex(String value) {
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d);
+        } catch (Exception e) {
+            throw new BusinessException("Empreinte indisponible : " + e.getMessage());
         }
     }
 

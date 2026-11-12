@@ -133,8 +133,11 @@ class CompanyFilesContractTest {
         UserRepository users = Mockito.mock(UserRepository.class);
         lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
         lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
+        AuthorizationService members = Mockito.mock(AuthorizationService.class);
+        lenient().when(members.isMember(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+            .thenReturn(true);
         McpOAuthService service = new McpOAuthService(new McpOAuthDiscovery(http), http, stateRepository(),
-            workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), repo, om);
+            workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), repo, om, members);
         service.allowLocalServersForContractTests();
         service.pointApiForContractTests("google-drive", google.base(), google.base());
         service.pointApiForContractTests("microsoft-365", microsoft.base(), microsoft.base());
@@ -147,7 +150,7 @@ class CompanyFilesContractTest {
             "google-drive", null, null, null, null, false, false, false, null));
         assertThat(outcome.next()).isEqualTo("browser");
         Map<String, String> back = google.approve(outcome.authorizeUrl());
-        return oauth.callback(back.get("state"), back.get("code"), null, null);
+        return McpConnectContractTest.finish(oauth, person, oauth.callback(back.get("state"), back.get("code"), null, null));
     }
 
     private List<AgentTool> toolsOf(User person) {
@@ -176,7 +179,8 @@ class CompanyFilesContractTest {
         Map<String, String> back = google.approve(outcome.authorizeUrl());
         String redirect = oauth.callback(back.get("state"), back.get("code"), null, null);
 
-        assertThat(redirect).contains("mcp=connected").contains("connector=google-drive");
+        assertThat(redirect).contains("mcp=finish").contains("connector=google-drive");
+        assertThat(McpConnectContractTest.finish(oauth, ada, redirect)).isEqualTo("mcp=connected");
         ConnectorConnection conn = rows.get(0);
         assertThat(conn.getScope()).isEqualTo(ConnectionScope.PERSONAL);
         assertThat(conn.isOwnedBy(ada.getId())).isTrue();
@@ -292,7 +296,8 @@ class CompanyFilesContractTest {
             "microsoft-365", null, null, null, null, false, allowWrites, false, null));
         assertThat(outcome.next()).isEqualTo("browser");
         Map<String, String> back = microsoft.approve(outcome.authorizeUrl(), false);
-        return oauth.callback(back.get("state"), back.get("code"), null, null, null);
+        return McpConnectContractTest.finish(oauth, person,
+            oauth.callback(back.get("state"), back.get("code"), null, null, null));
     }
 
     @Test
@@ -307,7 +312,8 @@ class CompanyFilesContractTest {
             .doesNotContain("Files.ReadWrite.All");
 
         Map<String, String> back = microsoft.approve(outcome.authorizeUrl(), false);
-        assertThat(oauth.callback(back.get("state"), back.get("code"), null, null, null)).contains("mcp=connected");
+        assertThat(McpConnectContractTest.finish(oauth, ada, oauth.callback(back.get("state"), back.get("code"), null,
+            null, null))).isEqualTo("mcp=connected");
 
         ConnectorConnection conn = rows.get(0);
         assertThat(conn.getAccountLabel()).isEqualTo("ada@contoso.example");

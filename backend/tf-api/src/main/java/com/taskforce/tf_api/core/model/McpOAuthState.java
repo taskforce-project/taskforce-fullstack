@@ -18,10 +18,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Etat ephemere du flux <b>OAuth 2.1</b> d'un serveur MCP (TF-MCP-02), entre le clic (start) et le
- * retour du fournisseur (callback). Le {@code state} (aleatoire, anti-CSRF) resout le workspace au
- * callback plutot qu'un slug devinable dans l'URL, puis la ligne est supprimee. Les secrets
- * ({@code codeVerifier} PKCE, {@code clientSecret} DCR) sont chiffres au repos.
+ * Etat ephemere du flux <b>OAuth 2.1</b> d'un serveur MCP (TF-MCP-02), entre le clic (start), le
+ * retour du fournisseur (callback, qui garde le code) et la fin dans l'app (complete). Le {@code state} (aleatoire,
+ * anti-CSRF) resout le workspace au callback plutot qu'un slug devinable dans l'URL, puis la ligne est supprimee a la
+ * fin. Les secrets ({@code codeVerifier} PKCE, {@code clientSecret} DCR, {@code code}) sont chiffres au repos.
  *
  * <p>Ligne courte duree ({@code expiresAt} ~ now + 10 min), purgee.
  */
@@ -117,6 +117,18 @@ public class McpOAuthState {
     @Column(name = "iss_required", nullable = false)
     @Builder.Default
     private boolean issRequired = false;
+
+    /**
+     * Le code d'autorisation rendu au retour du navigateur (V128, chiffre au repos) : l'app, connectee, finit l'echange,
+     * et seule la personne qui a lance le flux le peut. Nul tant que le navigateur n'est pas revenu.
+     */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(columnDefinition = "TEXT")
+    private String code;
+
+    /** L'empreinte SHA-256 (hexadecimale) du jeton a usage unique que seul le navigateur revenu a recu. */
+    @Column(name = "finish_hash", length = 64)
+    private String finishHash;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
