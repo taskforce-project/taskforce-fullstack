@@ -164,6 +164,20 @@ describe("ConnectPanel", () => {
       { shared: false, allowWrites: false, mcpUrl: "https://srv.zohomcp.com/mcp/k/message" }))
   })
 
+  it("when the vendor offers a key, the admin step leads to it instead", async () => {
+    connect.mockResolvedValue({ next: "connected", authorizeUrl: null, message: null })
+    show(notion({ key: "github-mcp", name: "GitHub", connection: "our-app", state: "WAITING_FOR_ADMIN",
+      admin: { text: "Register a GitHub OAuth app.", link: null, required: true },
+      apiKey: { hint: "Create a fine-grained personal access token.", link: null } }), true)
+
+    fireEvent.click(screen.getByRole("button", { name: t.useKeyInstead }))
+    fireEvent.change(screen.getByLabelText(t.keyLabel), { target: { value: "github_pat_1" } })
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+
+    await waitFor(() => expect(connect).toHaveBeenCalledWith("acme", "github-mcp",
+      { shared: false, allowWrites: false, mcpToken: "github_pat_1" }))
+  })
+
   it("a server on this computer connects only once the person approves its address", async () => {
     useConnectorStore.setState({ outcomes: { "custom-docker": { next: "local", authorizeUrl: null,
       message: "This server runs on your computer (127.0.0.1:8811)." } } })

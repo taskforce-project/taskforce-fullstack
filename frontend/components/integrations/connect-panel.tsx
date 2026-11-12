@@ -66,6 +66,8 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
   const forget = useConnectorStore((s) => s.forget)
   const [shared, setShared] = useState(false)
   const [allowWrites, setAllowWrites] = useState(false)
+  // La clé guidée, quand l'éditeur en propose une : un autre chemin que l'administrateur (GitHub, Stripe).
+  const [byKey, setByKey] = useState(false)
   const name = tool.name
 
   const go = useCallback(async (extra: Parameters<typeof connect>[2] = {}) => {
@@ -120,15 +122,17 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
     return <ConnectedView slug={slug} tool={tool} manager={manager} onChanged={onChanged} onWide={onWide} />
   }
 
-  const step = outcome?.next
+  const step = byKey ? "key" : outcome?.next
     ?? (tool.state === "WAITING_FOR_ADMIN" ? (manager && tool.connection === "company-app" ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
 
   if (step === "admin") {
-    return <AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()} />
+    return <AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()}
+      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />
   }
   if (step === "company-app") {
-    return <CompanyAppForm slug={slug} tool={tool} instructions={adminMessage} onSaved={() => go()} />
+    return <CompanyAppForm slug={slug} tool={tool} instructions={adminMessage} onSaved={() => go()}
+      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />
   }
   if (step === "key") {
     return <KeyForm tool={tool} busy={busy} onSubmit={(value) => go(tool.connection === "server-url"
@@ -173,8 +177,8 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
 }
 
 /** L'étape de l'administrateur : une phrase, le message à lui envoyer, sa page, et « Try again ». */
-function AdminStep({ name, message, link, busy, onRetry }: Readonly<{
-  name: string; message: string | null; link: string | null; busy: boolean; onRetry: () => void
+function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
+  name: string; message: string | null; link: string | null; busy: boolean; onRetry: () => void; onUseKey?: () => void
 }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [copied, setCopied] = useState(false)
@@ -208,6 +212,7 @@ function AdminStep({ name, message, link, busy, onRetry }: Readonly<{
         )}
       </div>
       <DialogFooter>
+        {onUseKey && <Button variant="ghost" onClick={onUseKey}>{t.useKeyInstead}</Button>}
         <Button onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
       </DialogFooter>
     </div>
@@ -215,8 +220,8 @@ function AdminStep({ name, message, link, busy, onRetry }: Readonly<{
 }
 
 /** L'application de l'entreprise (chemin C) : son administrateur la crée chez l'éditeur, puis la saisit ici une fois. */
-function CompanyAppForm({ slug, tool, instructions, onSaved }: Readonly<{
-  slug: string; tool: ConnectorView; instructions: string | null; onSaved: () => void
+function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonly<{
+  slug: string; tool: ConnectorView; instructions: string | null; onSaved: () => void; onUseKey?: () => void
 }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const save = useConnectorStore((s) => s.saveCompanyApp)
@@ -248,6 +253,7 @@ function CompanyAppForm({ slug, tool, instructions, onSaved }: Readonly<{
         {tool.companyApp && <span className="text-[11px] text-muted-foreground">{t.clientSecretKept}</span>}
       </label>
       <DialogFooter>
+        {onUseKey && <Button variant="ghost" onClick={onUseKey}>{t.useKeyInstead}</Button>}
         <Button onClick={submit} disabled={busy || !clientId.trim()}>{busy ? t.connecting : t.saveAndConnect}</Button>
       </DialogFooter>
     </div>
