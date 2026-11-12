@@ -38,7 +38,9 @@ import lombok.RequiredArgsConstructor;
  * Un document va à la cible de son projet, sinon à celle de l'espace, sinon au serveur de TaskForce.
  *
  * <p>Les propriétaires et administrateurs choisissent pour l'espace ; eux et le responsable d'un projet, pour ce projet.
- * Chaque membre voit la cible, et si lui peut y ranger : le stockage de l'entreprise s'écrit par sa propre connexion.</p>
+ * Chaque membre voit la cible, et si lui peut y ranger : le stockage de l'entreprise s'écrit par sa propre connexion.
+ * Un document se voit avec son projet ; sans projet, par les propriétaires, les administrateurs et la personne pour qui
+ * il a été écrit.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -158,7 +160,7 @@ public class StorageTargetService {
         return overview(slug, userId, projectId);
     }
 
-    /** Un document rangé, s'il est de cet espace et que la personne peut le voir. */
+    /** Un document rangé, s'il est de cet espace et que la personne peut le voir ({@link #canSee}). */
     @Transactional(readOnly = true)
     public StoredDocument document(String slug, Long userId, Long documentId) {
         Workspace ws = member(slug, userId);
@@ -168,8 +170,19 @@ public class StorageTargetService {
             projects.findByIdAndWorkspaceId(doc.getProjectId(), ws.getId())
                 .filter(p -> visibility.canView(p, userId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        } else if (!canSee(doc, userId, authorization.isManager(ws.getId(), userId))) {
+            throw new ResourceNotFoundException("Document not found");
         }
         return doc;
+    }
+
+    /**
+     * Un document sans projet (rangé hors d'un projet, ou dont le projet a été supprimé : la ligne reste, son projet
+     * devient nul, V127) ne se montre qu'aux propriétaires et administrateurs de l'espace, et à la personne pour qui il a
+     * été écrit ; jamais à tout membre.
+     */
+    private static boolean canSee(StoredDocument doc, Long userId, boolean manager) {
+        return manager || (userId != null && userId.equals(doc.getRequestedBy()));
     }
 
     /** L'espace de ce slug, si la personne en est membre. */
@@ -191,10 +204,11 @@ public class StorageTargetService {
             ? documents.findTop100ByWorkspaceIdOrderByCreatedAtDesc(ws.getId())
             : documents.findTop50ByWorkspaceIdAndProjectIdOrderByCreatedAtDesc(ws.getId(), projectId);
         Set<Long> viewable = new HashSet<>(visibility.viewableProjectIds(ws.getId(), userId));
+        boolean manager = authorization.isManager(ws.getId(), userId);
         Map<Long, String> names = new HashMap<>();
         List<DocumentView> out = new ArrayList<>();
         for (StoredDocument d : rows) {
-            if (d.getProjectId() != null && !viewable.contains(d.getProjectId())) continue;
+            if (d.getProjectId() != null ? !viewable.contains(d.getProjectId()) : !canSee(d, userId, manager)) continue;
             out.add(new DocumentView(d.getId(), d.getTitle(), d.getFileName(), d.getKind().wire(), d.getFolderName(),
                 d.getWebUrl(), d.getVersion(), d.getSizeBytes() == null ? 0 : d.getSizeBytes(),
                 d.getCreatedAt() == null ? null : d.getCreatedAt().toString(), d.getProjectId(),

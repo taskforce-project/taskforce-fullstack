@@ -166,6 +166,30 @@ class StorageTargetServiceTest {
     }
 
     @Test
+    @DisplayName("un document sans projet (son projet supprimé) : la ligne reste, pour les gestionnaires et la personne qui l'a demandé")
+    void aDocumentWithoutProjectStaysWithItsPerson() {
+        // Le projet supprimé laisse project_id nul (ON DELETE SET NULL, V127) : le document est gardé, pas montré à tous.
+        StoredDocument bobs = StoredDocument.builder().id(11L).workspaceId(WS).projectId(null).title("Bob's notes")
+            .fileName("Bob.md").kind(StorageKind.SERVER).sizeBytes(1L).requestedBy(BOB).via("cortex").build();
+        StoredDocument others = StoredDocument.builder().id(12L).workspaceId(WS).projectId(null).title("Old plan")
+            .fileName("Plan.md").kind(StorageKind.SERVER).sizeBytes(1L).requestedBy(42L).via("cortex").build();
+        when(documents.findTop100ByWorkspaceIdOrderByCreatedAtDesc(WS)).thenReturn(List.of(bobs, others));
+        when(documents.findByIdAndWorkspaceId(11L, WS)).thenReturn(Optional.of(bobs));
+        when(documents.findByIdAndWorkspaceId(12L, WS)).thenReturn(Optional.of(others));
+
+        assertThat(service.overview("acme", CAL, null).documents()).isEmpty();
+        assertThat(service.overview("acme", BOB, null).documents()).extracting(StorageTargetService.DocumentView::id)
+            .containsExactly(11L);
+        assertThat(service.overview("acme", ADA, null).documents()).extracting(StorageTargetService.DocumentView::id)
+            .containsExactly(11L, 12L);
+
+        assertThatThrownBy(() -> service.document("acme", CAL, 11L)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.document("acme", BOB, 12L)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(service.document("acme", BOB, 11L)).isSameAs(bobs);
+        assertThat(service.document("acme", ADA, 12L)).isSameAs(others);
+    }
+
+    @Test
     @DisplayName("un document d'un autre espace, ou d'un projet invisible, n'existe pas pour la personne")
     void documentAccess() {
         when(documents.findByIdAndWorkspaceId(5L, WS)).thenReturn(Optional.empty());
