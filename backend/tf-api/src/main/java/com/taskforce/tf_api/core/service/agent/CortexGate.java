@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -287,6 +288,82 @@ public class CortexGate {
     /** La raison d'une règle telle que la personne la lit : sa phrase quand une personne l'a écrite. */
     private static String reasonOf(RulesBundle.Rule rule) {
         return rule.text() != null && !rule.text().isBlank() ? rule.text() : rule.reason();
+    }
+
+    /** Ce que les règles du travail ont décidé d'un appel : la décision, le paquet et le projet qui l'ont prise. */
+    public record Judged(Verdict verdict, RulesBundle bundle, Long project) {
+    }
+
+    /** Le projet du travail en cours : celui de la conversation, sinon celui de l'écran ; jamais un argument d'outil. */
+    public static Long workProject(AgentContext ctx) {
+        return ctx.project() != null ? ctx.project() : ctx.screen().projectId();
+    }
+
+    /**
+     * Juge un appel avec les règles du travail en cours, celles de {@code project} : jamais celles d'un projet que nomment
+     * les arguments d'un outil. Un outil de TaskForce qui nomme un autre projet agit sur lui : il est jugé aussi avec les
+     * règles de ce projet, et la décision la plus stricte l'emporte. Les arguments d'un outil de l'entreprise parlent de
+     * cet outil, pas de TaskForce. {@code bundles} rend le paquet d'un projet.
+     */
+    public Judged judgeWork(AgentContext ctx, Long project, AgentTool tool, String argsJson, Exposure exposure,
+                            Function<Long, RulesBundle> bundles) {
+        RulesBundle bundle = bundles.apply(project);
+        Verdict verdict = judge(bundle, tool, argsJson, exposure);
+        Optional<Long> named = tool instanceof ExternalMcpTool ? Optional.empty()
+            : projectOf(ctx, argsJson).filter(p -> !p.equals(project));
+        if (named.isEmpty()) {
+            return new Judged(verdict, bundle, project);
+        }
+        RulesBundle there = bundles.apply(named.get());
+        Verdict other = judge(there, tool, argsJson, exposure);
+        Verdict kept = stricter(verdict, other);
+        return kept == other ? new Judged(other, there, named.get()) : new Judged(kept, bundle, project);
+    }
+
+    /**
+     * La plus stricte de deux décisions : refuser, puis demander, puis autoriser. Deux demandes réunissent leurs
+     * obligations ; la règle dite est celle qui en porte, sinon la première.
+     */
+    public static Verdict stricter(Verdict first, Verdict second) {
+        int a = rank(first.effect());
+        int b = rank(second.effect());
+        if (b > a) {
+            return second;
+        }
+        if (a > b || !RulesEngine.ASK.equals(first.effect())) {
+            return first;
+        }
+        RulesEngine.Obligations merged = merge(first.require(), second.require());
+        Verdict said = first.require() == null && second.require() != null ? second : first;
+        if (Objects.equals(merged, said.require())) {
+            return said;
+        }
+        return new Verdict(said.effect(), said.ruleId(), said.reason(), said.facts(), merged);
+    }
+
+    private static int rank(String effect) {
+        return switch (effect) {
+            case RulesEngine.DENY -> 3;
+            case RulesEngine.ASK -> 2;
+            default -> 1;
+        };
+    }
+
+    private static RulesEngine.Obligations merge(RulesEngine.Obligations a, RulesEngine.Obligations b) {
+        if (a == null) {
+            return b;
+        }
+        if (b == null) {
+            return a;
+        }
+        List<List<String>> approvers = new ArrayList<>(a.approvers());
+        for (List<String> set : b.approvers()) {
+            if (!approvers.contains(set)) {
+                approvers.add(set);
+            }
+        }
+        return new RulesEngine.Obligations(List.copyOf(approvers), Math.max(a.signatures(), b.signatures()),
+            a.separate() || b.separate());
     }
 
     /**

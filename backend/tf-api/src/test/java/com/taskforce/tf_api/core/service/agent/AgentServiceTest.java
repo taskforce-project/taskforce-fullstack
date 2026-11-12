@@ -540,8 +540,11 @@ class AgentServiceTest {
     /** Une règle de l'espace qui refuse tout. */
     private void denyEverything(String reason) {
         CortexGate deny = Mockito.mock(CortexGate.class);
-        lenient().when(deny.projectOf(any(), any())).thenReturn(Optional.empty());
-        when(deny.judge(any(), any(), any(), any())).thenReturn(new CortexGate.Verdict("deny", "frozen", reason, Map.of()));
+        CortexGate.Verdict refused = new CortexGate.Verdict("deny", "frozen", reason, Map.of());
+        // Une réponse juge par les règles du travail ; le rejeu d'un cas, par celles de l'espace.
+        lenient().when(deny.judgeWork(any(), any(), any(), any(), any(), any()))
+            .thenReturn(new CortexGate.Judged(refused, null, null));
+        lenient().when(deny.judge(any(), any(), any(), any())).thenReturn(refused);
         ReflectionTestUtils.setField(service, "gate", deny);
     }
 
