@@ -15,7 +15,7 @@ import {
   type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
-import { actionArguments, outcomeLine, plainOutput, proposalLine, serviceOf } from "@/lib/cortex/work-lines"
+import { actionArguments, outcomeLine, plainOutput, proposal, serviceOf, type Proposal } from "@/lib/cortex/work-lines"
 import { useCortexWork } from "@/lib/hooks/use-cortex-work"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
@@ -122,7 +122,7 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
-      <p className="text-foreground">{proposalLine(call.name, t, call.input)}</p>
+      <ProposalSentence said={proposal(call.name, t, call.input)} />
       {args.length > 0 && (
         <div className="flex flex-col gap-1">
           <button type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}
@@ -163,6 +163,29 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * La phrase de la carte d'accord (R160) : chaque valeur de l'action dans son propre élément, entre guillemets, pour
+ * qu'une valeur qui contient une phrase ne se lise jamais comme celle de la carte.
+ */
+function ProposalSentence({ said }: Readonly<{ said: Proposal }>) {
+  return (
+    <p className="text-foreground">
+      {said.lead}
+      {said.values.length > 0 && ": "}
+      {said.values.map((value, i) => (
+        <Fragment key={i}>
+          {i > 0 && ", "}
+          {value.label && `${value.label} `}
+          {value.number
+            ? <span className="font-medium">{value.text}</span>
+            : <q className="rounded-sm bg-foreground/[0.06] px-0.5 font-medium">{value.text}</q>}
+        </Fragment>
+      ))}
+      {said.tail}
+    </p>
   )
 }
 

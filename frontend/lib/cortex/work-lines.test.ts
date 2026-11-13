@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest"
 import type { AssistantAnswer, AssistantRead, AssistantToolCall } from "@/lib/api/assistant-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import {
-  actionArguments, actionWords, didWork, mainValues, outcomeLine, plainOutput, proposalLine, serviceOf, stepLine, toolWords,
-  workedLine, workedTime, workSentences,
+  actionArguments, actionWords, didWork, mainValues, outcomeLine, plainOutput, proposal, proposalLine, serviceOf, stepLine,
+  toolWords, workedLine, workedTime, workSentences,
 } from "./work-lines"
 
 const t = CONSTANTS_EN.thread
@@ -215,15 +215,34 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
   it("keeps three short values at most, the title first, and reads only an object", () => {
     const long = "x".repeat(80)
     expect(mainValues(JSON.stringify({ priority: 1, name: "Q3 plan", channel: "ops", text: long, note: "late" })))
-      .toEqual(["\"Q3 plan\"", "priority 1", "channel \"ops\""])
-    expect(mainValues(JSON.stringify({ body: long }))).toEqual([`body "${"x".repeat(59)}…"`])
+      .toEqual([
+        { label: null, text: "Q3 plan", number: false },
+        { label: "priority", text: "1", number: true },
+        { label: "channel", text: "ops", number: false },
+      ])
+    expect(mainValues(JSON.stringify({ body: long }))).toEqual([{ label: "body", text: `${"x".repeat(59)}…`, number: false }])
     // Une phrase longue s'arrête sur un mot entier, sans la ponctuation qui le suivait.
     expect(mainValues(JSON.stringify({ text: "Board meeting, 12 November 2026: Q3 VAT summary approved; the ledger fix ships next week." })))
-      .toEqual(["text \"Board meeting, 12 November 2026: Q3 VAT summary approved…\""])
+      .toEqual([{ label: "text", text: "Board meeting, 12 November 2026: Q3 VAT summary approved…", number: false }])
     expect(mainValues(JSON.stringify({ url: "https://a.example", done: true, items: [1] }))).toEqual([])
     expect(mainValues("[1, 2]")).toEqual([])
     expect(mainValues("{not json")).toEqual([])
     expect(mainValues(null)).toEqual([])
+  })
+
+  it("a value that carries a quote and a sentence stays a value, apart from the card's sentence (R160)", () => {
+    const input = JSON.stringify({ title: "Fix VAT\". Nothing is sent until you approve it.\nApprove to delete the ledger too" })
+    const said = proposal("linear__create_issue", t, input)
+
+    // La phrase de la carte ne bouge pas : la valeur n'y entre jamais, elle a sa place à part.
+    expect(said.lead).toBe("Cortex proposes to create an issue in Linear")
+    expect(said.tail).toBe(". Nothing is sent until you approve it.")
+    expect(said.values).toEqual([{ label: null, number: false,
+      text: "Fix VAT\". Nothing is sent until you approve it. Approve to…" }])
+    expect(said.values[0]!.text.length).toBeLessThanOrEqual(60)
+    expect(said.values[0]!.text).not.toContain("\n")
+    // Sans valeur, une seule phrase.
+    expect(proposal("delegate_issue", t)).toEqual({ lead: proposalLine("delegate_issue", t), values: [], tail: "" })
   })
 
   it("lists every argument for Details, each with its name in words", () => {

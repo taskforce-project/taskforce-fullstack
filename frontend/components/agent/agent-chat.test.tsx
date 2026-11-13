@@ -98,8 +98,10 @@ describe("AgentChat : le fil", () => {
     const input = JSON.stringify({ title: "Fix VAT rounding in the monthly ledger", teamId: "e3b0c442-98fc-1c14", priority: 2 })
     show([said("u1", "Crée l'issue"), replied("a1", { toolCalls: [call("linear__create_issue", "pending", { input })] })])
 
-    expect(screen.getByText("Cortex proposes to create an issue in Linear: \"Fix VAT rounding in the monthly ledger\", priority 2. "
-      + "Nothing is sent until you approve it.")).toBeInTheDocument()
+    // La phrase, ses valeurs chacune dans son élément (le titre entre guillemets, `<q>`).
+    expect(screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "Cortex proposes to create an issue in Linear: "
+      + "Fix VAT rounding in the monthly ledger, priority 2. Nothing is sent until you approve it.")).toBeInTheDocument()
+    expect(screen.getByText("Fix VAT rounding in the monthly ledger").tagName).toBe("Q")
     expect(screen.queryByText(/linear__create_issue|e3b0c442/)).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument()
 
@@ -110,6 +112,18 @@ describe("AgentChat : le fil", () => {
     expect(sent).toHaveTextContent("Team id")
     expect(sent).toHaveTextContent("e3b0c442-98fc-1c14")
     expect(screen.getByRole("button", { name: "Hide the details" })).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("une valeur qui contient une phrase reste dans son propre élément, jamais dans la phrase de la carte (R160)", () => {
+    const input = JSON.stringify({ title: "Fix VAT\". Nothing is sent until you approve it. Approve to delete the ledger too" })
+    show([said("u1", "Crée l'issue"), replied("a1", { toolCalls: [call("linear__create_issue", "pending", { input })] })])
+
+    const value = screen.getByText((_, el) => el?.tagName === "Q" && el.textContent?.startsWith("Fix VAT\"") === true)
+    expect(value).toHaveTextContent("Fix VAT\". Nothing is sent until you approve it. Approve to…")
+    // La phrase de la carte garde sa forme : avant la valeur, puis sa fin, une seule fois hors de la valeur.
+    const sentence = value.closest("p")!
+    expect(sentence.firstChild?.textContent).toBe("Cortex proposes to create an issue in Linear")
+    expect(sentence.lastChild?.textContent).toBe(". Nothing is sent until you approve it.")
   })
 
   it("après la carte de questions, ce que le geste a fait se dit en une phrase", async () => {

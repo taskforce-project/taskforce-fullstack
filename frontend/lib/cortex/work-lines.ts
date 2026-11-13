@@ -205,19 +205,54 @@ function saveProposal(input: string | null | undefined, t: ThreadTexts): string 
 
 /** Ce que dit la carte d'une action qui attend l'accord de la personne, sans le nom de son outil. */
 export function proposalLine(tool: string, t: ThreadTexts, input?: string | null): string {
+  const said = proposal(tool, t, input)
+  if (said.values.length === 0) return `${said.lead}${said.tail}`
+  return `${said.lead}: ${said.values.map(valueLine).join(", ")}${said.tail}`
+}
+
+/** Une valeur dite en texte : son nom puis la valeur, entre guillemets sauf un nombre. */
+const valueLine = (value: ProposalValue) =>
+  `${value.label ? `${value.label} ` : ""}${value.number ? value.text : `"${value.text}"`}`
+
+/**
+ * Une valeur que la carte montre (R160) : dans son propre élément, jamais lue comme la phrase de la carte, même quand
+ * elle contient des guillemets ou une autre phrase.
+ */
+export interface ProposalValue {
+  /** Le nom de l'argument en mots (« priority ») ; null pour le titre, qui se suffit. */
+  label: string | null
+  text: string
+  number: boolean
+}
+
+/** La phrase de la carte en trois parties : ce qui précède les valeurs, les valeurs, ce qui les suit. */
+export interface Proposal {
+  lead: string
+  values: ProposalValue[]
+  tail: string
+}
+
+/** Marque la place des valeurs dans la phrase : elles ne passent jamais par le texte de la phrase. */
+const VALUES_SLOT = "\u0000"
+
+/**
+ * La carte d'une action qui attend l'accord de la personne, sans le nom de son outil. Pour un outil connecté, l'action
+ * en mots et ses valeurs principales (R160) : « Cortex proposes to create an issue in Linear: "…" ».
+ */
+export function proposal(tool: string, t: ThreadTexts, input?: string | null): Proposal {
+  const sentence = (lead: string): Proposal => ({ lead, values: [], tail: "" })
   if (tool === "save_document") {
     const save = saveProposal(input, t)
-    if (save) return save
+    if (save) return sentence(save)
   }
   const service = serviceOf(tool)
   if (service) {
-    // L'action en mots et ses valeurs principales (R160) : « Cortex proposes to create an issue in Linear: "…" ».
     const action = actionWords(tool, service, t)
-    if (!action) return fillText(t.proposesExternal, { service })
-    const values = mainValues(input)
-    return fillText(t.proposesExternalAction, { action, service, values: values.length > 0 ? `: ${values.join(", ")}` : "" })
+    if (!action) return sentence(fillText(t.proposesExternal, { service }))
+    const [lead, tail = ""] = fillText(t.proposesExternalAction, { action, service, values: VALUES_SLOT }).split(VALUES_SLOT)
+    return { lead, values: mainValues(input), tail }
   }
-  return fillText(t.proposes, { what: toolWords(tool, t).proposes ?? t.proposesThis })
+  return sentence(fillText(t.proposes, { what: toolWords(tool, t).proposes ?? t.proposesThis }))
 }
 
 // ---------------------------------------------------------------------------
@@ -280,7 +315,9 @@ function identifies(key: string, value: unknown): boolean {
 }
 
 /** Une valeur longue s'arrête avant 60 caractères, sur un mot entier quand elle en a, puis « … ». */
-function short(text: string): string {
+function short(raw: string): string {
+  // Une ligne : les retours à la ligne et les caractères de contrôle d'une valeur deviennent des espaces.
+  const text = raw.replace(/[\p{Cc}\s]+/gu, " ").trim()
   if (text.length <= 60) return text
   const cut = text.slice(0, 59)
   const space = cut.lastIndexOf(" ")
@@ -288,21 +325,22 @@ function short(text: string): string {
 }
 
 /**
- * Ce que l'action dit d'elle au premier regard : son titre entre guillemets, puis des valeurs courtes avec leur nom
- * (« priority 2 », « channel "finance" »), trois au plus, jamais un identifiant.
+ * Ce que l'action dit d'elle au premier regard : son titre, puis des valeurs courtes avec leur nom (« priority 2 »,
+ * « channel "finance" »), trois au plus, jamais un identifiant ; chacune sur une ligne, 60 caractères au plus.
  */
-export function mainValues(input: string | null | undefined): string[] {
+export function mainValues(input: string | null | undefined): ProposalValue[] {
   const args = argsOf(input)
   if (!args) return []
   const said = Object.entries(args)
     .filter(([, value]) => (typeof value === "string" && value.trim() !== "") || typeof value === "number")
     .filter(([key, value]) => !identifies(key, value))
-  const quoted = (value: unknown) => (typeof value === "number" ? String(value) : `"${short(String(value).trim())}"`)
+  const valueOf = (label: string | null, value: unknown): ProposalValue =>
+    typeof value === "number" ? { label, text: String(value), number: true } : { label, text: short(String(value)), number: false }
   const title = said.find(([key]) => TITLE_KEYS.has(key.toLowerCase()))
   const others = said.filter((entry) => entry !== title)
   return [
-    ...(title ? [quoted(title[1])] : []),
-    ...others.map(([key, value]) => `${argWords(key)} ${quoted(value)}`),
+    ...(title ? [valueOf(null, title[1])] : []),
+    ...others.map(([key, value]) => valueOf(argWords(key), value)),
   ].slice(0, 3)
 }
 
