@@ -131,20 +131,25 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
 
   // L'étape de l'administrateur : un propriétaire ou un administrateur la fait (l'application de l'entreprise, « Set it
   // up ») ; un membre l'attend, avec le message à lui envoyer (R160).
-  const adminTurn = tool.state === "NEEDS_SETUP" || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app")
+  const adminTurn = tool.state === "NEEDS_SETUP"
+    || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app" && !tool.companyApp)
   const step = byKey ? "key" : outcome?.next
     ?? (adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
   // La cause d'abord, puis le geste qui la suit (R133 : un échec dit ce qui s'est passé et quoi faire).
   const note = failure ? <FailureNote failure={failure} name={name} /> : null
-  const withNote = (content: React.ReactNode) => (note ? <div className="flex flex-col gap-3">{note}{content}</div> : content)
+  // Toujours le même conteneur : une note qui apparaît ne remonte pas l'étape, ce que la personne a saisi reste (R161).
+  const withNote = (content: React.ReactNode) => <div className="flex flex-col gap-3">{note}{content}</div>
 
   if (step === "admin") {
     return withNote(<AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()}
       onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "company-app") {
-    return withNote(<CompanyAppForm slug={slug} tool={tool} instructions={adminMessage} onSaved={() => go()}
+    // Enregistrée, l'application de l'entreprise change l'outil : le catalogue se relit, et le panneau propose de se
+    // connecter, sans partir d'emblée chez l'éditeur.
+    return withNote(<CompanyAppForm slug={slug} tool={tool} instructions={adminMessage}
+      onSaved={() => { forget(tool.key); onChanged() }}
       onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "key") {

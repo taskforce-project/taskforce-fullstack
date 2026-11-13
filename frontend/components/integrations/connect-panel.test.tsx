@@ -160,10 +160,9 @@ describe("ConnectPanel", () => {
     expect(connect).toHaveBeenCalled()
   })
 
-  it("an owner or admin enters the company's app once, then connects", async () => {
+  it("an owner or admin enters the company's app once; the catalog is read again and the panel offers to connect (R161)", async () => {
     saveCompanyApp.mockResolvedValue(true)
-    connect.mockResolvedValue({ next: "browser", authorizeUrl: "https://slack.test/a", message: null })
-    Object.defineProperty(window, "location", { value: { href: "" }, configurable: true, writable: true })
+    useConnectorStore.setState({ outcomes: { "slack-mcp": { next: "company-app", authorizeUrl: null, message: "Create an internal app." } } })
     show(notion({ key: "slack-mcp", name: "Slack", connection: "company-app", state: "WAITING_FOR_ADMIN",
       admin: { text: "Create an internal app.", link: null, required: true } }), true)
 
@@ -172,8 +171,26 @@ describe("ConnectPanel", () => {
     fireEvent.change(screen.getByLabelText(t.clientSecret), { target: { value: "s-1" } })
     fireEvent.click(screen.getByRole("button", { name: t.saveAndConnect }))
 
-    await waitFor(() => expect(connect).toHaveBeenCalled())
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(saveCompanyApp).toHaveBeenCalledWith("acme", "slack-mcp", "c-1", "s-1")
+    // Pas de départ d'emblée chez l'éditeur : la suite gardée s'efface, le panneau relu propose « Connect ».
+    expect(connect).not.toHaveBeenCalled()
+    expect(useConnectorStore.getState().outcomes["slack-mcp"]).toBeUndefined()
+  })
+
+  it("a failure keeps what the person typed: the step stays mounted when its note appears (R161)", async () => {
+    useConnectorStore.setState({ outcomes: { stripe: { next: "key", authorizeUrl: null, message: null } } })
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "stripe", kind: "unknown", raw: "boom" } })
+      return null
+    })
+    show(notion({ key: "stripe", name: "Stripe", apiKey: { hint: "Create a restricted key.", link: null } }))
+
+    fireEvent.change(screen.getByLabelText(t.keyLabel), { target: { value: "rk_1" } })
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+
+    expect(await screen.findByRole("alert")).toBeTruthy()
+    expect((screen.getByLabelText(t.keyLabel) as HTMLInputElement).value).toBe("rk_1")
   })
 
   it("the guided key, and the address of the company's own server", async () => {
