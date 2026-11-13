@@ -429,7 +429,7 @@ public class WorkspaceMcpService {
     /**
      * Redonne l'accord à la liste actuelle des outils d'une connexion (R158) : les outils qui avaient changé, ou qui
      * sont apparus, sont de nouveau servis. La personne pour sa connexion ; un propriétaire ou un administrateur pour
-     * celle de l'espace (vérifié ici).
+     * celle de l'espace (vérifié ici), et ce nouvel accord entre au journal de l'espace.
      */
     @Transactional
     public void approveTools(Long workspaceId, Long userId, String connectorKey, boolean shared) {
@@ -441,12 +441,22 @@ public class WorkspaceMcpService {
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server");
         McpClient.Session session = client.initialize(ref);
+        int tools;
         try {
-            pin(conn, client.listTools(session));
+            List<McpClient.ToolDef> defs = client.listTools(session);
+            pin(conn, defs);
+            tools = defs == null ? 0 : defs.size();
         } finally {
             client.close(session);
         }
         invalidate(workspaceId);
+        if (shared) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("change", "tools-approved");
+            details.put("connectorKey", connectorKey);
+            details.put("tools", tools);
+            recordShared(workspaceId, userId, connectorKey, details);
+        }
     }
 
     // -------------------------------------------------------------------------

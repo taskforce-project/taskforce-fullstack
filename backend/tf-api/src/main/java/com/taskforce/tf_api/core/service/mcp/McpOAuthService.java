@@ -503,6 +503,13 @@ public class McpOAuthService {
         conn.setState(ConnectionState.WAITING_FOR_ADMIN);
         connections.save(conn);
         workspaceMcp.invalidate(row.getWorkspaceId());
+        // La connexion de l'espace qui attend son administrateur entre au journal, une fois validée.
+        if (row.isShared()) {
+            workspaceMcp.recordShared(row.getWorkspaceId(), row.getUserId(), row.getConnectorKey(),
+                WorkspaceMcpService.sharedDetails("waiting-for-admin",
+                    new WorkspaceMcpService.ServerIdentity(row.getConnectorKey(), row.getMcpName()), row.getMcpUrl(),
+                    "oauth"));
+        }
     }
 
     /**

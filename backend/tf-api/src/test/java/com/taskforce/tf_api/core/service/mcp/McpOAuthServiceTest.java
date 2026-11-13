@@ -572,6 +572,28 @@ class McpOAuthServiceTest {
     }
 
     @Test
+    @DisplayName("callback : la connexion de l'espace qui attend son administrateur entre au journal ; la sienne, non")
+    void aSharedAdminWaitIsRecorded() {
+        anAdminWaitCouldSucceed("linear");
+        McpOAuthState own = openState("st-own-a");
+        McpOAuthState shared = openState("st-shared-a");
+        shared.setShared(true);
+        when(stateRepository.findById("st-own-a")).thenReturn(Optional.of(own));
+        when(stateRepository.findById("st-shared-a")).thenReturn(Optional.of(shared));
+        when(workspaceMcp.ownConnection(ws, person, "linear", true)).thenReturn(ConnectorConnection.builder()
+            .workspace(ws).connectorKey("linear").scope(ConnectionScope.WORKSPACE).build());
+
+        assertThat(service.callback("st-own-a", null, "admin_approval_required")).contains("mcp=admin");
+        verify(workspaceMcp, never()).recordShared(any(), any(), any(), any());
+        assertThat(service.callback("st-shared-a", null, "admin_approval_required")).contains("mcp=admin");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, Object>> details = ArgumentCaptor.forClass(java.util.Map.class);
+        verify(workspaceMcp).recordShared(eq(WS_ID), eq(USER_ID), eq("linear"), details.capture());
+        assertThat(details.getValue()).containsEntry("change", "waiting-for-admin").containsEntry("host", "203.0.113.10");
+    }
+
+    @Test
     @DisplayName("callback : l'administrateur attendu sur une connexion de l'espace déjà gardée -> la personne qui l'a faite reste")
     void anAdminAnswerKeepsWhoMadeTheConnection() {
         McpOAuthState row = openState("st-s");

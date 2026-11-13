@@ -686,6 +686,28 @@ class WorkspaceMcpServiceTest {
     }
 
     @Test
+    @DisplayName("redonner l'accord aux outils de la connexion de l'espace entre au journal ; à sa propre connexion, non")
+    void approving_the_shared_tools_is_recorded() throws Exception {
+        ConnectorConnection shared = ConnectorConnection.builder().id(9L).connectorKey("linear")
+            .config("{\"mcpUrl\":\"http://x/mcp\"}").scope(ConnectionScope.WORKSPACE).build();
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "linear")).thenReturn(Optional.of(shared));
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L))
+            .thenReturn(Optional.of(personal("linear", ada)));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("save_issue")));
+
+        service.approveTools(1L, 7L, "linear", false);
+        org.mockito.Mockito.verifyNoInteractions(audit);
+        service.approveTools(1L, 7L, "linear", true);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit).recordAfterCommit(eq(1L), eq(7L), eq(AuditService.SHARED_CONNECTION_CHANGED),
+            eq("connector_connection"), eq("linear"), details.capture());
+        assertThat(details.getValue()).containsEntry("change", "tools-approved").containsEntry("tools", 2);
+    }
+
+    @Test
     @DisplayName("sa propre connexion n'entre pas au journal de l'espace")
     void a_personal_connection_is_not_recorded() {
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L)).thenReturn(Optional.empty());
