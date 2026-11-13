@@ -336,27 +336,31 @@ public class McpOAuthService {
      *
      * <p>Le code n'est pas échangé ici : il est gardé avec son {@code state}, et l'adresse de retour porte un jeton à
      * usage unique que seul ce navigateur reçoit ({@code finish}). L'app, connectée, le présente pour finir ; seule la
-     * personne qui a lancé le flux le peut. Le retour ne retire jamais le flux : un second retour le laisse tel quel, et
-     * un flux qui n'aboutit pas s'efface à son échéance.</p>
+     * personne qui a lancé le flux le peut. Le retour ne retire jamais le flux, mais le premier le clôt, quel qu'il soit
+     * : un second retour, même une erreur, ne change plus rien, et un flux qui n'aboutit pas s'efface à son échéance.</p>
      */
     @Transactional
     public String callback(String state, String code, String error, String iss, String errorDescription) {
         McpOAuthState row = (state == null || state.isBlank()) ? null
             : stateRepository.findById(state).orElse(null);
         if (row == null) return settings.appBase() + "/?mcp=error"; // state inconnu/expire : retour generique
+        boolean open = false;
         try {
-            // Un state ne revient qu'une fois : un second retour, même une erreur, ne change plus rien.
+            // Un state ne revient qu'une fois, et pas après son échéance : un second retour, même une erreur, ne change
+            // plus rien.
             if (row.getCode() != null || row.getFinishHash() != null) throw new BusinessException("retour deja recu");
+            if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
+            open = true;
             if (error != null && !error.isBlank()) {
                 // L'administrateur n'est attendu que si l'éditeur le dit (ses erreurs d'administrateur, les codes de
                 // Microsoft) ; jamais sur le refus de la personne elle-même (access_denied, son « Cancel »).
                 if (ADMIN_ERRORS.contains(error) || microsoftAdminFirst(row.getConnectorKey(), errorDescription)) {
+                    close(row);
                     markWaitingForAdmin(row);
                     return appRedirect(row, "admin");
                 }
                 throw new BusinessException("refus : " + error);
             }
-            if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
             if (code == null || code.isBlank()) throw new BusinessException("code manquant");
             // RFC 9207 : le retour doit venir de l'émetteur attendu (attaque par mélange de serveurs).
             if (iss != null && !iss.isBlank() && !sameIssuer(iss, row.getIssuer())) {
@@ -371,8 +375,19 @@ public class McpOAuthService {
             return appRedirect(row, "finish") + "&state=" + enc(row.getState()) + "&finish=" + enc(finish);
         } catch (Exception e) {
             log.warn("Callback OAuth MCP echoue (connector={}) : {}", LogSafe.of(row.getConnectorKey()), LogSafe.of(e.getMessage()));
+            if (open && row.getFinishHash() == null) close(row);
             return appRedirect(row, "error");
         }
+    }
+
+    /**
+     * Clôt un flux revenu sans code à finir (une erreur, un retour incomplet, un autre émetteur) : il porte l'empreinte
+     * d'un jeton que personne ne reçoit, donc un second retour le trouve déjà reçu et aucune app ne peut le finir. Il
+     * s'efface à son échéance, comme un flux qui n'aboutit pas.
+     */
+    private void close(McpOAuthState row) {
+        row.setFinishHash(sha256Hex(urlSafe(24)));
+        stateRepository.save(row);
     }
 
     /** Comment l'app a fini une connexion : {@code connected} ou {@code error}, et l'outil, pour son message. */

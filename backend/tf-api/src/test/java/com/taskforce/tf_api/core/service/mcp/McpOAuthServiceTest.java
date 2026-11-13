@@ -497,6 +497,38 @@ class McpOAuthServiceTest {
     }
 
     @Test
+    @DisplayName("callback : un retour en erreur clôt le flux -> un second retour, même une erreur d'administrateur, ne change rien")
+    void anErrorReturnClosesTheFlow() {
+        McpOAuthState row = openState("st-e");
+        when(stateRepository.findById("st-e")).thenReturn(Optional.of(row));
+        ConnectorConnection conn = anAdminWaitCouldSucceed("linear");
+
+        assertThat(service.callback("st-e", null, "access_denied")).contains("mcp=error");
+        assertThat(row.getCode()).isNull();
+        assertThat(row.getFinishHash()).isNotNull(); // clos : personne ne détient le jeton qui le finirait
+        assertThat(service.callback("st-e", null, "admin_approval_required")).contains("mcp=error")
+            .doesNotContain("mcp=admin");
+        assertThat(conn.getState()).isNotEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        verify(connections, never()).save(any());
+        assertThat(service.complete(USER_ID, "st-e", "any").outcome()).isEqualTo("error");
+        verify(client, never()).postForm(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("callback : un flux échu revient avec une erreur d'administrateur -> erreur, la connexion n'attend pas l'administrateur")
+    void anExpiredFlowIsNeverAnAdminWait() {
+        McpOAuthState row = openState("st-x2");
+        row.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        when(stateRepository.findById("st-x2")).thenReturn(Optional.of(row));
+        ConnectorConnection conn = anAdminWaitCouldSucceed("linear");
+
+        assertThat(service.callback("st-x2", null, "admin_approval_required")).contains("mcp=error")
+            .doesNotContain("mcp=admin");
+        assertThat(conn.getState()).isNotEqualTo(ConnectionState.WAITING_FOR_ADMIN);
+        verify(connections, never()).save(any());
+    }
+
+    @Test
     @DisplayName("callback : l'éditeur attend son administrateur -> la connexion le dit, retour admin")
     void callbackWaitingForAdmin() {
         when(stateRepository.findById("st-a")).thenReturn(Optional.of(openState("st-a")));
