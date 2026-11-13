@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import {
-  cardAction, catalogForThisApp, connectedLabel, connectionOf, filterCatalog, folds, FOLDED_COUNT, isConnected, shownAccess,
+  cardAction, cardPathLabel, catalogForThisApp, connectedLabel, connectionOf, filterCatalog, folds, FOLDED_COUNT, isConnected, shownAccess,
 } from "./integrations-catalog"
 
 const t = CONSTANTS_EN.integrations
@@ -127,6 +127,12 @@ describe("une carte par outil, et « Connect » depuis la carte (R160)", () => {
     expect(connectedLabel(slack({ live: live({ connected: true, state: "CONNECTED", scope: "PERSONAL" }) }), c)).toBe("Cortex connected")
     expect(connectedLabel(slack({ connected: true, live: live({ connected: true }) }), c)).toBe("Connected")
     expect(connectedLabel(tool("linear", true, "MCP"), c)).toBe("Connected")
+  })
+
+  it("Slack dans l'app desktop : la carte dit le chemin de Cortex, que « Connect » ouvre, pas « Web app only » (R160)", () => {
+    expect(cardPathLabel(slack(), t, true, c)).toBe("Admin first")
+    expect(cardPathLabel(tool("slack", false), t, true, c)).toBe("Web app only")
+    expect(cardPathLabel(slack(), t, false, c)).toBe("One click")
   })
 
   it("Slack dans l'app desktop : la native ne se connecte pas ici, son second accès oui", () => {

@@ -156,6 +156,15 @@ export function cardAction(tool: ConnectorView, t: IntegrationTexts, desktop: bo
   return c.connect
 }
 
+/**
+ * Le chemin que la carte dit, à côté de son geste : celui de la native, ou, quand elle ne se connecte pas ici (Slack
+ * dans l'app desktop), celui du second accès, que « Connect » ouvre (R160).
+ */
+export function cardPathLabel(tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts): string {
+  const native = connectionOf(tool, t, desktop, c)
+  return !native.canConnect && tool.live ? connectionOf(tool.live, t, desktop, c).label : native.label
+}
+
 /** Le badge d'un outil branché : « Connected » pour sa native, « Cortex connected » quand seul le second accès l'est. */
 export function connectedLabel(tool: ConnectorView, c: ConnectTexts): string {
   return tool.connected || !tool.live?.connected ? c.connected : c.liveConnected
@@ -237,7 +246,7 @@ function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
       </span>
     )
   }
-  return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{connectionOf(tool, t, IS_DESKTOP, c).label}</span>
+  return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{cardPathLabel(tool, t, IS_DESKTOP, c)}</span>
 }
 
 /**
