@@ -287,6 +287,21 @@ class ConnectorCatalogTest {
         assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
     }
 
+    @ParameterizedTest(name = "{0} / {1} -> {2}")
+    @CsvSource({
+        // La page range les outils par intention, sans dire ce qu'un groupe permet : chacun reste une lecture sur sa
+        // propre description (relue le 13/11/2026).
+        "jira,       getJiraIssue,                  READ",
+        "jira,       getJiraWorkflows,              READ",
+        "jira,       getJiraScreen,                 READ",
+        "jira,       getJiraWorkflowEditorLink,     WRITE",
+        "confluence, diffConfluenceContentVersions, READ",
+    })
+    @DisplayName("Atlassian : une lecture sur la description de l'outil, pas sur le seul nom de son groupe (revue de la PR #532)")
+    void atlassianParLaDescriptionDeChaqueOutil(String cle, String outil, ToolClass classe) {
+        assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
     @ParameterizedTest(name = "{0} / {1} / {2} -> {3}")
     @CsvSource({
         // L'éditeur écrit que l'adresse de lecture seule ne sert que des lectures : chaque outil qu'elle sert en est une.
