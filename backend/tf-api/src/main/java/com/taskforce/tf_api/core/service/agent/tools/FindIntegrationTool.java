@@ -93,7 +93,8 @@ public class FindIntegrationTool implements AgentTool {
         if (c.capabilities() != null) {
             for (String cap : c.capabilities()) if (contains(cap, query)) return true;
         }
-        return false;
+        // Une carte par outil (R160) : la native se trouve aussi par son second accès, celui de Cortex (R159).
+        return c.live() != null && matches(c.live(), group, query);
     }
 
     private static boolean contains(String s, String q) {
