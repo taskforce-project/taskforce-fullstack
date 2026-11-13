@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, Check, Copy, ExternalLink, Loader2, Plug, ShieldCheck, Terminal } from "lucide-react"
 import { toast } from "sonner"
 
@@ -60,6 +60,18 @@ export function pathLabel(tool: ConnectorView, t: ConnectTexts): string | null {
 }
 
 /**
+ * Le focus perdu revient à ce qui compte (R161). Un bouton qui se désactive ou disparaît (« Connect » pendant l'essai,
+ * « Set it up » qui ouvre le formulaire) laisse le focus à la page, puis au dialogue lui-même. Quand une étape ou un
+ * échec arrive (`key` change) et que le focus n'est nulle part, il va à `target` ; ailleurs, on ne le prend pas.
+ */
+export function useFocusWhenLost(target: React.RefObject<HTMLElement | null>, key: unknown = null) {
+  useEffect(() => {
+    const active = document.activeElement
+    if (!active || active === document.body || active.getAttribute("role") === "dialog") target.current?.focus()
+  }, [target, key])
+}
+
+/**
  * Se brancher à un outil du catalogue (TF-J2-12, séance n°22 R154) : un clic, le navigateur, la connexion chez
  * l'éditeur, le retour, « Connected as … ». Derrière, le serveur choisit le chemin que l'éditeur permet et dit la suite :
  * le navigateur, c'est branché, l'étape de l'administrateur (une phrase et un message à lui envoyer, ou le formulaire de
@@ -85,6 +97,20 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
   // La clé guidée, quand l'éditeur en propose une : un autre chemin que l'administrateur (GitHub, Stripe).
   const [byKey, setByKey] = useState(false)
   const name = tool.name
+  // L'étape de l'administrateur : un propriétaire ou un administrateur la fait (l'application de l'entreprise, « Set it
+  // up ») ; un membre l'attend, avec le message à lui envoyer (R160).
+  const adminTurn = tool.state === "NEEDS_SETUP"
+    || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app" && !tool.companyApp)
+  // NEEDS_SETUP suffit : le serveur ne le rend qu'à un propriétaire ou un administrateur, sans attendre la liste des
+  // membres de l'écran (R160).
+  const step = byKey ? "key" : outcome?.next
+    ?? (tool.state === "NEEDS_SETUP" ? "company-app"
+      : adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
+  // Ce qui prend le focus quand l'étape change, dans les vues de ce panneau ; les étapes à part ont le leur.
+  const own = useRef<HTMLElement | null>(null)
+  const ownRef = useCallback((el: HTMLElement | null) => { own.current = el }, [])
+  const view = tool.blocked ? "blocked" : waiting ? "waiting" : tool.state === "CONNECTED" && !outcome ? "connected" : step
+  useFocusWhenLost(own, view)
 
   const go = useCallback(async (extra: Parameters<typeof connect>[2] = {}) => {
     const result = await connect(slug, tool.key, { shared, allowWrites, ...extra })
@@ -120,7 +146,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
   if (waiting) {
     return (
       <div className="flex flex-col gap-3" aria-live="polite">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <div ref={ownRef} tabIndex={-1} className="flex items-center gap-2 text-sm font-medium text-foreground outline-none">
           <Loader2 className="size-4 animate-spin" /> {t.browserTitle}
         </div>
         <p className="text-sm text-muted-foreground">{fillText(t.browserText, { name })}</p>
@@ -134,15 +160,6 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
     return <ConnectedView slug={slug} tool={tool} manager={manager} onChanged={onChanged} onWide={onWide} />
   }
 
-  // L'étape de l'administrateur : un propriétaire ou un administrateur la fait (l'application de l'entreprise, « Set it
-  // up ») ; un membre l'attend, avec le message à lui envoyer (R160).
-  const adminTurn = tool.state === "NEEDS_SETUP"
-    || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app" && !tool.companyApp)
-  // NEEDS_SETUP suffit : le serveur ne le rend qu'à un propriétaire ou un administrateur, sans attendre la liste des
-  // membres de l'écran (R160).
-  const step = byKey ? "key" : outcome?.next
-    ?? (tool.state === "NEEDS_SETUP" ? "company-app"
-      : adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
   // La cause d'abord, puis le geste qui la suit (R133 : un échec dit ce qui s'est passé et quoi faire).
   const note = failure ? <FailureNote failure={failure} name={name} withKey={Boolean(tool.apiKey)} /> : null
@@ -201,7 +218,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
         )}
         {/* Après un refus pour le rôle, réessayer n'y change rien : pas de « Try again » (R161). */}
         {failure?.kind !== "forbidden" && (
-          <Button onClick={() => go()} disabled={busy} className="gap-1.5">
+          <Button ref={ownRef} onClick={() => go()} disabled={busy} className="gap-1.5">
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
             {busy ? t.connecting : failure ? t.tryAgain : reconnecting ? t.reconnect : t.connect}
           </Button>
@@ -219,9 +236,11 @@ export function FailureNote({ failure, name, withKey = false }: Readonly<{ failu
   const t = usePreferencesStore((s) => s.t.connect)
   const [details, setDetails] = useState(false)
   const [raw, setRaw] = useState(false)
+  const sentence = useRef<HTMLParagraphElement>(null)
+  useFocusWhenLost(sentence, failure)
   return (
     <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-      <p role="alert" className="flex items-start gap-2 text-foreground">
+      <p ref={sentence} role="alert" tabIndex={-1} className="flex items-start gap-2 rounded-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
         <span>{failureSentence(failure, name, t, withKey)}</span>
       </p>
@@ -261,6 +280,8 @@ function AdminStep({ name, message, link, busy, tried, onRetry, onUseKey }: Read
 }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [copied, setCopied] = useState(false)
+  const primary = useRef<HTMLButtonElement>(null)
+  useFocusWhenLost(primary)
   async function copy() {
     if (!message) return
     try {
@@ -293,9 +314,9 @@ function AdminStep({ name, message, link, busy, tried, onRetry, onUseKey }: Read
       <DialogFooter>
         {onUseKey && <Button variant="ghost" onClick={onUseKey}>{t.useKeyInstead}</Button>}
         {tried ? (
-          <Button onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
+          <Button ref={primary} onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
         ) : message && (
-          <Button onClick={copy} className="gap-1.5">
+          <Button ref={primary} onClick={copy} className="gap-1.5">
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : t.copyMessage}
           </Button>
         )}
@@ -313,6 +334,8 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
   const busy = useConnectorStore((s) => s.busy === tool.key)
   const [clientId, setClientId] = useState("")
   const [secret, setSecret] = useState("")
+  const first = useRef<HTMLInputElement>(null)
+  useFocusWhenLost(first)
   // L'adresse de retour se donne à part, entière et copiable : les étapes y renvoient au lieu de la couper (R161).
   const redirect = tool.admin?.redirectUri ?? null
   const steps = instructions && redirect ? instructions.split(redirect).join(t.redirectInSteps) : instructions
@@ -357,7 +380,7 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
       )}
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{t.clientId}</span>
-        <Input value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />
+        <Input ref={first} value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{t.clientSecret}</span>
@@ -395,6 +418,8 @@ function CopyButton({ text, label, name }: Readonly<{ text: string; label: strin
 function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy: boolean; onSubmit: (value: string) => void }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [value, setValue] = useState("")
+  const field = useRef<HTMLInputElement>(null)
+  useFocusWhenLost(field)
   const address = tool.connection === "server-url"
   return (
     <div className="flex flex-col gap-3">
@@ -409,7 +434,7 @@ function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy:
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{address ? t.serverAddressLabel : t.keyLabel}</span>
         {/* Une adresse se lit en clair, pour qu'on voie ce qu'on a collé ; le navigateur ne la garde pas (R161). */}
-        <Input type={address ? "url" : "password"} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off"
+        <Input ref={field} type={address ? "url" : "password"} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off"
           spellCheck={false} />
       </label>
       <DialogFooter>
@@ -423,12 +448,14 @@ function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy:
 function LocalStep({ message, busy, onApprove }: Readonly<{ message: string | null; busy: boolean; onApprove: () => void }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [confirmed, setConfirmed] = useState(false)
+  const box = useRef<HTMLInputElement>(null)
+  useFocusWhenLost(box)
   return (
     <div className="flex flex-col gap-3">
       <p className="flex items-center gap-2 text-sm font-medium text-foreground"><ShieldCheck className="size-4" /> {t.localTitle}</p>
       {message && <p className="text-sm text-muted-foreground">{message}</p>}
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> {t.localConfirm}
+        <input ref={box} type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> {t.localConfirm}
       </label>
       <DialogFooter>
         <Button onClick={onApprove} disabled={busy || !confirmed}>{busy ? t.connecting : t.connect}</Button>
@@ -454,6 +481,8 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   const failure = useConnectorStore((s) => (s.failure?.key === tool.key ? s.failure : null))
   const shared = tool.scope === "WORKSPACE"
   const mayChange = !shared || manager
+  const head = useRef<HTMLDivElement>(null)
+  useFocusWhenLost(head)
 
   useEffect(() => {
     let alive = true
@@ -493,7 +522,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   return (
     <div className="flex flex-col gap-3">
       {failure && <FailureNote failure={failure} name={tool.name} />}
-      <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-sm text-ink-green">
+      <div ref={head} tabIndex={-1} className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-sm text-ink-green outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
         <Check className="size-4 shrink-0" />
         <span>
           {tool.accountLabel ? fillText(t.connectedAs, { account: tool.accountLabel })

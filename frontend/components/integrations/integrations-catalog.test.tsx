@@ -119,9 +119,12 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
 
     expect(within(dialog()).getByText("Posts issue notifications to your channels.")).toBeInTheDocument()
     expect(within(dialog()).getByText(c.liveTitle.replace("{name}", "Slack"))).toBeInTheDocument()
+    within(dialog()).getByRole("button", { name: t.setUp }).focus()
     fireEvent.click(within(dialog()).getByRole("button", { name: t.setUp }))
     // Le propriétaire fait l'étape de l'administrateur : l'application de l'entreprise, pas une attente.
     expect(within(dialog()).getByText(c.companyAppTitle)).toBeInTheDocument()
+    // « Set it up » disparaît : le focus va au premier champ du formulaire, pas au dialogue (R161).
+    await waitFor(() => expect(within(dialog()).getByLabelText(c.clientId)).toHaveFocus())
     expect(within(dialog()).queryByText(c.waitingForAdmin)).toBeNull()
     fireEvent.click(within(dialog()).getByRole("button", { name: c.liveBack.replace("{name}", "Slack") }))
     expect(within(dialog()).getByText(c.liveTitle.replace("{name}", "Slack"))).toBeInTheDocument()

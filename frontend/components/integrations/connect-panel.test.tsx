@@ -71,6 +71,39 @@ describe("ConnectPanel", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith(t.liveReturnedConnected.replace("{name}", "Slack")))
   })
 
+  it("after Connect, the focus lands on the next step or on the failure, never on the dialog (R161)", async () => {
+    // Le navigateur retire le focus d'un bouton qui se désactive pendant l'essai : il tombe sur la page.
+    const lose = () => (document.activeElement as HTMLElement | null)?.blur()
+    connect.mockImplementation(async () => {
+      lose()
+      useConnectorStore.setState({ outcomes: { notion: { next: "key", authorizeUrl: null, message: null } } })
+      return { next: "key", authorizeUrl: null, message: null }
+    })
+    const view = show(notion({ apiKey: { hint: "Create a key.", link: null } }))
+    screen.getByRole("button", { name: t.connect }).focus()
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    await waitFor(() => expect(screen.getByLabelText(t.keyLabel)).toHaveFocus())
+    view.unmount()
+
+    useConnectorStore.setState({ outcomes: {} })
+    connect.mockImplementation(async () => {
+      lose()
+      useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+      return null
+    })
+    show(notion())
+    screen.getByRole("button", { name: t.connect }).focus()
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveFocus())
+  })
+
+  it("a panel that opens never takes the focus from where the person is", () => {
+    render(<button type="button">elsewhere</button>)
+    screen.getByRole("button", { name: "elsewhere" }).focus()
+    show(notion({ apiKey: { hint: "Create a key.", link: null } }))
+    expect(screen.getByRole("button", { name: "elsewhere" })).toHaveFocus()
+  })
+
   it("on the web, sends the page to the vendor's sign-in", async () => {
     const location = { href: "http://app.test/acme" }
     Object.defineProperty(window, "location", { value: location, configurable: true, writable: true })
