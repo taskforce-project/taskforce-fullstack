@@ -147,4 +147,19 @@ class AnalysisVisibilityIntegrationTest extends AbstractIntegrationTest {
         }
         verify(messaging, never()).convertAndSend(startsWith("/topic/analysis."), any(Object.class));
     }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("🔒 un compte d'un autre espace ne suit aucun flux d'un projet, même public : son board, ses analyses, ses missions")
+    void an_account_of_another_workspace_follows_no_stream_of_the_project() {
+        User stranger = userRepository.save(User.builder().keycloakId("kc-analysis-stranger")
+            .email("stranger@analysis-visibility.dev").displayName("stranger").isActive(true).build());
+        Workspace theirs = workspaceRepository.save(Workspace.builder().name("Elsewhere").slug("ws-elsewhere").owner(stranger).build());
+        join(theirs, stranger, WorkspaceRole.OWNER);
+
+        // Le projet public est ouvert aux membres de son espace, pas aux comptes d'un autre espace de l'instance.
+        assertThat(realtime.canSubscribeProject(stranger.getId(), projects.get(Visibility.PUBLIC))).isFalse();
+        assertThat(realtime.canSubscribeProject(stranger.getId(), projects.get(Visibility.PRIVATE))).isFalse();
+        assertThat(realtime.canSubscribeProject(id(Reader.OUTSIDER), projects.get(Visibility.PUBLIC))).isTrue();
+        assertThat(realtime.canSubscribeProject(id(Reader.ADMIN), -1L)).isFalse();
+    }
 }
