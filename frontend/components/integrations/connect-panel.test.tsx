@@ -254,6 +254,16 @@ describe("ConnectPanel", () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
+  it("a failure clears when the panel closes, so the dialog reopens clean (R161)", () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+    const view = show(notion())
+    expect(screen.getByRole("alert")).toBeTruthy()
+    view.unmount()
+    expect(useConnectorStore.getState().failure).toBeNull()
+    show(notion())
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
   it("a failure keeps what the person typed: the step stays mounted when its note appears (R161)", async () => {
     useConnectorStore.setState({ outcomes: { stripe: { next: "key", authorizeUrl: null, message: null } } })
     connect.mockImplementation(async () => {

@@ -61,6 +61,15 @@ describe("useConnectorStore", () => {
     expect(useConnectorStore.getState().failure?.kind).toBe("notDisconnected")
   })
 
+  it("closing a tool's panel clears its failure, not another tool's (R161)", () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null }, error: "x" })
+    useConnectorStore.getState().clearFailure("linear")
+    expect(useConnectorStore.getState().failure?.key).toBe("notion")
+    useConnectorStore.getState().clearFailure("notion")
+    expect(useConnectorStore.getState().failure).toBeNull()
+    expect(useConnectorStore.getState().error).toBeNull()
+  })
+
   it("a new gesture, or forgetting the tool, clears its failure; another tool's stays", async () => {
     useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
     useConnectorStore.getState().forget("linear")

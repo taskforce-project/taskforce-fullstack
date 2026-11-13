@@ -41,6 +41,8 @@ interface ConnectorState {
   saveCompanyApp: (slug: string, key: string, clientId: string, clientSecret: string) => Promise<boolean>
   servers: (slug: string) => Promise<McpServerStatus[] | null>
   forget: (key: string) => void
+  /** Efface l'échec de cet outil seulement : son panneau se ferme, le dialogue rouvert repart sans lui (R161). */
+  clearFailure: (key: string) => void
 }
 
 export interface WaitOptions {
@@ -149,4 +151,6 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
       delete outcomes[key]
       return { outcomes, error: null, failure: s.failure?.key === key ? null : s.failure }
     }),
+
+  clearFailure: (key) => set((s) => (s.failure?.key === key ? { failure: null, error: null } : {})),
 }))

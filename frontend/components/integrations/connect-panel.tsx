@@ -75,6 +75,9 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
   const waitForConnection = useConnectorStore((s) => s.waitForConnection)
   const stopWaiting = useConnectorStore((s) => s.stopWaiting)
   const forget = useConnectorStore((s) => s.forget)
+  const clearFailure = useConnectorStore((s) => s.clearFailure)
+  // Le panneau se ferme (le dialogue, ou le retour à la native) : son échec ne l'attend pas à la réouverture (R161).
+  useEffect(() => () => clearFailure(tool.key), [clearFailure, tool.key])
   // Le dernier geste de cet outil qui a échoué : la phrase reste dans le panneau, pas dans un toast qui passe (R160).
   const failure = useConnectorStore((s) => (s.failure?.key === tool.key ? s.failure : null))
   const [shared, setShared] = useState(false)
