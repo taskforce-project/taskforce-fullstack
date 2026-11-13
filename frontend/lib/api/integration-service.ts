@@ -418,16 +418,20 @@ export interface ConnectPayload {
   returnTo?: string;
 }
 
-/** Le geste « Connect » d'un outil : le serveur choisit le chemin et dit la suite. */
+/**
+ * Le geste « Connect » d'un outil : le serveur choisit le chemin et dit la suite. Son échec, réseau compris, se dit une
+ * fois, dans le panneau : pas de toast global en plus (R161). Les autres gestes du panneau font de même.
+ */
 export async function connectTool(slug: string, connectorKey: string, payload: ConnectPayload): Promise<ConnectOutcome> {
-  const res = await apiClient.post<{ data: ConnectOutcome }>(INTEGRATION_ROUTES.MCP_CONNECT(slug, connectorKey), payload);
+  const res = await apiClient.post<{ data: ConnectOutcome }>(INTEGRATION_ROUTES.MCP_CONNECT(slug, connectorKey), payload,
+    { silentError: true });
   return res.data.data;
 }
 
 /** Redonne l'accord aux outils qui ont changé depuis la connexion ; renvoie les statuts frais. */
 export async function approveMcpTools(slug: string, connectorKey: string, shared = false): Promise<McpServerStatus[]> {
   const res = await apiClient.post<{ data: McpServerStatus[] }>(
-    `${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(slug, connectorKey)}?shared=${shared}`,
+    `${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(slug, connectorKey)}?shared=${shared}`, undefined, { silentError: true },
   );
   return res.data.data;
 }
@@ -454,7 +458,7 @@ export async function saveCompanyApp(
   const res = await apiClient.put<{ data: CompanyApp }>(INTEGRATION_ROUTES.MCP_APP(slug, connectorKey), {
     clientId,
     clientSecret,
-  });
+  }, { silentError: true });
   return res.data.data;
 }
 
@@ -496,7 +500,7 @@ export async function getMcpServers(slug: string): Promise<McpServerStatus[]> {
 
 /** Connecte (ou reconfigure) un serveur MCP externe ; renvoie le statut frais (joignable + outils). */
 export async function connectMcpServer(slug: string, payload: McpServerPayload): Promise<McpServerStatus[]> {
-  const res = await apiClient.post<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVERS(slug), payload);
+  const res = await apiClient.post<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVERS(slug), payload, { silentError: true });
   return res.data.data;
 }
 
@@ -506,7 +510,7 @@ export async function connectMcpServer(slug: string, payload: McpServerPayload):
  */
 export async function disconnectMcpServer(slug: string, connectorKey: string, shared = false): Promise<DisconnectResult> {
   const res = await apiClient.delete<{ data: DisconnectResult }>(
-    `${INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey)}?shared=${shared}`,
+    `${INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey)}?shared=${shared}`, { silentError: true },
   );
   return res.data.data;
 }
