@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { CONSTANTS_EN } from "@/lib/constants_en"
+import { serviceOf } from "@/lib/cortex/work-lines"
 import { useTheme } from "next-themes"
 
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -1950,13 +1951,9 @@ export function SettingsPanels({ active }: Readonly<{ active: SettingsSection }>
  * Les briques (`SECTIONS`, `SettingsNav`, `SettingsPanels`, panneaux) restent exportées ci-dessus
  * et sont réutilisées par le modal.
  */
-/** Le nom d'un outil revenu du navigateur : sa clé de connecteur, lisible (`slack-mcp` devient « Slack mcp »). */
+/** Le nom d'un outil revenu du navigateur : sa clé de connecteur, lisible (`github-mcp` devient « GitHub »). */
 function connectorName(key: string | null): string {
-  if (!key) return "The tool"
-  const words = key.replace(/^custom-/, "").replace(/-mcp$/, "").split("-").filter(Boolean)
-  if (words.length === 0) return "The tool"
-  const name = words.join(" ")
-  return name.charAt(0).toUpperCase() + name.slice(1)
+  return (key ? serviceOf(`${key}__`) : null) ?? "The tool"
 }
 
 export default function SettingsPage() {
@@ -1980,7 +1977,9 @@ export default function SettingsPage() {
     if (slack === "connected") toast.success("Slack connected successfully!", { id: "oauth-slack" })
     if (slack === "error") toast.error("Slack wasn't connected. Try again, and allow the access on Slack.", { id: "oauth-slack" })
     const said = (outcome: string | null) => {
-      if (outcome === "connected") toast.success(CONSTANTS_EN.connect.returnedConnected.replace("{name}", tool), { id: "oauth-mcp" })
+      const connected = /-mcp$/.test(searchParams.get("connector") ?? "")
+        ? CONSTANTS_EN.connect.liveReturnedConnected : CONSTANTS_EN.connect.returnedConnected
+      if (outcome === "connected") toast.success(connected.replace("{name}", tool), { id: "oauth-mcp" })
       if (outcome === "admin") toast.warning(CONSTANTS_EN.connect.returnedAdmin.replace("{name}", tool), { id: "oauth-mcp" })
       if (outcome === "error") toast.error(CONSTANTS_EN.connect.returnedError.replace("{name}", tool), { id: "oauth-mcp" })
     }

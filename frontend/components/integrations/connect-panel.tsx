@@ -30,6 +30,8 @@ type PanelProps = Readonly<{
   onChanged: () => void
   /** La console d'actions, dépliée, élargit le dialogue. */
   onWide?: (wide: boolean) => void
+  /** Le second accès d'une native (R160) : ses mots disent que c'est Cortex qui est branché. */
+  live?: boolean
 }>
 
 /** Le chemin d'un outil en une phrase simple, pour sa fiche (R160) ; null pour une native ou un serveur ajouté. */
@@ -64,7 +66,7 @@ export function pathLabel(tool: ConnectorView, t: ConnectTexts): string | null {
  * l'application de l'entreprise), la clé guidée, l'accord d'un serveur local. Une colonne, une action principale en bas
  * à droite (R133).
  */
-export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelProps) {
+export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = false }: PanelProps) {
   const t = usePreferencesStore((s) => s.t.connect)
   const outcome = useConnectorStore((s) => s.outcomes[tool.key])
   const busy = useConnectorStore((s) => s.busy === tool.key)
@@ -91,7 +93,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
         const ok = await waitForConnection(slug, tool.key)
         if (ok) {
           forget(tool.key)
-          toast.success(fillText(t.returnedConnected, { name }))
+          toast.success(fillText(live ? t.liveReturnedConnected : t.returnedConnected, { name }))
           onChanged()
         }
       } else {
@@ -99,10 +101,10 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
       }
     } else if (result.next === "connected") {
       forget(tool.key)
-      toast.success(fillText(t.returnedConnected, { name }))
+      toast.success(fillText(live ? t.liveReturnedConnected : t.returnedConnected, { name }))
       onChanged()
     }
-  }, [connect, slug, tool.key, shared, allowWrites, t, name, waitForConnection, forget, onChanged])
+  }, [connect, slug, tool.key, shared, allowWrites, t, name, waitForConnection, forget, onChanged, live])
 
   if (tool.blocked) {
     return (

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { cardAction, catalogForThisApp, connectionOf, filterCatalog, folds, FOLDED_COUNT, isConnected } from "./integrations-catalog"
+import {
+  cardAction, catalogForThisApp, connectedLabel, connectionOf, filterCatalog, folds, FOLDED_COUNT, isConnected, shownAccess,
+} from "./integrations-catalog"
 
 const t = CONSTANTS_EN.integrations
 const c = CONSTANTS_EN.connect
@@ -113,6 +115,18 @@ describe("une carte par outil, et « Connect » depuis la carte (R160)", () => {
     ["fermé par l'éditeur", { ...tool("figma", false, "MCP"), connection: "our-app", blocked: "Waitlist." }, null],
   ] as [string, ConnectorView, string | null][])("%s : %s", (_label, item, expected) => {
     expect(cardAction(item, t, false, c)).toBe(expected)
+  })
+
+  it("la native pas branchée : la carte montre le second accès dès qu'il a une connexion, et le nomme (R160, R161)", () => {
+    expect(shownAccess(slack()).key).toBe("slack")
+    const stale = slack({ live: live({ state: "NEEDS_RECONNECT", scope: "WORKSPACE" }) })
+    expect(shownAccess(stale).key).toBe("slack-mcp")
+    expect(cardAction(stale, t, false, c)).toBe("Reconnect")
+    // La native branchée reste ce que la carte montre.
+    expect(shownAccess(slack({ connected: true, live: live({ state: "NEEDS_RECONNECT", scope: "PERSONAL" }) })).key).toBe("slack")
+    expect(connectedLabel(slack({ live: live({ connected: true, state: "CONNECTED", scope: "PERSONAL" }) }), c)).toBe("Cortex connected")
+    expect(connectedLabel(slack({ connected: true, live: live({ connected: true }) }), c)).toBe("Connected")
+    expect(connectedLabel(tool("linear", true, "MCP"), c)).toBe("Connected")
   })
 
   it("Slack dans l'app desktop : la native ne se connecte pas ici, son second accès oui", () => {

@@ -64,6 +64,13 @@ describe("ConnectPanel", () => {
     expect(toast.success).toHaveBeenCalledWith(t.returnedConnected.replace("{name}", "Notion"))
   })
 
+  it("Cortex's own access says that Cortex is connected, not the tool (R161)", async () => {
+    connect.mockResolvedValue({ next: "connected", authorizeUrl: null, message: null })
+    render(<ConnectPanel slug="acme" tool={notion({ key: "slack-mcp", name: "Slack" })} manager={false} onChanged={onChanged} live />)
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(t.liveReturnedConnected.replace("{name}", "Slack")))
+  })
+
   it("on the web, sends the page to the vendor's sign-in", async () => {
     const location = { href: "http://app.test/acme" }
     Object.defineProperty(window, "location", { value: location, configurable: true, writable: true })

@@ -131,17 +131,34 @@ export function connectionOf(
 }
 
 /**
+ * L'accès dont la carte dit l'état (R160) : la native, sauf quand elle n'est pas branchée et que le second accès a une
+ * connexion (branchée, à refaire, en attente) ; la carte dit alors son état, sa portée et son compte.
+ */
+export function shownAccess(tool: ConnectorView): ConnectorView {
+  return !tool.connected && tool.live?.scope ? tool.live : tool
+}
+
+/** Le second accès est-il celui que la carte montre ? Ses mots le nomment alors : « Cortex connected ». */
+const liveShown = (tool: ConnectorView) => shownAccess(tool) !== tool
+
+/**
  * Le geste de la carte (R160) : « Connect » ouvre la connexion tout de suite, sans passer par la fiche ; « Manage » pour
- * un outil branché, « Set it up » quand l'étape de l'administrateur revient à la personne ; null quand rien ne se
- * connecte ici (un outil que l'éditeur ferme encore).
+ * un outil branché, « Set it up » quand l'étape de l'administrateur revient à la personne, « Reconnect » quand l'accès
+ * montré doit se refaire ; null quand rien ne se connecte ici (un outil que l'éditeur ferme encore).
  */
 export function cardAction(tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts): string | null {
   if (isConnected(tool)) return t.manage
   if (tool.blocked) return null
   if (!connectionOf(tool, t, desktop, c).canConnect && !tool.live) return null
-  if (tool.state === "NEEDS_SETUP") return t.setUp
-  if (tool.state === "NEEDS_RECONNECT") return c.reconnect
+  const shown = shownAccess(tool)
+  if (shown.state === "NEEDS_SETUP") return t.setUp
+  if (shown.state === "NEEDS_RECONNECT") return c.reconnect
   return c.connect
+}
+
+/** Le badge d'un outil branché : « Connected » pour sa native, « Cortex connected » quand seul le second accès l'est. */
+export function connectedLabel(tool: ConnectorView, c: ConnectTexts): string {
+  return tool.connected || !tool.live?.connected ? c.connected : c.liveConnected
 }
 
 /** Les filtres de la grille : la recherche, la catégorie choisie, et ce que la personne a connecté ou pas. */
@@ -192,23 +209,32 @@ function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
   if (tool.blocked && !tool.connected) {
     return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{c.notAvailable}</span>
   }
-  const shared = tool.scope === "WORKSPACE" ? <span className="text-[10px] text-muted-foreground">{c.shared}</span> : null
+  // L'accès que la carte montre : la native, ou le second accès quand lui seul a une connexion (sa portée, son compte).
+  const shown = shownAccess(tool)
+  const live = liveShown(tool)
+  const shared = shown.scope === "WORKSPACE" ? <span className="text-[10px] text-muted-foreground">{c.shared}</span> : null
   if (isConnected(tool)) {
     return (
       <span className="flex flex-col items-end gap-0.5">
-        <Badge variant="outline" title={tool.accountLabel ? c.connectedAs.replace("{account}", tool.accountLabel) : undefined}
+        <Badge variant="outline" title={shown.accountLabel ? c.connectedAs.replace("{account}", shown.accountLabel) : undefined}
                className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
-          <Check className="size-3" /> {c.connected}
+          <Check className="size-3" /> {connectedLabel(tool, c)}
         </Badge>
         {shared}
       </span>
     )
   }
-  if (tool.state === "NEEDS_RECONNECT" || tool.state === "WAITING_FOR_ADMIN") {
+  if (shown.state === "NEEDS_RECONNECT" || shown.state === "WAITING_FOR_ADMIN") {
+    const words = shown.state === "NEEDS_RECONNECT"
+      ? (live ? c.liveNeedsReconnecting : c.needsReconnecting)
+      : (live ? c.liveWaitingForAdmin : c.waitingForAdmin)
     return (
-      <Badge variant="outline" className="gap-1 border-shape-yellow/25 bg-shape-yellow/10 text-[10px] text-ink-yellow">
-        <AlertTriangle className="size-3" /> {tool.state === "NEEDS_RECONNECT" ? c.needsReconnecting : c.waitingForAdmin}
-      </Badge>
+      <span className="flex flex-col items-end gap-0.5">
+        <Badge variant="outline" className="gap-1 border-shape-yellow/25 bg-shape-yellow/10 text-[10px] text-ink-yellow">
+          <AlertTriangle className="size-3" /> {words}
+        </Badge>
+        {shared}
+      </span>
     )
   }
   return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{connectionOf(tool, t, IS_DESKTOP, c).label}</span>
@@ -294,7 +320,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
    *  native ne se connecte pas ici (Slack dans l'app desktop). */
   function openConnection(tool: ConnectorView) {
     const nativeHere = connectionOf(tool, t, IS_DESKTOP, connectTexts).canConnect
-    setDialog({ key: tool.key, live: !nativeHere && Boolean(tool.live) })
+    setDialog({ key: tool.key, live: Boolean(tool.live) && (!nativeHere || liveShown(tool)) })
   }
 
   // Filtrage recherche + catégorie (marketplace) - catégories vides masquées.
@@ -531,7 +557,7 @@ function ConnectorDetailView({
               <h3 className="text-lg font-semibold text-foreground">{tool.name}</h3>
               {connected && (
                 <Badge variant="outline" className="gap-1 border-shape-green/25 bg-shape-green/10 text-[10px] text-ink-green">
-                  <Check className="size-3" /> {c.connected}
+                  <Check className="size-3" /> {connectedLabel(tool, c)}
                 </Badge>
               )}
             </div>
@@ -659,7 +685,7 @@ function NativeAccess({ slug, tool, startLive, manager, onClose, onChanged, onWi
                 className="flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <ChevronLeft className="size-3.5" /> {fillText(c.liveBack, { name: tool.name })}
         </button>
-        <ConnectPanel slug={slug} tool={tool.live} manager={manager} onChanged={onChanged} onWide={onWide} />
+        <ConnectPanel slug={slug} tool={tool.live} manager={manager} onChanged={onChanged} onWide={onWide} live />
       </div>
     )
   }

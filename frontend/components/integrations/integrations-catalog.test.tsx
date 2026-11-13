@@ -147,6 +147,20 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(within(dialog()).getByRole("checkbox", { name: new RegExp(c.localConfirm) })).toBeInTheDocument()
   })
 
+  it("a card shows the state, scope and account of Cortex's access when only it has a connection, and names it", async () => {
+    const shared = { ...slack, live: { ...slack.live!, connected: true, state: "CONNECTED" as const, scope: "WORKSPACE" as const,
+      accountLabel: "ops@acme.test" } }
+    vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(shared))
+    render(<IntegrationsCatalog slug="acme" />)
+
+    const badge = await screen.findByText(c.liveConnected)
+    expect(badge.closest("[title]")?.getAttribute("title")).toBe(c.connectedAs.replace("{account}", "ops@acme.test"))
+    expect(screen.getByText(c.shared)).toBeInTheDocument()
+    // « Manage » ouvre l'accès branché : Cortex, avec le retour vers Slack.
+    fireEvent.click(screen.getByRole("button", { name: t.manage }))
+    expect(within(dialog()).getByRole("button", { name: c.liveBack.replace("{name}", "Slack") })).toBeInTheDocument()
+  })
+
   it("an owner or admin reads « Set it up » on a tool that needs the company's app, never a wait", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("zoom", "Zoom", { connection: "company-app", state: "NEEDS_SETUP" })))
     render(<IntegrationsCatalog slug="acme" />)

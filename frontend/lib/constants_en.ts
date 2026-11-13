@@ -914,6 +914,11 @@ export const CONSTANTS_EN = {
     liveText: "With your own account, Cortex reads {name} in your conversations. It asks you before any change.",
     liveConnect: "Connect for Cortex",
     liveBack: "Back to {name}",
+    // The card and the toasts name the access that is connected when only Cortex's own access is (R161)
+    liveConnected: "Cortex connected",
+    liveNeedsReconnecting: "Cortex needs reconnecting",
+    liveWaitingForAdmin: "Cortex waits for your admin",
+    liveReturnedConnected: "Cortex is connected to {name}.",
     nativeConnected: "{name} is connected for this workspace.",
     // Options before connecting
     shareWithWorkspace: "Share with the workspace",
