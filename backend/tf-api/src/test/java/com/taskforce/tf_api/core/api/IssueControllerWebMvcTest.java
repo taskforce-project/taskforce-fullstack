@@ -234,6 +234,19 @@ class IssueControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("GET /issues/relations : les liens du projet en une lecture (R166), pas une issue nommée relations")
+    void project_relations_200() throws Exception {
+        stubUser();
+        when(issueService.listProjectRelations("acme", 5L, 7L)).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.ProjectIssueRelationsResponse(List.of(), List.of()));
+
+        mockMvc.perform(get(BASE + "/relations").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.relations").isArray())
+            .andExpect(jsonPath("$.data.subIssues").isArray());
+    }
+
+    @Test
     @DisplayName("POST checklist/worklogs/relations → 2xx")
     void add_sub_resources() throws Exception {
         stubUser();

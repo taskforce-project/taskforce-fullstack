@@ -41,6 +41,7 @@ import com.taskforce.tf_api.core.dto.response.BulkSmartAssignItemResponse;
 import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueSpecDraft;
 import com.taskforce.tf_api.core.dto.response.KnowledgeNodeResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectIssueRelationsResponse;
 import com.taskforce.tf_api.core.dto.response.SmartAssignResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -562,6 +563,21 @@ public class IssueController {
     // =========================================================================
     // Relations
     // =========================================================================
+
+    /**
+     * GET /api/workspaces/{slug}/projects/{projectId}/issues/relations : les liens entre les issues du projet, en une
+     * lecture (la vue du workflow, R166) : ses relations, de la source vers la cible, et ses sous-issues avec leur parent.
+     */
+    @GetMapping("/relations")
+    public ResponseEntity<ApiResponse<ProjectIssueRelationsResponse>> listProjectRelations(
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Project relations retrieved",
+            issueService.listProjectRelations(slug, projectId, userId)));
+    }
 
     @GetMapping("/{issueId}/relations")
     public ResponseEntity<ApiResponse<List<IssueRelationResponse>>> listRelations(

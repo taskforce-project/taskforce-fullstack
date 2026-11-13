@@ -81,6 +81,7 @@ class DeliveryApprovalObligationsTest {
     @Mock private WorkspaceMemberRepository members;
     @Mock private ProjectMemberRepository projectMembers;
     @Mock private DeliveryRunApprovalSignatureRepository signatures;
+    @Mock private ProjectDeliveryFeed feed;
 
     private DeliveryActivityService service;
     private DeliveryRun run;
@@ -95,7 +96,7 @@ class DeliveryApprovalObligationsTest {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
             visibilityGuard, access, notificationService, settings, evidenceService, new HarnessRulesService(ruleSets, members),
-            new RuleApprovers(members, projectMembers), signatures, members);
+            new RuleApprovers(members, projectMembers), signatures, members, feed);
         delegator = User.builder().id(7L).email("ada@example.com").displayName("Ada").build();
         finance = User.builder().id(42L).email("marie@example.com").displayName("Marie Martin").build();
         admin = User.builder().id(5L).email("linus@example.com").displayName("Linus").build();

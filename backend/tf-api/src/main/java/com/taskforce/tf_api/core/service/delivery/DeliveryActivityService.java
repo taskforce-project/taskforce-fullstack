@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,7 @@ public class DeliveryActivityService {
     private final RuleApprovers approvers;
     private final DeliveryRunApprovalSignatureRepository signatureRepository;
     private final WorkspaceMemberRepository workspaceMembers;
+    private final ProjectDeliveryFeed feed;
 
     /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
     private static final Map<String, String> EVIDENCE_TYPE = Map.of(
@@ -99,10 +101,12 @@ public class DeliveryActivityService {
     /**
      * Ajoute des événements à la suite de la chronologie et du dossier de preuve ; le run est verrouillé par
      * l'appelant. La chronologie a son plafond d'affichage ; le dossier, le sien, plus haut, et le dit quand il est atteint.
+     * Quand la chronologie avance, le topic du projet le dit, une fois par lot, avec la nouvelle étape en cours.
      */
     @Transactional
     public void appendEvents(DeliveryRun run, List<RunnerEventsRequest.Event> events) {
         int seq = eventRepository.maxSeq(run.getId());
+        DeliveryRunEvent last = null;
         for (RunnerEventsRequest.Event event : events) {
             evidenceService.append(run, EVIDENCE_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event), evidenceData(event));
             if (EVIDENCE_ONLY.contains(event.kind())) {
@@ -112,7 +116,7 @@ public class DeliveryActivityService {
                 log.debug("Run {} : chronologie pleine, événement {} gardé au seul dossier de preuve", run.getId(), event.kind());
                 continue;
             }
-            eventRepository.save(DeliveryRunEvent.builder()
+            last = eventRepository.save(DeliveryRunEvent.builder()
                 .run(run)
                 .seq(++seq)
                 .kind(event.kind())
@@ -120,6 +124,7 @@ public class DeliveryActivityService {
                 .text(clip(event.text()))
                 .build());
         }
+        if (last != null) feed.step(run, last);
     }
 
     /** Qui agit : la règle pour ses décisions, le runner pour les sorties et le plafond, l'agent pour le reste. */
@@ -201,6 +206,7 @@ public class DeliveryActivityService {
                 notificationService.notifyAgentApproval(run.getIssue(), signer, approval.getTool(), approval.getSummary(), byRunner);
             }
         }
+        feed.approval(run, approval);
         log.info("Run {} : validation {} demandée ({}){}", run.getId(), approval.getId(), approval.getTool(),
             refused ? ", refusée par les règles du serveur" : "");
         return toRunnerResponse(approval);
@@ -381,22 +387,54 @@ public class DeliveryActivityService {
             .findByRunIdAndSeqGreaterThanOrderBySeqAsc(runId, Math.max(after, 0), PageRequest.of(0, PAGE)).stream()
             .map(e -> new DeliveryRunActivityResponse.Event(e.getSeq(), e.getKind(), e.getTool(), e.getText(), e.getCreatedAt()))
             .toList();
-        Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
         List<DeliveryRunActivityResponse.Approval> approvals = approvalRepository.findByRunIdOrderByCreatedAtAsc(runId).stream()
             .peek(a -> expireIfDue(a, now))
-            .map(a -> {
-                RulesEngine.Obligations require = a.obligations();
-                List<String> signedBy = RuleApprovers.ordinary(require) ? List.of()
-                    : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
-                        .filter(DeliveryRunApprovalSignature::isAllow).map(s -> displayName(s.getUser())).toList();
-                return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
-                    a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
-                    canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
-                    approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
-                    require != null && require.separate(), signedBy, a.isBinding());
-            })
+            .map(a -> approvalView(run, a, userId))
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
+    }
+
+    /**
+     * Les demandes encore ouvertes de ces missions, par mission (la vue du projet, R166), avec les champs de la chronologie :
+     * {@code canDecide} pour cette personne, comme les règles de l'espace en décident ({@link RuleApprovers}). Une demande
+     * échue passe EXPIRED ici, comme à la lecture de la chronologie. Seule une mission en cours a des demandes ouvertes ;
+     * l'appelant a vérifié que la personne voit le projet de ces missions.
+     */
+    @Transactional
+    public Map<Long, List<DeliveryRunActivityResponse.Approval>> pendingApprovals(Collection<DeliveryRun> runs, Long userId) {
+        Map<Long, DeliveryRun> running = new LinkedHashMap<>();
+        for (DeliveryRun run : runs) {
+            if (run.getStatus() == DeliveryRunStatus.RUNNING) running.put(run.getId(), run);
+        }
+        if (running.isEmpty()) return Map.of();
+        LocalDateTime now = LocalDateTime.now();
+        Map<Long, List<DeliveryRunActivityResponse.Approval>> pending = new LinkedHashMap<>();
+        for (DeliveryRunApproval approval : approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(running.keySet(),
+                DeliveryApprovalStatus.PENDING)) {
+            DeliveryRun run = running.get(approval.getRun().getId());
+            if (run == null) continue;
+            expireIfDue(approval, now);
+            if (approval.getStatus() != DeliveryApprovalStatus.PENDING) continue;
+            pending.computeIfAbsent(run.getId(), id -> new ArrayList<>()).add(approvalView(run, approval, userId));
+        }
+        return pending;
+    }
+
+    /**
+     * Une demande telle que la chronologie et la vue du projet la montrent. {@code canDecide} : cette personne peut encore y
+     * répondre, comme {@link #decide} l'accepterait.
+     */
+    private DeliveryRunActivityResponse.Approval approvalView(DeliveryRun run, DeliveryRunApproval a, Long userId) {
+        Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
+        RulesEngine.Obligations require = a.obligations();
+        List<String> signedBy = RuleApprovers.ordinary(require) ? List.of()
+            : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
+                .filter(DeliveryRunApprovalSignature::isAllow).map(s -> displayName(s.getUser())).toList();
+        return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
+            a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
+            canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
+            approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
+            require != null && require.separate(), signedBy, a.isBinding());
     }
 
     /** Le dossier de preuve du run, en JSON ou en Markdown, si le projet est visible ; vide pour un run de la v1. */
@@ -462,6 +500,8 @@ public class DeliveryActivityService {
                 signed.put("decision", "SIGNED");
                 signed.put("signatures", allowed.size());
                 evidenceService.append(run, "human.decision", personActor(run, userId), signed);
+                // Une signature de plus : la demande attend encore, mais qui a signé et qui peut encore signer ont changé.
+                feed.approval(run, approval);
                 log.info("Run {} : validation {} signée par {} ({} sur {})", runId, approvalId, userId, allowed.size(),
                     require.signatures());
                 return null;
@@ -480,6 +520,7 @@ public class DeliveryActivityService {
         decided.put("decision", approval.getStatus().name());
         decided.put("scope", approval.getScope());
         evidenceService.append(run, "human.decision", personActor(run, userId), decided);
+        feed.approval(run, approval);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);
         return approval.getScope();
     }
@@ -501,6 +542,7 @@ public class DeliveryActivityService {
             approvalRepository.save(approval);
             recordUnanswered(approval.getRun(), approval, "No answer in time.");
             readNotificationsIfSettled(approval.getRun());
+            feed.approval(approval.getRun(), approval);
         }
     }
 

@@ -315,6 +315,80 @@ export interface DeliveryRunActivity {
   approvals: DeliveryRunApproval[];
 }
 
+/**
+ * L'étape en cours d'une mission, telle que le serveur la connaît : le dernier événement de sa chronologie. Les cinq
+ * étapes (comprendre, prévoir, faire, vérifier, rendre) se lisent de toute la chronologie (`missionSequence`), comme sur
+ * la vue du travail : `seq` dit si la chronologie lue est à jour.
+ */
+export interface ProjectRunStep {
+  seq: number;
+  kind: DeliveryRunEvent["kind"];
+  tool: string | null;
+  at: string | null;
+}
+
+/** Les liens d'une mission : sa branche, sa pull request, la mission qu'elle reprend et la dernière qui la reprend (R139). */
+export interface ProjectRunLinks {
+  branch: string | null;
+  pullRequestUrl: string | null;
+  followUpOf: number | null;
+  followedUpBy: number | null;
+}
+
+/** Une mission d'un projet telle que la vue du workflow la lit (R166) : elle, son étape en cours, ses liens, ses demandes. */
+export interface ProjectRun {
+  run: DeliveryRun;
+  /** Nulle tant que la mission n'a rien fait. */
+  step: ProjectRunStep | null;
+  links: ProjectRunLinks;
+  /** Ses demandes encore ouvertes ; `canDecide` : la personne connectée peut y répondre, comme les règles en décident. */
+  approvals: DeliveryRunApproval[];
+}
+
+/** Une page des missions d'un projet, les plus récentes d'abord. */
+export interface ProjectRunsPage {
+  content: ProjectRun[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+/**
+ * Ce que publie le topic des missions d'un projet, `/topic/projects.{projectId}.delivery` : qu'une mission a changé. Sans
+ * ce que seule la personne connectée peut savoir (`canDecide`) : la mission se relit pour cela.
+ */
+export interface ProjectDeliveryEvent {
+  /** `run` : son état, son résultat, ses liens ; `approval` : une demande ouverte ou tranchée ; `step` : une étape de plus. */
+  type: "run" | "approval" | "step";
+  projectId: number;
+  runId: number;
+  issueId: number | null;
+  status: DeliveryRunStatus | null;
+  outcome: DeliveryRunOutcome | null;
+  approvalId: number | null;
+  approvalStatus: DeliveryApprovalStatus | null;
+  /** La nouvelle étape en cours, pour `step`. */
+  step: ProjectRunStep | null;
+}
+
+/** Les missions d'un projet et leurs demandes ouvertes, une page à la fois. Lu en arrière-plan : jamais de toast. */
+export async function listProjectRuns(slug: string, projectId: number, page = 0, size = 20): Promise<ProjectRunsPage> {
+  const res = await apiClient.get<{ data: ProjectRunsPage }>(DELIVERY_ROUTES.PROJECT_RUNS(slug, projectId), {
+    params: { page, size }, silentError: true,
+  });
+  return res.data.data;
+}
+
+/** Une mission d'un projet, comme une ligne de la liste : relue quand le topic du projet l'annonce. Jamais de toast. */
+export async function getProjectRun(slug: string, projectId: number, runId: number): Promise<ProjectRun> {
+  const res = await apiClient.get<{ data: ProjectRun }>(DELIVERY_ROUTES.PROJECT_RUN(slug, projectId, runId), { silentError: true });
+  return res.data.data;
+}
+
 /** Chronologie d'un run après l'événement `after`, et ses demandes. Lu en boucle pendant le run : jamais de toast. */
 export async function getRunActivity(slug: string, runId: number, after: number): Promise<DeliveryRunActivity> {
   const res = await apiClient.get<{ data: DeliveryRunActivity }>(DELIVERY_ROUTES.ACTIVITY(slug, runId, after), { silentError: true });

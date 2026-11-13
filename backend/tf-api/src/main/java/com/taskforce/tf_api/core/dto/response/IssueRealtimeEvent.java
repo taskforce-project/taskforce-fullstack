@@ -12,10 +12,15 @@ import lombok.Data;
 @Builder
 public class IssueRealtimeEvent {
 
-    /** {@code created} | {@code updated} | {@code deleted} | {@code activity} (l'activité de l'issue a bougé) */
+    /**
+     * {@code created} | {@code updated} | {@code deleted} | {@code activity} (l'activité de l'issue a bougé) |
+     * {@code relation.added} | {@code relation.removed} (un lien entre deux issues du projet, posé depuis {@code issueId})
+     */
     private String action;
     private Long projectId;
     private Long issueId;
-    /** Issue complète pour created/updated ; null pour deleted et activity. */
+    /** Issue complète pour created/updated ; null pour deleted, activity et les liens. */
     private IssueResponse issue;
+    /** Le lien posé ou retiré, tel que la lecture des liens du projet le rend ; null pour les autres actions. */
+    private ProjectIssueRelationsResponse.Relation relation;
 }

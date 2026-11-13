@@ -24,6 +24,7 @@ import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.dto.response.MissionChangesResponse;
 import com.taskforce.tf_api.core.dto.response.MissionFileChangeResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -32,7 +33,9 @@ import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
 import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
+import com.taskforce.tf_api.core.service.delivery.ProjectDeliveryService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
+import com.taskforce.tf_api.shared.dto.PageResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import jakarta.validation.Valid;
@@ -60,6 +63,7 @@ public class DeliveryController {
     private final DeliveryActivityService activityService;
     private final MissionResultService missionResults;
     private final MissionChangesService missionChanges;
+    private final ProjectDeliveryService projectDelivery;
     private final UserRepository userRepository;
 
     /**
@@ -134,6 +138,56 @@ public class DeliveryController {
             runs = deliveryService.listRuns(slug, userId);
         }
         return ResponseEntity.ok(ApiResponse.success("Runs retrieved", runs));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/delivery/projects/{projectId}/runs?page=0&size=20 : les missions d'un projet et leurs
+     * demandes encore ouvertes, page par page (la vue du workflow, R166) ; {@code size} va jusqu'à 50. Les missions en
+     * attente ou en cours sont relues, comme sur la fiche d'une issue : la page ne montre pas « en cours » une mission dont
+     * le runner s'est tu.
+     */
+    @GetMapping("/projects/{projectId}/runs")
+    public ResponseEntity<ApiResponse<PageResponse<ProjectRunResponse>>> projectRuns(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @RequestParam(name = "page", defaultValue = "0") int page,
+        @RequestParam(name = "size", defaultValue = "" + ProjectDeliveryService.DEFAULT_PAGE_SIZE) int size
+    ) {
+        Long userId = resolveUserId(jwt);
+        PageResponse<ProjectRunResponse> runs = projectDelivery.listRuns(slug, projectId, page, size, userId);
+        if (advance(ProjectDeliveryService.toAdvance(runs.getContent()))) {
+            runs = projectDelivery.listRuns(slug, projectId, page, size, userId);
+        }
+        return ResponseEntity.ok(ApiResponse.success("Project runs retrieved", runs));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/delivery/projects/{projectId}/runs/{runId} : une mission du projet, comme une ligne de la
+     * liste ; l'écran la relit quand le topic des missions du projet l'annonce ({@code canDecide} est propre à chacun).
+     */
+    @GetMapping("/projects/{projectId}/runs/{runId}")
+    public ResponseEntity<ApiResponse<ProjectRunResponse>> projectRun(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long projectId,
+        @PathVariable Long runId
+    ) {
+        Long userId = resolveUserId(jwt);
+        ProjectRunResponse run = projectDelivery.run(slug, projectId, runId, userId);
+        if (advance(ProjectDeliveryService.toAdvance(List.of(run)))) {
+            run = projectDelivery.run(slug, projectId, runId, userId);
+        }
+        return ResponseEntity.ok(ApiResponse.success("Project run retrieved", run));
+    }
+
+    /** Missions qu'une lecture fait avancer au plus, par appel : chacune peut interroger son agent. */
+    static final int MAX_ADVANCED_RUNS = 10;
+
+    /** Fait avancer ces missions, chacune dans sa transaction ; vrai s'il y en avait une à relire. */
+    private boolean advance(List<Long> runIds) {
+        runIds.stream().limit(MAX_ADVANCED_RUNS).forEach(deliveryRunner::refresh);
+        return !runIds.isEmpty();
     }
 
     /**

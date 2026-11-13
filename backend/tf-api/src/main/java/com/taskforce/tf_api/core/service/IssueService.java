@@ -45,6 +45,7 @@ import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
 import com.taskforce.tf_api.core.dto.response.IssueStatusResponse;
 import com.taskforce.tf_api.core.dto.response.IssueTypeResponse;
 import com.taskforce.tf_api.core.dto.response.IssueSummaryResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectIssueRelationsResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.UserSummaryResponse;
 import com.taskforce.tf_api.core.enums.IssueActivityType;
@@ -1145,6 +1146,29 @@ public class IssueService {
         return isSource ? r.getRelationType() == IssueRelationType.BLOCKED_BY : r.getRelationType() == IssueRelationType.BLOCKS;
     }
 
+    /**
+     * Les liens entre les issues du projet, en une lecture (la vue du workflow, R166) : ses relations, et ses sous-issues
+     * avec leur parent, que la liste des issues ne porte pas. Gardée comme cette liste : le projet de l'espace, un membre de
+     * l'espace, un projet qu'il voit.
+     */
+    @Transactional(readOnly = true)
+    public ProjectIssueRelationsResponse listProjectRelations(String workspaceSlug, Long projectId, Long userId) {
+        Project project = resolveProject(workspaceSlug, projectId);
+        assertWorkspaceMember(project.getWorkspace().getId(), userId);
+        visibilityGuard.assertCanView(project, userId); // projet privé : membres invités + OWNER/ADMIN
+        List<ProjectIssueRelationsResponse.Relation> relations = relationRepository.findByProjectId(project.getId()).stream()
+            .map(this::toProjectRelation)
+            .toList();
+        List<ProjectIssueRelationsResponse.SubIssue> subIssues = issueRepository.findSubIssues(project.getId()).stream()
+            .map(child -> new ProjectIssueRelationsResponse.SubIssue(toIssueSummary(child.getParent()), toIssueSummary(child)))
+            .toList();
+        return new ProjectIssueRelationsResponse(relations, subIssues);
+    }
+
+    /**
+     * Pose un lien entre deux issues du projet. Il entre à l'activité des deux, chacune le disant de son côté (« bloque
+     * WEB-12 », « bloquée par WEB-11 »), et le topic du projet l'annonce après le commit, comme les autres changements.
+     */
     @Transactional
     public IssueRelationResponse addRelation(String workspaceSlug, Long projectId, Long issueId,
                                               CreateIssueRelationRequest request, Long userId) {
@@ -1171,16 +1195,72 @@ public class IssueService {
             .createdBy(actor)
             .build();
         relation = relationRepository.save(relation);
+        logActivity(source, actor, IssueActivityType.RELATION_ADDED, null, sourceView(type) + " " + keyOf(target));
+        logActivity(target, actor, IssueActivityType.RELATION_ADDED, null, targetView(type) + " " + keyOf(source));
+        announceRelation(RELATION_ADDED_EVENT, project.getId(), source.getId(), toProjectRelation(relation));
         return toRelationResponse(relation, source.getId());
     }
 
+    /**
+     * Retire un lien. L'issue du chemin doit être de ce projet, et le lien la toucher : un lien d'un autre projet, ou d'un
+     * autre espace, ne se retire pas d'ici. Le retrait entre à l'activité des deux issues, et le topic du projet l'annonce.
+     */
     @Transactional
     public void deleteRelation(String workspaceSlug, Long projectId, Long issueId, Long relationId, Long userId) {
         Project project = resolveWritableProject(workspaceSlug, projectId, userId);
-        IssueRelation relation = relationRepository.findById(relationId)
-            .filter(r -> r.getSource().getId().equals(issueId) || r.getTarget().getId().equals(issueId))
+        Issue issue = resolveIssue(issueId, project.getId());
+        IssueRelation relation = relationRepository.findWithEndsById(relationId)
+            .filter(r -> r.getSource().getId().equals(issue.getId()) || r.getTarget().getId().equals(issue.getId()))
             .orElseThrow(() -> new ResourceNotFoundException("Relation not found"));
+        ProjectIssueRelationsResponse.Relation removed = toProjectRelation(relation);
+        User actor = resolveUser(userId);
         relationRepository.delete(relation);
+        IssueRelationType type = relation.getRelationType();
+        logActivity(relation.getSource(), actor, IssueActivityType.RELATION_REMOVED,
+            sourceView(type) + " " + keyOf(relation.getTarget()), null);
+        logActivity(relation.getTarget(), actor, IssueActivityType.RELATION_REMOVED,
+            targetView(type) + " " + keyOf(relation.getSource()), null);
+        announceRelation(RELATION_REMOVED_EVENT, project.getId(), issue.getId(), removed);
+    }
+
+    /** Les événements temps réel d'un lien posé ou retiré, sur le topic du projet. */
+    static final String RELATION_ADDED_EVENT = "relation.added";
+    static final String RELATION_REMOVED_EVENT = "relation.removed";
+
+    /** Le lien vu de sa source, tel que l'activité le garde : {@code BLOCKS}, {@code BLOCKED_BY}, {@code DUPLICATE_OF}... */
+    static String sourceView(IssueRelationType type) {
+        return type == IssueRelationType.DUPLICATE ? "DUPLICATE_OF" : type.name();
+    }
+
+    /** Le lien vu de sa cible : « A bloque B » se lit depuis B « bloquée par A », « A doublon de B » : « B doublée par A ». */
+    static String targetView(IssueRelationType type) {
+        return switch (type) {
+            case BLOCKS -> IssueRelationType.BLOCKED_BY.name();
+            case BLOCKED_BY -> IssueRelationType.BLOCKS.name();
+            case DUPLICATE -> "DUPLICATED_BY";
+            case RELATES_TO -> IssueRelationType.RELATES_TO.name();
+        };
+    }
+
+    /** La clé d'une issue, « WEB-12 ». */
+    private static String keyOf(Issue issue) {
+        return issue.getProject().getIdentifier() + "-" + issue.getSequenceNumber();
+    }
+
+    /** Annonce un lien posé ou retiré sur le topic du projet, après le commit : la relecture trouve ce qui vient d'être écrit. */
+    private void announceRelation(String action, Long projectId, Long issueId, ProjectIssueRelationsResponse.Relation relation) {
+        afterCommit(() -> {
+            try {
+                messagingTemplate.convertAndSend("/topic/projects." + projectId, IssueRealtimeEvent.builder()
+                    .action(action)
+                    .projectId(projectId)
+                    .issueId(issueId)
+                    .relation(relation)
+                    .build());
+            } catch (Exception ex) {
+                log.warn("Publication temps réel d'un lien échouée (projet {}): {}", projectId, ex.getMessage());
+            }
+        });
     }
 
     // =========================================================================
@@ -1292,15 +1372,20 @@ public class IssueService {
         if (issue.getId() == null || issue.getProject() == null || issue.getProject().getId() == null) return;
         Long projectId = issue.getProject().getId();
         Long issueId = issue.getId();
+        afterCommit(() -> publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null));
+    }
+
+    /** Après le commit de la transaction en cours ; hors transaction, tout de suite. */
+    private static void afterCommit(Runnable task) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null);
+                    task.run();
                 }
             });
         } else {
-            publishIssueEvent(ACTIVITY_EVENT, projectId, issueId, null);
+            task.run();
         }
     }
 
@@ -1436,6 +1521,12 @@ public class IssueService {
             .createdBy(toUserSummary(r.getCreatedBy()))
             .createdAt(r.getCreatedAt())
             .build();
+    }
+
+    /** Une relation telle qu'elle a été posée, de la source vers la cible, pour la lecture des liens du projet. */
+    private ProjectIssueRelationsResponse.Relation toProjectRelation(IssueRelation r) {
+        return new ProjectIssueRelationsResponse.Relation(r.getId(), r.getRelationType(), toIssueSummary(r.getSource()),
+            toIssueSummary(r.getTarget()), toUserSummary(r.getCreatedBy()), r.getCreatedAt());
     }
 
     public UserSummaryResponse toUserSummaryPublic(User u) {
