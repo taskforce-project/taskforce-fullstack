@@ -267,6 +267,26 @@ class ConnectorCatalogTest {
         assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
     }
 
+    @ParameterizedTest(name = "{0} / {1} -> {2}")
+    @CsvSource({
+        // Excalidraw : create_view garde chaque dessin chez l'éditeur ; read_checkpoint lit ce dépôt, pour l'app seule.
+        "excalidraw,      read_me,                 READ",
+        "excalidraw,      create_view,             WRITE",
+        "excalidraw,      read_checkpoint,         WRITE",
+        "excalidraw,      export_to_excalidraw,    WRITE",
+        // Confluence : un export fabriqué chez Atlassian, avec un lien dont l'accès n'est pas documenté.
+        "confluence,      exportConfluenceContent, WRITE",
+        "confluence,      getConfluenceContent,    READ",
+        // Excalidraw+ : deux outils sans description sur la page de l'éditeur.
+        "excalidraw-plus, list_invites,            WRITE",
+        "excalidraw-plus, get_invite,              WRITE",
+        "excalidraw-plus, get_scene,               READ",
+    })
+    @DisplayName("un outil qui garde ou envoie un contenu chez l'éditeur, ou que sa page ne décrit pas, demande (revue de la PR #532)")
+    void ceQuiGardeOuEnvoieDemande(String cle, String outil, ToolClass classe) {
+        assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
     @ParameterizedTest(name = "{0} / {1} / {2} -> {3}")
     @CsvSource({
         // L'éditeur écrit que l'adresse de lecture seule ne sert que des lectures : chaque outil qu'elle sert en est une.

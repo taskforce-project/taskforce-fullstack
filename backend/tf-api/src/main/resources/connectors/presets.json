@@ -137,12 +137,12 @@
       "tools": {
         "source": "https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/",
         "checked": "2026-11-12",
-        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "getContentFormatGuide", "search", "getConfluenceContent", "listConfluenceContent", "listConfluenceSpaces", "getConfluenceSpace", "getConfluenceSpaceInstructions", "getConfluencePersonalSpace", "listConfluenceComments", "getConfluenceComment", "getConfluenceContentSuggestions", "listConfluenceContentVersions", "getConfluenceContentVersion", "diffConfluenceContentVersions", "listConfluenceAttachments", "getConfluenceAttachment", "downloadConfluenceAttachment", "exportConfluenceContent", "getConfluenceContentPermissions", "getConfluenceContentRestrictionState", "getConfluencePublicLinkStatus", "getConfluenceReactions", "getConfluenceTask", "listConfluenceTasks", "listConfluenceTemplates", "getConfluenceTemplate", "resolveConfluenceContentMacros", "getConfluenceMauiApp", "searchConfluence", "getTeamworkGraphContext", "getTeamworkGraphObject", "getPeopleInfo", "getWorkPortfolio", "getWorkActivity", "getPullRequests", "getCollaborators", "searchCode", "getCodeFile", "listCodeDirectory", "scanCodeRepo", "getCodeSymbol", "diffCodeSymbols"],
+        "read": ["atlassianUserInfo", "getAccessibleAtlassianResources", "discover", "getContentFormatGuide", "search", "getConfluenceContent", "listConfluenceContent", "listConfluenceSpaces", "getConfluenceSpace", "getConfluenceSpaceInstructions", "getConfluencePersonalSpace", "listConfluenceComments", "getConfluenceComment", "getConfluenceContentSuggestions", "listConfluenceContentVersions", "getConfluenceContentVersion", "diffConfluenceContentVersions", "listConfluenceAttachments", "getConfluenceAttachment", "downloadConfluenceAttachment", "getConfluenceContentPermissions", "getConfluenceContentRestrictionState", "getConfluencePublicLinkStatus", "getConfluenceReactions", "getConfluenceTask", "listConfluenceTasks", "listConfluenceTemplates", "getConfluenceTemplate", "resolveConfluenceContentMacros", "getConfluenceMauiApp", "searchConfluence", "getTeamworkGraphContext", "getTeamworkGraphObject", "getPeopleInfo", "getWorkPortfolio", "getWorkActivity", "getPullRequests", "getCollaborators", "searchCode", "getCodeFile", "listCodeDirectory", "scanCodeRepo", "getCodeSymbol", "diffCodeSymbols"],
         "write": ["executeWrite", "executeDestructive", "createConfluenceContent", "updateConfluenceContent", "createConfluenceSpace", "setConfluenceSpaceInstructions", "copyConfluenceContent", "moveConfluenceContent", "archiveConfluenceContent", "unarchiveConfluenceContent", "restoreConfluenceContentVersion", "convertConfluenceContentMode", "setConfluenceContentStatus", "createConfluenceComment", "updateConfluenceComment", "updateConfluenceCommentResolution", "addConfluenceContentSuggestions", "createConfluenceAttachment", "addLabelsToConfluenceContent", "addConfluenceReaction", "addConfluenceContentPermissions", "removeConfluenceContentPermissions", "replaceConfluenceContentPermissions", "setConfluenceContentRestrictionState", "enableConfluencePublicLink", "disableConfluencePublicLink", "completeConfluenceTask", "reopenConfluenceTask", "starConfluenceContent", "unstarConfluenceContent", "starConfluenceSpace", "unstarConfluenceSpace", "watchConfluenceContent", "unwatchConfluenceContent", "watchConfluenceSpace", "unwatchConfluenceSpace", "watchConfluenceLabel", "unwatchConfluenceLabel", "createConfluenceInfographicForPage", "editConfluenceInfographicForPage", "createConfluenceMauiApp", "editConfluenceMauiApp"]
       },
       "tried": null,
       "sources": ["https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/", "https://auth.atlassian.com/.well-known/oauth-authorization-server/VCeDsk8ZHncYF1g234fKtc4lNipbBhu3"],
-      "unverified": ["whether the default 127.0.0.1 entry covers every port", "whether executeRead runs only read tools (the page does not say so: it asks)"]
+      "unverified": ["whether the default 127.0.0.1 entry covers every port", "whether executeRead runs only read tools (the page does not say so: it asks)", "exportConfluenceContent makes a PDF or Word export at Atlassian and returns a download link whose access and lifetime are not documented: unclassified, it asks"]
     },
     {
       "key": "asana",
@@ -531,14 +531,14 @@
       "mcpUrl": "https://mcp.excalidraw.com/mcp",
       "connection": "open",
       "tools": {
-        "source": "https://github.com/excalidraw/excalidraw-mcp",
-        "checked": "2026-11-12",
-        "read": ["read_me", "create_view", "read_checkpoint"],
-        "write": ["export_to_excalidraw", "save_checkpoint"]
+        "source": "https://github.com/excalidraw/excalidraw-mcp/blob/main/src/server.ts",
+        "checked": "2026-11-13",
+        "read": ["read_me"],
+        "write": ["create_view", "export_to_excalidraw", "save_checkpoint"]
       },
       "tried": null,
-      "sources": ["https://github.com/excalidraw/excalidraw-mcp"],
-      "unverified": ["what create_view returns to a client without the MCP Apps interface"]
+      "sources": ["https://github.com/excalidraw/excalidraw-mcp", "https://github.com/excalidraw/excalidraw-mcp/blob/main/src/server.ts"],
+      "unverified": ["what create_view returns to a client without the MCP Apps interface", "the README names no tool: the classes come from src/server.ts, where create_view keeps each diagram on the server as a checkpoint (so it asks, whatever its readOnlyHint) and read_checkpoint, shown to the app only, reads that store (unclassified, it asks)"]
     },
     {
       "key": "excalidraw-plus",
@@ -558,12 +558,12 @@
         "link": "https://plus.excalidraw.com/docs/mcp/getting-started"
       },
       "tools": {
-        "read": ["list_scenes", "get_scene", "search_scene_content", "get_scene_content", "read_diagram_format", "read_presentation_format", "read_freeform_format", "get_diagram", "list_slides", "check_scene_layout", "take_screenshot", "list_collections", "get_collection", "list_collection_scenes", "get_workspace", "list_workspace_users", "get_workspace_user", "list_invites", "get_invite", "list_logs"],
+        "read": ["list_scenes", "get_scene", "search_scene_content", "get_scene_content", "read_diagram_format", "read_presentation_format", "read_freeform_format", "get_diagram", "list_slides", "check_scene_layout", "take_screenshot", "list_collections", "get_collection", "list_collection_scenes", "get_workspace", "list_workspace_users", "get_workspace_user", "list_logs"],
         "write": ["create_scene", "update_scene", "delete_scene", "edit_scene_content", "create_mermaid_diagram", "create_diagram", "create_chart", "create_table", "transform_elements", "compose_slide", "compose_slides", "create_slide", "update_slide", "duplicate_slide", "delete_slide", "set_slide_animations", "create_sticky_notes", "share_scene", "share_presentation", "add_image", "create_collection", "update_collection", "delete_collection", "create_collection_scene", "update_workspace", "update_workspace_user", "remove_workspace_user", "create_email_invite", "create_invite_link", "update_invite", "delete_invite"]
       },
       "tried": null,
       "sources": ["https://plus.excalidraw.com/docs/mcp/getting-started", "https://plus.excalidraw.com/docs/mcp/tools"],
-      "unverified": ["the Excalidraw+ plan required", "a read-only key"]
+      "unverified": ["the Excalidraw+ plan required", "a read-only key", "list_invites and get_invite carry no description on the tools page (13/11/2026): unclassified, they ask"]
     },
     {
       "key": "canva",
