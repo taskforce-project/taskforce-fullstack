@@ -56,7 +56,7 @@ public class McpClientRegistrar {
     /** Aucun chemin d'inscription : ni client enregistré, ni CIMD, ni DCR. */
     public static class NoClient extends BusinessException {
         public NoClient(String message) {
-            super(message);
+            super(ConnectFailure.NO_CLIENT, message);
         }
     }
 
@@ -180,7 +180,9 @@ public class McpClientRegistrar {
         if (known != null) return new RegisteredClient(known.getClientId(), blankToNull(known.getClientSecret()), DCR);
         JsonNode reg = client.postJson(auth.registrationEndpoint(), dcrBody(redirectUri));
         String clientId = reg.path("client_id").asText(null);
-        if (clientId == null || clientId.isBlank()) throw new BusinessException("The DCR response has no client_id");
+        if (clientId == null || clientId.isBlank()) {
+            throw ConnectFailure.of(ConnectFailure.REGISTRATION_REFUSED, "The DCR response has no client_id");
+        }
         String secret = blankToNull(reg.path("client_secret").asText(null));
         registrations.save(McpOAuthRegistration.builder().issuer(auth.issuer()).redirectUri(redirectUri)
             .clientId(clientId).clientSecret(secret).build());

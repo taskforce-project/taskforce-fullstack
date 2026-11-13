@@ -29,6 +29,12 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import com.taskforce.tf_api.shared.dto.ErrorResponse;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.slf4j.LoggerFactory;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -57,6 +63,26 @@ class GlobalExceptionHandlerTest {
         assertThat(r.getBody()).isNotNull();
         assertThat(r.getBody().getMessage()).contains("not found");
         assertThat(r.getBody().getPath()).isEqualTo("/api/test");
+    }
+
+    @Test
+    @DisplayName("un refus de la garde des adresses → 400 avec son code, journalisé en WARN comme une requête invalide (R159)")
+    void a_refused_address_logs_at_warn() {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            ResponseEntity<ErrorResponse> r = handler.handleBusinessException(
+                new RefusedRequestException("CONNECT_ADDRESS_NOT_ALLOWED", "Blocked internal address"), req());
+            assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(r.getBody().getError()).isEqualTo("CONNECT_ADDRESS_NOT_ALLOWED");
+            handler.handleBusinessException(new BusinessException("PLAN_LIMIT", "Limite du plan atteinte"), req());
+
+            assertThat(logs.list).extracting(ILoggingEvent::getLevel).containsExactly(Level.WARN, Level.ERROR);
+        } finally {
+            logger.detachAppender(logs);
+        }
     }
 
     @Test

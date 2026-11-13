@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import type { ConnectorView } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useConnectorStore } from "@/lib/store/connector-store"
-import { ConnectPanel, pathLabel } from "./connect-panel"
+import { ConnectPanel, pathLabel, pathSentence } from "./connect-panel"
 
 const desktop = vi.hoisted(() => ({ value: false }))
 vi.mock("@/lib/desktop", () => ({ get IS_DESKTOP() { return desktop.value } }))
@@ -46,7 +46,7 @@ describe("ConnectPanel", () => {
     vi.clearAllMocks()
     desktop.value = false
     useConnectorStore.setState({
-      outcomes: {}, busy: null, waiting: null, error: null,
+      outcomes: {}, busy: null, waiting: null, error: null, failure: null,
       connect, waitForConnection, saveCompanyApp, approveTools, disconnect, servers,
     })
     servers.mockResolvedValue([])
@@ -62,6 +62,63 @@ describe("ConnectPanel", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(connect).toHaveBeenCalledWith("acme", "notion", { shared: false, allowWrites: false })
     expect(toast.success).toHaveBeenCalledWith(t.returnedConnected.replace("{name}", "Notion"))
+  })
+
+  it("Cortex's own access says that Cortex is connected, not the tool (R161)", async () => {
+    connect.mockResolvedValue({ next: "connected", authorizeUrl: null, message: null })
+    render(<ConnectPanel slug="acme" tool={notion({ key: "slack-mcp", name: "Slack" })} manager={false} onChanged={onChanged} live />)
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(t.liveReturnedConnected.replace("{name}", "Slack")))
+  })
+
+  it("after Connect, the focus lands on the next step or on the failure, never on the dialog (R161)", async () => {
+    // Le navigateur retire le focus d'un bouton qui se désactive pendant l'essai : il tombe sur la page.
+    const lose = () => (document.activeElement as HTMLElement | null)?.blur()
+    connect.mockImplementation(async () => {
+      lose()
+      useConnectorStore.setState({ outcomes: { notion: { next: "key", authorizeUrl: null, message: null } } })
+      return { next: "key", authorizeUrl: null, message: null }
+    })
+    const view = show(notion({ apiKey: { hint: "Create a key.", link: null } }))
+    screen.getByRole("button", { name: t.connect }).focus()
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    await waitFor(() => expect(screen.getByLabelText(t.keyLabel)).toHaveFocus())
+    view.unmount()
+
+    useConnectorStore.setState({ outcomes: {} })
+    connect.mockImplementation(async () => {
+      lose()
+      useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+      return null
+    })
+    show(notion())
+    screen.getByRole("button", { name: t.connect }).focus()
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveFocus())
+  })
+
+  it("the Details toggles look like controls, and the server's words wrap between words (R161)", () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: "invalid_client: the redirect address is not registered" } })
+    show(notion())
+
+    const details = screen.getByRole("button", { name: t.failureDetails })
+    // Un contrôle : souligné, avec son chevron, et il dit s'il est ouvert.
+    expect(details).toHaveClass("underline")
+    expect(details.querySelector("svg")).not.toBeNull()
+    expect(details).toHaveAttribute("aria-expanded", "false")
+    fireEvent.click(details)
+    expect(screen.getByRole("button", { name: t.failureHideDetails })).toHaveAttribute("aria-expanded", "true")
+    fireEvent.click(screen.getByRole("button", { name: t.failureRaw }))
+    const raw = screen.getByText(/invalid_client/)
+    expect(raw).toHaveClass("break-words")
+    expect(raw).not.toHaveClass("break-all")
+  })
+
+  it("a panel that opens never takes the focus from where the person is", () => {
+    render(<button type="button">elsewhere</button>)
+    screen.getByRole("button", { name: "elsewhere" }).focus()
+    show(notion({ apiKey: { hint: "Create a key.", link: null } }))
+    expect(screen.getByRole("button", { name: "elsewhere" })).toHaveFocus()
   })
 
   it("on the web, sends the page to the vendor's sign-in", async () => {
@@ -102,13 +159,68 @@ describe("ConnectPanel", () => {
     expect(stopWaiting).toHaveBeenCalled()
   })
 
-  it("says the failure and what to do", async () => {
-    connect.mockResolvedValue(null)
-    useConnectorStore.setState({ error: null })
+  it("a failure stays in the panel: what happened and what to do, then where it stopped, then the server's words (R160)", async () => {
+    const raw = "OAuth DCR https://auth.notion.test/register : HTTP 400 (invalid_redirect_uri)"
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "notion", kind: "CONNECT_REGISTRATION_REFUSED", raw } })
+      return null
+    })
     show(notion())
 
     fireEvent.click(screen.getByRole("button", { name: t.connect }))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(t.failed.replace("{name}", "Notion")))
+
+    const said = await screen.findByRole("alert")
+    expect(said).toHaveTextContent(t.failures.CONNECT_REGISTRATION_REFUSED.replaceAll("{name}", "Notion"))
+    expect(toast.error).not.toHaveBeenCalled()
+    // Ni code, ni adresse, ni erreur OAuth au premier regard ; « Try again » vient après la cause.
+    expect(screen.queryByText(/invalid_redirect_uri|auth\.notion\.test/)).toBeNull()
+    expect(screen.getByRole("button", { name: t.tryAgain })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole("button", { name: t.failureDetails }))
+    expect(screen.getByText("Where it stopped: registering TaskForce with Notion.")).toBeTruthy()
+    expect(screen.queryByText(raw)).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: t.failureRaw }))
+    expect(screen.getByText(raw)).toBeTruthy()
+
+    // Un autre outil ne montre pas cet échec.
+    useConnectorStore.setState({ failure: { key: "linear", kind: "unknown", raw: null } })
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
+  })
+
+  it("a failure offers a key only when the tool has one, and then the panel has its button (R161)", async () => {
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "stripe", kind: "CONNECT_REGISTRATION_REFUSED", raw: null } })
+      return null
+    })
+    const view = show(notion({ key: "stripe", name: "Stripe", apiKey: { hint: "Create a restricted key.", link: null } }))
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failuresWithKey.CONNECT_REGISTRATION_REFUSED.replaceAll("{name}", "Stripe"))
+    fireEvent.click(screen.getByRole("button", { name: t.useKeyInstead }))
+    expect(screen.getByLabelText(t.keyLabel)).toBeTruthy()
+    view.unmount()
+
+    useConnectorStore.setState({ failure: { key: "notion", kind: "CONNECT_REGISTRATION_REFUSED", raw: null } })
+    show(notion())
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/key/i)
+    expect(screen.queryByRole("button", { name: t.useKeyInstead })).toBeNull()
+  })
+
+  it("an owner or admin sets up a tool that needs the company's app: no wait on his own step (R160)", () => {
+    const slack = notion({ key: "slack-mcp", name: "Slack", connection: "company-app", state: "NEEDS_SETUP",
+      admin: { text: "Create an internal app.", link: null, required: true } })
+    const view = show(slack, true)
+    expect(screen.getByText(t.companyAppTitle)).toBeTruthy()
+    expect(screen.queryByText(t.waitingForAdmin)).toBeNull()
+    view.unmount()
+
+    // NEEDS_SETUP suffit, même avant que la liste des membres ne dise le rôle de la personne.
+    const early = show(slack, false)
+    expect(screen.getByText(t.companyAppTitle)).toBeTruthy()
+    early.unmount()
+
+    show({ ...slack, state: "WAITING_FOR_ADMIN" }, false)
+    expect(screen.getByText(t.waitingForAdmin)).toBeTruthy()
+    expect(screen.queryByText(t.companyAppTitle)).toBeNull()
   })
 
   it("waiting for the admin: one sentence, the message to send, the admin page, and try again", async () => {
@@ -128,10 +240,30 @@ describe("ConnectPanel", () => {
     expect(connect).toHaveBeenCalled()
   })
 
-  it("an owner or admin enters the company's app once, then connects", async () => {
+  it("no Try again where retrying can't help: before any try, and after a refusal for the role (R161)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+    const zoom = notion({ key: "zoom", name: "Zoom", connection: "company-app", state: "WAITING_FOR_ADMIN",
+      admin: { text: "Create a Zoom app.", link: null, required: true } })
+    const view = show(zoom)
+    expect(screen.queryByRole("button", { name: t.tryAgain })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.copyMessage) }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Create a Zoom app."))
+    view.unmount()
+
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "notion", kind: "forbidden", raw: "Access denied" } })
+      return null
+    })
+    show(notion())
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failures.forbidden.replace("{name}", "Notion"))
+    expect(screen.queryByRole("button", { name: t.tryAgain })).toBeNull()
+  })
+
+  it("an owner or admin enters the company's app once; the catalog is read again and the panel offers to connect (R161)", async () => {
     saveCompanyApp.mockResolvedValue(true)
-    connect.mockResolvedValue({ next: "browser", authorizeUrl: "https://slack.test/a", message: null })
-    Object.defineProperty(window, "location", { value: { href: "" }, configurable: true, writable: true })
+    useConnectorStore.setState({ outcomes: { "slack-mcp": { next: "company-app", authorizeUrl: null, message: "Create an internal app." } } })
     show(notion({ key: "slack-mcp", name: "Slack", connection: "company-app", state: "WAITING_FOR_ADMIN",
       admin: { text: "Create an internal app.", link: null, required: true } }), true)
 
@@ -140,8 +272,83 @@ describe("ConnectPanel", () => {
     fireEvent.change(screen.getByLabelText(t.clientSecret), { target: { value: "s-1" } })
     fireEvent.click(screen.getByRole("button", { name: t.saveAndConnect }))
 
-    await waitFor(() => expect(connect).toHaveBeenCalled())
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(saveCompanyApp).toHaveBeenCalledWith("acme", "slack-mcp", "c-1", "s-1")
+    // Pas de départ d'emblée chez l'éditeur : la suite gardée s'efface, le panneau relu propose « Connect ».
+    expect(connect).not.toHaveBeenCalled()
+    expect(useConnectorStore.getState().outcomes["slack-mcp"]).toBeUndefined()
+  })
+
+  it("the company app form gives its owner the guide, the whole redirect address to copy, and steps to send (R161)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+    const redirect = "https://api.example.test/api/mcp/oauth/callback"
+    const text = `Create a General app with the redirect address ${redirect} and the meeting scopes, then enter its client ID.`
+    show(notion({ key: "zoom", name: "Zoom", connection: "company-app", state: "NEEDS_SETUP",
+      admin: { text, link: "https://developers.zoom.us/docs/mcp/", required: true, redirectUri: redirect } }), true)
+
+    expect(screen.getByText(t.companyAppText.replaceAll("{name}", "Zoom"))).toBeInTheDocument()
+    // Les étapes renvoient à l'adresse, donnée à part et entière dans son propre élément.
+    expect(screen.getByText("Create a General app with the redirect address below and the meeting scopes, then enter its client ID."))
+      .toBeInTheDocument()
+    expect(screen.getByText(redirect).tagName).toBe("CODE")
+    expect(screen.getByRole("link", { name: new RegExp(t.companyAppGuide.replace("{name}", "Zoom")) }).getAttribute("href"))
+      .toBe("https://developers.zoom.us/docs/mcp/")
+
+    fireEvent.click(screen.getByRole("button", { name: t.copyRedirect }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(redirect))
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.copySteps) }))
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(text))
+  })
+
+  it("a refused company app and a failed disconnection say so in the panel, never as raw text in a toast (R161)", async () => {
+    saveCompanyApp.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "zoom", kind: "appNotSaved", raw: "Enter the client ID of your company's app" } })
+      return false
+    })
+    const view = show(notion({ key: "zoom", name: "Zoom", connection: "company-app", state: "NEEDS_SETUP",
+      admin: { text: "Create a Zoom app.", link: null, required: true } }), true)
+    fireEvent.change(screen.getByLabelText(t.clientId), { target: { value: "c-1" } })
+    fireEvent.click(screen.getByRole("button", { name: t.saveAndConnect }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failures.appNotSaved.replace("{name}", "Zoom"))
+    expect(toast.error).not.toHaveBeenCalled()
+    expect((screen.getByLabelText(t.clientId) as HTMLInputElement).value).toBe("c-1")
+    view.unmount()
+
+    disconnect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "notion", kind: "notDisconnected", raw: "HTTP 500" } })
+      return null
+    })
+    show(notion({ connected: true, state: "CONNECTED", scope: "PERSONAL" }))
+    fireEvent.click(screen.getByRole("button", { name: t.disconnect }))
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect Notion" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failures.notDisconnected.replace("{name}", "Notion"))
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it("a failure clears when the panel closes, so the dialog reopens clean (R161)", () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+    const view = show(notion())
+    expect(screen.getByRole("alert")).toBeTruthy()
+    view.unmount()
+    expect(useConnectorStore.getState().failure).toBeNull()
+    show(notion())
+    expect(screen.queryByRole("alert")).toBeNull()
+  })
+
+  it("a failure keeps what the person typed: the step stays mounted when its note appears (R161)", async () => {
+    useConnectorStore.setState({ outcomes: { stripe: { next: "key", authorizeUrl: null, message: null } } })
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "stripe", kind: "unknown", raw: "boom" } })
+      return null
+    })
+    show(notion({ key: "stripe", name: "Stripe", apiKey: { hint: "Create a restricted key.", link: null } }))
+
+    fireEvent.change(screen.getByLabelText(t.keyLabel), { target: { value: "rk_1" } })
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+
+    expect(await screen.findByRole("alert")).toBeTruthy()
+    expect((screen.getByLabelText(t.keyLabel) as HTMLInputElement).value).toBe("rk_1")
   })
 
   it("the guided key, and the address of the company's own server", async () => {
@@ -158,6 +365,10 @@ describe("ConnectPanel", () => {
     useConnectorStore.setState({ outcomes: { zoho: { next: "key", authorizeUrl: null, message: null } } })
     show(notion({ key: "zoho", name: "Zoho", connection: "server-url", mcpSuggestedUrl: null,
       apiKey: { hint: "Create your server in the Zoho MCP console.", link: null } }))
+    // Une adresse n'est pas une clé : son étape le dit, et elle se lit en clair (R161).
+    expect(screen.getByText(t.serverAddressTitle)).toBeInTheDocument()
+    expect(screen.queryByText(t.keyTitle)).toBeNull()
+    expect(screen.getByLabelText(t.serverAddressLabel)).toHaveAttribute("type", "url")
     fireEvent.change(screen.getByLabelText(t.serverAddressLabel), { target: { value: "https://srv.zohomcp.com/mcp/k/message" } })
     fireEvent.click(screen.getByRole("button", { name: t.connect }))
     await waitFor(() => expect(connect).toHaveBeenLastCalledWith("acme", "zoho",
@@ -224,6 +435,23 @@ describe("ConnectPanel", () => {
     expect(toast.success).toHaveBeenCalledWith(t.disconnectedRevoked.replace("{name}", "Notion"))
   })
 
+  it("disconnecting a tool with no sign-in says nothing is left to remove; a key's tool says the key still works (R161)", async () => {
+    disconnect.mockResolvedValue({ revoked: false, revocable: false, servers: [] })
+    const view = show(notion({ key: "excalidraw", name: "Excalidraw", connection: "open", connected: true, state: "CONNECTED",
+      scope: "PERSONAL" }))
+    fireEvent.click(screen.getByRole("button", { name: t.disconnect }))
+    expect(await screen.findByText(t.disconnectConsequenceOpen.replace("{name}", "Excalidraw"))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect Excalidraw" }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(t.disconnectedOpen.replaceAll("{name}", "Excalidraw")))
+    expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("settings"))
+    view.unmount()
+
+    show(notion({ key: "render", name: "Render", connection: "api-key", connected: true, state: "CONNECTED", scope: "PERSONAL" }))
+    fireEvent.click(screen.getByRole("button", { name: t.disconnect }))
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect Render" }))
+    await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith(t.disconnectedKey.replace("{name}", "Render")))
+  })
+
   it("a shared source: only owners and admins change it", async () => {
     show(notion({ connected: true, state: "CONNECTED", scope: "WORKSPACE" }), false)
 
@@ -242,5 +470,14 @@ describe("ConnectPanel", () => {
     expect(pathLabel(notion({ connection: "server-url" }), t)).toBe(t.pathAddress)
     expect(pathLabel(notion({ connection: "open" }), t)).toBe(t.pathOpen)
     expect(pathLabel(notion({ connection: null }), t)).toBeNull()
+  })
+
+  it("says each path in one plain sentence, never OAuth or MCP (R160)", () => {
+    expect(pathSentence(notion(), t)).toBe("you sign in to Notion in your browser, then come back connected.")
+    expect(pathSentence(notion({ connection: "company-app" }), t))
+      .toBe("an owner or admin of this workspace sets up Notion once, then everyone connects with their own account.")
+    expect(pathSentence(notion({ connection: "api-key" }), t)).toBe("you create a key in Notion and paste it here.")
+    expect(pathSentence(notion({ connection: null }), t)).toBeNull()
+    for (const sentence of Object.values(t.pathSentence)) expect(sentence).not.toMatch(/OAuth|MCP|token|header/)
   })
 })

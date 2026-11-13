@@ -91,6 +91,20 @@ public class WorkspaceMcpService {
     private static final Set<String> RESERVED_HEADERS = Set.of("accept", "connection", "content-length",
         "content-type", "expect", "host", "keep-alive", "mcp-protocol-version", "mcp-session-id", "te", "trailer",
         "transfer-encoding", "upgrade");
+
+    /**
+     * Le jeton envoyé dans un en-tête choisi : un nom valable que le transport ne pose pas lui-même, et une valeur.
+     * Sinon un échec à code stable ({@link ConnectFailure#HEADER_NOT_ALLOWED}), que l'écran dit en mots (R160).
+     */
+    static void checkTokenHeader(String header, String token) {
+        if (header.isEmpty()) return;
+        if (!HEADER_NAME.matcher(header).matches() || RESERVED_HEADERS.contains(header.toLowerCase(Locale.ROOT))) {
+            throw ConnectFailure.of(ConnectFailure.HEADER_NOT_ALLOWED, "This header can't carry the token: " + header);
+        }
+        if (token.isEmpty()) {
+            throw ConnectFailure.of(ConnectFailure.HEADER_NOT_ALLOWED, "Enter the value of the " + header + " header");
+        }
+    }
     /** Séparateur de namespace des outils externes : {@code <connecteur>__<outil>}. */
     static final String NS = "__";
 
@@ -133,7 +147,7 @@ public class WorkspaceMcpService {
     /** Un serveur local accordé par la personne demande cet accord explicite avant d'être enregistré. */
     public static class LocalServerNeedsApproval extends BusinessException {
         public LocalServerNeedsApproval(String host) {
-            super("This server runs on your computer or your local network (" + host + "). Connect it only if you "
+            super(ConnectFailure.LOCAL_NEEDS_APPROVAL, "This server runs on your computer or your local network (" + host + "). Connect it only if you "
                 + "started it yourself.");
         }
     }
@@ -288,12 +302,7 @@ public class WorkspaceMcpService {
         ServerIdentity id = resolveServer(ws.getId(), req.connectorKey(), req.name());
         String token = req.token() == null ? "" : req.token().trim();
         String header = req.authHeader() == null ? "" : req.authHeader().trim();
-        if (!header.isEmpty()) {
-            if (!HEADER_NAME.matcher(header).matches() || RESERVED_HEADERS.contains(header.toLowerCase(Locale.ROOT))) {
-                throw new BusinessException("This header can't carry the token: " + header);
-            }
-            if (token.isEmpty()) throw new BusinessException("Enter the value of the " + header + " header");
-        }
+        checkTokenHeader(header, token);
 
         Map<String, String> config = new LinkedHashMap<>();
         config.put(CONFIG_URL, mcpUrl);

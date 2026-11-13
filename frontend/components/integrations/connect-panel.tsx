@@ -1,18 +1,20 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { AlertTriangle, Check, Copy, ExternalLink, Loader2, Plug, ShieldCheck, Terminal } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
+import { DisclosureButton } from "@/components/ui/disclosure-button"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
 import { GoogleDriveFiles } from "@/components/storage/google-drive-files"
 import { DisconnectConfirmDialog } from "@/components/integrations/disconnect-confirm-dialog"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { fillText } from "@/lib/delivery/result-card"
 import { getMcpServerTools, type ConnectorView, type McpServerStatus, type McpToolInfo } from "@/lib/api/integration-service"
+import { failureSentence, failureStep, keyHelps, type ConnectFailure } from "@/lib/integrations/connect-failure"
 import { useConnectorStore } from "@/lib/store/connector-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { toolLabel } from "@/lib/utils/tool-label"
@@ -29,7 +31,14 @@ type PanelProps = Readonly<{
   onChanged: () => void
   /** La console d'actions, dépliée, élargit le dialogue. */
   onWide?: (wide: boolean) => void
+  /** Le second accès d'une native (R160) : ses mots disent que c'est Cortex qui est branché. */
+  live?: boolean
 }>
+
+/** Le chemin d'un outil en une phrase simple, pour sa fiche (R160) ; null pour une native ou un serveur ajouté. */
+export function pathSentence(tool: ConnectorView, t: ConnectTexts): string | null {
+  return tool.connection ? fillText(t.pathSentence[tool.connection], { name: tool.name }) : null
+}
 
 /** Le chemin d'un outil tel que la carte le dit (R133 : pas de mot interne). */
 export function pathLabel(tool: ConnectorView, t: ConnectTexts): string | null {
@@ -52,13 +61,25 @@ export function pathLabel(tool: ConnectorView, t: ConnectTexts): string | null {
 }
 
 /**
+ * Le focus perdu revient à ce qui compte (R161). Un bouton qui se désactive ou disparaît (« Connect » pendant l'essai,
+ * « Set it up » qui ouvre le formulaire) laisse le focus à la page, puis au dialogue lui-même. Quand une étape ou un
+ * échec arrive (`key` change) et que le focus n'est nulle part, il va à `target` ; ailleurs, on ne le prend pas.
+ */
+export function useFocusWhenLost(target: React.RefObject<HTMLElement | null>, key: unknown = null) {
+  useEffect(() => {
+    const active = document.activeElement
+    if (!active || active === document.body || active.getAttribute("role") === "dialog") target.current?.focus()
+  }, [target, key])
+}
+
+/**
  * Se brancher à un outil du catalogue (TF-J2-12, séance n°22 R154) : un clic, le navigateur, la connexion chez
  * l'éditeur, le retour, « Connected as … ». Derrière, le serveur choisit le chemin que l'éditeur permet et dit la suite :
  * le navigateur, c'est branché, l'étape de l'administrateur (une phrase et un message à lui envoyer, ou le formulaire de
  * l'application de l'entreprise), la clé guidée, l'accord d'un serveur local. Une colonne, une action principale en bas
  * à droite (R133).
  */
-export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelProps) {
+export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = false }: PanelProps) {
   const t = usePreferencesStore((s) => s.t.connect)
   const outcome = useConnectorStore((s) => s.outcomes[tool.key])
   const busy = useConnectorStore((s) => s.busy === tool.key)
@@ -67,19 +88,34 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
   const waitForConnection = useConnectorStore((s) => s.waitForConnection)
   const stopWaiting = useConnectorStore((s) => s.stopWaiting)
   const forget = useConnectorStore((s) => s.forget)
+  const clearFailure = useConnectorStore((s) => s.clearFailure)
+  // Le panneau se ferme (le dialogue, ou le retour à la native) : son échec ne l'attend pas à la réouverture (R161).
+  useEffect(() => () => clearFailure(tool.key), [clearFailure, tool.key])
+  // Le dernier geste de cet outil qui a échoué : la phrase reste dans le panneau, pas dans un toast qui passe (R160).
+  const failure = useConnectorStore((s) => (s.failure?.key === tool.key ? s.failure : null))
   const [shared, setShared] = useState(false)
   const [allowWrites, setAllowWrites] = useState(false)
   // La clé guidée, quand l'éditeur en propose une : un autre chemin que l'administrateur (GitHub, Stripe).
   const [byKey, setByKey] = useState(false)
   const name = tool.name
+  // L'étape de l'administrateur : un propriétaire ou un administrateur la fait (l'application de l'entreprise, « Set it
+  // up ») ; un membre l'attend, avec le message à lui envoyer (R160).
+  const adminTurn = tool.state === "NEEDS_SETUP"
+    || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app" && !tool.companyApp)
+  // NEEDS_SETUP suffit : le serveur ne le rend qu'à un propriétaire ou un administrateur, sans attendre la liste des
+  // membres de l'écran (R160).
+  const step = byKey ? "key" : outcome?.next
+    ?? (tool.state === "NEEDS_SETUP" ? "company-app"
+      : adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
+  // Ce qui prend le focus quand l'étape change, dans les vues de ce panneau ; les étapes à part ont le leur.
+  const own = useRef<HTMLElement | null>(null)
+  const ownRef = useCallback((el: HTMLElement | null) => { own.current = el }, [])
+  const view = tool.blocked ? "blocked" : waiting ? "waiting" : tool.state === "CONNECTED" && !outcome ? "connected" : step
+  useFocusWhenLost(own, view)
 
   const go = useCallback(async (extra: Parameters<typeof connect>[2] = {}) => {
     const result = await connect(slug, tool.key, { shared, allowWrites, ...extra })
-    if (!result) {
-      const error = useConnectorStore.getState().error
-      toast.error(error ? `${fillText(t.failed, { name })} ${error}` : fillText(t.failed, { name }))
-      return
-    }
+    if (!result) return
     if (result.next === "browser" && result.authorizeUrl) {
       if (IS_DESKTOP) {
         // Le navigateur du système (RFC 8252) ; la fenêtre de l'app reste, et attend le retour sur 127.0.0.1.
@@ -87,7 +123,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
         const ok = await waitForConnection(slug, tool.key)
         if (ok) {
           forget(tool.key)
-          toast.success(fillText(t.returnedConnected, { name }))
+          toast.success(fillText(live ? t.liveReturnedConnected : t.returnedConnected, { name }))
           onChanged()
         }
       } else {
@@ -95,10 +131,10 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
       }
     } else if (result.next === "connected") {
       forget(tool.key)
-      toast.success(fillText(t.returnedConnected, { name }))
+      toast.success(fillText(live ? t.liveReturnedConnected : t.returnedConnected, { name }))
       onChanged()
     }
-  }, [connect, slug, tool.key, shared, allowWrites, t, name, waitForConnection, forget, onChanged])
+  }, [connect, slug, tool.key, shared, allowWrites, t, name, waitForConnection, forget, onChanged, live])
 
   if (tool.blocked) {
     return (
@@ -111,7 +147,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
   if (waiting) {
     return (
       <div className="flex flex-col gap-3" aria-live="polite">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <div ref={ownRef} tabIndex={-1} className="flex items-center gap-2 text-sm font-medium text-foreground outline-none">
           <Loader2 className="size-4 animate-spin" /> {t.browserTitle}
         </div>
         <p className="text-sm text-muted-foreground">{fillText(t.browserText, { name })}</p>
@@ -125,29 +161,36 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
     return <ConnectedView slug={slug} tool={tool} manager={manager} onChanged={onChanged} onWide={onWide} />
   }
 
-  const step = byKey ? "key" : outcome?.next
-    ?? (tool.state === "WAITING_FOR_ADMIN" ? (manager && tool.connection === "company-app" ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
+  // La cause d'abord, puis le geste qui la suit (R133 : un échec dit ce qui s'est passé et quoi faire).
+  const note = failure ? <FailureNote failure={failure} name={name} withKey={Boolean(tool.apiKey)} /> : null
+  // Toujours le même conteneur : une note qui apparaît ne remonte pas l'étape, ce que la personne a saisi reste (R161).
+  const withNote = (content: React.ReactNode) => <div className="flex flex-col gap-3">{note}{content}</div>
 
   if (step === "admin") {
-    return <AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()}
-      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />
+    return withNote(<AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy}
+      tried={Boolean(outcome) && failure?.kind !== "forbidden"} onRetry={() => go()}
+      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "company-app") {
-    return <CompanyAppForm slug={slug} tool={tool} instructions={adminMessage} onSaved={() => go()}
-      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />
+    // Enregistrée, l'application de l'entreprise change l'outil : le catalogue se relit, et le panneau propose de se
+    // connecter, sans partir d'emblée chez l'éditeur.
+    return withNote(<CompanyAppForm slug={slug} tool={tool} instructions={adminMessage}
+      onSaved={() => { forget(tool.key); onChanged() }}
+      onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "key") {
-    return <KeyForm tool={tool} busy={busy} onSubmit={(value) => go(tool.connection === "server-url"
-      ? { mcpUrl: value } : { mcpToken: value })} />
+    return withNote(<KeyForm tool={tool} busy={busy} onSubmit={(value) => go(tool.connection === "server-url"
+      ? { mcpUrl: value } : { mcpToken: value })} />)
   }
   if (step === "local") {
-    return <LocalStep message={outcome?.message ?? null} busy={busy} onApprove={() => go({ localApproved: true })} />
+    return withNote(<LocalStep message={outcome?.message ?? null} busy={busy} onApprove={() => go({ localApproved: true })} />)
   }
 
   const reconnecting = tool.state === "NEEDS_RECONNECT"
   return (
     <div className="flex flex-col gap-3">
+      {note}
       <p className="text-sm text-muted-foreground">
         {reconnecting ? fillText(t.needsReconnectingText, { name }) : fillText(shared ? t.introShared : t.intro, { name })}
       </p>
@@ -170,21 +213,89 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
         </label>
       )}
       <DialogFooter>
-        <Button onClick={() => go()} disabled={busy} className="gap-1.5">
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-          {busy ? t.connecting : reconnecting ? t.reconnect : t.connect}
-        </Button>
+        {/* La phrase propose une clé : le panneau aussi (R161). */}
+        {failure && tool.apiKey && keyHelps(failure, t) && (
+          <Button variant="ghost" onClick={() => setByKey(true)}>{t.useKeyInstead}</Button>
+        )}
+        {/* Après un refus pour le rôle, réessayer n'y change rien : pas de « Try again » (R161). */}
+        {failure?.kind !== "forbidden" && (
+          <Button ref={ownRef} onClick={() => go()} disabled={busy} className="gap-1.5">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+            {busy ? t.connecting : failure ? t.tryAgain : reconnecting ? t.reconnect : t.connect}
+          </Button>
+        )}
       </DialogFooter>
     </div>
   )
 }
 
-/** L'étape de l'administrateur : une phrase, le message à lui envoyer, sa page, et « Try again ». */
-function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
-  name: string; message: string | null; link: string | null; busy: boolean; onRetry: () => void; onUseKey?: () => void
+/**
+ * Ce que la déconnexion a fait, en une phrase (R161) : l'accès révoqué chez l'éditeur ; rien à retirer quand l'outil ne
+ * demandait ni compte ni clé (Excalidraw) ; la clé, ou le serveur, qui reste chez l'éditeur ; sinon TaskForce à retirer
+ * de ses réglages, quand l'éditeur ne laisse pas révoquer l'accès.
+ */
+export function disconnectedSentence(tool: ConnectorView, revoked: boolean, t: ConnectTexts): string {
+  const text = revoked ? t.disconnectedRevoked
+    : tool.connection === "open" ? t.disconnectedOpen
+      : tool.connection === "api-key" ? t.disconnectedKey
+        : tool.connection === "server-url" ? t.disconnectedAddress
+          : t.disconnectedHere
+  return fillText(text, { name: tool.name })
+}
+
+/**
+ * Un geste qui n'a pas abouti (R160) : ce qui s'est passé et quoi faire, en une phrase ; où il s'est arrêté, un clic
+ * plus loin ; ce que le serveur a dit, tel quel, à deux clics (R133).
+ */
+export function FailureNote({ failure, name, withKey = false }: Readonly<{ failure: ConnectFailure; name: string; withKey?: boolean }>) {
+  const t = usePreferencesStore((s) => s.t.connect)
+  const [details, setDetails] = useState(false)
+  const [raw, setRaw] = useState(false)
+  const sentence = useRef<HTMLParagraphElement>(null)
+  useFocusWhenLost(sentence, failure)
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+      <p ref={sentence} role="alert" tabIndex={-1} className="flex items-start gap-2 rounded-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+        <span>{failureSentence(failure, name, t, withKey)}</span>
+      </p>
+      <DisclosureButton open={details} onToggle={() => setDetails((v) => !v)}>
+        {details ? t.failureHideDetails : t.failureDetails}
+      </DisclosureButton>
+      {details && (
+        <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+          <p>{failureStep(failure, name, t)}</p>
+          {failure.raw && (
+            <>
+              <DisclosureButton open={raw} onToggle={() => setRaw((v) => !v)}>
+                {raw ? t.failureHideRaw : t.failureRaw}
+              </DisclosureButton>
+              {raw && (
+                // Entre les mots ; un mot plus long que la ligne seulement se coupe (R161).
+                <pre tabIndex={0} className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">
+                  {failure.raw}
+                </pre>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * L'étape de l'administrateur : une phrase, le message à lui envoyer, sa page. « Try again » seulement après un essai :
+ * avant, réessayer n'y change rien, et le geste principal est de copier le message (R161).
+ */
+function AdminStep({ name, message, link, busy, tried, onRetry, onUseKey }: Readonly<{
+  name: string; message: string | null; link: string | null; busy: boolean; tried: boolean; onRetry: () => void
+  onUseKey?: () => void
 }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [copied, setCopied] = useState(false)
+  const primary = useRef<HTMLButtonElement>(null)
+  useFocusWhenLost(primary)
   async function copy() {
     if (!message) return
     try {
@@ -202,7 +313,7 @@ function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
         <blockquote className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground">{message}</blockquote>
       )}
       <div className="flex flex-wrap gap-2">
-        {message && (
+        {message && tried && (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={copy}>
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : t.copyMessage}
           </Button>
@@ -216,7 +327,13 @@ function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
       </div>
       <DialogFooter>
         {onUseKey && <Button variant="ghost" onClick={onUseKey}>{t.useKeyInstead}</Button>}
-        <Button onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
+        {tried ? (
+          <Button ref={primary} onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
+        ) : message && (
+          <Button ref={primary} onClick={copy} className="gap-1.5">
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : t.copyMessage}
+          </Button>
+        )}
       </DialogFooter>
     </div>
   )
@@ -231,24 +348,53 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
   const busy = useConnectorStore((s) => s.busy === tool.key)
   const [clientId, setClientId] = useState("")
   const [secret, setSecret] = useState("")
+  const first = useRef<HTMLInputElement>(null)
+  useFocusWhenLost(first)
+  // L'adresse de retour se donne à part, entière et copiable : les étapes y renvoient au lieu de la couper (R161).
+  const redirect = tool.admin?.redirectUri ?? null
+  const steps = instructions && redirect ? instructions.split(redirect).join(t.redirectInSteps) : instructions
+  const guide = tool.admin?.link ?? null
   async function submit() {
+    // Un refus se dit dans le panneau, au-dessus du formulaire, qui garde ce que la personne a saisi (R161).
     if (await save(slug, tool.key, clientId.trim(), secret.trim())) {
       toast.success(t.companyAppSaved)
       onSaved()
-    } else {
-      toast.error(useConnectorStore.getState().error ?? t.failedAdmin)
     }
   }
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm font-medium text-foreground">{t.companyAppTitle}</p>
       <p className="text-sm text-muted-foreground">{fillText(t.companyAppText, { name: tool.name })}</p>
-      {instructions && (
-        <p className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground">{instructions}</p>
+      {steps && (
+        <p className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground">{steps}</p>
+      )}
+      {redirect && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">{t.redirectAddress}</span>
+          <div className="flex items-center gap-2">
+            {/* D'un seul tenant : elle défile plutôt que de passer à la ligne au milieu (R161). */}
+            <code tabIndex={0} className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md border border-border bg-muted/40 px-2 py-1.5 font-mono text-xs text-foreground">
+              {redirect}
+            </code>
+            <CopyButton text={redirect} label={t.copy} name={t.copyRedirect} />
+          </div>
+        </div>
+      )}
+      {(instructions || guide) && (
+        <div className="flex flex-wrap gap-2">
+          {/* Les étapes entières, l'adresse comprise : pour les envoyer à qui administre l'outil. */}
+          {instructions && <CopyButton text={instructions} label={t.copySteps} />}
+          {guide && (
+            <a href={guide} target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted">
+              {fillText(t.companyAppGuide, { name: tool.name })} <ExternalLink className="size-3" />
+            </a>
+          )}
+        </div>
       )}
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{t.clientId}</span>
-        <Input value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />
+        <Input ref={first} value={clientId} onChange={(e) => setClientId(e.target.value)} autoComplete="off" />
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{t.clientSecret}</span>
@@ -263,14 +409,35 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
   )
 }
 
+/** Copie un texte ; le bouton dit « Copied » une fois fait. `name` : ce qu'il copie, quand son libellé ne le dit pas. */
+function CopyButton({ text, label, name }: Readonly<{ text: string; label: string; name?: string }>) {
+  const t = usePreferencesStore((s) => s.t.connect)
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={copy} aria-label={copied ? t.copied : name}>
+      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : label}
+    </Button>
+  )
+}
+
 /** La clé guidée (chemin D), ou l'adresse du serveur que l'entreprise crée chez l'éditeur : elle vaut une clé. */
 function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy: boolean; onSubmit: (value: string) => void }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [value, setValue] = useState("")
+  const field = useRef<HTMLInputElement>(null)
+  useFocusWhenLost(field)
   const address = tool.connection === "server-url"
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-medium text-foreground">{t.keyTitle}</p>
+      <p className="text-sm font-medium text-foreground">{address ? t.serverAddressTitle : t.keyTitle}</p>
       {tool.apiKey && <p className="text-sm text-muted-foreground">{tool.apiKey.hint}</p>}
       {tool.apiKey?.link && (
         <a href={tool.apiKey.link} target="_blank" rel="noopener noreferrer"
@@ -280,7 +447,9 @@ function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy:
       )}
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{address ? t.serverAddressLabel : t.keyLabel}</span>
-        <Input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" />
+        {/* Une adresse se lit en clair, pour qu'on voie ce qu'on a collé ; le navigateur ne la garde pas (R161). */}
+        <Input ref={field} type={address ? "url" : "password"} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off"
+          spellCheck={false} />
       </label>
       <DialogFooter>
         <Button onClick={() => onSubmit(value.trim())} disabled={busy || !value.trim()}>{busy ? t.connecting : t.connect}</Button>
@@ -293,12 +462,14 @@ function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy:
 function LocalStep({ message, busy, onApprove }: Readonly<{ message: string | null; busy: boolean; onApprove: () => void }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [confirmed, setConfirmed] = useState(false)
+  const box = useRef<HTMLInputElement>(null)
+  useFocusWhenLost(box)
   return (
     <div className="flex flex-col gap-3">
       <p className="flex items-center gap-2 text-sm font-medium text-foreground"><ShieldCheck className="size-4" /> {t.localTitle}</p>
       {message && <p className="text-sm text-muted-foreground">{message}</p>}
       <label className="flex items-center gap-2 text-sm text-foreground">
-        <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> {t.localConfirm}
+        <input ref={box} type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /> {t.localConfirm}
       </label>
       <DialogFooter>
         <Button onClick={onApprove} disabled={busy || !confirmed}>{busy ? t.connecting : t.connect}</Button>
@@ -321,8 +492,11 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   const [tools, setTools] = useState<McpToolInfo[] | null>(null)
   const [showConsole, setShowConsole] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const failure = useConnectorStore((s) => (s.failure?.key === tool.key ? s.failure : null))
   const shared = tool.scope === "WORKSPACE"
   const mayChange = !shared || manager
+  const head = useRef<HTMLDivElement>(null)
+  useFocusWhenLost(head)
 
   useEffect(() => {
     let alive = true
@@ -344,7 +518,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
 
   async function approve() {
     const list = await approveTools(slug, tool.key, shared)
-    if (!list) { toast.error(useConnectorStore.getState().error ?? t.failedAdmin); return }
+    if (!list) return
     setStatus(list.find((s) => s.connectorKey === tool.key) ?? null)
     toast.success(t.changesApproved)
     onChanged()
@@ -353,15 +527,16 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   async function onDisconnect() {
     setConfirming(false)
     const result = await disconnect(slug, tool.key, shared)
-    if (!result) { toast.error(useConnectorStore.getState().error ?? t.failedAdmin); return }
-    toast.success(fillText(result.revoked ? t.disconnectedRevoked : t.disconnectedHere, { name: tool.name }))
+    if (!result) return
+    toast.success(disconnectedSentence(tool, result.revoked, t))
     onChanged()
   }
 
   const changed = status?.changedTools ?? []
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-sm text-ink-green">
+      {failure && <FailureNote failure={failure} name={tool.name} />}
+      <div ref={head} tabIndex={-1} className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-sm text-ink-green outline-none focus-visible:ring-2 focus-visible:ring-ring/50">
         <Check className="size-4 shrink-0" />
         <span>
           {tool.accountLabel ? fillText(t.connectedAs, { account: tool.accountLabel })
@@ -417,7 +592,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
         open={confirming}
         onOpenChange={setConfirming}
         name={tool.name}
-        consequence={fillText(t.disconnectConsequence, { name: tool.name })}
+        consequence={fillText(tool.connection === "open" ? t.disconnectConsequenceOpen : t.disconnectConsequence, { name: tool.name })}
         onConfirm={onDisconnect}
       />
     </div>

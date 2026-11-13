@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Fragment, useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import { useReducedMotion } from "framer-motion"
 import {
   Sparkles, ChevronDown, ChevronUp, Plus, Trash2, Play, CircleAlert,
 } from "lucide-react"
 import { Message, TokenMeter } from "@/components/chat"
+import { DisclosureButton } from "@/components/ui/disclosure-button"
 import { cn } from "@/lib/utils"
 import { fillModelText } from "@/lib/ai/model-table"
 import {
@@ -15,7 +16,9 @@ import {
   type AssistantAnswer, type AssistantToolCall,
 } from "@/lib/api/assistant-service"
 import { getErrorMessage } from "@/lib/api/client"
-import { outcomeLine, plainOutput, proposalLine } from "@/lib/cortex/work-lines"
+import {
+  actionArguments, actionRaw, outcomeLine, plainOutput, proposal, serviceOf, type ActionArgument, type Proposal,
+} from "@/lib/cortex/work-lines"
 import { useCortexWork } from "@/lib/hooks/use-cortex-work"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
@@ -94,8 +97,13 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
   const [state, setState] = useState<"idle" | "running" | "success" | "refused" | "error">("idle")
   const [output, setOutput] = useState<string | null>(null)
   const [result, setResult] = useState<AssistantActionResult | null>(null)
+  // Une action dans un outil connecté : ses arguments, un clic plus loin, sous « Details » (R160).
+  const [details, setDetails] = useState(false)
+  const [rawShown, setRawShown] = useState(false)
   const noteDone = useCortexStore((s) => s.noteDone)
   const t = usePreferencesStore((s) => s.t.thread)
+  const args = serviceOf(call.name) ? actionArguments(call.input, t) : []
+  const rawRequest = args.length > 0 ? actionRaw(call.input, t) : null
   const outcome = { success: t.outcomeDone, refused: "", error: t.outcomeFailed }
   // Accordée et faite : l'appel tel qu'il a abouti, avec l'empreinte que « Undo » nomme et l'issue qu'il touche.
   const done: AssistantToolCall = { ...call, status: "success", output, ref: result?.ref ?? null, target: result?.target ?? null }
@@ -119,7 +127,34 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
 
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
-      <p className="text-muted-foreground">{proposalLine(call.name, t, call.input)}</p>
+      <ProposalSentence said={proposal(call.name, t, call.input)} />
+      {args.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <DisclosureButton open={details} onToggle={() => setDetails((v) => !v)}>
+            {details ? t.hideDetails : t.details}
+          </DisclosureButton>
+          {details && (
+            <>
+              {/* Une hauteur bornée : un long argument défile dans la carte, au clavier aussi. */}
+              <div role="region" aria-label={t.detailsLabel} tabIndex={0} className="max-h-48 overflow-y-auto">
+                <ArgumentRows rows={args} hidden={t.hiddenValue} />
+              </div>
+              {rawRequest && (
+                <>
+                  <DisclosureButton open={rawShown} onToggle={() => setRawShown((v) => !v)}>
+                    {rawShown ? t.hideRawRequest : t.rawRequest}
+                  </DisclosureButton>
+                  {rawShown && (
+                    <pre tabIndex={0} className="max-h-48 overflow-auto whitespace-pre-wrap break-words bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">
+                      {rawRequest}
+                    </pre>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
       {state === "idle" || state === "running" ? (
         <button
           type="button"
@@ -142,6 +177,47 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
         </>
       )}
     </div>
+  )
+}
+
+/** Les arguments d'une action en lignes, nom et valeur ; un objet ou une liste d'objets, en lignes à leur tour. */
+function ArgumentRows({ rows, hidden }: Readonly<{ rows: ActionArgument[]; hidden: string }>) {
+  return (
+    <dl className="grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] gap-x-3 gap-y-1">
+      {rows.map((row) => (
+        <Fragment key={row.key}>
+          <dt className="text-muted-foreground">{row.label}</dt>
+          <dd className="min-w-0 whitespace-pre-wrap break-words text-foreground">
+            {row.secret
+              ? <span className="italic text-muted-foreground">{hidden}</span>
+              : row.rows.length > 0 ? <ArgumentRows rows={row.rows} hidden={hidden} /> : row.value}
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
+  )
+}
+
+/**
+ * La phrase de la carte d'accord (R160) : chaque valeur de l'action dans son propre élément, entre guillemets, pour
+ * qu'une valeur qui contient une phrase ne se lise jamais comme celle de la carte.
+ */
+function ProposalSentence({ said }: Readonly<{ said: Proposal }>) {
+  return (
+    <p className="text-foreground">
+      {said.lead}
+      {said.values.length > 0 && ": "}
+      {said.values.map((value, i) => (
+        <Fragment key={i}>
+          {i > 0 && ", "}
+          {value.label && `${value.label} `}
+          {value.number
+            ? <span className="font-medium">{value.text}</span>
+            : <q className="rounded-sm bg-foreground/[0.06] px-0.5 font-medium">{value.text}</q>}
+        </Fragment>
+      ))}
+      {said.tail}
+    </p>
   )
 }
 

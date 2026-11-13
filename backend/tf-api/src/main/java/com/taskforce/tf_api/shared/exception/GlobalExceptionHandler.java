@@ -65,7 +65,12 @@ public class GlobalExceptionHandler {
             BusinessException ex,
             HttpServletRequest request) {
 
-        log.error("Business error: {} - {}", ex.getErrorCode(), ex.getMessage());
+        // Un refus attendu (une adresse que la garde écarte) n'est pas une panne : WARN, comme une requête invalide.
+        if (ex instanceof RefusedRequestException) {
+            log.warn("Refused request: {} - {}", ex.getErrorCode(), LogSafe.of(ex.getMessage()));
+        } else {
+            log.error("Business error: {} - {}", ex.getErrorCode(), ex.getMessage());
+        }
 
         ErrorResponse error = ErrorResponse.of(
                 HttpStatus.BAD_REQUEST.value(),

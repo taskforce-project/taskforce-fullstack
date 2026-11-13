@@ -322,9 +322,15 @@ export interface ConnectorView {
   blocked?: string | null;
   /** Essayé de bout en bout ; faux sur une instance d'essai, qui montre aussi les autres. */
   tried?: boolean;
+  /**
+   * Le second accès de GitHub, Slack et Plane (R160) : le préréglage du même outil, par lequel Cortex le lit en direct
+   * avec la connexion de chaque personne ; une carte par outil. Absent pour les autres.
+   */
+  live?: ConnectorView | null;
 }
 
-export type ConnectionState = "CONNECTED" | "NEEDS_RECONNECT" | "WAITING_FOR_ADMIN" | "NOT_CONNECTED";
+/** `NEEDS_SETUP` : l'étape de l'administrateur revient à la personne (propriétaire ou administrateur), qui la fait. */
+export type ConnectionState = "CONNECTED" | "NEEDS_RECONNECT" | "WAITING_FOR_ADMIN" | "NEEDS_SETUP" | "NOT_CONNECTED";
 export type ConnectionScope = "PERSONAL" | "WORKSPACE";
 export type ConnectionPath = "self-registration" | "our-app" | "company-app" | "api-key" | "server-url" | "open";
 
@@ -333,6 +339,8 @@ export interface AdminStep {
   link: string | null;
   /** Rien ne se connecte avant elle. */
   required: boolean;
+  /** L'adresse de retour que `text` demande d'enregistrer chez l'éditeur ; nulle quand il n'en demande pas. */
+  redirectUri?: string | null;
 }
 
 export interface KeyGuide {
@@ -412,16 +420,20 @@ export interface ConnectPayload {
   returnTo?: string;
 }
 
-/** Le geste « Connect » d'un outil : le serveur choisit le chemin et dit la suite. */
+/**
+ * Le geste « Connect » d'un outil : le serveur choisit le chemin et dit la suite. Son échec, réseau compris, se dit une
+ * fois, dans le panneau : pas de toast global en plus (R161). Les autres gestes du panneau font de même.
+ */
 export async function connectTool(slug: string, connectorKey: string, payload: ConnectPayload): Promise<ConnectOutcome> {
-  const res = await apiClient.post<{ data: ConnectOutcome }>(INTEGRATION_ROUTES.MCP_CONNECT(slug, connectorKey), payload);
+  const res = await apiClient.post<{ data: ConnectOutcome }>(INTEGRATION_ROUTES.MCP_CONNECT(slug, connectorKey), payload,
+    { silentError: true });
   return res.data.data;
 }
 
 /** Redonne l'accord aux outils qui ont changé depuis la connexion ; renvoie les statuts frais. */
 export async function approveMcpTools(slug: string, connectorKey: string, shared = false): Promise<McpServerStatus[]> {
   const res = await apiClient.post<{ data: McpServerStatus[] }>(
-    `${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(slug, connectorKey)}?shared=${shared}`,
+    `${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(slug, connectorKey)}?shared=${shared}`, undefined, { silentError: true },
   );
   return res.data.data;
 }
@@ -448,7 +460,7 @@ export async function saveCompanyApp(
   const res = await apiClient.put<{ data: CompanyApp }>(INTEGRATION_ROUTES.MCP_APP(slug, connectorKey), {
     clientId,
     clientSecret,
-  });
+  }, { silentError: true });
   return res.data.data;
 }
 
@@ -490,7 +502,7 @@ export async function getMcpServers(slug: string): Promise<McpServerStatus[]> {
 
 /** Connecte (ou reconfigure) un serveur MCP externe ; renvoie le statut frais (joignable + outils). */
 export async function connectMcpServer(slug: string, payload: McpServerPayload): Promise<McpServerStatus[]> {
-  const res = await apiClient.post<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVERS(slug), payload);
+  const res = await apiClient.post<{ data: McpServerStatus[] }>(INTEGRATION_ROUTES.MCP_SERVERS(slug), payload, { silentError: true });
   return res.data.data;
 }
 
@@ -500,7 +512,7 @@ export async function connectMcpServer(slug: string, payload: McpServerPayload):
  */
 export async function disconnectMcpServer(slug: string, connectorKey: string, shared = false): Promise<DisconnectResult> {
   const res = await apiClient.delete<{ data: DisconnectResult }>(
-    `${INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey)}?shared=${shared}`,
+    `${INTEGRATION_ROUTES.MCP_SERVER(slug, connectorKey)}?shared=${shared}`, { silentError: true },
   );
   return res.data.data;
 }
