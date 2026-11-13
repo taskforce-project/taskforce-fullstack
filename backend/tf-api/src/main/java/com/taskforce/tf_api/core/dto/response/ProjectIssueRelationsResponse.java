@@ -5,6 +5,8 @@ import java.util.List;
 
 import com.taskforce.tf_api.core.enums.IssueRelationType;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * Les liens entre les issues d'un projet, en une lecture (la vue du workflow, R166) : chaque relation telle qu'elle a été
  * posée, et chaque sous-issue avec son parent, que la liste des issues ne porte pas (elle ne liste que le premier niveau).
@@ -20,6 +22,7 @@ public record ProjectIssueRelationsResponse(List<Relation> relations, List<SubIs
      * Une relation telle qu'elle a été posée, de la source vers la cible : « {@code source} BLOCKS {@code target} » se lit
      * « la source bloque la cible ».
      */
+    @Schema(name = "ProjectIssueRelation")
     public record Relation(
         Long id,
         IssueRelationType relationType,
@@ -30,5 +33,6 @@ public record ProjectIssueRelationsResponse(List<Relation> relations, List<SubIs
     ) {}
 
     /** Une sous-issue, et l'issue dont elle dépend. */
+    @Schema(name = "ProjectSubIssue")
     public record SubIssue(IssueSummaryResponse parent, IssueSummaryResponse issue) {}
 }

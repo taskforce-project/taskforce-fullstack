@@ -3,6 +3,8 @@ package com.taskforce.tf_api.core.dto.response;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * Une mission d'un projet telle que la vue du workflow la lit (R166) : la mission comme ailleurs, son étape en cours, ses
  * liens et ses demandes encore ouvertes, en une lecture.
@@ -23,6 +25,7 @@ public record ProjectRunResponse(
 ) {
 
     /** Un événement de la chronologie : son numéro d'ordre, sa sorte ({@code tool}, {@code test}...), l'outil, l'heure. */
+    @Schema(name = "ProjectRunStep")
     public record Step(int seq, String kind, String tool, LocalDateTime at) {}
 
     /**
@@ -31,5 +34,6 @@ public record ProjectRunResponse(
      * @param followUpOf     la mission que celle-ci reprend sur la même branche (R139)
      * @param followedUpBy   la dernière mission qui reprend celle-ci, quand la personne a demandé des changements
      */
+    @Schema(name = "ProjectRunLinks")
     public record Links(String branch, String pullRequestUrl, Long followUpOf, Long followedUpBy) {}
 }
