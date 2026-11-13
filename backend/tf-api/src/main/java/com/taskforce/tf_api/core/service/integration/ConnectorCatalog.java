@@ -115,10 +115,13 @@ public class ConnectorCatalog {
 
     /**
      * La classe d'un outil servi par ce serveur : celle du préréglage seulement quand le serveur est le sien (son serveur
-     * officiel) ; tout autre serveur, même enregistré sous la clé d'un préréglage, n'a que des écritures.
+     * officiel) ; tout autre serveur, même enregistré sous la clé d'un préréglage, n'a que des écritures. Sur l'adresse de
+     * lecture seule que l'éditeur documente comme ne servant que des lectures, chaque outil est une lecture (séance n°23,
+     * R160) ; sur l'adresse entière, la liste documentée vaut.
      */
     public ToolClass classOn(String connectorKey, String serverUrl, String tool) {
-        return preset(connectorKey).filter(p -> p.serves(serverUrl)).map(p -> p.classOf(tool)).orElse(ToolClass.WRITE);
+        return preset(connectorKey).filter(p -> p.serves(serverUrl)).map(p -> p.classAt(serverUrl, tool))
+            .orElse(ToolClass.WRITE);
     }
 
     /**
@@ -191,13 +194,19 @@ public class ConnectorCatalog {
         Set<String> both = new LinkedHashSet<>(read);
         both.retainAll(write);
         if (!both.isEmpty()) throw new IllegalStateException("Preset " + key + " classes a tool twice: " + both);
-        toolListSource(key, n.path("tools"));
+        source(key, "its tool list", text(n.path("tools"), "source"), text(n.path("tools"), "checked"));
+        String readUrl = text(n, "readUrl");
+        ConnectorPreset.Source readUrlSource = source(key, "its read-only address", text(n, "readUrlSource"),
+            text(n, "readUrlChecked"));
+        if (readUrlSource != null && readUrl == null) {
+            throw new IllegalStateException("Preset " + key + " documents a read-only address it does not have");
+        }
         JsonNode scopes = n.path("scopes");
         JsonNode admin = n.path("admin");
         JsonNode apiKey = n.path("apiKey");
         JsonNode tried = n.path("tried");
         return new ConnectorPreset(key, required(n, "name"), ConnectorCategory.valueOf(required(n, "category")),
-            required(n, "description"), required(n, "website"), mcpUrl, text(n, "readUrl"), connection,
+            required(n, "description"), required(n, "website"), mcpUrl, readUrl, readUrlSource, connection,
             scopes.isObject() ? new ConnectorPreset.Scopes(list(scopes.path("read")), list(scopes.path("write")))
                 : ConnectorPreset.Scopes.NONE,
             admin.isObject() ? new ConnectorPreset.Admin(admin.path("required").asBoolean(false),
@@ -210,27 +219,27 @@ public class ConnectorCatalog {
     }
 
     /**
-     * D'où vient la liste des outils d'un préréglage (séance n°23, R160) : la page publique de l'éditeur
-     * ({@code tools.source}, en HTTPS) et la date de sa lecture ({@code tools.checked}, AAAA-MM-JJ), l'une avec l'autre.
-     * Un outil n'y est en lecture que si l'éditeur le documente ainsi ; le reste demande.
+     * Une page publique de l'éditeur et la date de sa lecture (séance n°23, R160), l'une avec l'autre : en HTTPS, datée
+     * AAAA-MM-JJ ; nulle quand le préréglage n'en donne pas. Pour la liste des outils ({@code tools.source},
+     * {@code tools.checked}) : un outil n'y est en lecture que si l'éditeur le documente ainsi, le reste demande. Pour
+     * l'adresse de lecture seule ({@code readUrlSource}, {@code readUrlChecked}) : l'éditeur y écrit qu'elle ne sert que
+     * des outils de lecture.
      */
-    private static void toolListSource(String key, JsonNode tools) {
-        String source = text(tools, "source");
-        String checked = text(tools, "checked");
-        if ((source == null) != (checked == null)) {
-            throw new IllegalStateException("Preset " + key + " gives the page of its tool list and the date it was read "
+    private static ConnectorPreset.Source source(String key, String what, String page, String checked) {
+        if ((page == null) != (checked == null)) {
+            throw new IllegalStateException("Preset " + key + " gives the page of " + what + " and the date it was read "
                 + "together, or neither");
         }
-        if (source != null && !source.startsWith("https://")) {
-            throw new IllegalStateException("Preset " + key + " must read its tool list on an HTTPS page");
+        if (page == null) return null;
+        if (!page.startsWith("https://")) {
+            throw new IllegalStateException("Preset " + key + " must read " + what + " on an HTTPS page");
         }
-        if (checked != null) {
-            try {
-                java.time.LocalDate.parse(checked);
-            } catch (java.time.format.DateTimeParseException e) {
-                throw new IllegalStateException("Preset " + key + " dates its tool list as YYYY-MM-DD: " + checked, e);
-            }
+        try {
+            java.time.LocalDate.parse(checked);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalStateException("Preset " + key + " dates " + what + " as YYYY-MM-DD: " + checked, e);
         }
+        return new ConnectorPreset.Source(page, checked);
     }
 
     /** L'API d'un éditeur que TaskForce sert lui-même : son émetteur et son adresse, en HTTPS. */

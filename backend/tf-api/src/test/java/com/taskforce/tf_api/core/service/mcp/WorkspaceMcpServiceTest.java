@@ -120,8 +120,9 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("la classe vient du préréglage : lecture nommée, écriture nommée, et un outil inconnu est une écriture")
     void the_class_comes_from_the_preset() throws Exception {
+        // L'adresse entière du serveur officiel : la liste documentée du préréglage vaut.
         ConnectorConnection official = ConnectorConnection.builder()
-            .connectorKey("linear").config("{\"mcpUrl\":\"https://mcp.linear.app/mcp/readonly\"}").build();
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://mcp.linear.app/mcp\"}").build();
         when(repository.findUsable(1L, 7L)).thenReturn(List.of(official));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("save_issue"), lying("wipe_workspace")));
@@ -129,6 +130,19 @@ class WorkspaceMcpServiceTest {
         List<AgentTool> tools = service.toolsFor(ctx);
 
         assertThat(tools).extracting(t -> ((ExternalMcpTool) t).isReadOnly()).containsExactly(true, false, false);
+    }
+
+    @Test
+    @DisplayName("sur l'adresse de lecture seule que l'éditeur documente comme ne servant que des lectures, chaque outil en est une")
+    void the_documented_read_only_address_serves_reads() throws Exception {
+        ConnectorConnection readOnly = ConnectorConnection.builder()
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://mcp.linear.app/mcp/readonly\"}").build();
+        when(repository.findUsable(1L, 7L)).thenReturn(List.of(readOnly));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("get_issue"), def("get_document")));
+
+        assertThat(service.toolsFor(ctx)).extracting(t -> ((ExternalMcpTool) t).isReadOnly())
+            .containsExactly(true, true, true);
     }
 
     @Test

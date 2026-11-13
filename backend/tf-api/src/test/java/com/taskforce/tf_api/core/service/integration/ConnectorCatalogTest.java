@@ -253,7 +253,8 @@ class ConnectorCatalogTest {
         "confluence, searchCode,              READ",
         "jira,       executeRead,             WRITE",
         "confluence, executeRead,             WRITE",
-        // Linear ne publie pas de liste : seul ce que son journal des changements dit en lecture sert sans demander.
+        // Linear ne publie pas de liste : sur son adresse entière, seul ce que son journal des changements dit en lecture
+        // sert sans demander (son adresse de lecture seule : voir laLectureSeuleDocumentee).
         "linear,     list_customer_needs,     READ",
         "linear,     get_issue,               WRITE",
         "gitlab,     list_pipeline_schedules, READ",
@@ -264,6 +265,39 @@ class ConnectorCatalogTest {
     @DisplayName("la première vague, relue le 12/11/2026 : lecture seulement si l'éditeur le dit, le doute demande (R160)")
     void laPremiereVagueRelue(String cle, String outil, ToolClass classe) {
         assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
+    @ParameterizedTest(name = "{0} / {1} / {2} -> {3}")
+    @CsvSource({
+        // L'éditeur écrit que l'adresse de lecture seule ne sert que des lectures : chaque outil qu'elle sert en est une.
+        "linear,     https://mcp.linear.app/mcp/readonly,         get_issue,    READ",
+        "linear,     https://mcp.linear.app/mcp/readonly,         anything_new, READ",
+        "github-mcp, https://api.githubcopilot.com/mcp/readonly,  get_me,       READ",
+        "neon,       https://mcp.neon.tech/mcp?readonly=true,     run_sql,      READ",
+        // Sur l'adresse entière, la liste documentée vaut.
+        "linear,     https://mcp.linear.app/mcp,                  get_issue,    WRITE",
+        "linear,     https://mcp.linear.app/mcp,                  list_issues,  READ",
+        "neon,       https://mcp.neon.tech/mcp,                   run_sql,      WRITE",
+        // Une adresse de lecture seule que l'éditeur ne documente pas ainsi : la classe du nom.
+        "supabase,   https://mcp.supabase.com/mcp?read_only=true, execute_sql,  WRITE",
+        "lucid,      https://mcp.lucid.app/mcp/readonly,          search,       WRITE",
+    })
+    @DisplayName("l'adresse de lecture seule que l'éditeur documente ne sert que des lectures (revue de la PR #532)")
+    void laLectureSeuleDocumentee(String cle, String adresse, String outil, ToolClass classe) {
+        assertThat(catalogue.classOn(cle, adresse, outil)).isEqualTo(classe);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"linear", "github-mcp", "neon", "posthog", "klaviyo"})
+    @DisplayName("chaque adresse de lecture seule tenue pour lecture cite la page de l'éditeur et la date de sa lecture")
+    void lesAdressesDeLectureSeuleCitentLeurPage(String cle) {
+        ConnectorPreset preset = catalogue.preset(cle).orElseThrow();
+        assertThat(preset.readUrlSource()).as(cle).isNotNull();
+        assertThat(preset.readUrlSource().page()).as(cle).startsWith("https://");
+        assertThat(java.time.LocalDate.parse(preset.readUrlSource().checked())).as(cle)
+            .isAfterOrEqualTo(java.time.LocalDate.of(2026, 11, 13));
+        assertThat(preset.isDocumentedReadOnly(preset.readUrl())).as(cle).isTrue();
+        assertThat(preset.isDocumentedReadOnly(preset.mcpUrl())).as(cle).isFalse();
     }
 
     @Test

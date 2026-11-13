@@ -67,6 +67,8 @@
       "website": "https://linear.app",
       "mcpUrl": "https://mcp.linear.app/mcp",
       "readUrl": "https://mcp.linear.app/mcp/readonly",
+      "readUrlSource": "https://linear.app/docs/mcp",
+      "readUrlChecked": "2026-11-13",
       "connection": "self-registration",
       "scopes": { "read": ["read"], "write": ["read", "write"] },
       "admin": {
@@ -227,6 +229,8 @@
       "website": "https://github.com",
       "mcpUrl": "https://api.githubcopilot.com/mcp/",
       "readUrl": "https://api.githubcopilot.com/mcp/readonly",
+      "readUrlSource": "https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md",
+      "readUrlChecked": "2026-11-13",
       "connection": "our-app",
       "scopes": { "read": ["repo", "read:org", "read:user"], "write": ["repo", "read:org", "read:user", "project"] },
       "admin": {
@@ -317,7 +321,7 @@
       "connection": "self-registration",
       "tried": null,
       "sources": ["https://supabase.com/docs/guides/ai-tools/mcp", "https://api.supabase.com/.well-known/oauth-authorization-server"],
-      "unverified": ["whether read_only also hides the tools that change projects (it runs queries as a read-only role)", "the tool names (every tool asks until they are classified)"]
+      "unverified": ["whether read_only also hides the tools that change projects (it runs queries as a read-only role): its tools keep the class of their name", "the tool names (every tool asks until they are classified)"]
     },
     {
       "key": "neon",
@@ -327,6 +331,8 @@
       "website": "https://neon.tech",
       "mcpUrl": "https://mcp.neon.tech/mcp",
       "readUrl": "https://mcp.neon.tech/mcp?readonly=true",
+      "readUrlSource": "https://neon.com/docs/ai/neon-mcp-server",
+      "readUrlChecked": "2026-11-13",
       "connection": "self-registration",
       "scopes": { "read": ["read"], "write": ["read", "write"] },
       "tried": null,
@@ -1174,6 +1180,8 @@
       "website": "https://posthog.com",
       "mcpUrl": "https://mcp.posthog.com/mcp",
       "readUrl": "https://mcp.posthog.com/mcp?readonly=true",
+      "readUrlSource": "https://posthog.com/docs/model-context-protocol/faq",
+      "readUrlChecked": "2026-11-13",
       "connection": "self-registration",
       "tried": null,
       "sources": ["https://posthog.com/docs/model-context-protocol", "https://posthog.com/docs/model-context-protocol/faq", "https://oauth.posthog.com/.well-known/oauth-authorization-server"],
@@ -1386,6 +1394,8 @@
       "website": "https://www.klaviyo.com",
       "mcpUrl": "https://mcp.klaviyo.com/mcp",
       "readUrl": "https://mcp.klaviyo.com/mcp?read-only=true",
+      "readUrlSource": "https://developers.klaviyo.com/en/docs/connect_to_the_klaviyo_mcp_server",
+      "readUrlChecked": "2026-11-13",
       "connection": "self-registration",
       "tried": null,
       "sources": ["https://developers.klaviyo.com/en/docs/connect_to_the_klaviyo_mcp_server", "https://mcp.klaviyo.com/.well-known/oauth-authorization-server"],
@@ -1637,7 +1647,7 @@
       },
       "tried": null,
       "sources": ["https://help.lucid.co/hc/en-us/articles/42578801807508-Integrate-Lucid-with-AI-tools-using-the-Lucid-MCP-server", "https://help.lucid.co/hc/en-us/articles/51290793390740-View-and-search-Lucid-content-with-AI-tools-using-the-Lucid-read-only-MCP-server", "https://mcp.lucid.app/.well-known/oauth-authorization-server"],
-      "unverified": ["the tool names (every tool asks until they are classified)"]
+      "unverified": ["the tool names (every tool asks until they are classified)", "whether the read-only address serves only read tools (the page lists sending feedback and exporting a PNG): its tools keep the class of their name"]
     },
     {
       "key": "framer",

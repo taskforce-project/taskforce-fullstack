@@ -107,7 +107,8 @@ class McpConnectContractTest {
             @Override
             public Optional<ConnectorPreset> preset(String asked) {
                 return super.preset(asked).map(p -> key.equals(asked) ? new ConnectorPreset(p.key(), p.name(),
-                    p.category(), p.description(), p.website(), officialUrl, null, p.connection(), p.scopes(), p.admin(),
+                    p.category(), p.description(), p.website(), officialUrl, null, null, p.connection(), p.scopes(),
+                    p.admin(),
                     p.apiKey(), p.readTools(), p.writeTools(), p.tried(), p.blocked(), p.sources(), p.unverified(),
                     p.api()) : p);
             }
