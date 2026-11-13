@@ -290,14 +290,27 @@ export function actionWords(tool: string, service: string, args: Record<string, 
   const write = /^(.+?)[_-]write$/i.exec(name)
   if (write) {
     const method = typeof args?.method === "string" ? args.method.trim().toLowerCase().split(/[_\s-]+/)[0] ?? "" : ""
-    return ACT_VERBS.has(method) ? phrase(method, toolLabel(write[1], service).split(" ")) : null
+    return ACT_VERBS.has(method) ? phrase(method, unbranded(toolLabel(write[1], service), service)) : null
   }
   const label = toolLabel(name, service).trim()
   if (!label) return null
-  const [first, ...rest] = label.split(" ")
+  const [first, ...rest] = unbranded(label, service)
   const verb = first.toLowerCase()
   if (BARE_VERBS.has(verb)) return [verb, ...rest].join(" ")
-  return ACT_VERBS.has(verb) ? phrase(verb, rest) : null
+  // `save_issue` (Linear) crée, ou met à jour le ticket que son `id` désigne.
+  const updates = verb === "save" && hasId(args)
+  return ACT_VERBS.has(verb) ? phrase(updates ? "update" : verb, rest) : null
+}
+
+/** Les mots d'un outil sans le nom de son service, que la phrase dit déjà : `editJiraIssue` donne « Edit issue ». */
+function unbranded(label: string, service: string): string[] {
+  return label.split(" ").filter((word, i) => i === 0 || word.toLowerCase() !== service.toLowerCase())
+}
+
+/** L'action désigne-t-elle une chose existante par son `id` ? */
+function hasId(args: Record<string, unknown> | null): boolean {
+  const id = args?.id
+  return (typeof id === "string" && id.trim() !== "") || typeof id === "number"
 }
 
 /** Le verbe et ce sur quoi il porte, avec l'article qui convient : « create an issue », « push files », « send money ». */
@@ -352,8 +365,42 @@ const SECRET_WORD = /(^| )(password|passwd|passphrase|pass|pin|secret|secrets|to
  * `projectKey` disent où l'action arrive, et restent montrés.
  */
 const SECRET_KEY = /^keys?$|(^| )(api|access|secret|private|client|signing|encryption|ssh|license|session|auth) keys?$/
+/** Le suffixe qui désigne un lieu ou un objet : `teamId`, `issueIdOrKey`, `pullNumber`, `merge_request_iid`. */
+const PLACE_SUFFIX = / (id or key|id|ids|iid|gid|name|key|slug|number)$/
 /** Où l'action arrive : un canal, un dépôt, une page, un projet. Toujours dit, même quand c'est un identifiant. */
-const PLACE_WORD = /^(channel|channels|conversation|thread|repo|repository|page|parent|project|database|board|folder|space|team|list|calendar|site|drive|table|sheet|base|workspace)( (id|ids|name|key|slug))?$/
+const PLACE_WORD = new RegExp(`^(channel|channels|conversation|thread|repo|repository|page|parent|project|database|board|folder|space|team|list|calendar|site|drive|table|sheet|base|workspace)(${PLACE_SUFFIX.source.slice(0, -1)})?$`)
+/**
+ * Ce sur quoi une mise à jour, une suppression ou un commentaire porte : un ticket, une pull request, un document. Plus
+ * précis que le lieu qui le contient, la phrase le nomme seul, même par son identifiant (R161).
+ */
+const OBJECT_WORD = new RegExp(`^(issue|ticket|task|pull request|pull|pr|merge request|mr|document|file|card|event|record)(${PLACE_SUFFIX.source.slice(0, -1)})?$`)
+/** Le nom d'un objet abrégé dans le nom d'un argument : `pullNumber` désigne une pull request. */
+const OBJECT_NAMES: Readonly<Record<string, string>> = { pull: "pull request", pr: "pull request", mr: "merge request" }
+
+/** Le nom d'un lieu ou d'un objet, sans son suffixe : « team id » se dit « team », « pull number » « pull request ». */
+function placeLabel(words: string): string {
+  const base = words.replace(PLACE_SUFFIX, "")
+  return OBJECT_NAMES[base] ?? base
+}
+
+/**
+ * Ce sur quoi l'outil porte, d'après son nom : `save_issue` un ticket, `update_pull_request` une pull request. Son
+ * `id` le nomme alors ; un outil qui crée n'en a pas encore.
+ */
+function toolObject(tool: string, args: Record<string, unknown>): string | null {
+  const name = tool.slice(tool.indexOf("__") + 2)
+  const write = /^(.+?)[_-]write$/i.exec(name)
+  const words = argWords(write ? write[1] : name).split(" ")
+  const verb = write ? String(args.method ?? "").toLowerCase() : words[0]
+  if (verb === "create") return null
+  for (const size of [2, 1]) {
+    // Sans `*_write`, le premier mot est le verbe : l'objet vient après lui.
+    if (words.length < size + (write ? 0 : 1)) continue
+    const tail = words.slice(-size).join(" ")
+    if (OBJECT_WORD.test(tail)) return placeLabel(tail)
+  }
+  return null
+}
 
 /** Le nom de cet argument dit-il un secret (`password`, `apiKey`, `pin`) ? */
 export function namesSecret(key: string): boolean {
@@ -398,9 +445,10 @@ export function amountText(amount: number, currency: string | null, connector: s
 }
 
 /**
- * Ce que l'action dit d'elle au premier regard : son titre, où elle arrive (un canal, un dépôt, une page, un projet,
- * même désigné par un identifiant), un montant dans sa devise, puis des valeurs courtes avec leur nom ; trois au plus,
- * jamais un secret ni un autre identifiant ; chacune sur une ligne, 60 caractères au plus.
+ * Ce que l'action dit d'elle au premier regard : ce sur quoi elle porte (un ticket, une pull request), son titre, sinon
+ * où elle arrive (un canal, un dépôt, une page, un projet), même désigné par un identifiant, un montant dans sa devise,
+ * puis des valeurs courtes avec leur nom ; trois au plus, jamais un secret ni un autre identifiant ; chacune sur une
+ * ligne, 60 caractères au plus. De deux lieux, seul le plus précis : « issue "FIN-42" », pas son projet.
  */
 export function mainValues(input: string | null | undefined, tool = ""): ProposalValue[] {
   const args = argsOf(input)
@@ -410,19 +458,34 @@ export function mainValues(input: string | null | undefined, tool = ""): Proposa
   const plain = (label: string | null, value: string): ProposalValue => ({ label, text: short(value), number: true })
   const used = new Set<string>(["method"])
   const out: ProposalValue[] = []
+  const place = (key: string, label: string, value: unknown): void => {
+    if (typeof value === "string" && value.trim()) { out.push(text(label, value)); used.add(key) }
+    else if (typeof value === "number") { out.push(plain(label, String(value))); used.add(key) }
+  }
+
+  // Ce sur quoi l'action porte, même par son identifiant : `issueIdOrKey`, `pullNumber`, l'`id` d'un ticket mis à jour.
+  const object = toolObject(tool, args)
+  for (const [key, value] of Object.entries(args)) {
+    if (namesSecret(key)) continue
+    const words = argWords(key)
+    if (OBJECT_WORD.test(words)) place(key, placeLabel(words), value)
+    else if (key === "id" && object) place(key, object, value)
+  }
+  const precise = out.length > 0
 
   const title = Object.keys(args).find((key) => TITLE_KEYS.has(key.toLowerCase()) && typeof args[key] === "string" && String(args[key]).trim())
   if (title) { out.push(text(null, String(args[title]))); used.add(title) }
 
-  // Où l'action arrive : le dépôt de GitHub se dit « owner/repo », un canal ou un projet même par son identifiant.
+  // Où l'action arrive : le dépôt de GitHub se dit « owner/repo », un canal ou un projet même par son identifiant. Un
+  // objet nommé est plus précis : le lieu qui le contient reste sous « Details ».
   if (typeof args.owner === "string" && typeof args.repo === "string") {
-    out.push(text("repository", `${args.owner}/${args.repo}`))
+    if (!precise) out.push(text("repository", `${args.owner}/${args.repo}`))
     used.add("owner").add("repo")
   }
   for (const [key, value] of Object.entries(args)) {
     if (used.has(key) || namesSecret(key) || !PLACE_WORD.test(argWords(key))) continue
-    if (typeof value === "string" && value.trim()) { out.push(text(argWords(key).replace(/ (id|ids|name|key|slug)$/, ""), value)); used.add(key) }
-    else if (typeof value === "number") { out.push(plain(argWords(key).replace(/ (id|ids|name|key|slug)$/, ""), String(value))); used.add(key) }
+    if (precise) used.add(key)
+    else place(key, placeLabel(argWords(key)), value)
   }
 
   // Un montant, dans sa devise quand elle est sûre ; sa devise n'est pas redite à part.

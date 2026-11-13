@@ -274,10 +274,30 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
     for (const masked of ["apiKey", "api_key", "accessKey", "privateKey", "client_secret", "password", "pin", "token", "key"]) {
       expect(namesSecret(masked), masked).toBe(true)
     }
-    // Une carte de Jira dit quel ticket elle change sous « Details », et le projet dans sa phrase.
+    // Une carte de Jira dit quel ticket elle change, sous « Details » et dans sa phrase, plutôt que son projet.
     const edit = JSON.stringify({ issueIdOrKey: "FIN-42", projectKey: "FIN", summary: "Fix VAT rounding" })
     expect(actionArguments(edit, t).find((r) => r.key === "issueIdOrKey")).toMatchObject({ secret: false, value: "FIN-42" })
-    expect(mainValues(edit, "atlassian__editJiraIssue").map((v) => v.text)).toContain("FIN")
+    expect(mainValues(edit, "jira__editJiraIssue").map((v) => v.text)).toEqual(["FIN-42", "Fix VAT rounding"])
+  })
+
+  it("names what an update, a delete or a comment acts on, even by its id, and only the most specific place (R161)", () => {
+    // Jira : le ticket que la carte change, par sa clé ; l'action sans le nom du service, que la phrase dit déjà.
+    expect(proposalLine("jira__editJiraIssue", t, JSON.stringify({ cloudId: "a1b2c3d4-e5f6-7890", issueIdOrKey: "FIN-42",
+      fields: { summary: "Round VAT half up" } })))
+      .toBe("Cortex proposes to edit an issue in Jira: issue \"FIN-42\". Nothing is sent until you approve it.")
+    // GitHub : la pull request, par son numéro, plutôt que le dépôt qui la contient.
+    expect(proposalLine("github-mcp__add_reply_to_pull_request_comment", t, JSON.stringify({ owner: "northwind",
+      repo: "ledger", pullNumber: 12, commentId: 99, body: "Fixed in the next commit" })))
+      .toBe("Cortex proposes to add reply to pull request comment in GitHub: pull request 12, body \"Fixed in the next commit\". "
+        + "Nothing is sent until you approve it.")
+    // Linear : save_issue avec un id met à jour ce ticket, que son id nomme ; l'équipe reste sous « Details ».
+    expect(proposalLine("linear__save_issue", t, JSON.stringify({ id: "ENG-123", title: "Round VAT half up",
+      teamId: "e3b0c442-98fc-1c14", priority: 2 })))
+      .toBe("Cortex proposes to update an issue in Linear: issue \"ENG-123\", \"Round VAT half up\", priority 2. "
+        + "Nothing is sent until you approve it.")
+    // Sans id, save_issue crée : aucun ticket à nommer, l'équipe reste le lieu.
+    expect(mainValues(JSON.stringify({ title: "New", teamId: "e3b0c442-98fc-1c14" }), "linear__save_issue").map((v) => v.label))
+      .toEqual([null, "team"])
   })
 
   it("keeps three short values at most, the title first, and reads only an object", () => {
