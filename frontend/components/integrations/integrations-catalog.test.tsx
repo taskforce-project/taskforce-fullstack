@@ -164,6 +164,20 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(screen.queryByText("What this integration can do")).toBeNull()
   })
 
+  it("a catalog that can't load offers Retry without a loading icon; the detail header stacks on a narrow screen (R161)", async () => {
+    vi.mocked(getIntegrationCatalog).mockRejectedValueOnce(new Error("offline")).mockResolvedValue(catalog(preset("linear", "Linear")))
+    render(<IntegrationsCatalog slug="acme" />)
+
+    const retry = await screen.findByRole("button", { name: "Retry" })
+    expect(retry.querySelector("svg")?.getAttribute("class")).not.toMatch(/loader|spin/)
+    fireEvent.click(retry)
+
+    fireEvent.click(await screen.findByRole("button", { name: "Learn more about Linear" }))
+    // Une colonne sous 640 px, une ligne au-delà : la description garde la largeur de l'écran.
+    const header = screen.getByRole("heading", { name: "Linear" }).closest('[class~="sm:flex-row"]')
+    expect(header).toHaveClass("flex-col")
+  })
+
   it("a server on the local network asks for the person's approval, from its name or from the server's reason", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("linear", "Linear")))
     vi.mocked(connectMcpServer).mockRejectedValue(refused("CONNECT_LOCAL_NEEDS_APPROVAL", "This server runs on your local network."))

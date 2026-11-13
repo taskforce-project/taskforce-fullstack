@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, ChevronRight, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal, Plus } from "lucide-react"
+import { Info, Loader2, ExternalLink, Check, Plug, Search, ChevronLeft, ChevronRight, Globe, BookOpen, Server, Wrench, AlertTriangle, Terminal, Plus, RotateCw } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -372,8 +372,9 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
         <p className="text-sm text-muted-foreground">The integrations catalog could not be loaded.</p>
+        {/* Réessayer, pas « en cours » : l'icône d'un chargement disait le contraire du bouton (R161). */}
         <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5">
-          <Loader2 className="size-3.5" /> Retry
+          <RotateCw className="size-3.5" aria-hidden="true" /> Retry
         </Button>
       </div>
     )
@@ -585,8 +586,8 @@ function ConnectorDetailView({
         <ChevronLeft className="size-4" /> Back
       </button>
 
-      {/* En-tête */}
-      <div className="flex items-start justify-between gap-4">
+      {/* En-tête : sur un écran étroit, le bouton passe sous la description au lieu de la serrer (R161). */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted p-2">
             <BrandLogo slug={tool.key} name={tool.name} className="size-full" />
@@ -604,7 +605,7 @@ function ConnectorDetailView({
           </div>
         </div>
         {action && (
-          <Button size="sm" className="shrink-0 gap-1.5" variant={connected ? "outline" : "default"} onClick={onConnect}>
+          <Button size="sm" className="shrink-0 gap-1.5 self-start" variant={connected ? "outline" : "default"} onClick={onConnect}>
             <Plug className="size-3.5" />
             {action}
           </Button>
