@@ -974,6 +974,7 @@ export const CONSTANTS_EN = {
     keyTitle: "Connect with a key",
     keyLabel: "Key",
     serverAddressLabel: "Your server's address",
+    serverAddressTitle: "Connect with your server's address",
     createKey: "Where to create it",
     useKeyInstead: "Connect with a key instead",
     // A server on this computer or the local network

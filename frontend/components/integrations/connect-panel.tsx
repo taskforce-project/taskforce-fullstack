@@ -398,7 +398,7 @@ function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy:
   const address = tool.connection === "server-url"
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-medium text-foreground">{t.keyTitle}</p>
+      <p className="text-sm font-medium text-foreground">{address ? t.serverAddressTitle : t.keyTitle}</p>
       {tool.apiKey && <p className="text-sm text-muted-foreground">{tool.apiKey.hint}</p>}
       {tool.apiKey?.link && (
         <a href={tool.apiKey.link} target="_blank" rel="noopener noreferrer"
@@ -408,7 +408,9 @@ function KeyForm({ tool, busy, onSubmit }: Readonly<{ tool: ConnectorView; busy:
       )}
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{address ? t.serverAddressLabel : t.keyLabel}</span>
-        <Input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off" />
+        {/* Une adresse se lit en clair, pour qu'on voie ce qu'on a collé ; le navigateur ne la garde pas (R161). */}
+        <Input type={address ? "url" : "password"} value={value} onChange={(e) => setValue(e.target.value)} autoComplete="off"
+          spellCheck={false} />
       </label>
       <DialogFooter>
         <Button onClick={() => onSubmit(value.trim())} disabled={busy || !value.trim()}>{busy ? t.connecting : t.connect}</Button>

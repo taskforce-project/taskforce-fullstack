@@ -315,6 +315,10 @@ describe("ConnectPanel", () => {
     useConnectorStore.setState({ outcomes: { zoho: { next: "key", authorizeUrl: null, message: null } } })
     show(notion({ key: "zoho", name: "Zoho", connection: "server-url", mcpSuggestedUrl: null,
       apiKey: { hint: "Create your server in the Zoho MCP console.", link: null } }))
+    // Une adresse n'est pas une clé : son étape le dit, et elle se lit en clair (R161).
+    expect(screen.getByText(t.serverAddressTitle)).toBeInTheDocument()
+    expect(screen.queryByText(t.keyTitle)).toBeNull()
+    expect(screen.getByLabelText(t.serverAddressLabel)).toHaveAttribute("type", "url")
     fireEvent.change(screen.getByLabelText(t.serverAddressLabel), { target: { value: "https://srv.zohomcp.com/mcp/k/message" } })
     fireEvent.click(screen.getByRole("button", { name: t.connect }))
     await waitFor(() => expect(connect).toHaveBeenLastCalledWith("acme", "zoho",
