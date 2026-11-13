@@ -127,6 +127,23 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(within(dialog()).getByText(c.liveTitle.replace("{name}", "Slack"))).toBeInTheDocument()
   })
 
+  it("a search through the whole catalog hides the category pills, so its results come first; a chosen category keeps them (R161)", async () => {
+    vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("linear", "Linear"), slack))
+    render(<IntegrationsCatalog slug="acme" />)
+    const pill = () => screen.queryByRole("button", { name: /^Chat, mail and meetings/ })
+    const search = await screen.findByPlaceholderText("Search integrations…")
+    expect(pill()).toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: "slack" } })
+    expect(pill()).toBeNull()
+    expect(screen.getByRole("heading", { name: "Slack" })).toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: "" } })
+    fireEvent.click(pill()!)
+    fireEvent.change(search, { target: { value: "slack" } })
+    expect(pill()).toBeInTheDocument()
+  })
+
   it("a server on the local network asks for the person's approval, from its name or from the server's reason", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("linear", "Linear")))
     vi.mocked(connectMcpServer).mockRejectedValue(refused("CONNECT_LOCAL_NEEDS_APPROVAL", "This server runs on your local network."))

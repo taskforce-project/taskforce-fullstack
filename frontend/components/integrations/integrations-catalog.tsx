@@ -415,17 +415,21 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           />
         </div>
 
-        {/* Filtres par catégorie : treize catégories, sur plusieurs lignes plutôt qu'un défilement caché */}
-        <div className="flex flex-wrap gap-1.5">
-          <CatPill active={activeCat === "all"} onClick={() => setActiveCat("all")}>
-            All <span className="tabular-nums opacity-60">{catalog.total}</span>
-          </CatPill>
-          {catalog.categories.map((g) => (
-            <CatPill key={g.category} active={activeCat === g.category} onClick={() => setActiveCat(g.category)}>
-              {g.label} <span className="tabular-nums opacity-60">{g.tools.length}</span>
+        {/* Filtres par catégorie : treize catégories, sur plusieurs lignes plutôt qu'un défilement caché. Une recherche
+            dans tout le catalogue les efface : à 375 px, ses résultats tiennent dans le premier écran (R161). Une
+            catégorie choisie les garde, pour qu'on voie ce qui filtre. */}
+        {(!query.trim() || activeCat !== "all") && (
+          <div className="flex flex-wrap gap-1.5">
+            <CatPill active={activeCat === "all"} onClick={() => setActiveCat("all")}>
+              All <span className="tabular-nums opacity-60">{catalog.total}</span>
             </CatPill>
-          ))}
-        </div>
+            {catalog.categories.map((g) => (
+              <CatPill key={g.category} active={activeCat === g.category} onClick={() => setActiveCat(g.category)}>
+                {g.label} <span className="tabular-nums opacity-60">{g.tools.length}</span>
+              </CatPill>
+            ))}
+          </div>
+        )}
 
         {/* Grille */}
         {groups.length === 0 ? (
