@@ -84,6 +84,47 @@ class StorageTargetServiceTest {
     }
 
     @Test
+    @DisplayName("un dossier de la machine entre au journal par son seul nom ; une racine, sans nom ni chemin")
+    void aMachineFolderIsRecordedByItsNameOnly() {
+        // L'écrivain de la machine, sur l'app desktop : pour une racine, il nomme le dossier par son chemin entier.
+        DocumentWriter machine = Mockito.mock(DocumentWriter.class);
+        when(machine.kind()).thenReturn(StorageKind.MACHINE);
+        when(machine.offered()).thenReturn(true);
+        when(machine.check(any(), any(), any())).thenAnswer(i -> {
+            String path = ((StorageTarget) i.getArgument(2)).getLocalPath();
+            String name = path.equals("C:\\") ? path : "Reports";
+            return StorageTarget.builder().workspaceId(WS).kind(StorageKind.MACHINE).localPath(path).folderName(name).build();
+        });
+        StorageTargetService desktop = new StorageTargetService(targets, documents, workspaces, projects, members,
+            visibility, authorization, users, List.of(machine), audit);
+
+        desktop.choose("acme", ADA, null, new StorageTargetService.TargetRequest("machine", null, null, "C:\\"));
+        desktop.choose("acme", ADA, null, new StorageTargetService.TargetRequest("machine", null, null,
+            "C:\\Users\\ada\\Reports"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit, Mockito.times(2)).recordAfterCommit(eq(WS), eq(ADA), eq(AuditService.STORAGE_TARGET_CHANGED),
+            eq("storage_target"), isNull(), details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("storage", "machine").doesNotContainKey("folderName");
+        assertThat(details.getAllValues().get(1)).containsEntry("folderName", "Reports");
+        assertThat(details.getAllValues().toString()).doesNotContain("C:\\").doesNotContain("Users");
+    }
+
+    @Test
+    @DisplayName("le dernier segment d'un dossier : nul pour une racine, sous Windows comme ailleurs")
+    void lastSegment() {
+        assertThat(StorageTargetService.lastSegment("C:\\")).isNull();
+        assertThat(StorageTargetService.lastSegment("C:")).isNull();
+        assertThat(StorageTargetService.lastSegment("\\\\host\\share\\")).isNull();
+        assertThat(StorageTargetService.lastSegment("\\\\host")).isNull();
+        assertThat(StorageTargetService.lastSegment("/")).isNull();
+        assertThat(StorageTargetService.lastSegment("\\\\host\\share\\Team docs")).isEqualTo("Team docs");
+        assertThat(StorageTargetService.lastSegment("C:\\Users\\ada\\Reports\\")).isEqualTo("Reports");
+        assertThat(StorageTargetService.lastSegment("/home/ada/Reports")).isEqualTo("Reports");
+    }
+
+    @Test
     @DisplayName("choisir l'endroit, puis revenir au choix du dessus, entre au journal de l'espace")
     void choosingIsRecorded() {
         service.choose("acme", ADA, null, new StorageTargetService.TargetRequest("server", null, null, null));

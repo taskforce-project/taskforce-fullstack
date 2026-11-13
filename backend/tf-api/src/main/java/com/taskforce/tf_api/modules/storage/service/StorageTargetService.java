@@ -152,7 +152,9 @@ public class StorageTargetService {
         Map<String, Object> details = changeDetails("chosen", projectId);
         details.put("storage", kind.wire());
         if (row.getConnectorKey() != null) details.put("connectorKey", row.getConnectorKey());
-        if (row.getFolderName() != null) details.put("folderName", row.getFolderName());
+        // Un dossier de la machine : son seul nom, jamais son chemin ; une racine (C:\, \\hôte\partage\) n'en a pas.
+        String folderName = kind == StorageKind.MACHINE ? lastSegment(row.getLocalPath()) : row.getFolderName();
+        if (folderName != null) details.put("folderName", folderName);
         record(ws, userId, projectId, details);
         return overview(slug, userId, projectId);
     }
@@ -282,6 +284,28 @@ public class StorageTargetService {
 
     private static String blank(String s) {
         return s == null || s.isBlank() ? null : s.strip();
+    }
+
+    /**
+     * Le dernier segment d'un dossier de la machine, sous Windows comme ailleurs, sans le reste de son chemin ; nul pour
+     * une racine ({@code C:\}, {@code \\hôte\partage\}, {@code /}), qui n'a pas de nom à elle.
+     */
+    static String lastSegment(String path) {
+        if (path == null) return null;
+        String p = path.strip();
+        int end = p.length();
+        while (end > 0 && (p.charAt(end - 1) == '\\' || p.charAt(end - 1) == '/')) end--;
+        p = p.substring(0, end);
+        if (p.isEmpty()) return null;
+        if (p.length() == 2 && Character.isLetter(p.charAt(0)) && p.charAt(1) == ':') return null;
+        if (p.startsWith("\\\\") || p.startsWith("//")) {
+            String share = p.substring(2);
+            long separators = share.chars().filter(c -> c == '\\' || c == '/').count();
+            if (separators <= 1) return null;
+        }
+        int cut = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+        String last = p.substring(cut + 1);
+        return last.isEmpty() ? null : last;
     }
 
     /** Le début du détail d'un choix : ce qui a changé, et pour quoi (l'espace, ou un projet). */
