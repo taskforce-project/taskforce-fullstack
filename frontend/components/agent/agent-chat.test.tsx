@@ -98,20 +98,27 @@ describe("AgentChat : le fil", () => {
     const input = JSON.stringify({ title: "Fix VAT rounding in the monthly ledger", teamId: "e3b0c442-98fc-1c14", priority: 2 })
     show([said("u1", "Crée l'issue"), replied("a1", { toolCalls: [call("linear__create_issue", "pending", { input })] })])
 
-    // La phrase, ses valeurs chacune dans son élément (le titre entre guillemets, `<q>`).
+    // La phrase, ses valeurs chacune dans son élément (le titre entre guillemets, `<q>`), et où l'issue arrive.
     expect(screen.getByText((_, el) => el?.tagName === "P" && el.textContent === "Cortex proposes to create an issue in Linear: "
-      + "Fix VAT rounding in the monthly ledger, priority 2. Nothing is sent until you approve it.")).toBeInTheDocument()
+      + "Fix VAT rounding in the monthly ledger, team e3b0c442-98fc-1c14, priority 2. Nothing is sent until you approve it.")).toBeInTheDocument()
     expect(screen.getByText("Fix VAT rounding in the monthly ledger").tagName).toBe("Q")
-    expect(screen.queryByText(/linear__create_issue|e3b0c442/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/linear__create_issue/)).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument()
 
     const details = screen.getByRole("button", { name: "Details" })
     expect(details).toHaveAttribute("aria-expanded", "false")
     fireEvent.click(details)
-    const sent = screen.getByLabelText("What Cortex will send")
+    const sent = screen.getByRole("region", { name: "What Cortex will send" })
     expect(sent).toHaveTextContent("Team id")
     expect(sent).toHaveTextContent("e3b0c442-98fc-1c14")
+    // Une hauteur bornée, qui défile au clavier.
+    expect(sent).toHaveClass("max-h-48")
+    expect(sent).toHaveAttribute("tabindex", "0")
     expect(screen.getByRole("button", { name: "Hide the details" })).toHaveAttribute("aria-expanded", "true")
+    // Le brut, à deux clics.
+    expect(screen.queryByText(/"teamId"/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Show the raw request" }))
+    expect(screen.getByText(/"teamId": "e3b0c442-98fc-1c14"/)).toBeInTheDocument()
   })
 
   it("une valeur qui contient une phrase reste dans son propre élément, jamais dans la phrase de la carte (R160)", () => {

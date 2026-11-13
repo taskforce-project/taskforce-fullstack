@@ -237,7 +237,8 @@ const VALUES_SLOT = "\u0000"
 
 /**
  * La carte d'une action qui attend l'accord de la personne, sans le nom de son outil. Pour un outil connecté, l'action
- * en mots et ses valeurs principales (R160) : « Cortex proposes to create an issue in Linear: "…" ».
+ * en mots et ses valeurs principales (R160) : « Cortex proposes to create an issue in Linear: "…" » ; une action dont le
+ * nom ne dit pas le geste : « Cortex proposes an action in GitHub: … », jamais le nom de l'outil.
  */
 export function proposal(tool: string, t: ThreadTexts, input?: string | null): Proposal {
   const sentence = (lead: string): Proposal => ({ lead, values: [], tail: "" })
@@ -247,46 +248,77 @@ export function proposal(tool: string, t: ThreadTexts, input?: string | null): P
   }
   const service = serviceOf(tool)
   if (service) {
-    const action = actionWords(tool, service, t)
-    if (!action) return sentence(fillText(t.proposesExternal, { service }))
-    const [lead, tail = ""] = fillText(t.proposesExternalAction, { action, service, values: VALUES_SLOT }).split(VALUES_SLOT)
-    return { lead, values: mainValues(input), tail }
+    const action = actionWords(tool, service, argsOf(input))
+    const values = mainValues(input, tool)
+    if (!action && values.length === 0) return sentence(fillText(t.proposesExternal, { service }))
+    const template = action ? t.proposesExternalAction : t.proposesExternalValues
+    const [lead, tail = ""] = fillText(template, { action: action ?? "", service, values: VALUES_SLOT }).split(VALUES_SLOT)
+    return { lead, values, tail }
   }
   return sentence(fillText(t.proposes, { what: toolWords(tool, t).proposes ?? t.proposesThis }))
 }
 
 // ---------------------------------------------------------------------------
 // L'action d'un outil connecté, en mots (R160) : son verbe et ce sur quoi elle porte, ses valeurs principales, puis ses
-// arguments un clic plus loin. Jamais le nom technique au premier regard (R133).
+// arguments un clic plus loin, et le brut à deux. Jamais le nom technique au premier regard (R133).
 // ---------------------------------------------------------------------------
 
 /** Les verbes d'une action qui porte sur une chose : « create an issue », « post a channel message ». */
 const ACT_VERBS = new Set([
-  "add", "approve", "archive", "assign", "book", "cancel", "close", "comment", "create", "delete", "draft", "edit",
-  "fork", "invite", "merge", "move", "open", "post", "publish", "reject", "remove", "rename", "reply", "request", "run",
-  "save", "schedule", "send", "set", "share", "start", "stop", "submit", "trigger", "update", "upload", "write",
+  "add", "approve", "archive", "assign", "book", "cancel", "capture", "charge", "close", "comment", "create", "delete",
+  "dismiss", "draft", "edit", "fork", "invite", "mark", "merge", "move", "open", "pay", "post", "publish", "push",
+  "refund", "reject", "remove", "rename", "reply", "request", "run", "save", "schedule", "send", "set", "share", "star",
+  "start", "stop", "submit", "transfer", "trigger", "unstar", "update", "upload", "write",
 ])
 /** Ces verbes lisent ou cherchent : sans article (« search code », « list issues »). */
 const BARE_VERBS = new Set(["search", "list", "get", "read", "fetch", "find", "query", "look"])
 const NO_ARTICLE = new Set(["a", "an", "the", "or", "and", "to", "from", "in", "on", "of", "for", "my", "your", "all", "each"])
+/** Ce qui ne se compte pas ne prend pas d'article : « send money », « export data ». */
+const UNCOUNTABLE = new Set([
+  "access", "advice", "billing", "code", "content", "data", "equipment", "evidence", "feedback", "funding", "info",
+  "information", "media", "metadata", "money", "music", "news", "payroll", "software", "storage", "traffic",
+])
 
 /**
  * L'action d'un outil externe en mots : `linear__create_issue` donne « create an issue », `slack__search_messages`
- * « search messages » ; un nom qui ne commence pas par un verbe connu se dit `use "Issue write"`. Vide sans nom.
+ * « search messages », `github-mcp__issue_write` avec `method: "update"` « update an issue ». null quand le nom ne dit
+ * pas un geste connu : la carte dit alors « an action », jamais le nom de l'outil.
  */
-export function actionWords(tool: string, service: string, t: ThreadTexts): string {
-  const label = toolLabel(tool.slice(tool.indexOf("__") + 2), service).trim()
-  if (!label) return ""
+export function actionWords(tool: string, service: string, args: Record<string, unknown> | null = null): string | null {
+  const name = tool.slice(tool.indexOf("__") + 2)
+  // `issue_write`, `label_write` (GitHub) : un outil pour plusieurs gestes, que l'argument `method` choisit.
+  const write = /^(.+?)[_-]write$/i.exec(name)
+  if (write) {
+    const method = typeof args?.method === "string" ? args.method.trim().toLowerCase().split(/[_\s-]+/)[0] ?? "" : ""
+    return ACT_VERBS.has(method) ? phrase(method, toolLabel(write[1], service).split(" ")) : null
+  }
+  const label = toolLabel(name, service).trim()
+  if (!label) return null
   const [first, ...rest] = label.split(" ")
   const verb = first.toLowerCase()
-  if (BARE_VERBS.has(verb) || (ACT_VERBS.has(verb) && rest.length === 0)) return [verb, ...rest].join(" ")
-  if (!ACT_VERBS.has(verb)) return fillText(t.proposesUse, { action: label })
-  const last = rest[rest.length - 1]
-  const plural = /s$/i.test(last) && !/ss$/i.test(last)
-  const article = !plural && rest.length <= 2 && !NO_ARTICLE.has(rest[0].toLowerCase()) && !/^\d/.test(rest[0])
-    ? (/^[aeiou]/i.test(rest[0]) ? "an " : "a ")
-    : ""
-  return `${verb} ${article}${rest.join(" ")}`
+  if (BARE_VERBS.has(verb)) return [verb, ...rest].join(" ")
+  return ACT_VERBS.has(verb) ? phrase(verb, rest) : null
+}
+
+/** Le verbe et ce sur quoi il porte, avec l'article qui convient : « create an issue », « push files », « send money ». */
+function phrase(verb: string, rest: string[]): string {
+  const words = rest.map((word, i) => (i === 0 ? word.toLowerCase() : word)).filter(Boolean)
+  if (words.length === 0) return verb
+  const last = words[words.length - 1].toLowerCase()
+  const plural = /s$/.test(last) && !/ss$/.test(last)
+  const counted = !plural && !UNCOUNTABLE.has(last) && words.length <= 2 && !NO_ARTICLE.has(words[0]) && !/^\d/.test(words[0])
+  return `${verb} ${counted ? `${articleFor(words[0])} ` : ""}${words.join(" ")}`
+}
+
+/**
+ * « a » ou « an » d'après le son du mot, pas sa lettre : « a user », « a unit », « an update », « an hour ». Les mots
+ * qui commencent par le son « you » ou « wun », et ceux dont le « h » ne se dit pas, sont listés par leur début.
+ */
+export function articleFor(word: string): "a" | "an" {
+  const w = word.toLowerCase()
+  if (/^(u[bcfgklmnprstv][aeiou]|uni|eu|ewe|one|once|ur[aeiou])/.test(w) && !/^(und|unl|unt|ups|ush|umb)/.test(w)) return "a"
+  if (/^(hour|honest|honou?r|heir)/.test(w)) return "an"
+  return /^[aeiou]/.test(w) ? "an" : "a"
 }
 
 /** Les arguments d'un geste, quand ils se lisent : un objet JSON, sinon null. */
@@ -294,11 +326,14 @@ function argsOf(input: string | null | undefined): Record<string, unknown> | nul
   if (!input) return null
   try {
     const args: unknown = JSON.parse(input)
-    return args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : null
+    return isRecord(args) ? args : null
   } catch {
     return null
   }
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value)
 
 /** Le nom d'un argument en mots : `assigneeId` donne « assignee id », `due_date` « due date ». */
 function argWords(key: string): string {
@@ -307,10 +342,19 @@ function argWords(key: string): string {
 
 const TITLE_KEYS = new Set(["title", "name", "subject", "summary"])
 const ID_WORD = /(^| )(id|ids|uuid|guid|token|cursor|url|uri|href|key|secret|password)$/
+/** Un argument dont le nom dit un secret : sa valeur ne se montre nulle part, ni dans la phrase, ni sous « Details ». */
+const SECRET_WORD = /(^| )(password|passwd|passphrase|pass|pin|secret|secrets|token|tokens|key|keys|apikey|credential|credentials|auth|authorization|cookie|otp)$/
+/** Où l'action arrive : un canal, un dépôt, une page, un projet. Toujours dit, même quand c'est un identifiant. */
+const PLACE_WORD = /^(channel|channels|conversation|thread|repo|repository|page|parent|project|database|board|folder|space|team|list|calendar|site|drive|table|sheet|base|workspace)( (id|ids|name|key|slug))?$/
+
+/** Le nom de cet argument dit-il un secret (`password`, `apiKey`, `pin`) ? */
+export function namesSecret(key: string): boolean {
+  return SECRET_WORD.test(argWords(key)) || SECRET_WORD.test(key.toLowerCase())
+}
 
 /** Une valeur qui identifie plutôt qu'elle ne dit : un id, une adresse, un jeton opaque (« e3b0c442-98fc-1c14 »). */
 function identifies(key: string, value: unknown): boolean {
-  if (ID_WORD.test(argWords(key))) return true
+  if (ID_WORD.test(argWords(key)) || namesSecret(key)) return true
   return typeof value === "string" && !/\s/.test(value) && value.length >= 12 && /\d/.test(value)
 }
 
@@ -324,43 +368,131 @@ function short(raw: string): string {
   return `${(space > 40 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/, "")}…`
 }
 
+/** Les devises que Stripe compte sans décimales, et celles qu'il compte en millièmes. */
+const ZERO_DECIMAL = new Set(["BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF"])
+const THREE_DECIMALS = new Set(["BHD", "JOD", "KWD", "OMR", "TND"])
+/** Les devises à deux décimales que la carte sait dire : une autre garde son nombre brut et son code. */
+const TWO_DECIMALS = new Set(["AUD", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "EUR", "GBP", "HKD", "INR", "MXN", "NOK", "NZD", "PLN", "SEK", "SGD", "USD", "ZAR"])
+
 /**
- * Ce que l'action dit d'elle au premier regard : son titre, puis des valeurs courtes avec leur nom (« priority 2 »,
- * « channel "finance" »), trois au plus, jamais un identifiant ; chacune sur une ligne, 60 caractères au plus.
+ * Un montant tel que la carte le dit : en devise seulement quand l'unité est sûre (Stripe compte dans la plus petite
+ * unité de la devise, sauf les devises sans décimales) ; sinon le nombre tel quel, avec le code de sa devise. Un montant
+ * mal lu sur cette carte serait pire qu'un montant brut.
  */
-export function mainValues(input: string | null | undefined): ProposalValue[] {
-  const args = argsOf(input)
-  if (!args) return []
-  const said = Object.entries(args)
-    .filter(([, value]) => (typeof value === "string" && value.trim() !== "") || typeof value === "number")
-    .filter(([key, value]) => !identifies(key, value))
-  const valueOf = (label: string | null, value: unknown): ProposalValue =>
-    typeof value === "number" ? { label, text: String(value), number: true } : { label, text: short(String(value)), number: false }
-  const title = said.find(([key]) => TITLE_KEYS.has(key.toLowerCase()))
-  const others = said.filter((entry) => entry !== title)
-  return [
-    ...(title ? [valueOf(null, title[1])] : []),
-    ...others.map(([key, value]) => valueOf(argWords(key), value)),
-  ].slice(0, 3)
+export function amountText(amount: number, currency: string | null, connector: string): string {
+  const code = currency?.trim().toUpperCase() ?? ""
+  if (!/^[A-Z]{3}$/.test(code)) return String(amount)
+  const digits = ZERO_DECIMAL.has(code) ? 0 : THREE_DECIMALS.has(code) ? 3 : TWO_DECIMALS.has(code) ? 2 : null
+  if (connector !== "stripe" || digits === null || !Number.isInteger(amount)) return `${amount} ${code}`
+  return new Intl.NumberFormat("en", { style: "currency", currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits })
+    .format(amount / 10 ** digits)
 }
 
-/** Un argument d'une action, tel que « Details » le montre : son nom en mots, sa valeur. */
+/**
+ * Ce que l'action dit d'elle au premier regard : son titre, où elle arrive (un canal, un dépôt, une page, un projet,
+ * même désigné par un identifiant), un montant dans sa devise, puis des valeurs courtes avec leur nom ; trois au plus,
+ * jamais un secret ni un autre identifiant ; chacune sur une ligne, 60 caractères au plus.
+ */
+export function mainValues(input: string | null | undefined, tool = ""): ProposalValue[] {
+  const args = argsOf(input)
+  if (!args) return []
+  const connector = tool.includes("__") ? tool.slice(0, tool.indexOf("__")).replace(/-mcp$/, "") : ""
+  const text = (label: string | null, value: string): ProposalValue => ({ label, text: short(value), number: false })
+  const plain = (label: string | null, value: string): ProposalValue => ({ label, text: short(value), number: true })
+  const used = new Set<string>(["method"])
+  const out: ProposalValue[] = []
+
+  const title = Object.keys(args).find((key) => TITLE_KEYS.has(key.toLowerCase()) && typeof args[key] === "string" && String(args[key]).trim())
+  if (title) { out.push(text(null, String(args[title]))); used.add(title) }
+
+  // Où l'action arrive : le dépôt de GitHub se dit « owner/repo », un canal ou un projet même par son identifiant.
+  if (typeof args.owner === "string" && typeof args.repo === "string") {
+    out.push(text("repository", `${args.owner}/${args.repo}`))
+    used.add("owner").add("repo")
+  }
+  for (const [key, value] of Object.entries(args)) {
+    if (used.has(key) || namesSecret(key) || !PLACE_WORD.test(argWords(key))) continue
+    if (typeof value === "string" && value.trim()) { out.push(text(argWords(key).replace(/ (id|ids|name|key|slug)$/, ""), value)); used.add(key) }
+    else if (typeof value === "number") { out.push(plain(argWords(key).replace(/ (id|ids|name|key|slug)$/, ""), String(value))); used.add(key) }
+  }
+
+  // Un montant, dans sa devise quand elle est sûre ; sa devise n'est pas redite à part.
+  for (const [key, value] of Object.entries(args)) {
+    if (used.has(key) || typeof value !== "number" || !/(^| )amount$/.test(argWords(key))) continue
+    const currency = typeof args.currency === "string" ? args.currency : null
+    out.push(plain(argWords(key), amountText(value, currency, connector)))
+    used.add(key)
+    if (currency) used.add("currency")
+  }
+
+  for (const [key, value] of Object.entries(args)) {
+    if (used.has(key) || identifies(key, value)) continue
+    if (typeof value === "string" && value.trim()) out.push(text(argWords(key), value))
+    else if (typeof value === "number") out.push(plain(argWords(key), String(value)))
+  }
+  return out.slice(0, 3)
+}
+
+/** Un argument d'une action, tel que « Details » le montre : son nom en mots, sa valeur, ou ses propres lignes. */
 export interface ActionArgument {
+  /** Le nom tel que l'action l'envoie : il distingue `teamId` de `team_id`, que leurs mots confondent. */
+  key: string
   label: string
+  /** La valeur en texte, ses retours à la ligne gardés ; vide pour un secret, qui ne se montre pas. */
   value: string
+  secret: boolean
+  /** Un objet, ou une liste d'objets : ses lignes, nom et valeur. */
+  rows: ActionArgument[]
 }
 
-/** Les arguments d'une action, un clic plus loin (R160) : chacun avec son nom en mots et sa valeur entière. */
-export function actionArguments(input: string | null | undefined): ActionArgument[] {
-  const args = argsOf(input)
-  if (!args) return []
+/** Au-delà de cette profondeur, un objet se dit sur une ligne. */
+const MAX_DEPTH = 3
+
+function argumentRow(key: string, label: string, value: unknown, t: ThreadTexts, depth: number): ActionArgument {
+  const row = (text: string, rows: ActionArgument[] = []): ActionArgument => ({ key, label, value: text, secret: false, rows })
+  if (namesSecret(key)) return { key, label, value: "", secret: true, rows: [] }
+  if (typeof value === "string") return row(value)
+  if (typeof value === "boolean") return row(value ? t.valueYes : t.valueNo)
+  if (typeof value === "number") return row(String(value))
+  if (value === null || value === undefined) return row("")
+  if (depth >= MAX_DEPTH) return row(JSON.stringify(value))
+  if (Array.isArray(value)) {
+    // Une liste de mots se lit « Bug, Checkout » ; une liste d'objets, une ligne par élément, numérotée.
+    if (value.every((item) => ["string", "number", "boolean"].includes(typeof item))) {
+      return row(value.map((item) => (typeof item === "boolean" ? (item ? t.valueYes : t.valueNo) : String(item))).join(", "))
+    }
+    return row("", value.map((item, i) => argumentRow(`${key}.${i}`, String(i + 1), item, t, depth + 1)))
+  }
+  if (isRecord(value)) return row("", rowsOf(value, t, depth + 1, `${key}.`))
+  return row(String(value))
+}
+
+function rowsOf(args: Record<string, unknown>, t: ThreadTexts, depth: number, prefix: string): ActionArgument[] {
   return Object.entries(args)
     .filter(([, value]) => value !== null && value !== undefined && value !== "")
     .map(([key, value]) => {
       const words = argWords(key)
-      return {
-        label: words ? words.charAt(0).toUpperCase() + words.slice(1) : key,
-        value: typeof value === "string" ? value : JSON.stringify(value),
-      }
+      return argumentRow(`${prefix}${key}`, words ? words.charAt(0).toUpperCase() + words.slice(1) : key, value, t, depth)
     })
+}
+
+/**
+ * Les arguments d'une action, un clic plus loin (R160) : chacun avec son nom en mots et sa valeur ; une liste se lit
+ * « Bug, Checkout », un objet en lignes, un secret masqué.
+ */
+export function actionArguments(input: string | null | undefined, t: ThreadTexts): ActionArgument[] {
+  const args = argsOf(input)
+  return args ? rowsOf(args, t, 0, "") : []
+}
+
+/** Le brut d'une action, à deux clics (R133) : le JSON reçu, ses secrets masqués. */
+export function actionRaw(input: string | null | undefined, t: ThreadTexts): string | null {
+  const args = argsOf(input)
+  if (!args) return null
+  const mask = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(mask)
+    if (!isRecord(value)) return value
+    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, namesSecret(key) ? t.hiddenValue : mask(inner)]))
+  }
+  return JSON.stringify(mask(args), null, 2)
 }

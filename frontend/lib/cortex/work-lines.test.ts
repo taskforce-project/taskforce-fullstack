@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest"
 import type { AssistantAnswer, AssistantRead, AssistantToolCall } from "@/lib/api/assistant-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import {
-  actionArguments, actionWords, didWork, mainValues, outcomeLine, plainOutput, proposal, proposalLine, serviceOf, stepLine,
-  toolWords, workedLine, workedTime, workSentences,
+  actionArguments, actionRaw, actionWords, amountText, articleFor, didWork, mainValues, outcomeLine, plainOutput, proposal,
+  proposalLine, serviceOf, stepLine, toolWords, workedLine, workedTime, workSentences,
 } from "./work-lines"
 
 const t = CONSTANTS_EN.thread
@@ -176,15 +176,31 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
     expect(proposalLine(tool, t)).toBe(expected)
   })
 
-  // Une action dans un outil connecté (R160) : l'action en mots et ses valeurs principales, jamais un identifiant.
-  it("names the action and its main values, never an id", () => {
+  // Une action dans un outil connecté (R160) : l'action en mots, où elle arrive, ses valeurs ; jamais un autre identifiant.
+  it("names the action, where it lands even by an id, and its main values", () => {
     const issue = JSON.stringify({ title: "Fix VAT rounding in the monthly ledger", teamId: "e3b0c442-98fc-1c14",
       assigneeId: "usr_8f2a", priority: 2 })
-    expect(proposalLine("linear__create_issue", t, issue)).toBe(
-      "Cortex proposes to create an issue in Linear: \"Fix VAT rounding in the monthly ledger\", priority 2. Nothing is sent until you approve it.")
+    expect(proposalLine("linear__create_issue", t, issue)).toBe("Cortex proposes to create an issue in Linear: "
+      + "\"Fix VAT rounding in the monthly ledger\", team \"e3b0c442-98fc-1c14\", priority 2. Nothing is sent until you approve it.")
     const post = JSON.stringify({ teamId: "19:abc@thread.tacv2", channel: "finance", text: "Summary of the board meeting" })
-    expect(proposalLine("microsoft-365__post_channel_message", t, post)).toBe(
-      "Cortex proposes to post a channel message in Microsoft 365: channel \"finance\", text \"Summary of the board meeting\". Nothing is sent until you approve it.")
+    expect(proposalLine("microsoft-365__post_channel_message", t, post)).toBe("Cortex proposes to post a channel message in "
+      + "Microsoft 365: team \"19:abc@thread.tacv2\", channel \"finance\", text \"Summary of the board meeting\". Nothing is sent until you approve it.")
+    // Le dépôt de GitHub se dit « owner/repo ».
+    expect(mainValues(JSON.stringify({ owner: "acme", repo: "app", title: "Bug", body: "Steps" }), "github-mcp__issue_write"))
+      .toEqual([{ label: null, text: "Bug", number: false }, { label: "repository", text: "acme/app", number: false },
+        { label: "body", text: "Steps", number: false }])
+  })
+
+  it("never quotes a tool's name: a *_write tool takes its verb from method, else the card says an action", () => {
+    expect(proposalLine("github-mcp__issue_write", t, JSON.stringify({ method: "update", owner: "acme", repo: "app", title: "Bug" })))
+      .toBe("Cortex proposes to update an issue in GitHub: \"Bug\", repository \"acme/app\". Nothing is sent until you approve it.")
+    expect(proposalLine("github-mcp__sub_issue_write", t, JSON.stringify({ method: "add", owner: "acme", repo: "app" })))
+      .toBe("Cortex proposes to add a sub issue in GitHub: repository \"acme/app\". Nothing is sent until you approve it.")
+    const unknown = proposalLine("github-mcp__issue_write", t, JSON.stringify({ owner: "acme", repo: "app" }))
+    expect(unknown).toBe("Cortex proposes an action in GitHub: repository \"acme/app\". Nothing is sent until you approve it.")
+    expect(proposalLine("zoho__crm_records", t, JSON.stringify({ module: "Leads" })))
+      .toBe("Cortex proposes an action in Zoho: module \"Leads\". Nothing is sent until you approve it.")
+    expect(unknown).not.toMatch(/write|Issue write/i)
   })
 
   // Ranger un document (R156) : quoi et où, avant l'accord.
@@ -201,15 +217,56 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
   it.each([
     ["linear__create_issue", "create an issue"],
     ["github-mcp__merge_pull_request", "merge a pull request"],
-    ["github-mcp__push_files", "use \"Push files\""],
+    ["github-mcp__push_files", "push files"],
     ["github-mcp__create_or_update_file", "create or update file"],
     ["github-mcp__assign_copilot_to_issue", "assign copilot to issue"],
     ["slack-mcp__search_messages", "search messages"],
     ["notion__update_pages", "update pages"],
     ["box__upload", "upload"],
     ["gmail__send_email", "send an email"],
+    ["wise__send_money", "send money"],
+    ["x__export_data", null],
+    ["x__create_user", "create a user"],
+    ["x__post_update", "post an update"],
+    ["x__crm_records", null],
   ])("actionWords %s : %s", (tool, expected) => {
-    expect(actionWords(tool, serviceOf(tool) ?? "", t)).toBe(expected)
+    expect(actionWords(tool, serviceOf(tool) ?? "")).toBe(expected)
+  })
+
+  it.each([["user", "a"], ["unit", "a"], ["update", "an"], ["hour", "an"], ["issue", "an"], ["one", "a"], ["umbrella", "an"]])(
+    "articleFor %s : %s", (word, expected) => {
+      expect(articleFor(word)).toBe(expected)
+    })
+
+  // Un montant se dit dans sa devise seulement quand son unité est sûre (Stripe : la plus petite unité de la devise).
+  it.each([
+    [1250, "eur", "stripe", "€12.50"],
+    [500, "jpy", "stripe", "¥500"],
+    // Intl sépare le code de la devise par une espace insécable.
+    [12345, "kwd", "stripe", "KWD 12.345"],
+    [1250, "eur", "paypal", "1250 EUR"],
+    [1250, "xyz", "stripe", "1250 XYZ"],
+    [12.5, "eur", "stripe", "12.5 EUR"],
+    [1250, null, "stripe", "1250"],
+  ] as const)("amountText %s %s %s : %s", (amount, currency, connector, expected) => {
+    expect(amountText(amount, currency, connector)).toBe(expected)
+  })
+
+  it("an amount reads in its currency, which is not said again", () => {
+    expect(mainValues(JSON.stringify({ amount: 1250, currency: "eur", product: "Pro plan" }), "stripe__create_payment_link"))
+      .toEqual([{ label: "amount", text: "€12.50", number: true }, { label: "product", text: "Pro plan", number: false }])
+  })
+
+  it("never shows a secret, in the sentence, under Details or in the raw request", () => {
+    const input = JSON.stringify({ title: "Deploy", password: "hunter2", pin: "1234", apiKey: "sk_live_1", nested: { token: "t-1" } })
+    expect(mainValues(input).map((v) => v.text)).toEqual(["Deploy"])
+    const rows = actionArguments(input, t)
+    expect(rows.filter((r) => r.secret).map((r) => r.key)).toEqual(["password", "pin", "apiKey"])
+    expect(rows.every((r) => !r.secret || r.value === "")).toBe(true)
+    expect(rows.find((r) => r.key === "nested")?.rows[0]).toMatchObject({ key: "nested.token", secret: true, value: "" })
+    const raw = actionRaw(input, t) ?? ""
+    expect(raw).not.toMatch(/hunter2|1234|sk_live_1|t-1/)
+    expect(raw).toContain("\"password\": \"Hidden\"")
   })
 
   it("keeps three short values at most, the title first, and reads only an object", () => {
@@ -217,8 +274,8 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
     expect(mainValues(JSON.stringify({ priority: 1, name: "Q3 plan", channel: "ops", text: long, note: "late" })))
       .toEqual([
         { label: null, text: "Q3 plan", number: false },
-        { label: "priority", text: "1", number: true },
         { label: "channel", text: "ops", number: false },
+        { label: "priority", text: "1", number: true },
       ])
     expect(mainValues(JSON.stringify({ body: long }))).toEqual([{ label: "body", text: `${"x".repeat(59)}…`, number: false }])
     // Une phrase longue s'arrête sur un mot entier, sans la ponctuation qui le suivait.
@@ -245,14 +302,23 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
     expect(proposal("delegate_issue", t)).toEqual({ lead: proposalLine("delegate_issue", t), values: [], tail: "" })
   })
 
-  it("lists every argument for Details, each with its name in words", () => {
-    expect(actionArguments(JSON.stringify({ title: "Fix", teamId: "e3b0", labels: ["vat"], empty: "", none: null })))
-      .toEqual([
-        { label: "Title", value: "Fix" },
-        { label: "Team id", value: "e3b0" },
-        { label: "Labels", value: "[\"vat\"]" },
-      ])
-    expect(actionArguments(undefined)).toEqual([])
+  it("lists every argument for Details: its name in words, a list in words, an object in rows, real line breaks", () => {
+    const rows = actionArguments(JSON.stringify({ title: "Fix", teamId: "e3b0", team_id: "f4c1", labels: ["Bug", "Checkout"],
+      body: "Line one\nLine two", draft: true, empty: "", none: null, assignee: { name: "Paul", role: "lead" } }), t)
+    expect(rows.map((r) => [r.key, r.label, r.value])).toEqual([
+      ["title", "Title", "Fix"],
+      ["teamId", "Team id", "e3b0"],
+      ["team_id", "Team id", "f4c1"],
+      ["labels", "Labels", "Bug, Checkout"],
+      ["body", "Body", "Line one\nLine two"],
+      ["draft", "Draft", "Yes"],
+      ["assignee", "Assignee", ""],
+    ])
+    expect(rows.at(-1)?.rows.map((r) => [r.key, r.label, r.value])).toEqual([["assignee.name", "Name", "Paul"], ["assignee.role", "Role", "lead"]])
+    // Une liste d'objets : une ligne numérotée par élément.
+    expect(actionArguments(JSON.stringify({ items: [{ sku: "A1" }] }), t)[0]?.rows[0]).toMatchObject({ label: "1", rows: [{ label: "Sku", value: "A1" }] })
+    expect(actionArguments(undefined, t)).toEqual([])
+    expect(actionRaw("{not json", t)).toBeNull()
   })
 
   it("save_document without readable arguments says the general sentence", () => {

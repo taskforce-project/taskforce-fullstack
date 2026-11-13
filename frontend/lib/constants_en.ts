@@ -1238,10 +1238,18 @@ export const CONSTANTS_EN = {
     // The card of an action in a connected tool (R160): the action in words and its main values, the arguments one
     // click away under "Details"
     proposesExternalAction: "Cortex proposes to {action} in {service}{values}. Nothing is sent until you approve it.",
-    proposesUse: "use \"{action}\"",
+    // An action whose name doesn't say the gesture: never the tool's name
+    proposesExternalValues: "Cortex proposes an action in {service}{values}. Nothing is sent until you approve it.",
     details: "Details",
     hideDetails: "Hide the details",
     detailsLabel: "What Cortex will send",
+    // A value whose name says a secret (a password, a key, a token) never shows
+    hiddenValue: "Hidden",
+    valueYes: "Yes",
+    valueNo: "No",
+    // The raw request, two clicks away (R133)
+    rawRequest: "Show the raw request",
+    hideRawRequest: "Hide the raw request",
     // Saving a document (R156): what and where, before the person approves.
     proposesSave: "Cortex proposes to save \"{title}\" {where}. Nothing is saved until you approve it.",
     saveWhere: {
