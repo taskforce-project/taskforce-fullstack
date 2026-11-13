@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +28,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -267,10 +269,36 @@ public class CortexGate {
      * que la réponse a déjà lu), puis la règle la plus stricte qui les couvre, couches de l'entreprise et socle compris.
      */
     public Verdict judge(RulesBundle bundle, AgentTool tool, String argsJson, Exposure exposure) {
+        return judge(bundle, tool, argsJson, exposure, null);
+    }
+
+    /**
+     * Comme {@link #judge(RulesBundle, AgentTool, String, Exposure)}, avec ce que l'outil dit lui-même de cet appel dans
+     * ce contexte ({@link AgentTool#facts}) : le connecteur où {@code save_document} rangerait, par exemple.
+     */
+    public Verdict judge(RulesBundle bundle, AgentTool tool, String argsJson, Exposure exposure, AgentContext ctx) {
         Map<String, String> facts = facts(tool);
+        if (ctx != null) {
+            facts.putAll(toolFacts(tool, argsJson, ctx));
+        }
         facts.putAll(floorFacts(tool, argsJson, exposure));
         return judge(bundle, facts);
     }
+
+    /** Ce qu'un appel a pour lui-même dans les mots du contrat : seulement les faits que le moteur connaît. */
+    private Map<String, String> toolFacts(AgentTool tool, String argsJson, AgentContext ctx) {
+        JsonNode args = args(argsJson);
+        Map<String, Object> parsed = args == null ? Map.of()
+            : objectMapper.convertValue(args, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        Map<String, String> out = new LinkedHashMap<>();
+        tool.facts(parsed, ctx).forEach((k, v) -> {
+            if (TOOL_FACTS.contains(k) && v != null) out.put(k, v);
+        });
+        return out;
+    }
+
+    /** Ce qu'un outil peut dire de lui-même : jamais l'acteur, ni les faits que le socle produit. */
+    private static final Set<String> TOOL_FACTS = Set.of("server");
 
     /**
      * Juge un geste par ses faits, quand il n'est pas un outil de Cortex : un outil lancé par la personne depuis la
@@ -287,6 +315,110 @@ public class CortexGate {
     /** La raison d'une règle telle que la personne la lit : sa phrase quand une personne l'a écrite. */
     private static String reasonOf(RulesBundle.Rule rule) {
         return rule.text() != null && !rule.text().isBlank() ? rule.text() : rule.reason();
+    }
+
+    /** Ce qu'un accord doit réunir, et le projet où cela se lit : le responsable de ce projet y accorde. */
+    public record Check(RulesEngine.Obligations require, Long project) {
+    }
+
+    /**
+     * Ce que les règles du travail ont décidé d'un appel : la décision, le paquet et le projet qui l'ont prise, et, pour
+     * chaque projet dont les règles demandent, ce qu'un accord doit y réunir.
+     */
+    public record Judged(Verdict verdict, RulesBundle bundle, Long project, List<Check> checks) {
+
+        public Judged(Verdict verdict, RulesBundle bundle, Long project) {
+            this(verdict, bundle, project, List.of(new Check(verdict.require(), project)));
+        }
+
+        /**
+         * La personne qui a préparé l'action suffit-elle seule à l'accorder ? Dans chaque projet dont les règles demandent,
+         * avec les obligations de ce projet et ceux qui y accordent.
+         */
+        public boolean aloneSuffices(RuleApprovers approvers, Long workspaceId, Long preparer) {
+            return checks.stream().allMatch(c -> approvers.aloneSuffices(c.require(), workspaceId, c.project(), preparer));
+        }
+    }
+
+    /** Le projet du travail en cours : celui de la conversation, sinon celui de l'écran ; jamais un argument d'outil. */
+    public static Long workProject(AgentContext ctx) {
+        return ctx.project() != null ? ctx.project() : ctx.screen().projectId();
+    }
+
+    /**
+     * Juge un appel avec les règles du travail en cours, celles de {@code project} : jamais celles d'un projet que nomment
+     * les arguments d'un outil. Un outil de TaskForce qui nomme un autre projet agit sur lui : il est jugé aussi avec les
+     * règles de ce projet, et la décision la plus stricte l'emporte. Les arguments d'un outil de l'entreprise parlent de
+     * cet outil, pas de TaskForce. {@code bundles} rend le paquet d'un projet.
+     */
+    public Judged judgeWork(AgentContext ctx, Long project, AgentTool tool, String argsJson, Exposure exposure,
+                            Function<Long, RulesBundle> bundles) {
+        RulesBundle bundle = bundles.apply(project);
+        Verdict verdict = judge(bundle, tool, argsJson, exposure, ctx);
+        Optional<Long> named = tool instanceof ExternalMcpTool ? Optional.empty()
+            : projectOf(ctx, argsJson).filter(p -> !p.equals(project));
+        if (named.isEmpty()) {
+            return new Judged(verdict, bundle, project);
+        }
+        RulesBundle there = bundles.apply(named.get());
+        Verdict other = judge(there, tool, argsJson, exposure, ctx);
+        Verdict kept = stricter(verdict, other);
+        // Chaque projet dont les règles demandent garde ses obligations : ceux qui accordent se lisent chez lui.
+        List<Check> checks = new ArrayList<>();
+        if (RulesEngine.ASK.equals(verdict.effect())) {
+            checks.add(new Check(verdict.require(), project));
+        }
+        if (RulesEngine.ASK.equals(other.effect())) {
+            checks.add(new Check(other.require(), named.get()));
+        }
+        return kept == other ? new Judged(other, there, named.get(), List.copyOf(checks))
+            : new Judged(kept, bundle, project, List.copyOf(checks));
+    }
+
+    /**
+     * La plus stricte de deux décisions : refuser, puis demander, puis autoriser. Deux demandes réunissent leurs
+     * obligations ; la règle dite est celle qui en porte, sinon la première.
+     */
+    public static Verdict stricter(Verdict first, Verdict second) {
+        int a = rank(first.effect());
+        int b = rank(second.effect());
+        if (b > a) {
+            return second;
+        }
+        if (a > b || !RulesEngine.ASK.equals(first.effect())) {
+            return first;
+        }
+        RulesEngine.Obligations merged = merge(first.require(), second.require());
+        Verdict said = first.require() == null && second.require() != null ? second : first;
+        if (Objects.equals(merged, said.require())) {
+            return said;
+        }
+        return new Verdict(said.effect(), said.ruleId(), said.reason(), said.facts(), merged);
+    }
+
+    private static int rank(String effect) {
+        return switch (effect) {
+            case RulesEngine.DENY -> 3;
+            case RulesEngine.ASK -> 2;
+            default -> 1;
+        };
+    }
+
+    private static RulesEngine.Obligations merge(RulesEngine.Obligations a, RulesEngine.Obligations b) {
+        if (a == null) {
+            return b;
+        }
+        if (b == null) {
+            return a;
+        }
+        List<List<String>> approvers = new ArrayList<>(a.approvers());
+        for (List<String> set : b.approvers()) {
+            if (!approvers.contains(set)) {
+                approvers.add(set);
+            }
+        }
+        return new RulesEngine.Obligations(List.copyOf(approvers), Math.max(a.signatures(), b.signatures()),
+            a.separate() || b.separate());
     }
 
     /**
@@ -325,7 +457,8 @@ public class CortexGate {
 
     /**
      * Les faits du socle et des seuils (R157, R158) : l'acteur, le secret dans les arguments, ce que la réponse a déjà
-     * lu ; pour un outil de l'entreprise, ses arguments simples ({@code arg.<nom>}), qu'un seuil peut lire.
+     * lu ; pour un outil de l'entreprise, ses arguments simples ({@code arg.<nom>}) et les nombres de ses objets
+     * imbriqués, qu'un seuil peut lire.
      */
     Map<String, String> floorFacts(AgentTool tool, String argsJson, Exposure exposure) {
         Map<String, String> facts = new LinkedHashMap<>();
@@ -341,14 +474,57 @@ public class CortexGate {
         }
         JsonNode args = tool instanceof ExternalMcpTool ? args(argsJson) : null;
         if (args != null) {
-            args.fields().forEachRemaining(f -> {
-                String value = argument(f.getValue());
-                if (value != null && f.getKey().matches("[A-Za-z0-9_]{1,40}")) {
-                    facts.put("arg." + f.getKey(), value);
-                }
-            });
+            arguments(args, facts, 0);
         }
         return facts;
+    }
+
+    /** La profondeur des objets imbriqués dont un nombre se lit encore ({@code {"payment": {"amount": 5000}}}). */
+    private static final int MAX_DEPTH = 4;
+
+    /**
+     * Les arguments simples d'un outil de l'entreprise, sous leur nom ({@code arg.<nom>}) : ceux du premier niveau, et les
+     * nombres des objets imbriqués. Deux valeurs sous le même nom : la plus forte pour un seuil (une valeur qui n'est pas
+     * un nombre, sinon le plus grand nombre).
+     */
+    private static void arguments(JsonNode node, Map<String, String> facts, int depth) {
+        node.fields().forEachRemaining(f -> {
+            JsonNode value = f.getValue();
+            if (!f.getKey().matches("[A-Za-z0-9_]{1,40}")) {
+                return;
+            }
+            if (value.isObject()) {
+                if (depth < MAX_DEPTH) {
+                    arguments(value, facts, depth + 1);
+                }
+                return;
+            }
+            String read = depth == 0 ? argument(value) : value.isNumber() ? argument(value) : null;
+            if (read != null) {
+                facts.merge("arg." + f.getKey(), read, CortexGate::strongerForAThreshold);
+            }
+        });
+    }
+
+    /** De deux valeurs d'un même argument, celle qui compte le plus pour un seuil. */
+    private static String strongerForAThreshold(String a, String b) {
+        BigDecimal x = number(a);
+        BigDecimal y = number(b);
+        if (x == null) {
+            return a;
+        }
+        if (y == null) {
+            return b;
+        }
+        return x.compareTo(y) >= 0 ? a : b;
+    }
+
+    private static BigDecimal number(String value) {
+        try {
+            return new BigDecimal(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** Un argument simple, en texte : un nombre en chiffres (sans exposant), un mot ; rien pour un objet ou une liste. */

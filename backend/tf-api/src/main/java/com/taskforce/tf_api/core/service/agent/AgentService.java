@@ -164,15 +164,18 @@ public class AgentService {
             throw new BusinessException("Only workspace owners and admins can approve a change through a connection "
                 + "shared with the workspace.");
         }
-        // Les règles du projet qui avait jugé la proposition (R157), relues : elles ont pu changer depuis.
-        Long project = gate.projectOf(ctx, argsJson).orElseGet(() -> proposedProject(record, toolName));
+        // Les règles du travail qui avait jugé la proposition (R157), relues : elles ont pu changer depuis. Le projet est
+        // celui que le dossier a gardé, jamais celui que nomment les arguments ; un outil de TaskForce qui en nomme un
+        // autre est jugé aussi avec ses règles, et la décision la plus stricte l'emporte.
+        Long project = proposedProject(record, toolName);
         if (!records.approve(record, toolName, userId, argsJson)) {
             throw new BusinessException("This action is no longer waiting for your approval.");
         }
-        RulesBundle bundle = gate.rulesFor(ctx, project);
-        CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none());
+        CortexGate.Judged judged = gate.judgeWork(ctx, project, tool, argsJson, CortexGate.Exposure.none(),
+            p -> gate.rulesFor(ctx, p));
+        CortexGate.Verdict verdict = judged.verdict();
         traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
-            decidedData(verdict, bundle, project));
+            decidedData(verdict, judged.bundle(), project, judged.project()));
         String status = "success";
         String output;
         CortexGesture.Done done = null;
@@ -180,7 +183,7 @@ public class AgentService {
             if (verdict.denied()) {
                 status = "refused";
                 output = "Not run: the rules of this workspace refuse it. " + verdict.reason();
-            } else if (!verdict.allowed() && !approvers.aloneSuffices(verdict.require(), ws.getId(), project, userId)) {
+            } else if (!verdict.allowed() && !judged.aloneSuffices(approvers, ws.getId(), userId)) {
                 // Une règle de l'entreprise demande l'accord d'autres personnes (R98) : la carte n'y suffit pas.
                 status = "refused";
                 output = waitsForOthers(verdict, ws.getId());
@@ -1009,7 +1012,7 @@ public class AgentService {
         // Le plan de la question, comme dans une réponse (R117) : la banque dit s'il est suivi.
         List<Map<String, Object>> messages = withHistory(systemPrompt(CortexPlans.forRequest(replayCase.question()).orElse(null),
             "", notes, List.of(), replayCase.askedOn()), List.of(), replayCase.question());
-        ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx));
+        ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
         llm.beginUsageCapture();
         try {
             String answer = toolLoop(messages, tools.toolDefinitions(List.of()), List.of(), new ArrayList<>(),
@@ -1214,8 +1217,12 @@ public class AgentService {
             + "nothing was proposed. Do not try again; tell the user who has to approve it.";
     }
 
-    /** La décision au dossier : l'effet, les faits, et les règles qui l'ont prise (version, empreinte, projet). */
-    private static Map<String, Object> decidedData(CortexGate.Verdict verdict, RulesBundle bundle, Long project) {
+    /**
+     * La décision au dossier : l'effet, les faits, et les règles qui l'ont prise (version, empreinte) ; le projet du
+     * travail, et celui que l'outil nommait quand ses règles ont décidé.
+     */
+    private static Map<String, Object> decidedData(CortexGate.Verdict verdict, RulesBundle bundle, Long project,
+                                                   Long decidedBy) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("effect", verdict.effect());
         data.put("facts", verdict.facts());
@@ -1224,6 +1231,7 @@ public class AgentService {
         rules.put("version", bundle.version());
         if (bundle.digest() != null) rules.put("digest", bundle.digest());
         if (project != null) rules.put("project", project);
+        if (decidedBy != null && !decidedBy.equals(project)) rules.put("namedProject", decidedBy);
         data.put("rules", rules);
         return data;
     }
@@ -1336,16 +1344,18 @@ public class AgentService {
     private final class ReplayStep implements ToolStep {
         private final ReplayCase replayCase;
         private final RulesBundle bundle;
+        private final AgentContext ctx;
         private final List<ReplayOutcome.ReplayCall> calls = new ArrayList<>();
 
-        ReplayStep(ReplayCase replayCase, RulesBundle bundle) {
+        ReplayStep(ReplayCase replayCase, RulesBundle bundle, AgentContext ctx) {
             this.replayCase = replayCase;
             this.bundle = bundle;
+            this.ctx = ctx;
         }
 
         @Override
         public ToolOutcome apply(AgentTool tool, String name, String argsJson) {
-            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none());
+            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, CortexGate.Exposure.none(), ctx);
             ToolOutcome outcome;
             if (verdict.denied()) {
                 outcome = new ToolOutcome("refused", refusedText(verdict));
@@ -1384,7 +1394,8 @@ public class AgentService {
         /** Ce que la réponse a déjà lu (R158) : le socle en tient compte avant toute écriture ou sortie. */
         private final CortexGate.Exposure exposure;
         private Map<String, String> judgedFacts;
-        private Long judgedProject;
+        /** La dernière décision des règles du travail, avec ce qu'un accord doit réunir dans chaque projet. */
+        private CortexGate.Judged lastJudged;
         private UUID record;
 
         Kernel(AgentContext ctx, String question, Map<String, Object> origin) {
@@ -1433,7 +1444,7 @@ public class AgentService {
                     // rien ne se propose, et Cortex dit qui accorde. Une écriture externe ne se propose qu'à qui peut la
                     // valider : la personne pour sa connexion ; un propriétaire ou un administrateur pour une connexion
                     // partagée (séance n°22, R154 ; OSS-1.5) ; les autres l'apprennent d'emblée.
-                    if (!approvers.aloneSuffices(verdict.require(), ctx.workspaceId(), judgedProject, ctx.userId())) {
+                    if (!lastJudged.aloneSuffices(approvers, ctx.workspaceId(), ctx.userId())) {
                         result = waitsForOthers(verdict, ctx.workspaceId());
                         status = "refused";
                     } else if (tool instanceof ExternalMcpTool external && external.shared()
@@ -1553,16 +1564,18 @@ public class AgentService {
          * garde leur version, leur empreinte et ce projet, que l'accord de la personne relira.
          */
         CortexGate.Verdict judge(AgentTool tool, String argsJson) {
-            Long project = gate.projectOf(ctx, argsJson).orElse(ctx.project() != null ? ctx.project() : ctx.screen().projectId());
-            RulesBundle bundle = bundles.computeIfAbsent(project, p -> gate.rulesFor(ctx, p));
+            // Les règles du travail en cours : la conversation, sinon l'écran ; jamais un projet que nomment les arguments.
+            Long project = CortexGate.workProject(ctx);
             if (record == null) record = records.open(ctx, question, withModel(origin));
             traceBefore(record, "action.requested", CortexRecordService.Actor.CORTEX,
                 Map.of("tool", tool.name(), "arguments", CortexRecordService.shorten(argsJson)));
-            CortexGate.Verdict verdict = gate.judge(bundle, tool, argsJson, exposure);
+            CortexGate.Judged judged = gate.judgeWork(ctx, project, tool, argsJson, exposure,
+                p -> bundles.computeIfAbsent(p, q -> gate.rulesFor(ctx, q)));
+            CortexGate.Verdict verdict = judged.verdict();
             traceBefore(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
-                decidedData(verdict, bundle, project));
+                decidedData(verdict, judged.bundle(), project, judged.project()));
             judgedFacts = verdict.facts();
-            judgedProject = project;
+            lastJudged = judged;
             return verdict;
         }
 

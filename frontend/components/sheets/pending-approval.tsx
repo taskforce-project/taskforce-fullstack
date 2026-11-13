@@ -31,7 +31,8 @@ function Said({ label, children }: Readonly<{ label: string; children: React.Rea
 /**
  * « Accorder » (R78, séance n°13) : la demande dite en mots, ce que l'agent veut faire, pourquoi on la pose (la raison
  * de la règle), sa tâche, ce qui se passe si l'on refuse ; la commande reste repliée (R49, R133). Un accord de l'agent vaut
- * pour le reste de la mission (R46) ; une demande de TaskForce lui-même (une sortie, un départ) vaut une fois. Sans
+ * pour le reste de la mission (R46) ; une demande de TaskForce lui-même (une sortie, un départ), ou une décision qui lie
+ * (une règle de l'entreprise, des obligations, le socle), vaut une fois. Sans
  * réponse, c'est non, et le déroulé le dit ensuite. `compact` : dans la conversation et sur l'issue, une ligne et ses deux
  * boutons (ce qui attend se montre là où l'on regarde) ; le pourquoi se lit dans la vue du travail.
  */
@@ -51,7 +52,8 @@ export function PendingApproval({ slug, runId, approval, goal, run, compact = fa
   const decide = useDeliveryStore((s) => s.decideApproval)
   const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
   const words = approvalWords(approval, t, requestWant(approval, run, sequence))
-  const forMission = approval.askedBy !== "runner"
+  // Une décision qui lie (une règle de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois.
+  const forMission = approval.askedBy !== "runner" && !approval.binding
   const deadline = deadlineText(minutesLeft(approval.expiresAt), t)
   // Une règle de l'entreprise désigne qui accorde (R98) : la carte dit qui, et combien de personnes.
   const obligations = obligationWords(approval, rulesText)
@@ -112,6 +114,7 @@ export function PendingApproval({ slug, runId, approval, goal, run, compact = fa
             {obligations.length > 0 && <span className="text-[11px] text-muted-foreground">{obligations.join(" ")}</span>}
             <span className="text-[11px] text-muted-foreground">{deadline}</span>
             {forMission && <span className="text-[11px] text-muted-foreground">{t.forMissionHint}</span>}
+            {approval.binding && <span className="text-[11px] text-muted-foreground">{t.onceHint}</span>}
           </>
         ) : (
           <span className="text-[11px] text-muted-foreground">{waiting} {deadline}</span>

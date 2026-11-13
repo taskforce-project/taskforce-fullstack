@@ -119,11 +119,26 @@ export function preToolUseAnswer(allow: boolean): Record<string, unknown> {
 }
 
 /**
- * Une demande que les préférences du poste ne lèvent pas (`allowedInAdvance`) : celle d'une règle de l'entreprise (R157),
- * qui peut désigner qui accorde, ou du socle. Elle va toujours à TaskForce, où les bonnes personnes répondent.
+ * Une décision qui lie : celle d'une règle de l'entreprise (R157), d'une règle qui porte des obligations (qui accorde,
+ * combien de signatures, un seuil), ou du socle. Les préférences du poste ne la lèvent pas (`allowedInAdvance`) : elle va
+ * toujours à TaskForce, où les bonnes personnes répondent ; et un accord n'y vaut qu'une fois, jamais pour la mission.
  */
 export function binding(decision: Decision): boolean {
-  return Boolean(decision.require) || Boolean(decision.rule?.layer) || Boolean(decision.rule?.id.startsWith("floor-"));
+  return Boolean(decision.require) || Boolean(decision.rule?.layer) || Boolean(decision.rule?.id.startsWith("floor-"))
+    || Boolean(decision.rule?.when?.over);
+}
+
+/**
+ * Un appel lie-t-il ? Sa décision, ou celle de l'un de ses morceaux qui demandent (une commande composée) : un seul qui
+ * lie suffit, et l'accord ne vaut alors que pour cet appel.
+ */
+export function bindingCall(rules: RulesBundle | undefined, factsList: Facts[], judged?: Decision): boolean {
+  if (judged && binding(judged)) return true;
+  if (!rules) return false;
+  return factsList.some((facts) => {
+    const decision = decide(rules, facts);
+    return decision.effect === "ask" && binding(decision);
+  });
 }
 
 /** Le programme d'une commande simple, sans son chemin. */
@@ -283,7 +298,9 @@ export class ApprovalServer {
       if (decision.effect !== "ask") {
         if (decision.effect === "allow") this.took(tool, input.tool_input);
         this.reply(res, 200, preToolUseDecision({ effect: decision.effect, rule: decision.rule }));
-      } else if (this.inAdvance(tool) && !binding(decision)) {
+      } else if (this.inAdvance(tool)
+        && !bindingCall(this.options.rules, this.factsOf(tool, input.tool_input), decision)) {
+        // Autorisé d'avance sur le poste, et aucun morceau de l'appel ne relève d'une décision qui lie.
         this.passed(decision);
         this.took(tool, input.tool_input);
         this.reply(res, 200, {}); // aux permissions de Claude Code : autorisé d'avance, ou le hook PermissionRequest
@@ -326,8 +343,9 @@ export class ApprovalServer {
    */
   private async askPerson(tool: string, toolInput: unknown, decision?: Decision): Promise<boolean> {
     const summary = describeToolInput(tool, toolInput, this.workDir) || "(no details)";
-    const { scopes, ...ruling } = this.ruling(tool, toolInput, decision);
-    if (scopes.every((s) => this.allowedForMission.has(s))) {
+    const { scopes, binds, ...ruling } = this.ruling(tool, toolInput, decision);
+    // Un accord pour la mission ne couvre jamais une décision qui lie : elle se demande à chaque fois.
+    if (!binds && scopes.every((s) => this.allowedForMission.has(s))) {
       const scope = scopes.join(", ");
       log.info(`Allowed for this mission earlier: ${tool} (${scope})`);
       this.options.onMissionAllowed?.(tool, scope, toolInput);
@@ -337,7 +355,7 @@ export class ApprovalServer {
     const approval = await requestDecision(this.api, this.runId, toolLabel(tool), summary, this.options.waitMs, this.pollMs,
       "agent", ruling);
     const allow = approval?.status === "ALLOWED";
-    if (allow && approval?.scope === "MISSION") for (const s of scopes) this.allowedForMission.add(s);
+    if (allow && approval?.scope === "MISSION" && !binds) for (const s of scopes) this.allowedForMission.add(s);
     return allow;
   }
 
@@ -382,11 +400,12 @@ export class ApprovalServer {
    * règle qui demande et sa raison, et les portées d'un accord pour la mission ({@link missionScopes}). Au-delà du
    * plafond, c'est lui qui demande, et un accord pour la mission le lève ({@link CHANGES_CAP}).
    */
-  ruling(tool: string, toolInput: unknown, judged?: Decision): Ruling & { scopes: string[] } {
+  ruling(tool: string, toolInput: unknown, judged?: Decision): Ruling & { scopes: string[]; binds: boolean } {
     const facts = this.factsOf(tool, toolInput);
     const action = facts.find((f) => f.action)?.action;
     if (judged?.rule?.id === CHANGES_CAP) {
-      return { ...(action ? { action } : {}), rule: CHANGES_CAP, reason: judged.rule.reason, scopes: [CHANGES_CAP] };
+      return { ...(action ? { action } : {}), rule: CHANGES_CAP, reason: judged.rule.reason, scopes: [CHANGES_CAP],
+        binds: false };
     }
     const rules = this.options.rules;
     const decision: Decision = rules ? decideAll(rules, facts) : { effect: "ask", rule: null };
@@ -396,6 +415,8 @@ export class ApprovalServer {
       // Les faits jugés, pour que TaskForce rejuge l'action avec les mêmes règles et sache qui peut accorder (R98).
       ...(facts.length > 0 ? { facts } : {}),
       scopes: missionScopes(rules, facts, tool),
+      // Une décision qui lie : l'accord ne vaut que pour cet appel.
+      binds: bindingCall(rules, facts, judged ?? decision),
     };
   }
 

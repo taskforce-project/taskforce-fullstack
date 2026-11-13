@@ -38,6 +38,9 @@ public class HarnessRulesService {
 
     static final String DEFAULT_RESOURCE = "harness/default.rules.json";
     static final String OWNER_PLACEHOLDER = "workspace-owner";
+    /** Les rôles de l'espace qu'une couche de rôle vise : celle d'ADMIN vaut aussi pour OWNER. */
+    static final String OWNER_ROLE = "OWNER";
+    static final String ADMIN_ROLE = "ADMIN";
 
     /** L'ordre des couches dans le paquet : à effet égal, la plus précise l'emporte et sa raison se lit. */
     static final List<RuleScope> ORDER = List.of(RuleScope.PERSON, RuleScope.ROLE, RuleScope.PROCESS, RuleScope.PROJECT,
@@ -175,7 +178,10 @@ public class HarnessRulesService {
         return RulesDigest.of(JSON.valueToTree(rules));
     }
 
-    /** Les couches qui s'appliquent à ce travail, de la plus précise à la plus large. */
+    /**
+     * Les couches qui s'appliquent à ce travail, de la plus précise à la plus large. La couche du rôle ADMIN vaut aussi
+     * pour un propriétaire, comme {@code role:admin} parmi ceux qui accordent ; celle de son propre rôle passe d'abord.
+     */
     static List<LayerVersion> applicable(Work work, String role, Map<LayerKey, LayerVersion> layers) {
         List<LayerVersion> out = new ArrayList<>();
         for (LayerVersion layer : layers.values()) {
@@ -184,14 +190,15 @@ public class HarnessRulesService {
                 case WORKSPACE -> true;
                 case PROJECT -> work.projectId() != null && String.valueOf(work.projectId()).equals(ref);
                 case PROCESS -> work.process() != null && work.process().equals(ref);
-                case ROLE -> role != null && role.equals(ref);
+                case ROLE -> role != null && (role.equals(ref) || (OWNER_ROLE.equals(role) && ADMIN_ROLE.equals(ref)));
                 case PERSON -> work.personId() != null && String.valueOf(work.personId()).equals(ref);
             };
             if (applies && !layer.rules().isEmpty()) {
                 out.add(layer);
             }
         }
-        out.sort(Comparator.comparingInt(l -> ORDER.indexOf(l.key().scope())));
+        out.sort(Comparator.comparingInt((LayerVersion l) -> ORDER.indexOf(l.key().scope()))
+            .thenComparingInt(l -> l.key().scope() == RuleScope.ROLE && !Objects.equals(l.key().ref(), role) ? 1 : 0));
         return out;
     }
 

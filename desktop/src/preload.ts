@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld("taskforceDesktop", {
     },
   },
   openLogs: (): Promise<void> => ipcRenderer.invoke("desktop:open-logs"),
+  // Le dossier où TaskForce range ce qu'il écrit (R156) ; null quand la personne ferme la boîte sans choisir.
+  storage: {
+    chooseFolder: (): Promise<string | null> => ipcRenderer.invoke("desktop:choose-folder"),
+  },
   openBackups: (): Promise<void> => ipcRenderer.invoke("desktop:open-backups"),
   // Événement reçu pendant que la fenêtre n'est pas au premier plan : notification du système, qui ramène sur sa page.
   notify: (input: { title: string; body?: string; path?: string }): void => ipcRenderer.send("desktop:notify", input),

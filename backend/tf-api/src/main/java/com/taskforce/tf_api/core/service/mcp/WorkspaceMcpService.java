@@ -32,6 +32,8 @@ import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.service.AuditService;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
@@ -91,6 +93,20 @@ public class WorkspaceMcpService {
     private static final Set<String> RESERVED_HEADERS = Set.of("accept", "connection", "content-length",
         "content-type", "expect", "host", "keep-alive", "mcp-protocol-version", "mcp-session-id", "te", "trailer",
         "transfer-encoding", "upgrade");
+
+    /**
+     * Le jeton envoyé dans un en-tête choisi : un nom valable que le transport ne pose pas lui-même, et une valeur.
+     * Sinon un échec à code stable ({@link ConnectFailure#HEADER_NOT_ALLOWED}), que l'écran dit en mots (R160).
+     */
+    static void checkTokenHeader(String header, String token) {
+        if (header.isEmpty()) return;
+        if (!HEADER_NAME.matcher(header).matches() || RESERVED_HEADERS.contains(header.toLowerCase(Locale.ROOT))) {
+            throw ConnectFailure.of(ConnectFailure.HEADER_NOT_ALLOWED, "This header can't carry the token: " + header);
+        }
+        if (token.isEmpty()) {
+            throw ConnectFailure.of(ConnectFailure.HEADER_NOT_ALLOWED, "Enter the value of the " + header + " header");
+        }
+    }
     /** Séparateur de namespace des outils externes : {@code <connecteur>__<outil>}. */
     static final String NS = "__";
 
@@ -133,7 +149,7 @@ public class WorkspaceMcpService {
     /** Un serveur local accordé par la personne demande cet accord explicite avant d'être enregistré. */
     public static class LocalServerNeedsApproval extends BusinessException {
         public LocalServerNeedsApproval(String host) {
-            super("This server runs on your computer or your local network (" + host + "). Connect it only if you "
+            super(ConnectFailure.LOCAL_NEEDS_APPROVAL, "This server runs on your computer or your local network (" + host + "). Connect it only if you "
                 + "started it yourself.");
         }
     }
@@ -143,9 +159,24 @@ public class WorkspaceMcpService {
     private final ObjectMapper objectMapper;
     private final McpTokenService tokenService; // OAuth (TF-MCP-02) : access token géré + refresh auto
     private final ConnectorCatalog catalog;
+    /** Sa propre connexion : un membre ; une connexion partagée : un propriétaire ou un administrateur (règle 3). */
+    private final AuthorizationService authorization;
+    /** Une connexion partagée faite ou défaite entre au journal de l'espace (séance n°23, R160). */
+    private final AuditService audit;
 
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
+
+    /**
+     * Les outils des éditeurs que TaskForce sert par leur API (Google Drive, Microsoft 365), sans serveur MCP : la même
+     * connexion, les mêmes règles. Absents, ces connexions ne servent aucun outil.
+     */
+    private CompanyApiTools apiTools;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setApiTools(CompanyApiTools apiTools) {
+        this.apiTools = apiTools;
+    }
 
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
@@ -258,16 +289,20 @@ public class WorkspaceMcpService {
                                 String allow, boolean shared, boolean localApproved) {}
 
     /**
-     * Connecte (ou reconfigure) un serveur MCP : pour la personne (par défaut), ou partagé avec l'espace (contrôle du
-     * rôle fait en amont par le contrôleur). Persiste {@code mcpUrl}, le nom d'un serveur personnalisé et, au choix, un
-     * jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé, en JSON <b>chiffré</b>, puis fige la liste
-     * de ses outils et invalide le cache. Un serveur local (la machine, le réseau local) ne se connecte que sur une
-     * instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom retenus.
+     * Connecte (ou reconfigure) un serveur MCP : pour la personne (par défaut, un membre), ou partagé avec l'espace (un
+     * propriétaire ou un administrateur, vérifié ici). Persiste {@code mcpUrl}, le nom d'un serveur personnalisé et, au
+     * choix, un jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé, en JSON <b>chiffré</b>, puis fige
+     * la liste de ses outils et invalide le cache. Un serveur local (la machine, le réseau local) ne se connecte que sur
+     * une instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom
+     * retenus.
      */
     @Transactional
     public ServerIdentity connectServer(Workspace ws, User person, ServerRequest req) {
+        authorization.requireForConnection(ws.getId(), person == null ? null : person.getId(), req.shared());
         String mcpUrl = req.mcpUrl() == null ? "" : req.mcpUrl().trim();
         if (mcpUrl.isEmpty()) throw new BusinessException("Required field: mcpUrl");
+        // La clé d'un préréglage ne mène qu'à son serveur officiel : ses classes d'outils ne valent que là (R158).
+        catalog.assertAddress(req.connectorKey(), mcpUrl);
         boolean local = McpClient.isLocal(mcpUrl);
         // Refus immédiat d'une URL vers le réseau interne (OSS-1.2) ; le client revérifie avant chaque appel.
         client.assertAllowed(mcpUrl);
@@ -275,12 +310,7 @@ public class WorkspaceMcpService {
         ServerIdentity id = resolveServer(ws.getId(), req.connectorKey(), req.name());
         String token = req.token() == null ? "" : req.token().trim();
         String header = req.authHeader() == null ? "" : req.authHeader().trim();
-        if (!header.isEmpty()) {
-            if (!HEADER_NAME.matcher(header).matches() || RESERVED_HEADERS.contains(header.toLowerCase(Locale.ROOT))) {
-                throw new BusinessException("This header can't carry the token: " + header);
-            }
-            if (token.isEmpty()) throw new BusinessException("Enter the value of the " + header + " header");
-        }
+        checkTokenHeader(header, token);
 
         Map<String, String> config = new LinkedHashMap<>();
         config.put(CONFIG_URL, mcpUrl);
@@ -299,7 +329,36 @@ public class WorkspaceMcpService {
         repository.save(conn);
         pinQuietly(conn);
         invalidate(ws.getId());
+        if (req.shared()) {
+            recordShared(ws.getId(), person.getId(), id.connectorKey(), sharedDetails("connected", id, mcpUrl,
+                token.isEmpty() ? "address" : "key"));
+        }
         return id;
+    }
+
+    /**
+     * Ce qu'une connexion partagée faite garde au journal : l'outil, le nom d'un serveur ajouté à la main, l'hôte du
+     * serveur (jamais son adresse entière : celle d'un serveur Zoho vaut une clé), et comment elle s'est faite. Jamais un
+     * jeton.
+     */
+    static Map<String, Object> sharedDetails(String change, ServerIdentity id, String url, String via) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("change", change);
+        details.put("connectorKey", id.connectorKey());
+        if (id.name() != null) details.put("name", id.name());
+        String host = host(url);
+        if (host != null) details.put("host", host);
+        details.put("via", via);
+        return details;
+    }
+
+    /**
+     * Une connexion partagée faite ou défaite, au journal de l'espace, une fois le changement validé (best-effort, cf.
+     * {@link AuditService#recordAfterCommit}).
+     */
+    void recordShared(Long workspaceId, Long userId, String connectorKey, Map<String, Object> details) {
+        audit.recordAfterCommit(workspaceId, userId, AuditService.SHARED_CONNECTION_CHANGED, "connector_connection",
+            connectorKey, details);
     }
 
     /**
@@ -349,12 +408,13 @@ public class WorkspaceMcpService {
     }
 
     /**
-     * Déconnecte un serveur MCP : la connexion de la personne, ou celle de l'espace ({@code shared}, rôle vérifié en
-     * amont). Révoque d'abord le jeton chez l'éditeur quand il offre la révocation (RFC 7009), puis supprime la ligne
-     * et invalide le cache. Dit ce qui a été révoqué.
+     * Déconnecte un serveur MCP : la connexion de la personne, ou celle de l'espace ({@code shared}, par un propriétaire
+     * ou un administrateur, vérifié ici). Révoque d'abord le jeton chez l'éditeur quand il offre la révocation
+     * (RFC 7009), puis supprime la ligne et invalide le cache. Dit ce qui a été révoqué.
      */
     @Transactional
     public DisconnectResult disconnectServer(Long workspaceId, Long userId, String connectorKey, boolean shared) {
+        authorization.requireForConnection(workspaceId, userId, shared);
         ConnectorConnection conn = (shared
             ? repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(workspaceId, connectorKey)
             : repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(workspaceId, connectorKey, userId))
@@ -364,16 +424,25 @@ public class WorkspaceMcpService {
         boolean revoked = revocable && tokenService.revoke(conn);
         repository.delete(conn);
         invalidate(workspaceId);
+        if (shared) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("change", "disconnected");
+            details.put("connectorKey", connectorKey);
+            details.put("revoked", revoked);
+            details.put("revocable", revocable);
+            recordShared(workspaceId, userId, connectorKey, details);
+        }
         return new DisconnectResult(revoked, revocable);
     }
 
     /**
      * Redonne l'accord à la liste actuelle des outils d'une connexion (R158) : les outils qui avaient changé, ou qui
      * sont apparus, sont de nouveau servis. La personne pour sa connexion ; un propriétaire ou un administrateur pour
-     * celle de l'espace (vérifié en amont).
+     * celle de l'espace (vérifié ici), et ce nouvel accord entre au journal de l'espace.
      */
     @Transactional
     public void approveTools(Long workspaceId, Long userId, String connectorKey, boolean shared) {
+        authorization.requireForConnection(workspaceId, userId, shared);
         ConnectorConnection conn = (shared
             ? repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(workspaceId, connectorKey)
             : repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(workspaceId, connectorKey, userId))
@@ -381,12 +450,22 @@ public class WorkspaceMcpService {
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server");
         McpClient.Session session = client.initialize(ref);
+        int tools;
         try {
-            pin(conn, client.listTools(session));
+            List<McpClient.ToolDef> defs = client.listTools(session);
+            pin(conn, defs);
+            tools = defs == null ? 0 : defs.size();
         } finally {
             client.close(session);
         }
         invalidate(workspaceId);
+        if (shared) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("change", "tools-approved");
+            details.put("connectorKey", connectorKey);
+            details.put("tools", tools);
+            recordShared(workspaceId, userId, connectorKey, details);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -416,6 +495,11 @@ public class WorkspaceMcpService {
         List<AgentTool> tools = new ArrayList<>();
         for (ConnectorConnection conn : usable(workspaceId, userId)) {
             if (conn.getState() != ConnectionState.CONNECTED) continue;
+            String api = McpTokenService.apiKind(readConfig(conn.getConfig()));
+            if (api != null) {
+                if (apiTools != null) tools.addAll(apiTools.toolsFor(conn, api, userId));
+                continue;
+            }
             McpClient.ServerRef ref = toServerRef(conn);
             if (ref == null) continue;
             Set<String> allow = allowList(conn);
@@ -428,7 +512,7 @@ public class WorkspaceMcpService {
                     // Un outil changé ou apparu depuis la connexion attend un nouvel accord (R158).
                     if (held.contains(def.name())) continue;
                     tools.add(new ExternalMcpTool(client, refFor(conn, ref), def, objectMapper,
-                        catalog.classOf(conn.getConnectorKey(), def.name()), conn.getScope()));
+                        catalog.classOn(conn.getConnectorKey(), ref.serverUrl(), def.name()), conn.getScope()));
                 }
             } catch (Exception e) {
                 log.warn("Serveur MCP '{}' (ws={}) ignoré : {}", LogSafe.of(ref.connectorKey()), workspaceId, LogSafe.of(e.getMessage()));
@@ -497,6 +581,15 @@ public class WorkspaceMcpService {
                     conn.getAccountLabel(), false, List.of(), List.of(), null));
                 continue;
             }
+            // L'API d'un éditeur : ses outils sont ceux de TaskForce, connus d'avance, sans sonde.
+            String api = McpTokenService.apiKind(config);
+            if (api != null) {
+                List<String> names = apiTools == null ? List.of()
+                    : apiTools.infos(conn, api, userId).stream().map(McpToolInfo::name).toList();
+                out.add(new McpServerStatus(conn.getConnectorKey(), name, host(url), conn.getScope(), conn.getState(),
+                    conn.getAccountLabel(), true, names, List.of(), null));
+                continue;
+            }
             McpClient.ServerRef ref = toServerRef(conn);
             if (ref == null) continue;
             Set<String> allow = allowList(conn);
@@ -525,6 +618,8 @@ public class WorkspaceMcpService {
     public List<McpToolInfo> serverTools(Long workspaceId, Long userId, String connectorKey) {
         ConnectorConnection conn = connectionFor(workspaceId, userId, connectorKey)
             .orElseThrow(() -> new ResourceNotFoundException("MCP connector not connected: " + connectorKey));
+        String api = McpTokenService.apiKind(readConfig(conn.getConfig()));
+        if (api != null) return apiTools == null ? List.of() : apiTools.infos(conn, api, userId);
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server (mcpUrl missing)");
         Set<String> allow = allowList(conn);
@@ -534,7 +629,7 @@ public class WorkspaceMcpService {
         for (McpClient.ToolDef def : defs) {
             if (!allow.isEmpty() && !allow.contains(def.name())) continue;
             out.add(new McpToolInfo(def.name(), def.description(), def.inputSchema(),
-                catalog.classOf(connectorKey, def.name()).reads(), held.contains(def.name())));
+                catalog.classOn(connectorKey, ref.serverUrl(), def.name()).reads(), held.contains(def.name())));
         }
         return out;
     }
@@ -661,7 +756,8 @@ public class WorkspaceMcpService {
     private McpClient.ServerRef toServerRef(ConnectorConnection conn) {
         Map<String, String> config = readConfig(conn.getConfig());
         String url = config.getOrDefault(CONFIG_URL, "").trim();
-        if (url.isEmpty()) return null;
+        // L'API d'un éditeur n'est pas un serveur MCP : ni initialize, ni tools/list, ni liste figée à sonder.
+        if (url.isEmpty() || McpTokenService.apiKind(config) != null) return null;
         // OAuth (TF-MCP-02) : access token géré (refresh auto), en Bearer ; sinon jeton collé, en Bearer ou dans
         // l'en-tête choisi.
         String token;

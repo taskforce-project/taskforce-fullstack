@@ -99,7 +99,10 @@ public record RulesBundle(
         }
     }
 
-    /** Un seuil sur un fait chiffré (« au-delà de 5 000 ») : la condition tient quand le fait est un nombre plus grand. */
+    /**
+     * Un seuil sur un fait chiffré (« au-delà de 5 000 ») : la condition tient quand le fait est un nombre plus grand, ou
+     * quand il manque ou n'est pas un nombre (le seuil compte alors comme dépassé).
+     */
     public record Threshold(String fact, long value) {
     }
 }

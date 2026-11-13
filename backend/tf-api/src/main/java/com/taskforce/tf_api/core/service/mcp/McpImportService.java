@@ -2,9 +2,12 @@ package com.taskforce.tf_api.core.service.mcp;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -16,14 +19,17 @@ import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiMeter;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.util.LogSafe;
@@ -36,8 +42,9 @@ import lombok.extern.slf4j.Slf4j;
  * les <b>normalise</b> en une passe LLM (générique, quel que soit le serveur), crée un projet <b>natif</b>
  * TaskForce et y recrée les issues en masse. C'est le « importer son boulot ici » du wizard.
  *
- * <p>Autorisation (membre + gestionnaire) faite en amont par le contrôleur. Réutilise
- * {@link WorkspaceMcpService} pour le fetch (session + token OAuth gérés), donc aucun code par service.
+ * <p>Un projet créé vaut pour tout l'espace : le service vérifie lui-même que la personne en est propriétaire ou
+ * administratrice (règle 3). Réutilise {@link WorkspaceMcpService} pour le fetch (session + token OAuth gérés), donc
+ * aucun code par service.
  */
 @Service
 @RequiredArgsConstructor
@@ -56,6 +63,8 @@ public class McpImportService {
     private final AiMeter aiMeter; // quota et comptage des tokens de la normalisation
     private final CortexGate gate;
     private final CortexRecordService records;
+    private final RuleApprovers approvers;
+    private final AuthorizationService authorization;
 
     /** Résultat d'un import : le projet créé + le nombre d'issues importées / trouvées. */
     public record ImportResult(Long projectId, String projectIdentifier, String projectName,
@@ -71,21 +80,20 @@ public class McpImportService {
      * arrête l'import ; une action demandée est accordée par le clic « Import » de la personne, qui entre au dossier.
      */
     public ImportResult importProject(Workspace ws, Long userId, String connectorKey, String targetName) {
+        authorization.requireForConnection(ws.getId(), userId, true);
         if (connectorKey == null || connectorKey.isBlank()) throw new BusinessException("connectorKey is required");
         if (targetName == null || targetName.isBlank()) throw new BusinessException("The target project name is required");
 
         AgentContext ctx = new AgentContext(ws.getSlug(), ws.getId(), userId);
-        String issuesTool = findIssuesTool(ws.getId(), userId, connectorKey);
-        ExternalMcpTool read = workspaceMcp.toolFor(ws.getId(), userId, connectorKey + "__" + issuesTool)
-            .orElseThrow(() -> new BusinessException("\"" + connectorKey + "\" has no tool to list issues"));
+        ExternalMcpTool read = findIssuesTool(ws.getId(), userId, connectorKey);
         UUID record = records.open(ctx, "Import " + connectorKey + " into a new project: " + targetName,
             Map.of("via", "import"));
         RulesBundle bundle = gate.rulesFor(ctx);
         // Le geste de la personne, qui a cliqué « Import » : l'acteur est une personne (R157).
-        judgeOrRefuse(record, userId, bundle, read.name(), gate.personFacts(read, "{}"));
-        judgeOrRefuse(record, userId, bundle, "create_project",
+        judgeOrRefuse(record, ws.getId(), userId, bundle, read.name(), gate.personFacts(read, "{}"));
+        judgeOrRefuse(record, ws.getId(), userId, bundle, "create_project",
             Map.of("action", "project.create", "tool", "create_project", "actor", "person"));
-        judgeOrRefuse(record, userId, bundle, "create_issue",
+        judgeOrRefuse(record, ws.getId(), userId, bundle, "create_issue",
             Map.of("action", "issue.create", "tool", "create_issue", "actor", "person"));
 
         String raw = read.execute(Map.of(), ctx);
@@ -113,9 +121,11 @@ public class McpImportService {
 
     /**
      * La demande puis la décision des règles au dossier ; un refus arrête l'import (la raison de la règle remonte), une
-     * action demandée est accordée par le clic de la personne.
+     * action demandée est accordée par le clic de la personne, comme dans la console : seulement quand elle suffit seule
+     * aux personnes que la règle désigne (R98). Sinon l'import ne part pas, et la réponse dit qui doit accorder.
      */
-    private void judgeOrRefuse(UUID record, Long userId, RulesBundle bundle, String tool, Map<String, String> facts) {
+    private void judgeOrRefuse(UUID record, Long workspaceId, Long userId, RulesBundle bundle, String tool,
+                               Map<String, String> facts) {
         append(record, "action.requested", CortexRecordService.Actor.person(userId), Map.of("tool", tool));
         CortexGate.Verdict verdict = gate.judge(bundle, facts);
         append(record, "action.decided", CortexRecordService.Actor.rule(verdict.ruleId()),
@@ -125,9 +135,28 @@ public class McpImportService {
             throw new ForbiddenException("The rules of this workspace refuse this import. " + verdict.reason());
         }
         if (!verdict.allowed()) {
+            if (!approvers.aloneSuffices(verdict.require(), workspaceId, null, userId)) {
+                String reason = waitsForOthers(verdict, workspaceId);
+                result(record, tool, "refused", reason);
+                throw new ForbiddenException(reason);
+            }
             append(record, "human.decision", CortexRecordService.Actor.person(userId),
                 Map.of("tool", tool, "decision", "approved", "arguments", "{}"));
         }
+    }
+
+    /** Qui doit accorder, en mots, comme la console le dit : l'import ne part pas sans ces personnes. */
+    private String waitsForOthers(CortexGate.Verdict verdict, Long workspaceId) {
+        RulesEngine.Obligations require = verdict.require();
+        StringBuilder needs = new StringBuilder(String.join(", and ", approvers.names(require, workspaceId)));
+        if (require != null && require.signatures() > 1) {
+            needs.append(needs.isEmpty() ? "" : ", ").append(require.signatures()).append(" different people");
+        }
+        if (require != null && require.separate()) {
+            needs.append(needs.isEmpty() ? "" : ", ").append("someone other than you");
+        }
+        return "Your workspace's rules need the approval of " + (needs.isEmpty() ? "someone else" : needs)
+            + " for this import (" + verdict.reason() + "), so it doesn't run.";
     }
 
     private void append(UUID record, String type, CortexRecordService.Actor actor, Map<String, ?> data) {
@@ -148,17 +177,26 @@ public class McpImportService {
         }
     }
 
-    /** Cherche l'outil « lister les issues » du connecteur, par nom (générique), parmi ceux que la personne utilise. */
-    private String findIssuesTool(Long workspaceId, Long userId, String connectorKey) {
+    /**
+     * L'outil « lister les issues » du connecteur, parmi ceux que la personne utilise et que TaskForce classe en lecture :
+     * par son nom (générique), le plus proche d'abord. Un outil classé en écriture n'est jamais choisi, quel que soit son
+     * nom : l'import le lance sans arguments.
+     */
+    private ExternalMcpTool findIssuesTool(Long workspaceId, Long userId, String connectorKey) {
         List<String> tools = workspaceMcp.serverStatuses(workspaceId, userId).stream()
             .filter(s -> connectorKey.equals(s.connectorKey()) && s.reachable())
             .findFirst()
             .map(WorkspaceMcpService.McpServerStatus::tools)
             .orElseThrow(() -> new BusinessException("The MCP server \"" + connectorKey + "\" is not connected or not reachable"));
-        return tools.stream().filter(t -> t.equalsIgnoreCase("list_issues")).findFirst()
-            .or(() -> tools.stream().filter(t -> containsAll(t, "issue", "list")).findFirst())
-            .or(() -> tools.stream().filter(t -> t.toLowerCase(Locale.ROOT).contains("issue")).findFirst())
-            .orElseThrow(() -> new BusinessException("\"" + connectorKey + "\" has no tool to list issues"));
+        Set<String> candidates = new LinkedHashSet<>();
+        tools.stream().filter(t -> t.equalsIgnoreCase("list_issues")).forEach(candidates::add);
+        tools.stream().filter(t -> containsAll(t, "issue", "list")).forEach(candidates::add);
+        tools.stream().filter(t -> t.toLowerCase(Locale.ROOT).contains("issue")).forEach(candidates::add);
+        for (String name : candidates) {
+            Optional<ExternalMcpTool> tool = workspaceMcp.toolFor(workspaceId, userId, connectorKey + "__" + name);
+            if (tool.isPresent() && tool.get().isReadOnly()) return tool.get();
+        }
+        throw new BusinessException("\"" + connectorKey + "\" has no tool that only reads to list issues");
     }
 
     private List<NormalizedIssue> normalize(Long workspaceId, String raw) {

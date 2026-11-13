@@ -459,6 +459,8 @@ export const CONSTANTS_EN = {
     casesTitle: "Its cases",
     casePasses: "Holds",
     caseFails: "Doesn't hold",
+    // A case that doesn't hold says what the rule expected of it
+    caseExpected: " (expected: {decision})",
     historyShow: "Show the history",
     historyHide: "Hide the history",
     historyRow: "Version {version}: {layer}, by {who} on {date}",
@@ -564,7 +566,7 @@ export const CONSTANTS_EN = {
       saving: "Adding…",
       added: "Rule added",
       passes: "Its cases hold: you can add it.",
-      fails: "A case doesn't hold, so TaskForce won't add the rule as it is written.",
+      fails: "A case doesn't hold, so TaskForce won't add the rule as it is written. Say more precisely which actions it covers, then check it again.",
       breaks: "It would change what these rules already do:",
       unclear: "What TaskForce couldn't say with its rules: {text}",
       approverTitle: "Who approves? (“{words}”)",
@@ -572,12 +574,15 @@ export const CONSTANTS_EN = {
       approverAdmin: "An admin of the workspace",
       approverOwner: "The workspace's owner",
       approverLead: "The project's lead",
+      // Who approves, when TaskForce doesn't know the person the rule names and has no words for them
+      approverToChoose: "the person you choose below",
       edited: "Your words changed: check the rule again.",
     },
     problems: {
       loosens: "A rule you add can only make TaskForce stricter, and this one would let something happen without asking. Say what should be asked first, or refused.",
       noEffect: "TaskForce couldn't tell whether this rule asks first or refuses. Say it in other words.",
       noCondition: "TaskForce couldn't tell which actions this rule is about. Name them: changing files, deleting issues, writing in a connected tool…",
+      noAction: "TaskForce couldn't tell which kind of action this rule is about. Name it: changing files, running a command, writing in a connected tool…",
       unknownCondition: "Part of this rule is about something TaskForce doesn't know of an action. Say it in other words.",
       rulesAreTaskForce: "Changing the rules is TaskForce's own rule: only the people who may change them do. A rule can't be about it.",
       unknownAction: "TaskForce doesn't see this kind of action, so a rule about it would never apply.",
@@ -621,6 +626,75 @@ export const CONSTANTS_EN = {
       signatures: "{count} different people approve: {signed} so far.",
       signedBy: "Approved by {who}.",
       notThePreparer: "The person who delegated this task can't approve it.",
+    },
+  },
+
+  // Where TaskForce saves what it writes (R156): the workspace chooses, a project may choose its own.
+  storage: {
+    settingsLabel: "Storage",
+    intro: "Where TaskForce saves the documents it writes for you: reports, minutes, summaries.",
+    projectIntro: "Where TaskForce saves the documents it writes for this project.",
+    places: {
+      server: "In TaskForce",
+      machine: "On this computer",
+      "google-drive": "Google Drive",
+      onedrive: "OneDrive or SharePoint",
+    },
+    placeHelp: {
+      server: "Kept with your workspace. Nothing leaves TaskForce.",
+      machine: "A folder you choose on this computer.",
+      "google-drive": "A folder you choose in Google Drive. TaskForce sees only what you choose and what it saves.",
+      onedrive: "A folder you choose in your OneDrive or in a SharePoint library.",
+    },
+    inFolder: "{place}, in {folder}",
+    currentLine: "Documents are saved here: {where}.",
+    defaultNote: "Nothing is chosen yet, so documents stay in TaskForce.",
+    inheritedNote: "This project uses the workspace's choice.",
+    ownNote: "This project has its own place.",
+    chosenBy: "Chosen by {name}.",
+    asksFirst: "Saving outside TaskForce always waits for a person's approval.",
+    change: "Change",
+    useWorkspace: "Use the workspace's choice",
+    keepInTaskForce: "Keep documents in TaskForce",
+    readOnlyWorkspace: "Only owners and admins choose this for the workspace.",
+    readOnlyProject: "Only the project's lead, owners and admins choose this for the project.",
+    dialogTitle: "Where should TaskForce save documents?",
+    dialogProjectTitle: "Where should TaskForce save this project's documents?",
+    chooseFolder: "Choose a folder",
+    changeFolder: "Change folder",
+    noFolder: "No folder chosen yet.",
+    save: "Save",
+    saving: "Saving…",
+    cancel: "Cancel",
+    connectFirst: "Connect {name} first: Settings, Integrations.",
+    allowChanges: "Reconnect {name} and allow changes, so TaskForce can save there.",
+    saved: "Documents will be saved here from now on.",
+    failed: "Couldn't change where documents are saved.",
+    loadFailed: "Couldn't load where documents are saved.",
+    retry: "Try again",
+    pickerFailed: "Google Drive's picker didn't open. Try again in a moment.",
+    driveFiles: {
+      title: "Choose files for Cortex",
+      text: "Cortex reads only the files you choose here, and those TaskForce saves in your Drive.",
+      choose: "Choose files",
+      chosenOne: "Cortex can now read this file.",
+      chosen: "Cortex can now read these {count} files.",
+    },
+    documentsTitle: "Saved documents",
+    documentsEmpty: "Nothing saved yet. Ask Cortex to save a document it wrote.",
+    open: "Open",
+    linkFailed: "Couldn't open this document.",
+    savedFor: "Saved {when} for {name}",
+    savedAt: "Saved {when}",
+    version: "version {version}",
+    folders: {
+      title: "Choose a folder",
+      myFiles: "My files",
+      libraries: "SharePoint libraries",
+      empty: "No folders here.",
+      up: "Back",
+      useThis: "Use this folder",
+      failed: "Couldn't list the folders. Check your Microsoft 365 connection.",
     },
   },
 
@@ -785,6 +859,23 @@ export const CONSTANTS_EN = {
     // The catalog's first sentence (TF-J2-12): one connection per person, the address for a tool not listed
     catalogIntro: "Connect the tools you use, each with your own account. Cortex reads them directly and asks you before any change. A tool that isn't listed connects by the address of its MCP server.",
     slackDesktopHelp: "Slack can't be connected in the desktop app yet.",
+    // The card (R160): "Connect" opens the connection directly; the detail page stays for "Learn more"
+    learnMore: "Learn more",
+    learnMoreAbout: "Learn more about {name}",
+    manage: "Manage",
+    setUp: "Set it up",
+    // What a tool can do, on its detail page: one plain line each (R160)
+    capabilities: {
+      observe: { label: "Observe", text: "Reads this service's data into TaskForce." },
+      act: { label: "Act", text: "Acts in the service from TaskForce." },
+      mcp: { label: "Cortex", text: "Cortex reads it and asks before any change." },
+    },
+  },
+
+  // The catalog of tools (R153, Claude's connectors directory): with more than a hundred tools, each category
+  // shows its first ones when nothing is searched or filtered
+  catalog: {
+    showAll: "Show all {count}",
   },
 
   // Connecting a tool (TF-J2-12, session 22 R154): one gesture for the person, the vendor's path behind it.
@@ -808,7 +899,41 @@ export const CONSTANTS_EN = {
     pathOneClick: "One click",
     pathAdminFirst: "Admin first",
     pathKey: "Key",
+    pathAddress: "Server address",
     pathOpen: "No sign-in",
+    // The detail page's "Connection" line: one plain sentence per path (R160)
+    pathSentence: {
+      "self-registration": "you sign in to {name} in your browser, then come back connected.",
+      "our-app": "you sign in to {name} in your browser, then come back connected.",
+      "company-app": "an owner or admin of this workspace sets up {name} once, then everyone connects with their own account.",
+      "api-key": "you create a key in {name} and paste it here.",
+      "server-url": "your company creates its {name} server, and you paste its address here.",
+      open: "{name} needs no sign-in, so it connects in one click.",
+      oauth: "an owner or admin signs in to {name} once, for everyone in this workspace.",
+      key: "an owner or admin pastes a {name} key and the {name} workspace slug once, for everyone in this workspace.",
+      custom: "Cortex reads it through the address you gave.",
+    },
+    // GitHub, Slack and Plane: the second access, inside their card, named by what it adds (R160)
+    liveTitle: "Cortex reads {name}",
+    liveText: "With your own account, Cortex reads {name} in your conversations. It asks you before any change.",
+    liveConnect: "Connect for Cortex",
+    liveBack: "Back to {name}",
+    // The card and the toasts name the access that is connected when only Cortex's own access is (R161)
+    liveConnected: "Cortex connected",
+    liveNeedsReconnecting: "Cortex needs reconnecting",
+    liveWaitingForAdmin: "Cortex waits for your admin",
+    liveReturnedConnected: "Cortex is connected to {name}.",
+    nativeConnected: "{name} is connected for this workspace.",
+    // A server saved but not reached: the toast says it once, the server's own words stay in its dialog
+    savedUnreachableToast: "{name} is saved, but TaskForce can't reach it yet. Open it in Integrations to see why.",
+    // An added server not yet named, in a failure sentence
+    thisServer: "This server",
+    // A member: who connects a built-in integration, instead of a button refused to them (R161)
+    nativeManagersOnly: "An owner or admin connects {name} once, for everyone in this workspace.",
+    // The built-in integration's gesture says for whom it connects (R161)
+    connectForWorkspace: "Connect for the workspace",
+    // The button of a tool that waits for the admin: the message to send them
+    seeWhatToSend: "See what to send",
     // Options before connecting
     shareWithWorkspace: "Share with the workspace",
     shareWithWorkspaceHelp: "Everyone in the workspace reads {name} through your account. Use it for a shared source only.",
@@ -832,17 +957,24 @@ export const CONSTANTS_EN = {
     openAdminPage: "Open the admin page",
     // The company's app (path C), entered once by an owner or admin
     companyAppTitle: "Your company's app",
-    companyAppText: "Create the app in {name} as described below, then enter its details here once. Everyone in the workspace then connects with their own account.",
+    companyAppText: "Create the app in {name} with the steps below, or send them to a {name} admin, then enter its client ID and secret here once. Everyone in the workspace then connects with their own account.",
     clientId: "Client ID",
     clientSecret: "Client secret",
     clientSecretKept: "A secret is saved. Leave empty to keep it.",
     redirectAddress: "Redirect address to register",
+    // The steps point to the redirect address, given apart: whole, never cut, with its own Copy button (R161)
+    redirectInSteps: "below",
+    copy: "Copy",
+    copyRedirect: "Copy the redirect address",
+    copySteps: "Copy the steps",
+    companyAppGuide: "Open {name}'s guide",
     saveAndConnect: "Save and connect",
     companyAppSaved: "Your company's app is saved.",
     // The guided key (path D)
     keyTitle: "Connect with a key",
     keyLabel: "Key",
     serverAddressLabel: "Your server's address",
+    serverAddressTitle: "Connect with your server's address",
     createKey: "Where to create it",
     useKeyInstead: "Connect with a key instead",
     // A server on this computer or the local network
@@ -866,11 +998,69 @@ export const CONSTANTS_EN = {
     disconnectConsequence: "Cortex stops reading {name} through this connection, and TaskForce asks {name} to revoke its access.",
     disconnectedRevoked: "Disconnected. Your access was revoked at {name}.",
     disconnectedHere: "Disconnected here. {name} doesn't let TaskForce revoke the access: remove TaskForce in your {name} settings.",
+    // A tool with no sign-in, or connected by a key or an address: what is left at the vendor, if anything (R161)
+    disconnectConsequenceOpen: "Cortex stops reading {name} through this connection.",
+    disconnectedOpen: "Disconnected. {name} asked for no sign-in or key, so there is nothing to remove in {name}.",
+    disconnectedKey: "Disconnected here. The key still works in {name}: delete it there if nothing else uses it.",
+    disconnectedAddress: "Disconnected here. Your server still runs in {name}: delete it there if nothing else uses it.",
     // Not available
     notAvailable: "Not available yet",
     // Failures say what happened and what to do
     failed: "{name} wasn't connected. Try again.",
     failedAdmin: "Only owners and admins can do this.",
+    // A failed connection, in the panel (R160): what happened and what to do first, where it stopped one click away,
+    // the server's own words two clicks away. Keyed by the reason the server gives.
+    failures: {
+      CONNECT_OFFICIAL_SERVER_ONLY: "{name} only connects to its own server, so TaskForce didn't use this address. Connect {name} from its card, without an address.",
+      CONNECT_ADDRESS_NOT_ALLOWED: "TaskForce can't use this address: its name doesn't resolve, it isn't a web address, or it points inside a private network. Check the address; for a server on your computer, use the desktop app.",
+      CONNECT_NO_SIGN_IN: "{name} offers no sign-in that TaskForce can use, so it can't connect this way.",
+      CONNECT_SIGN_IN_UNREACHABLE: "{name}'s sign-in didn't answer. Check your connection, then try again in a moment.",
+      CONNECT_SIGN_IN_UNTRUSTED: "{name}'s sign-in didn't identify itself as expected, so TaskForce stopped to keep your account safe. Try again later, and tell your admin if it happens again.",
+      CONNECT_SIGN_IN_UNSUPPORTED: "{name}'s sign-in lacks what TaskForce needs to connect safely, so it can't connect this way yet.",
+      CONNECT_REGISTRATION_REFUSED: "{name} refused to register TaskForce, so its sign-in couldn't open. Ask your {name} admin whether outside apps may connect.",
+      CONNECT_NO_CLIENT: "{name} doesn't let TaskForce register on its own. Ask your admin to set up an app for TaskForce in {name}.",
+      CONNECT_HEADER_NOT_ALLOWED: "TaskForce can't send the token in this header. Choose another header name and enter its value, or send the token as Authorization: Bearer.",
+      CONNECT_LOCAL_NEEDS_APPROVAL: "This server runs on your computer or your local network. Check its address, tick “I started this server myself”, then connect again.",
+      network: "TaskForce's server can't be reached, so {name} wasn't connected. Check your connection, then try again.",
+      forbidden: "Only owners and admins can do this. Ask one of them to connect {name}.",
+      unknown: "{name} wasn't connected, and TaskForce can't tell why. Try again; if it fails again, show the details to your admin.",
+      // The dialogs' other gestures
+      appNotSaved: "Your company's app for {name} wasn't saved. Check its client ID and secret, then save it again.",
+      notApproved: "The changed tools of {name} weren't approved. Try again in a moment.",
+      notDisconnected: "{name} wasn't disconnected. Try again in a moment; if it fails again, show the details to your admin.",
+      savedUnreachable: "{name} is saved, but TaskForce can't reach it. Check that the server runs and that its address is right, then connect again.",
+    },
+    // The same failures when the tool offers a key, and the panel offers it too (R161)
+    failuresWithKey: {
+      CONNECT_NO_SIGN_IN: "{name} offers no sign-in that TaskForce can use. Connect with a key instead.",
+      CONNECT_SIGN_IN_UNSUPPORTED: "{name}'s sign-in lacks what TaskForce needs to connect safely. Connect with a key instead.",
+      CONNECT_REGISTRATION_REFUSED: "{name} refused to register TaskForce, so its sign-in couldn't open. Connect with a key instead, or ask your {name} admin whether outside apps may connect.",
+      CONNECT_NO_CLIENT: "{name} doesn't let TaskForce register on its own. Connect with a key instead, or ask your admin to set up an app for TaskForce in {name}.",
+    },
+    failureSteps: {
+      CONNECT_OFFICIAL_SERVER_ONLY: "checking the address",
+      CONNECT_ADDRESS_NOT_ALLOWED: "checking the address",
+      CONNECT_NO_SIGN_IN: "finding {name}'s sign-in",
+      CONNECT_SIGN_IN_UNREACHABLE: "reaching {name}'s sign-in",
+      CONNECT_SIGN_IN_UNTRUSTED: "checking {name}'s sign-in",
+      CONNECT_SIGN_IN_UNSUPPORTED: "checking {name}'s sign-in",
+      CONNECT_REGISTRATION_REFUSED: "registering TaskForce with {name}",
+      CONNECT_NO_CLIENT: "registering TaskForce with {name}",
+      CONNECT_HEADER_NOT_ALLOWED: "checking the token's header",
+      CONNECT_LOCAL_NEEDS_APPROVAL: "checking the address",
+      network: "reaching TaskForce's server",
+      forbidden: "checking your role in this workspace",
+      unknown: "connecting {name}",
+      appNotSaved: "saving your company's app",
+      notApproved: "approving the changed tools",
+      notDisconnected: "disconnecting {name}",
+      savedUnreachable: "reaching {name}",
+    },
+    failureDetails: "Details",
+    failureHideDetails: "Hide the details",
+    failureStep: "Where it stopped: {step}.",
+    failureRaw: "Show what the server said",
+    failureHideRaw: "Hide what the server said",
     // The return from the browser (web app)
     returnedConnected: "{name} is connected.",
     returnedAdmin: "{name} needs your admin first. Open it in Integrations to see what to send.",
@@ -1074,6 +1264,7 @@ export const CONSTANTS_EN = {
       create_issue: { doing: "Preparing the issue", did: "Created {key}", waits: "Prepared an issue for you to check", proposes: "create this issue" },
       create_project: { doing: "Preparing the project", did: "Created the project", waits: "Prepared the project", proposes: "create this project" },
       create_note: { doing: "Writing the note", did: "Wrote a note", waits: "Prepared a note", proposes: "write this note" },
+      save_document: { doing: "Preparing the document", did: "Saved the document", waits: "Asked before saving the document", proposes: "save this document" },
       update_issue: { doing: "Changing the issue", did: "Changed {key}", waits: "Proposed a change to {key}", proposes: "change this issue" },
       check_checklist_item: { doing: "Checking an item off", did: "Checked an item off", waits: "Proposed to check an item off", proposes: "check this item off" },
       add_comment: { doing: "Writing the comment", did: "Commented on {key}", waits: "Proposed a comment on {key}", proposes: "comment on this issue" },
@@ -1097,6 +1288,30 @@ export const CONSTANTS_EN = {
     proposes: "Cortex proposes to {what}. Nothing changes until you approve it.",
     proposesThis: "do this",
     proposesExternal: "Cortex proposes an action in {service}. Nothing is sent until you approve it.",
+    // The card of an action in a connected tool (R160): the action in words and its main values, the arguments one
+    // click away under "Details"
+    proposesExternalAction: "Cortex proposes to {action} in {service}{values}. Nothing is sent until you approve it.",
+    // An action whose name doesn't say the gesture: never the tool's name
+    proposesExternalValues: "Cortex proposes an action in {service}{values}. Nothing is sent until you approve it.",
+    details: "Details",
+    hideDetails: "Hide the details",
+    detailsLabel: "What Cortex will send",
+    // A value whose name says a secret (a password, a key, a token) never shows
+    hiddenValue: "Hidden",
+    valueYes: "Yes",
+    valueNo: "No",
+    // The raw request, two clicks away (R133)
+    rawRequest: "Show the raw request",
+    hideRawRequest: "Hide the raw request",
+    // Saving a document (R156): what and where, before the person approves.
+    proposesSave: "Cortex proposes to save \"{title}\" {where}. Nothing is saved until you approve it.",
+    saveWhere: {
+      server: "in TaskForce",
+      machine: "on this computer",
+      "google-drive": "to Google Drive",
+      onedrive: "to OneDrive or SharePoint",
+    },
+    saveWhereFolder: "{where}, in {folder}",
     approve: "Approve",
     approving: "Working…",
     outcomeDone: "Done. ",
@@ -1760,6 +1975,7 @@ export const CONSTANTS_EN = {
     allowOnce: "Allow",
     allowForMission: "Allow for this mission",
     forMissionHint: "Requests of the same kind won't be asked again until the mission ends.",
+    onceHint: "Your workspace's rules ask each time: this approval counts for this request only.",
     noAnswerMeansNo: "No answer in {minutes} min means no. You will see that it was refused.",
     noAnswerSoon: "No answer in less than a minute means no. You will see that it was refused.",
     showCommand: "Show the command",

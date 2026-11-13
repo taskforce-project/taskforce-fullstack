@@ -20,14 +20,20 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.AuditService;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +59,8 @@ class WorkspaceMcpServiceTest {
     @Mock private ConnectorConnectionRepository repository;
     @Mock private McpClient client;
     @Mock private McpTokenService tokenService; // OAuth (TF-MCP-02) : non-OAuth par défaut en test (isOAuth=false)
+    @Mock private WorkspaceMemberRepository members;
+    @Mock private AuditService audit;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private WorkspaceMcpService service;
@@ -66,7 +74,13 @@ class WorkspaceMcpServiceTest {
     void setup() {
         ConnectorCatalog catalog = new ConnectorCatalog();
         catalog.build();
-        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService, catalog);
+        // Les vrais droits : Ada (7) est propriétaire de l'espace, Bob (8) y est membre.
+        lenient().when(members.findByWorkspaceIdAndUserId(1L, 7L))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.OWNER).build()));
+        lenient().when(members.findByWorkspaceIdAndUserId(1L, 8L))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(WorkspaceRole.MEMBER).build()));
+        service = new WorkspaceMcpService(repository, client, objectMapper, tokenService, catalog,
+            new AuthorizationService(members), audit);
         ReflectionTestUtils.setField(service, "cacheTtlMs", 60_000L);
     }
 
@@ -106,13 +120,55 @@ class WorkspaceMcpServiceTest {
     @Test
     @DisplayName("la classe vient du préréglage : lecture nommée, écriture nommée, et un outil inconnu est une écriture")
     void the_class_comes_from_the_preset() throws Exception {
-        when(repository.findUsable(1L, 7L)).thenReturn(List.of(mcpConnector()));
+        // L'adresse entière du serveur officiel : la liste documentée du préréglage vaut.
+        ConnectorConnection official = ConnectorConnection.builder()
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://mcp.linear.app/mcp\"}").build();
+        when(repository.findUsable(1L, 7L)).thenReturn(List.of(official));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("save_issue"), lying("wipe_workspace")));
 
         List<AgentTool> tools = service.toolsFor(ctx);
 
         assertThat(tools).extracting(t -> ((ExternalMcpTool) t).isReadOnly()).containsExactly(true, false, false);
+    }
+
+    @Test
+    @DisplayName("sur l'adresse de lecture seule que l'éditeur documente comme ne servant que des lectures, chaque outil en est une")
+    void the_documented_read_only_address_serves_reads() throws Exception {
+        ConnectorConnection readOnly = ConnectorConnection.builder()
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://mcp.linear.app/mcp/readonly\"}").build();
+        when(repository.findUsable(1L, 7L)).thenReturn(List.of(readOnly));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("get_issue"), def("get_document")));
+
+        assertThat(service.toolsFor(ctx)).extracting(t -> ((ExternalMcpTool) t).isReadOnly())
+            .containsExactly(true, true, true);
+    }
+
+    @Test
+    @DisplayName("les classes d'un préréglage ne valent que sur son serveur officiel : ailleurs, chaque outil est une écriture")
+    void the_preset_classes_apply_to_its_own_server_only() throws Exception {
+        // Une connexion gardée sous la clé du préréglage, mais vers un autre serveur.
+        ConnectorConnection elsewhere = ConnectorConnection.builder()
+            .connectorKey("linear").config("{\"mcpUrl\":\"https://203.0.113.10/mcp\"}").build();
+        when(repository.findUsable(1L, 7L)).thenReturn(List.of(elsewhere));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("get_issue")));
+
+        assertThat(service.toolsFor(ctx)).extracting(t -> ((ExternalMcpTool) t).isReadOnly()).containsExactly(false, false);
+    }
+
+    @Test
+    @DisplayName("connectServer : la clé d'un préréglage vers un autre serveur que l'officiel, ou d'une API -> refus")
+    void connect_server_refuses_another_server_for_a_preset() {
+        assertThatThrownBy(() -> service.connectServer(ws, ada,
+            new WorkspaceMcpService.ServerRequest("linear", null, "https://203.0.113.10/mcp", "tok", null, null, false, false)))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("official server");
+        assertThatThrownBy(() -> service.connectServer(ws, ada,
+            new WorkspaceMcpService.ServerRequest("google-drive", null, "https://203.0.113.10/mcp", "tok", null, null,
+                false, false)))
+            .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -363,7 +419,7 @@ class WorkspaceMcpServiceTest {
     void server_tools_returns_rich_defs() throws Exception {
         ConnectorConnection conn = ConnectorConnection.builder()
             .connectorKey("linear")
-            .config("{\"mcpUrl\":\"http://x/mcp\",\"mcpAllow\":\"list_issues\"}").build();
+            .config("{\"mcpUrl\":\"https://mcp.linear.app/mcp\",\"mcpAllow\":\"list_issues\"}").build();
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "linear")).thenReturn(Optional.of(conn));
         when(client.initialize(any())).thenReturn(session);
         when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("delete_comment")));
@@ -398,7 +454,7 @@ class WorkspaceMcpServiceTest {
     void connect_server_persists_config() {
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L)).thenReturn(Optional.empty());
 
-        service.connectServer(ws, ada, request("linear", null, "https://203.0.113.10/mcp", null, null, "list_issues", false, false));
+        service.connectServer(ws, ada, request("linear", null, "https://mcp.linear.app/mcp", null, null, "list_issues", false, false));
 
         ArgumentCaptor<ConnectorConnection> captor = ArgumentCaptor.forClass(ConnectorConnection.class);
         verify(repository, atLeastOnce()).save(captor.capture());
@@ -406,7 +462,7 @@ class WorkspaceMcpServiceTest {
         assertThat(saved.getScope()).isEqualTo(ConnectionScope.PERSONAL);
         assertThat(saved.getOwner()).isEqualTo(ada);
         assertThat(saved.getConnectedBy()).isEqualTo(ada);
-        assertThat(saved.getConfig()).contains("mcpUrl").contains("https://203.0.113.10/mcp")
+        assertThat(saved.getConfig()).contains("mcpUrl").contains("https://mcp.linear.app/mcp")
             .contains("mcpAllow").contains("list_issues").doesNotContain("mcpToken");
     }
 
@@ -415,7 +471,7 @@ class WorkspaceMcpServiceTest {
     void connect_a_shared_server() {
         when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "linear")).thenReturn(Optional.empty());
 
-        service.connectServer(ws, ada, request("linear", null, "https://203.0.113.10/mcp", null, null, null, true, false));
+        service.connectServer(ws, ada, request("linear", null, "https://mcp.linear.app/mcp", null, null, null, true, false));
 
         ArgumentCaptor<ConnectorConnection> captor = ArgumentCaptor.forClass(ConnectorConnection.class);
         verify(repository, atLeastOnce()).save(captor.capture());
@@ -430,7 +486,7 @@ class WorkspaceMcpServiceTest {
             .when(client).assertAllowed("http://169.254.169.254/latest");
 
         assertThatThrownBy(() -> service.connectServer(ws, ada,
-            request("linear", null, " http://169.254.169.254/latest ", null, null, null, false, false)))
+            request("custom", "Docs", " http://169.254.169.254/latest ", null, null, null, false, false)))
             .isInstanceOf(BusinessException.class);
         verify(repository, never()).save(any());
     }
@@ -469,7 +525,7 @@ class WorkspaceMcpServiceTest {
     // ── Serveurs personnalisés (ADR-020) ────────────────────────────────────
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"github", "slack", "plane", "trello", "custom-", "custom-Docs", "custom--x", "docs"})
+    @ValueSource(strings = {"github", "slack", "plane", "docker", "custom-", "custom-Docs", "custom--x", "docs"})
     @NullSource
     @DisplayName("resolveServer refuse une native, une clé inconnue ou mal formée")
     void resolve_refuses_other_keys(String key) {
@@ -600,6 +656,83 @@ class WorkspaceMcpServiceTest {
         assertThat(result.revoked()).isTrue();
         assertThat(result.revocable()).isTrue();
         verify(repository).delete(conn);
+    }
+
+    @Test
+    @DisplayName("une connexion partagée faite puis défaite entre au journal : l'hôte, jamais le jeton ni l'adresse entière")
+    void a_shared_connection_is_recorded_without_its_secret() {
+        // Comme l'adresse d'un serveur Zoho, la clé est dans le chemin (une adresse IP publique : aucun nom à résoudre).
+        String secretUrl = "https://203.0.113.10:8443/mcp/k3y-in-the-path/message";
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "custom-zoho-crm"))
+            .thenReturn(Optional.empty());
+
+        WorkspaceMcpService.ServerIdentity id = service.connectServer(ws, ada,
+            request("custom", "Zoho CRM", secretUrl, "tok-very-secret", null, null, true, false));
+        ConnectorConnection shared = ConnectorConnection.builder().id(5L).connectorKey(id.connectorKey())
+            .config("{\"mcpUrl\":\"" + secretUrl + "\",\"mcpToken\":\"tok-very-secret\"}").scope(ConnectionScope.WORKSPACE)
+            .build();
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, id.connectorKey()))
+            .thenReturn(Optional.of(shared));
+        service.disconnectServer(1L, 7L, id.connectorKey(), true);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit, times(2)).recordAfterCommit(eq(1L), eq(7L), eq(AuditService.SHARED_CONNECTION_CHANGED),
+            eq("connector_connection"), eq("custom-zoho-crm"), details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("change", "connected").containsEntry("name", "Zoho CRM")
+            .containsEntry("host", "203.0.113.10:8443").containsEntry("via", "key");
+        assertThat(details.getAllValues().get(1)).containsEntry("change", "disconnected");
+        assertThat(details.getAllValues().toString()).doesNotContain("tok-very-secret").doesNotContain("k3y-in-the-path");
+    }
+
+    @Test
+    @DisplayName("redonner l'accord aux outils de la connexion de l'espace entre au journal ; à sa propre connexion, non")
+    void approving_the_shared_tools_is_recorded() throws Exception {
+        ConnectorConnection shared = ConnectorConnection.builder().id(9L).connectorKey("linear")
+            .config("{\"mcpUrl\":\"http://x/mcp\"}").scope(ConnectionScope.WORKSPACE).build();
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(1L, "linear")).thenReturn(Optional.of(shared));
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L))
+            .thenReturn(Optional.of(personal("linear", ada)));
+        when(client.initialize(any())).thenReturn(session);
+        when(client.listTools(session)).thenReturn(List.of(def("list_issues"), def("save_issue")));
+
+        service.approveTools(1L, 7L, "linear", false);
+        org.mockito.Mockito.verifyNoInteractions(audit);
+        service.approveTools(1L, 7L, "linear", true);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit).recordAfterCommit(eq(1L), eq(7L), eq(AuditService.SHARED_CONNECTION_CHANGED),
+            eq("connector_connection"), eq("linear"), details.capture());
+        assertThat(details.getValue()).containsEntry("change", "tools-approved").containsEntry("tools", 2);
+    }
+
+    @Test
+    @DisplayName("sa propre connexion n'entre pas au journal de l'espace")
+    void a_personal_connection_is_not_recorded() {
+        when(repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(1L, "linear", 7L)).thenReturn(Optional.empty());
+
+        service.connectServer(ws, ada, request("linear", null, "https://mcp.linear.app/mcp", "tok", null, null, false, false));
+
+        org.mockito.Mockito.verifyNoInteractions(audit);
+    }
+
+    @Test
+    @DisplayName("la connexion de l'espace : un membre ne la crée, ne la déconnecte ni ne la réaccorde, rien ne change")
+    void a_member_cannot_touch_the_shared_connection() {
+        User bob = User.builder().id(8L).email("bob@acme.test").build();
+
+        assertThatThrownBy(() -> service.connectServer(ws, bob,
+            request("linear", null, "https://mcp.linear.app/mcp", "tok", null, null, true, false)))
+            .isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.disconnectServer(1L, 8L, "linear", true)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> service.approveTools(1L, 8L, "linear", true)).isInstanceOf(ForbiddenException.class);
+
+        verify(repository, never()).findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(any(), any());
+        verify(repository, never()).save(any());
+        verify(repository, never()).delete(any());
+        verify(tokenService, never()).revoke(any());
+        org.mockito.Mockito.verifyNoInteractions(client);
     }
 
     @Test

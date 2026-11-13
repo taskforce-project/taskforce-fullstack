@@ -58,6 +58,38 @@ public class McpOAuthSettings {
             : cimdUrl.trim();
     }
 
+    /**
+     * Le locataire Microsoft Entra de notre application : {@code common} (comptes professionnels et personnels) par
+     * défaut ; une installation auto-hébergée avec une application d'un seul locataire met le sien
+     * ({@code TF_MICROSOFT_TENANT}).
+     */
+    @Value("${TF_MICROSOFT_TENANT:common}")
+    private String microsoftTenant = "common";
+
+    private org.springframework.core.env.Environment environment;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setEnvironment(org.springframework.core.env.Environment environment) {
+        this.environment = environment;
+    }
+
+    /**
+     * L'identifiant de notre application chez un éditeur servi par son API ({@code <préfixe>_CLIENT_ID}), pour le lien de
+     * la page de son administrateur ; nul quand l'instance ne l'a pas.
+     */
+    public String apiClientId(String envPrefix) {
+        if (environment == null || envPrefix == null) return null;
+        String id = environment.getProperty(envPrefix + "_CLIENT_ID");
+        return id == null || id.isBlank() ? null : id.trim();
+    }
+
+    /** L'émetteur d'une API d'éditeur, avec le locataire de l'instance à la place de {@code {tenant}}. */
+    public String apiIssuer(String issuer) {
+        String tenant = microsoftTenant == null ? "" : microsoftTenant.trim();
+        if (!tenant.matches("[A-Za-z0-9][A-Za-z0-9.-]{0,63}")) tenant = "common";
+        return issuer.replace("{tenant}", tenant);
+    }
+
     /** L'adresse de retour inscrite chez l'éditeur. */
     public String redirectUri() {
         return redirectUri;

@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.mcp;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -8,11 +9,13 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -26,7 +29,9 @@ import lombok.extern.slf4j.Slf4j;
  * chemin hors du moteur de règles ») : l'outil est celui que la personne utilise, par sa connexion ; la demande entre
  * au dossier, puis la décision des règles de l'espace ; un refus ne fait rien ; une action demandée attend la
  * confirmation de la personne (le bouton de la console, ou l'accord de la carte de Cortex) ; le résultat entre au
- * dossier. Une écriture par une connexion partagée avec l'espace reste réservée aux propriétaires et administrateurs.
+ * dossier. Une règle qui désigne qui accorde (R98) est tenue comme dans Cortex : la confirmation ne vaut que si la
+ * personne suffit seule ({@link RuleApprovers#aloneSuffices}). Une écriture par une connexion partagée avec l'espace reste
+ * réservée aux propriétaires et administrateurs.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,6 +46,7 @@ public class McpActionService {
     private final CortexRecordService records;
     private final AuthorizationService authorization;
     private final ObjectMapper objectMapper;
+    private final RuleApprovers approvers;
 
     /**
      * Lance un outil de la console pour une personne. {@code confirmed} : la personne a confirmé, après avoir vu ce que
@@ -69,6 +75,12 @@ public class McpActionService {
             return new ActionResult(toolRef, "refused", null, verdict.reason());
         }
         if (!verdict.allowed()) {
+            // Une règle qui désigne qui accorde (R98) : la console ne s'en contente que si la personne suffit seule.
+            if (!approvers.aloneSuffices(verdict.require(), ws.getId(), null, userId)) {
+                String reason = waitsForOthers(verdict, ws.getId());
+                result(record, tool.name(), "refused", reason);
+                return new ActionResult(toolRef, "refused", null, reason);
+            }
             if (!confirmed) {
                 result(record, tool.name(), "pending", verdict.reason());
                 return new ActionResult(toolRef, "confirm", null, verdict.reason());
@@ -89,6 +101,21 @@ public class McpActionService {
     }
 
     // -------------------------------------------------------------------------
+
+    /** Qui doit accorder, en mots : la console ne lance pas une action qu'une règle réserve à d'autres personnes. */
+    private String waitsForOthers(CortexGate.Verdict verdict, Long workspaceId) {
+        RulesEngine.Obligations require = verdict.require();
+        List<String> who = approvers.names(require, workspaceId);
+        StringBuilder needs = new StringBuilder(String.join(", and ", who));
+        if (require != null && require.signatures() > 1) {
+            needs.append(needs.length() == 0 ? "" : ", ").append(require.signatures()).append(" different people");
+        }
+        if (require != null && require.separate()) {
+            needs.append(needs.length() == 0 ? "" : ", ").append("someone other than you");
+        }
+        return "Your workspace's rules need the approval of " + (needs.length() == 0 ? "someone else" : needs)
+            + " for this action (" + verdict.reason() + "), so it doesn't run from the action console.";
+    }
 
     /** Avant tout effet : sans dossier, l'action ne part pas. */
     private void append(UUID record, String type, CortexRecordService.Actor actor, Map<String, ?> data) {

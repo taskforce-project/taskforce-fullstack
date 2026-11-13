@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.mcp.ConnectorAppService;
 import com.taskforce.tf_api.core.service.mcp.McpActionService;
@@ -40,7 +39,8 @@ import lombok.RequiredArgsConstructor;
  * <p>Une connexion appartient à la personne qui la fait ({@code shared=false}, le défaut) : elle seule la voit, s'en
  * sert, la déconnecte ; un membre suffit. Une connexion partagée avec l'espace ({@code shared=true}) se crée, se
  * déconnecte et se réaccorde par un propriétaire ou un administrateur ; ses outils servent à tous, et une écriture par
- * elle reste réservée aux propriétaires et administrateurs. Le geste « Connect » ({@code /connect}) choisit le chemin :
+ * elle reste réservée aux propriétaires et administrateurs. Le contrôleur vérifie que la personne est membre de l'espace ;
+ * les services des connexions vérifient le rôle (règle 3). Le geste « Connect » ({@code /connect}) choisit le chemin :
  * l'OAuth avec le premier client possible, la clé guidée, l'étape de l'administrateur. La console d'actions passe par
  * les règles de l'espace et entre au dossier ({@link McpActionService}).</p>
  */
@@ -52,7 +52,6 @@ public class McpActionController {
     private final WorkspaceMcpService  workspaceMcp;
     private final UserRepository       userRepository;
     private final BrainAccessGuard     access;
-    private final AuthorizationService authorizationService;
     private final McpOAuthService      mcpOAuthService;
     private final McpImportService     mcpImportService;
     private final McpActionService     mcpActionService;
@@ -97,8 +96,9 @@ public class McpActionController {
 
     /**
      * Connecte (ou reconfigure) un serveur MCP par son adresse, avec ou sans clé ; renvoie les statuts frais. Clé d'un
-     * préréglage du catalogue, {@code custom} pour un nouveau serveur personnalisé (nom obligatoire), ou la clé
-     * {@code custom-…} d'un serveur personnalisé existant. Un serveur local demande {@code localApproved}.
+     * préréglage du catalogue (son serveur officiel seulement), {@code custom} pour un nouveau serveur personnalisé (nom
+     * obligatoire), ou la clé {@code custom-…} d'un serveur personnalisé existant. Un serveur local demande
+     * {@code localApproved}.
      */
     @PostMapping("/servers")
     public ResponseEntity<ApiResponse<List<WorkspaceMcpService.McpServerStatus>>> connect(
@@ -106,11 +106,10 @@ public class McpActionController {
         @Valid @RequestBody McpServerRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        boolean shared = Boolean.TRUE.equals(body.shared());
-        Workspace ws = authorize(slug, jwt, shared);
+        Workspace ws = authorizeMember(slug, jwt);
         User person = resolveUser(jwt);
         workspaceMcp.connectServer(ws, person, new WorkspaceMcpService.ServerRequest(body.connectorKey(), body.name(),
-            body.mcpUrl(), body.mcpToken(), body.headerName(), body.mcpAllow(), shared,
+            body.mcpUrl(), body.mcpToken(), body.headerName(), body.mcpAllow(), Boolean.TRUE.equals(body.shared()),
             Boolean.TRUE.equals(body.localApproved())));
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId(), person.getId())));
     }
@@ -126,13 +125,11 @@ public class McpActionController {
         @Valid @RequestBody McpConnectRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        boolean shared = Boolean.TRUE.equals(body.shared());
-        Workspace ws = authorize(slug, jwt, shared);
+        Workspace ws = authorizeMember(slug, jwt);
         User person = resolveUser(jwt);
-        boolean manager = authorizationService.isManager(ws.getId(), person.getId());
-        return ResponseEntity.ok(ApiResponse.success(mcpOAuthService.connect(ws, person, manager,
+        return ResponseEntity.ok(ApiResponse.success(mcpOAuthService.connect(ws, person,
             new McpOAuthService.ConnectRequest(connectorKey, body.name(), body.mcpUrl(), body.mcpToken(),
-                body.headerName(), shared, Boolean.TRUE.equals(body.allowWrites()),
+                body.headerName(), Boolean.TRUE.equals(body.shared()), Boolean.TRUE.equals(body.allowWrites()),
                 Boolean.TRUE.equals(body.localApproved()), body.returnTo()))));
     }
 
@@ -147,7 +144,7 @@ public class McpActionController {
         @RequestParam(defaultValue = "false") boolean shared,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorize(slug, jwt, shared);
+        Workspace ws = authorizeMember(slug, jwt);
         Long userId = resolveUserId(jwt);
         WorkspaceMcpService.DisconnectResult result = workspaceMcp.disconnectServer(ws.getId(), userId, connectorKey, shared);
         return ResponseEntity.ok(ApiResponse.success(new DisconnectResponse(result.revoked(), result.revocable(),
@@ -162,13 +159,16 @@ public class McpActionController {
         @RequestParam(defaultValue = "false") boolean shared,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorize(slug, jwt, shared);
+        Workspace ws = authorizeMember(slug, jwt);
         Long userId = resolveUserId(jwt);
         workspaceMcp.approveTools(ws.getId(), userId, connectorKey, shared);
         return ResponseEntity.ok(ApiResponse.success(workspaceMcp.serverStatuses(ws.getId(), userId)));
     }
 
-    /** Démarre l'OAuth d'un serveur MCP par son adresse : renvoie l'URL d'autorisation (le front y envoie le navigateur). */
+    /**
+     * Démarre l'OAuth d'un serveur MCP par son adresse : renvoie l'URL d'autorisation (le front y envoie le navigateur).
+     * La clé d'un préréglage ne mène qu'à son serveur officiel : une autre adresse est refusée.
+     */
     @PostMapping("/servers/{connectorKey}/oauth/start")
     public ResponseEntity<ApiResponse<Map<String, String>>> oauthStart(
         @PathVariable String slug,
@@ -176,11 +176,10 @@ public class McpActionController {
         @Valid @RequestBody McpOAuthStartRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        boolean shared = Boolean.TRUE.equals(body.shared());
-        Workspace ws = authorize(slug, jwt, shared);
+        Workspace ws = authorizeMember(slug, jwt);
         String url = mcpOAuthService.start(ws, resolveUserId(jwt), new McpOAuthService.ConnectRequest(connectorKey,
-            body.name(), body.mcpUrl(), null, null, shared, Boolean.TRUE.equals(body.allowWrites()), false,
-            body.returnTo()), body.mcpUrl());
+            body.name(), body.mcpUrl(), null, null, Boolean.TRUE.equals(body.shared()),
+            Boolean.TRUE.equals(body.allowWrites()), false, body.returnTo()), body.mcpUrl());
         return ResponseEntity.ok(ApiResponse.success(Map.of("authorizeUrl", url)));
     }
 
@@ -190,8 +189,8 @@ public class McpActionController {
         @PathVariable String slug,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorize(slug, jwt, true);
-        return ResponseEntity.ok(ApiResponse.success(connectorApps.list(ws.getId())));
+        Workspace ws = authorizeMember(slug, jwt);
+        return ResponseEntity.ok(ApiResponse.success(connectorApps.list(ws.getId(), resolveUserId(jwt))));
     }
 
     /** Enregistre l'application de l'entreprise chez un éditeur : son identifiant et son secret, chiffré au repos. */
@@ -202,7 +201,7 @@ public class McpActionController {
         @Valid @RequestBody CompanyAppRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorize(slug, jwt, true);
+        Workspace ws = authorizeMember(slug, jwt);
         return ResponseEntity.ok(ApiResponse.success(
             connectorApps.save(ws, resolveUser(jwt), connectorKey, body.clientId(), body.clientSecret())));
     }
@@ -213,14 +212,15 @@ public class McpActionController {
         @PathVariable String connectorKey,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorize(slug, jwt, true);
-        connectorApps.remove(ws.getId(), connectorKey);
+        Workspace ws = authorizeMember(slug, jwt);
+        connectorApps.remove(ws.getId(), resolveUserId(jwt), connectorKey);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
      * Importe un projet externe (issues d'un connecteur MCP) dans un nouveau projet natif TaskForce, par la connexion
-     * de la personne, jugé par les règles et gardé au dossier.
+     * de la personne, jugé par les règles et gardé au dossier. Un propriétaire ou un administrateur : le service le
+     * vérifie.
      */
     @PostMapping("/import")
     public ResponseEntity<ApiResponse<McpImportService.ImportResult>> importProject(
@@ -228,7 +228,7 @@ public class McpActionController {
         @Valid @RequestBody McpImportRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeManager(slug, jwt);
+        Workspace ws = authorizeMember(slug, jwt);
         McpImportService.ImportResult result =
             mcpImportService.importProject(ws, resolveUserId(jwt), body.connectorKey(), body.targetName());
         return ResponseEntity.ok(ApiResponse.success(result));
@@ -237,18 +237,6 @@ public class McpActionController {
     /** Membre du workspace (sinon 403). Plus de garde de plan : chaque instance a toutes les fonctionnalités (ADR-016). */
     private Workspace authorizeMember(String slug, Jwt jwt) {
         return access.resolveAndAuthorize(slug, resolveUserId(jwt));
-    }
-
-    /** Ce qui touche l'espace entier = action de gestion : membre + rôle OWNER/ADMIN (sinon 403). */
-    private Workspace authorizeManager(String slug, Jwt jwt) {
-        Workspace ws = authorizeMember(slug, jwt);
-        authorizationService.requireManager(ws.getId(), resolveUserId(jwt));
-        return ws;
-    }
-
-    /** Sa propre connexion : un membre ; une connexion partagée avec l'espace : un propriétaire ou un administrateur. */
-    private Workspace authorize(String slug, Jwt jwt, boolean shared) {
-        return shared ? authorizeManager(slug, jwt) : authorizeMember(slug, jwt);
     }
 
     private Long resolveUserId(Jwt jwt) {

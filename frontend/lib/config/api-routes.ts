@@ -413,6 +413,18 @@ export const RULES_ROUTES = {
 } as const;
 
 /**
+ * Où TaskForce range ce qu'il écrit (R156) : la cible de l'espace et celle d'un projet, les documents rangés et leur
+ * lien. Backend: @RequestMapping("/api/workspaces/{slug}") de StorageController.
+ */
+export const STORAGE_ROUTES = {
+  WORKSPACE: (slug: string) => `/api/workspaces/${slug}/storage`,
+  PROJECT: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/storage`,
+  DOCUMENT_LINK: (slug: string, documentId: number) => `/api/workspaces/${slug}/storage/documents/${documentId}/link`,
+  GOOGLE_PICKER: (slug: string) => `/api/workspaces/${slug}/storage/google/picker`,
+  MICROSOFT_FOLDERS: (slug: string) => `/api/workspaces/${slug}/storage/microsoft/folders`,
+} as const;
+
+/**
  * Ce que Cortex peut lire dans un espace (R125), compté et daté, pour le volet « Progress ».
  * Backend: @RequestMapping("/api/workspaces/{slug}/assistant/sources").
  */
@@ -550,6 +562,8 @@ export const INTEGRATION_ROUTES = {
   MCP_ACTION_EXECUTE:(slug: string) => `/api/workspaces/${slug}/mcp/actions/execute`,
   /** OAuth 1-clic (TF-MCP-02) : démarre le flux, renvoie l'URL d'autorisation */
   MCP_OAUTH_START:   (slug: string, key: string) => `/api/workspaces/${slug}/mcp/servers/${key}/oauth/start`,
+  /** Le retour du navigateur a gardé le code : l'app, connectée, finit la connexion de la personne qui l'a lancée */
+  MCP_OAUTH_COMPLETE: "/api/mcp/oauth/complete",
   /** Import d'un projet externe (TF-MCP-04) : issues d'un connecteur MCP → projet natif */
   MCP_IMPORT:        (slug: string) => `/api/workspaces/${slug}/mcp/import`,
   /** Le geste « Connect » d'un outil (TF-J2-12) : le serveur choisit le chemin et dit la suite */
