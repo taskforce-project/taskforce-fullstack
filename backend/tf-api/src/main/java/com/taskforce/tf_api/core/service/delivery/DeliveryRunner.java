@@ -65,9 +65,10 @@ public class DeliveryRunner {
     private final MissionEvidenceService evidenceService;
     private final IssueService issueService;
     private final DeliveryActivityService activityService;
+    private final ProjectDeliveryFeed feed;
 
     /** Adresse d'une pull request sur GitHub : le dépôt et le numéro. */
-    private static final Pattern PULL_REQUEST =
+    static final Pattern PULL_REQUEST =
         Pattern.compile("^https://github\\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\\d{1,9})(?:[/?#].*)?$");
 
     /** Intervalle minimal entre deux lectures d'un provider « push » pour un même run (API externe, quotas). */
@@ -107,6 +108,7 @@ public class DeliveryRunner {
             DeliveryDispatch dispatch = provider.dispatch(run.getId(), brief);
             run.setExternalRef(dispatch.externalRef());
             runRepository.save(run);
+            feed.run(run); // partie : le topic du projet le dit, même si le résultat tarde
 
             // Provider synchrone : résultat déjà là ; sinon on poll (async).
             DeliveryPoll poll = dispatch.immediateResult() != null
@@ -194,6 +196,7 @@ public class DeliveryRunner {
         runRepository.findById(runId).ifPresent(expired -> {
             moveIssueTo(expired, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
             notifyFinished(expired);
+            feed.run(expired);
         });
         log.info("Delivery run {} clos : aucun runner ne l'a réclamé en {} min", runId, timeout.toMinutes());
         return true;
@@ -226,8 +229,16 @@ public class DeliveryRunner {
      * Applique le résultat d'un poll au run : DONE -> « In review by AI », FAILED -> « Blocked », sinon RUNNING. Une
      * mission qui a un dossier de preuve y est close ici, quelle que soit la fin : résultat du runner, runner perdu. Ses
      * demandes encore ouvertes aussi : elles ne recevront plus de réponse utile (R128), et vont au dossier avant sa clôture.
+     * Le topic des missions du projet l'annonce, une fois la transaction validée.
      */
     private void applyPoll(DeliveryRun run, DeliveryPoll poll) {
+        DeliveryRunStatus before = run.getStatus();
+        applyPollStatus(run, poll);
+        // Un poll qui trouve la mission toujours en cours ne change rien : rien à annoncer.
+        if (before != run.getStatus() || run.getStatus() != DeliveryRunStatus.RUNNING) feed.run(run);
+    }
+
+    private void applyPollStatus(DeliveryRun run, DeliveryPoll poll) {
         if (poll.status() == DeliveryRunStatus.DONE || poll.status() == DeliveryRunStatus.FAILED) {
             activityService.closeApprovals(run);
         }
@@ -302,6 +313,7 @@ public class DeliveryRunner {
         moveIssueTo(run, STATUS_BLOCKED, IssueStatusCategory.STARTED, COLOR_BLOCKED);
         runRepository.save(run);
         notifyFinished(run);
+        feed.run(run);
     }
 
     /**

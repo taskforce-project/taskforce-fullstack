@@ -74,6 +74,7 @@ class DeliveryActivityServiceTest {
     @Mock private com.taskforce.tf_api.core.repository.WorkspaceMemberRepository members;
     @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
     @Mock private com.taskforce.tf_api.core.repository.DeliveryRunApprovalSignatureRepository signatures;
+    @Mock private ProjectDeliveryFeed feed;
 
     private DeliveryActivityService service;
     private User delegator;
@@ -86,7 +87,7 @@ class DeliveryActivityServiceTest {
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
             visibilityGuard, access, notificationService, settings, evidenceService,
             new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members),
-            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), signatures, members);
+            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), signatures, members, feed);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada").build();
         teammate = User.builder().id(8L).email("linus@taskforce.dev").build();
         Workspace workspace = Workspace.builder().slug("acme").build();
@@ -419,6 +420,86 @@ class DeliveryActivityServiceTest {
 
         assertThatThrownBy(() -> service.activity("acme", 100L, 0, 8L)).isInstanceOf(ForbiddenException.class);
         verify(eventRepository, never()).findByRunIdAndSeqGreaterThanOrderBySeqAsc(any(), anyInt(), any());
+    }
+
+    // --------------------------------------------------------------------- le topic des missions du projet (R166)
+
+    @Test
+    void the_timeline_moving_on_is_announced_once_per_batch_with_its_last_step() {
+        when(eventRepository.maxSeq(100L)).thenReturn(4);
+        when(eventRepository.save(any(DeliveryRunEvent.class))).thenAnswer(saved -> saved.getArgument(0));
+
+        service.appendEvents(run, List.of(
+            new RunnerEventsRequest.Event("tool", "Read", "README.md"),
+            new RunnerEventsRequest.Event("decision", "Edit", "file.edit", "allow", "floor-edit"),
+            new RunnerEventsRequest.Event("tool", "Edit", "src/footer.tsx")));
+
+        ArgumentCaptor<DeliveryRunEvent> last = ArgumentCaptor.forClass(DeliveryRunEvent.class);
+        verify(feed, org.mockito.Mockito.times(1)).step(eq(run), last.capture());
+        assertThat(last.getValue().getSeq()).isEqualTo(6);
+        assertThat(last.getValue().getTool()).isEqualTo("Edit");
+    }
+
+    @Test
+    void nothing_is_announced_when_the_timeline_does_not_move() {
+        when(eventRepository.maxSeq(100L)).thenReturn(DeliveryActivityService.MAX_EVENTS_PER_RUN);
+
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("text", null, "still working")));
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("decision", "Bash", "git push", "deny", "no-agent-push")));
+
+        verify(feed, never()).step(any(), any());
+    }
+
+    @Test
+    void a_request_opened_decided_or_run_out_of_time_is_announced() {
+        DeliveryRunApproval opened = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.save(any())).thenReturn(opened);
+        service.openApproval(run, "Bash", "npm install lodash");
+        verify(feed).approval(run, opened);
+
+        DeliveryRunApproval decided = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(decided));
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+        service.decide("acme", 100L, 9L, false, 7L);
+        verify(feed).approval(run, decided);
+        assertThat(decided.getStatus()).isEqualTo(DeliveryApprovalStatus.DENIED);
+
+        DeliveryRunApproval late = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
+        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(late));
+        service.approvalStatus(run, 9L);
+        verify(feed).approval(run, late);
+    }
+
+    @Test
+    void pending_approvals_of_a_page_say_for_each_reader_who_can_answer() {
+        Issue other = Issue.builder().id(56L).title("Fix the header").project(run.getIssue().getProject()).build();
+        DeliveryRun done = DeliveryRun.builder().id(101L).issue(other).status(DeliveryRunStatus.DONE).startedBy(delegator).build();
+        DeliveryRunApproval waiting = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        DeliveryRunApproval late = DeliveryRunApproval.builder().id(10L).run(run).tool("Bash").summary("rm -rf build")
+            .status(DeliveryApprovalStatus.PENDING).expiresAt(LocalDateTime.now().minusSeconds(1)).build();
+        when(approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(java.util.Set.of(100L), DeliveryApprovalStatus.PENDING))
+            .thenReturn(List.of(waiting, late));
+
+        Map<Long, List<DeliveryRunActivityResponse.Approval>> forDelegator = service.pendingApprovals(List.of(run, done), 7L);
+
+        // Seule la mission en cours a des demandes ouvertes ; celle dont l'échéance est passée n'en est plus une.
+        assertThat(forDelegator).containsOnlyKeys(100L);
+        assertThat(forDelegator.get(100L)).extracting(DeliveryRunActivityResponse.Approval::id).containsExactly(9L);
+        assertThat(forDelegator.get(100L).get(0).canDecide()).isTrue();
+        assertThat(late.getStatus()).isEqualTo(DeliveryApprovalStatus.EXPIRED);
+        verify(feed).approval(run, late);
+
+        when(approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(java.util.Set.of(100L), DeliveryApprovalStatus.PENDING))
+            .thenReturn(List.of(waiting));
+        assertThat(service.pendingApprovals(List.of(run), 8L).get(100L).get(0).canDecide()).isFalse();
+    }
+
+    @Test
+    void a_page_without_a_mission_at_work_reads_no_request() {
+        run.setStatus(DeliveryRunStatus.QUEUED);
+
+        assertThat(service.pendingApprovals(List.of(run), 7L)).isEmpty();
+        verify(approvalRepository, never()).findByRunIdInAndStatusOrderByCreatedAtAsc(any(), any());
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

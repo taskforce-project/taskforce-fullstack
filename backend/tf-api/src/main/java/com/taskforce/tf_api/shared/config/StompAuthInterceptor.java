@@ -53,11 +53,12 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     /** Les étapes des réponses de Cortex : même règle, {@code /topic/cortex.{userId}} n'est lu que par cette personne. */
     private static final String CORTEX_TOPIC_PREFIX   = "/topic/cortex.";
     /**
-     * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board) et
-     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA).
+     * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board),
+     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA) et {@code /topic/projects.{projectId}.delivery}
+     * (ses missions et leurs demandes, la vue du workflow, R166).
      */
     private static final String PROJECT_TOPIC_PREFIX  = "/topic/projects.";
-    private static final String ANALYSIS_SUFFIX       = ".analysis";
+    private static final List<String> PROJECT_TOPIC_SUFFIXES = List.of(".analysis", ".delivery");
     /** Ancien flux d'analyse IA par espace, {@code /topic/analysis.{workspaceId}} : retiré, tout abonnement est refusé. */
     private static final String RETIRED_ANALYSIS_PREFIX = "/topic/analysis.";
 
@@ -141,8 +142,9 @@ public class StompAuthInterceptor implements ChannelInterceptor {
      * souscription exige une session authentifiée ; en plus, les canaux porteurs de données sont vérifiés :
      * <ul>
      *   <li>{@code /topic/notifications.{userId}} — l'abonné doit être ce {@code userId} ;</li>
-     *   <li>{@code /topic/projects.{projectId}} et {@code /topic/projects.{projectId}.analysis} : l'abonné doit
-     *       <b>voir</b> le projet (public / membre / OWNER-ADMIN).</li>
+     *   <li>{@code /topic/projects.{projectId}}, {@code /topic/projects.{projectId}.analysis} et
+     *       {@code /topic/projects.{projectId}.delivery} : l'abonné doit <b>voir</b> le projet (public / membre /
+     *       OWNER-ADMIN).</li>
      * </ul>
      * Avant, seul le topic notifications était contrôlé : {@code projects.*} / {@code analysis.*} n'exigeaient
      * qu'une session authentifiée → n'importe qui pouvait streamer l'activité d'un autre compte par simple
@@ -178,10 +180,7 @@ public class StompAuthInterceptor implements ChannelInterceptor {
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
         } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {
-            String channel = destination.substring(PROJECT_TOPIC_PREFIX.length());
-            String projectId = channel.endsWith(ANALYSIS_SUFFIX)
-                ? channel.substring(0, channel.length() - ANALYSIS_SUFFIX.length())
-                : channel;
+            String projectId = projectIdOf(destination.substring(PROJECT_TOPIC_PREFIX.length()));
             if (!realtimeAuth.canSubscribeProject(userId, parseId(projectId))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
                 throw new MessageDeliveryException("Access to this channel is denied");
@@ -192,6 +191,16 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             throw new MessageDeliveryException("This channel no longer exists");
         }
         // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ceux-ci).
+    }
+
+    /** L'id du projet d'un flux de projet ({@code 12}, {@code 12.analysis}, {@code 12.delivery}) ; un seul suffixe connu. */
+    private static String projectIdOf(String channel) {
+        for (String suffix : PROJECT_TOPIC_SUFFIXES) {
+            if (channel.endsWith(suffix)) {
+                return channel.substring(0, channel.length() - suffix.length());
+            }
+        }
+        return channel;
     }
 
     /** Id numérique d'un canal ; refuse une destination malformée. */

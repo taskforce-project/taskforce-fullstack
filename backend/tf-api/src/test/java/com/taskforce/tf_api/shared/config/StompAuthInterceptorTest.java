@@ -271,8 +271,10 @@ class StompAuthInterceptorTest {
         @CsvSource({
             "/topic/projects.3.analysis, true",
             "/topic/projects.3.analysis, false",
+            "/topic/projects.3.delivery, true",
+            "/topic/projects.3.delivery, false",
         })
-        @DisplayName("🔒 projects.{id}.analysis : les analyses IA d'un projet suivent sa visibilité, comme son board")
+        @DisplayName("🔒 projects.{id}.analysis et .delivery : les analyses et les missions d'un projet suivent sa visibilité, comme son board")
         void project_analysis_stream_follows_project_visibility(String destination, boolean canView) {
             when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(canView);
             Message<byte[]> msg = subscribe(destination, "7");
@@ -296,7 +298,8 @@ class StompAuthInterceptorTest {
 
         @ParameterizedTest(name = "{0} → REFUSÉ, sans lire les droits")
         @ValueSource(strings = {"/topic/projects.3.board", "/topic/projects.abc.analysis", "/topic/projects..analysis",
-            "/topic/projects.3.analysis.analysis"})
+            "/topic/projects.3.analysis.analysis", "/topic/projects.abc.delivery", "/topic/projects..delivery",
+            "/topic/projects.3.delivery.analysis", "/topic/projects.3.analysis.delivery"})
         @DisplayName("🔒 projects.* malformé → REFUSÉ")
         void malformed_project_channels_are_rejected(String destination) {
             assertThatThrownBy(() -> interceptor.preSend(subscribe(destination, "7"), channel))

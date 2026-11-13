@@ -49,6 +49,7 @@ public class DeliveryService {
     private final BrainAccessGuard access;
     private final ProjectRepository projectRepository;
     private final IssueService issueService;
+    private final ProjectDeliveryFeed feed;
 
     /**
      * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
@@ -87,6 +88,7 @@ public class DeliveryService {
         run = runRepository.save(run);
         // J4 : la délégation se voit, la personne d'abord ; une issue sans assigné prend pour assigné qui délègue.
         issueService.assignDelegatorIfUnassigned(issue, startedBy);
+        feed.run(run); // une mission de plus au projet, en attente
 
         log.info("Délégation issue {} -> provider {} (run {}, QUEUED)", issueId, provider.key(), run.getId());
         return toResponse(run);
@@ -117,8 +119,11 @@ public class DeliveryService {
             .stream().map(this::toResponse).toList();
     }
 
-    /** Mappe le run en DTO DANS la transaction (les accès paresseux issue/startedBy y sont sûrs). */
-    private DeliveryRunResponse toResponse(DeliveryRun r) {
+    /**
+     * Mappe le run en DTO DANS la transaction (les accès paresseux issue/startedBy y sont sûrs). Public : la page des
+     * missions d'un projet ({@link ProjectDeliveryService}) l'appelle à travers le proxy transactionnel de ce service.
+     */
+    public DeliveryRunResponse toResponse(DeliveryRun r) {
         Issue issue = r.getIssue();
         Project project = issue.getProject();
         String issueKey = (project != null && issue.getSequenceNumber() != null)

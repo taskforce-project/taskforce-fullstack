@@ -176,6 +176,27 @@ class DeliveryRunApprovalRepositoryIntegrationTest extends AbstractIntegrationTe
         assertThat(read(otherPerson)).isFalse();
     }
 
+    @Test
+    @DisplayName("findByRunIdInAndStatus : les demandes de ces missions dans cet état, la plus ancienne d'abord (R166)")
+    void requests_of_a_page_of_missions_in_one_state() {
+        // Deux missions de la même issue (une reprise) : un projet n'a qu'une colonne « Backlog ».
+        Issue footer = persistIssue(web, "Fix the footer");
+        DeliveryRun one = persistRun(footer, DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        DeliveryRun two = persistRun(footer, DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        DeliveryRun elsewhere = persistRun(persistIssue(api, "Rate limit"), DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        persistApproval(one, DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        persistApproval(two, DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        persistApproval(two, DeliveryApprovalStatus.ALLOWED, LocalDateTime.now().plusMinutes(5));
+        persistApproval(elsewhere, DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        em.clear();
+
+        List<DeliveryRunApproval> pending = approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(
+            List.of(one.getId(), two.getId()), DeliveryApprovalStatus.PENDING);
+
+        assertThat(pending).extracting(a -> a.getRun().getId()).containsExactlyInAnyOrder(one.getId(), two.getId());
+        assertThat(pending).extracting(DeliveryRunApproval::getStatus).containsOnly(DeliveryApprovalStatus.PENDING);
+    }
+
     private Notification persistNotification(User recipient, String issueIdentifier, String type) {
         return notificationRepository.saveAndFlush(Notification.builder()
             .recipient(recipient).workspace(workspace).type(type).urgency("warning").title("A title")

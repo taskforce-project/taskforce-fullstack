@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -50,6 +51,7 @@ class DeliveryServiceDelegateTest {
     @Mock private BrainAccessGuard access;
     @Mock private ProjectRepository projectRepository;
     @Mock private com.taskforce.tf_api.core.service.IssueService issueService;
+    @Mock private ProjectDeliveryFeed feed;
 
     @InjectMocks private DeliveryService service;
 
@@ -76,6 +78,7 @@ class DeliveryServiceDelegateTest {
             .hasMessageContaining("Set up your local runner first");
         verify(claude).unavailableReason(argThat(ctx -> ctx.userId() == 7L && ctx.project() == project && ctx.workspace() == workspace));
         verify(runRepository, never()).save(any());
+        verifyNoInteractions(feed);
     }
 
     @Test
@@ -93,6 +96,9 @@ class DeliveryServiceDelegateTest {
         service.delegate("acme", 55L, "claude-code", null, 7L);
 
         verify(issueService).assignDelegatorIfUnassigned(issue, ada);
+        // Une mission de plus au projet, en attente : le topic de ses missions le dit (R166).
+        verify(feed).run(argThat((com.taskforce.tf_api.core.model.DeliveryRun run) -> run.getIssue() == issue
+            && run.getStatus() == com.taskforce.tf_api.core.enums.DeliveryRunStatus.QUEUED));
     }
 
     @Test

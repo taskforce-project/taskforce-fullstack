@@ -23,6 +23,9 @@ public interface DeliveryRunApprovalRepository extends JpaRepository<DeliveryRun
 
     List<DeliveryRunApproval> findByRunIdOrderByCreatedAtAsc(Long runId);
 
+    /** Les demandes de ces missions dans cet état, la plus ancienne d'abord (la vue du projet, R166). */
+    List<DeliveryRunApproval> findByRunIdInAndStatusOrderByCreatedAtAsc(Collection<Long> runIds, DeliveryApprovalStatus status);
+
     Optional<DeliveryRunApproval> findByIdAndRunId(Long id, Long runId);
 
     /**

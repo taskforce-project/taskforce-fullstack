@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.repository;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.domain.Pageable;
@@ -19,4 +20,12 @@ public interface DeliveryRunEventRepository extends JpaRepository<DeliveryRunEve
 
     /** Événements après {@code after}, dans l'ordre : le front lit la suite de ce qu'il a déjà. */
     List<DeliveryRunEvent> findByRunIdAndSeqGreaterThanOrderBySeqAsc(Long runId, Integer after, Pageable page);
+
+    /** Le dernier événement de chacune de ces missions : leur étape en cours, pour la vue du projet (R166). */
+    @Query("""
+        SELECT e FROM DeliveryRunEvent e
+        WHERE e.run.id IN :runIds
+          AND e.seq = (SELECT MAX(e2.seq) FROM DeliveryRunEvent e2 WHERE e2.run.id = e.run.id)
+        """)
+    List<DeliveryRunEvent> findLastByRunIds(@Param("runIds") Collection<Long> runIds);
 }
