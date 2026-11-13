@@ -11,7 +11,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import type { CandidateRule, RuleDraft, RulePerson, RuleScope } from "@/lib/api/rules-service"
+import type { CandidateRule, RuleApprover, RuleCaseView, RuleDraft, RulePerson, RuleScope } from "@/lib/api/rules-service"
 import { fill, problemWords, ruleSentence, type RulesTexts } from "@/lib/rules/rule-words"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useRulesStore } from "@/lib/store/rules-store"
@@ -28,6 +28,11 @@ function withApprover(rules: CandidateRule[], approver: string): CandidateRule[]
   return rules.map((rule) => rule.effect === "ask"
     ? { ...rule, require: { ...(rule.require ?? {}), approvers: [approver] } }
     : rule)
+}
+
+/** Un cas joué a-t-il cassé ? Un des cas de la règle, ou un cas d'une règle déjà là, qu'elle changerait. */
+export function caseBroke(draft: Pick<RuleDraft, "cases" | "broken">): boolean {
+  return draft.cases.some((c) => !c.passed) || draft.broken.length > 0
 }
 
 /** Faut-il demander à la personne qui accorde ? Le modèle ne l'a pas trouvée, ou il en a nommé une qui n'existe pas. */
@@ -201,6 +206,8 @@ export function AddRuleDialog({ open, onOpenChange, slug, projectId, members }: 
 function DraftView({ draft, t, members, raw, onRaw }: Readonly<{
   draft: RuleDraft; t: RulesTexts; members: RulePerson[]; raw: boolean; onRaw: () => void
 }>) {
+  // Qui TaskForce ne connaît pas se dit par les mots de la règle, jamais par sa référence brute (R161).
+  const unknown = draft.approverNeeded ?? t.add.approverToChoose
   return (
     <div className="flex flex-col gap-3 rounded-md border border-border p-3" aria-live="polite">
       {draft.rules.length > 0 && (
@@ -209,7 +216,7 @@ function DraftView({ draft, t, members, raw, onRaw }: Readonly<{
           {draft.rules.map((rule, i) => (
             <p key={i} className="text-sm text-foreground">
               {ruleSentence({ when: rule.when, effect: rule.effect ?? "ask" }, t, {
-                approvers: (rule.require?.approvers ?? []).map((ref) => namedApprover(ref, members)),
+                approvers: (rule.require?.approvers ?? []).map((ref) => namedApprover(ref, members, unknown)),
                 signatures: rule.require?.signatures, separate: rule.require?.separate,
               })}
             </p>
@@ -219,7 +226,7 @@ function DraftView({ draft, t, members, raw, onRaw }: Readonly<{
       {draft.cases.length > 0 && (
         <div className="flex flex-col gap-1">
           <p className="text-xs font-medium text-muted-foreground">{t.casesTitle}</p>
-          <RuleCaseList cases={draft.cases} t={t} />
+          <RuleCaseList cases={draft.cases.map((c) => spokenCase(c, unknown))} t={t} />
         </div>
       )}
       {draft.broken.length > 0 && (
@@ -235,12 +242,16 @@ function DraftView({ draft, t, members, raw, onRaw }: Readonly<{
         </p>
       ))}
       {draft.unclear && <p className="text-xs text-muted-foreground">{fill(t.add.unclear, { text: draft.unclear })}</p>}
-      <p className="flex items-start gap-1.5 text-sm font-medium text-foreground">
-        {draft.passed
-          ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-ink-green" aria-hidden="true" />
-          : <CircleX className="mt-0.5 size-4 shrink-0 text-ink-red" aria-hidden="true" />}
-        <span>{draft.passed ? t.add.passes : t.add.fails}</span>
-      </p>
+      {/* « Un cas ne tient pas » seulement quand un cas a été joué et a cassé (R160) ; un refus pour une autre raison
+          (personne pour accorder, une règle qui relâcherait le socle) finit sur cette raison. */}
+      {(draft.passed || caseBroke(draft) || draft.problems.length === 0) && (
+        <p className="flex items-start gap-1.5 text-sm font-medium text-foreground">
+          {draft.passed
+            ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-ink-green" aria-hidden="true" />
+            : <CircleX className="mt-0.5 size-4 shrink-0 text-ink-red" aria-hidden="true" />}
+          <span>{draft.passed ? t.add.passes : t.add.fails}</span>
+        </p>
+      )}
       <div>
         <button type="button" className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           aria-expanded={raw} onClick={onRaw}>
@@ -256,8 +267,25 @@ function DraftView({ draft, t, members, raw, onRaw }: Readonly<{
   )
 }
 
-/** Une personne désignée, avec son nom quand elle est de l'espace ; un rôle reste sa référence, dite en mots ensuite. */
-function namedApprover(ref: string, members: RulePerson[]): { ref: string; name: string | null; detail: string | null } {
+/**
+ * Une personne désignée, avec son nom quand elle est de l'espace ; un rôle reste sa référence, dite en mots ensuite.
+ * Une référence que TaskForce ne connaît pas (« head-of-finance ») ne s'écrit jamais telle quelle : `unknown`, les mots
+ * de la règle qui désignent la personne, la remplace (R161).
+ */
+function namedApprover(ref: string, members: RulePerson[], unknown: string): RuleApprover {
   const person = ref.startsWith("person:") ? members.find((m) => `person:${m.id}` === ref) : undefined
-  return { ref, name: person?.name ?? null, detail: person?.jobTitle ?? null }
+  if (person) return { ref, name: person.name, detail: person.jobTitle ?? null }
+  return { ref, name: isRole(ref) ? null : unknown, detail: null }
+}
+
+/** Un rôle qu'une règle peut désigner : `approverName` le dit en mots. */
+function isRole(ref: string): boolean {
+  return (ROLE_APPROVERS as readonly string[]).includes(ref)
+}
+
+/** Un cas joué, dont les personnes que TaskForce ne connaît pas se disent par les mots de la règle (R161). */
+function spokenCase(c: RuleCaseView, unknown: string): RuleCaseView {
+  const spoken = (a: RuleApprover): RuleApprover => (a.name || isRole(a.ref) ? a : { ...a, name: unknown })
+  return { ...c, decision: { ...c.decision, approvers: c.decision.approvers.map((set) => set.map(spoken)) },
+    expectApprovers: c.expectApprovers?.map(spoken) ?? null }
 }

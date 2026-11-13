@@ -43,6 +43,9 @@ import {
 import { apiClient } from './client';
 import { INTEGRATION_ROUTES } from '../config/api-routes';
 
+/** Les gestes d'un panneau de connexion : leur échec se dit dans le panneau, sans toast global. */
+const SILENT = { silentError: true };
+
 vi.mock('./client', () => ({
   apiClient: {
     get: vi.fn(),
@@ -374,7 +377,7 @@ describe('integration-service', () => {
 
       expect(await connectMcpServer(SLUG, payload)).toEqual([status]);
       expect(NEW_CUSTOM_MCP_KEY).toBe('custom');
-      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVERS(SLUG), payload);
+      expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_SERVERS(SLUG), payload, SILENT);
     });
 
     it('DELETE sa connexion par la clé, et dit si l\'éditeur a révoqué l\'accès', async () => {
@@ -382,30 +385,31 @@ describe('integration-service', () => {
       vi.mocked(apiClient.delete).mockResolvedValue(envelope(result));
 
       expect(await disconnectMcpServer(SLUG, 'custom-docs')).toEqual(result);
-      expect(apiClient.delete).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'custom-docs')}?shared=false`);
+      expect(apiClient.delete).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'custom-docs')}?shared=false`, SILENT);
     });
 
     it('DELETE la connexion de l\'espace avec shared=true', async () => {
       vi.mocked(apiClient.delete).mockResolvedValue(envelope({ revoked: false, revocable: false, servers: [] }));
 
       await disconnectMcpServer(SLUG, 'notion', true);
-      expect(apiClient.delete).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'notion')}?shared=true`);
+      expect(apiClient.delete).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_SERVER(SLUG, 'notion')}?shared=true`, SILENT);
     });
 
-    it('POST le geste « Connect » et rend la suite choisie par le serveur', async () => {
+    // Un échec réseau se dit une fois, dans le panneau : les gestes du panneau ne lèvent pas le toast global (R161).
+    it('POST le geste « Connect » sans toast global et rend la suite choisie par le serveur', async () => {
       const outcome = { next: 'browser', authorizeUrl: 'https://vendor.example/authorize', message: null };
       vi.mocked(apiClient.post).mockResolvedValue(envelope(outcome));
 
       expect(await connectTool(SLUG, 'notion', { allowWrites: false, shared: false })).toEqual(outcome);
       expect(apiClient.post).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_CONNECT(SLUG, 'notion'),
-        { allowWrites: false, shared: false });
+        { allowWrites: false, shared: false }, SILENT);
     });
 
     it('POST l\'accord redonné aux outils changés', async () => {
       vi.mocked(apiClient.post).mockResolvedValue(envelope([status]));
 
       expect(await approveMcpTools(SLUG, 'notion')).toEqual([status]);
-      expect(apiClient.post).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(SLUG, 'notion')}?shared=false`);
+      expect(apiClient.post).toHaveBeenCalledWith(`${INTEGRATION_ROUTES.MCP_TOOLS_APPROVE(SLUG, 'notion')}?shared=false`, undefined, SILENT);
     });
 
     it('lit, enregistre et retire l\'application de l\'entreprise, jamais son secret en retour', async () => {
@@ -416,7 +420,7 @@ describe('integration-service', () => {
 
       expect(await getCompanyApps(SLUG)).toEqual([app]);
       expect(await saveCompanyApp(SLUG, 'slack-mcp', 'c-1', 's-1')).toEqual(app);
-      expect(apiClient.put).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_APP(SLUG, 'slack-mcp'), { clientId: 'c-1', clientSecret: 's-1' });
+      expect(apiClient.put).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_APP(SLUG, 'slack-mcp'), { clientId: 'c-1', clientSecret: 's-1' }, SILENT);
       await removeCompanyApp(SLUG, 'slack-mcp');
       expect(apiClient.delete).toHaveBeenCalledWith(INTEGRATION_ROUTES.MCP_APP(SLUG, 'slack-mcp'));
     });

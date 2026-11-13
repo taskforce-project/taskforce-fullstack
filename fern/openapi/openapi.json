@@ -22765,6 +22765,9 @@
           },
           "required": {
             "type": "boolean"
+          },
+          "redirectUri": {
+            "type": "string"
           }
         }
       },
@@ -22894,6 +22897,9 @@
           },
           "tried": {
             "type": "boolean"
+          },
+          "live": {
+            "$ref": "#/components/schemas/ConnectorView"
           }
         }
       },

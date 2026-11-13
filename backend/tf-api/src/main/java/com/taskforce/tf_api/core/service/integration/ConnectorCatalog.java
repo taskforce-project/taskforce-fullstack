@@ -21,7 +21,7 @@ import com.taskforce.tf_api.core.enums.ConnectionPath;
 import com.taskforce.tf_api.core.enums.ConnectorAuthType;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
 import com.taskforce.tf_api.core.enums.ToolClass;
-import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.core.service.mcp.ConnectFailure;
 
 import jakarta.annotation.PostConstruct;
 
@@ -44,6 +44,16 @@ public class ConnectorCatalog {
 
     /** Le fichier des préréglages, dans les ressources du backend. */
     static final String PRESETS = "connectors/presets.json";
+
+    /**
+     * Le second accès d'une native (revue des écrans de J2, séance n°23, R160) : le préréglage MCP du même outil, par
+     * lequel Cortex le lit en direct avec la connexion de chaque personne. Une carte par outil : la native le porte, il
+     * n'a pas la sienne.
+     */
+    private static final Map<String, String> LIVE_ACCESS = Map.of(
+        "github", "github-mcp",
+        "slack", "slack-mcp",
+        "plane", "plane-mcp");
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -100,6 +110,18 @@ public class ConnectorCatalog {
         return byKey(key).map(d -> d.authType() == ConnectorAuthType.MCP).orElse(false);
     }
 
+    /** Le second accès de cette native, quand elle en a un : le préréglage MCP du même outil. */
+    public Optional<ConnectorDescriptor> liveAccessOf(String nativeKey) {
+        return Optional.ofNullable(nativeKey == null ? null : LIVE_ACCESS.get(nativeKey)).flatMap(this::byKey)
+            .filter(d -> d.preset() != null);
+    }
+
+    /** Ce préréglage est-il le second accès d'une native, montré dans sa carte plutôt qu'à côté ? */
+    public boolean isLiveAccess(String key) {
+        return key != null && LIVE_ACCESS.entrySet().stream()
+            .anyMatch(e -> e.getValue().equals(key) && byKey.containsKey(e.getKey()));
+    }
+
     /** Préréglage essayé de bout en bout ? (faux pour une native, une clé inconnue et un préréglage jamais essayé) */
     public boolean isTriedPreset(String key) {
         return preset(key).map(ConnectorPreset::isTried).orElse(false);
@@ -148,10 +170,11 @@ public class ConnectorCatalog {
     private static void assertAddress(ConnectorPreset preset, String url) {
         if (url == null) return;
         if (preset.api() != null) {
-            throw new BusinessException(preset.name() + " connects through its own sign-in, not by an address.");
+            throw ConnectFailure.of(ConnectFailure.OFFICIAL_SERVER_ONLY,
+                preset.name() + " connects through its own sign-in, not by an address.");
         }
         if (preset.hasOfficialServer() && !preset.serves(url)) {
-            throw new BusinessException(preset.name() + " connects only to its official server ("
+            throw ConnectFailure.of(ConnectFailure.OFFICIAL_SERVER_ONLY, preset.name() + " connects only to its official server ("
                 + java.net.URI.create(preset.mcpUrl()).getHost() + ").");
         }
     }

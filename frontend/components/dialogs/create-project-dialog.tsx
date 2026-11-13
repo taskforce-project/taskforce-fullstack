@@ -138,8 +138,10 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     setToolsLoading(true)
     getIntegrationCatalog(slug)
       .then((cat) => {
+        // Le second accès d'une native (Plane : R160) se branche comme un préréglage : il compte aussi.
         const pm = cat.categories
           .flatMap((g) => g.tools)
+          .flatMap((t) => (t.live ? [t, t.live] : [t]))
           .filter((t) => t.mcpSuggestedUrl && t.category === PM_CATEGORY)
         setTools(pm)
       })

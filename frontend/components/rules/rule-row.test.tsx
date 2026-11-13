@@ -47,6 +47,14 @@ describe("RuleCaseList", () => {
     expect(screen.getByLabelText("Doesn't hold")).toBeInTheDocument()
   })
 
+  it("a case that doesn't hold says what the rule expected of it (R161)", () => {
+    render(<RuleCaseList cases={[CEO_CASE, { ...BESIDE_CASE, passed: false, decision: CEO_CASE.decision }]} t={t} />)
+
+    const [holds, breaks] = screen.getAllByRole("listitem")
+    expect(holds).not.toHaveTextContent("expected")
+    expect(breaks).toHaveTextContent("An agent changes a file at docs/notes.md: Asks Marie Martin first (expected: allowed)")
+  })
+
   it("no case, nothing", () => {
     const { container } = render(<RuleCaseList cases={[]} t={t} />)
     expect(container).toBeEmptyDOMElement()

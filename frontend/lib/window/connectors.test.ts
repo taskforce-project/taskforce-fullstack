@@ -41,6 +41,19 @@ describe("connectorLines", () => {
     expect(connectorLines(catalog, [])).toEqual([{ key: "notion", name: "Notion", reconnect: true }])
   })
 
+  it("une carte à deux accès (R160) se montre une fois, par sa native ou par les outils de Cortex", () => {
+    const slack: ConnectorView = { ...tool("slack", "Slack", false), live: tool("slack-mcp", "Slack", true) }
+    const github: ConnectorView = { ...tool("github", "GitHub", true), live: tool("github-mcp", "GitHub", true) }
+    const plane: ConnectorView = { ...tool("plane", "Plane", false), live: { ...tool("plane-mcp", "Plane", false), state: "NEEDS_RECONNECT" } }
+    const catalog: IntegrationCatalog = { total: 3, connected: 2, categories: [{ category: "DEV", label: "Dev", tools: [slack, github, plane] }] }
+
+    expect(connectorLines(catalog, [server("slack-mcp", false)])).toEqual([
+      { key: "plane", name: "Plane", reconnect: true },
+      { key: "slack", name: "Slack", reconnect: true },
+      { key: "github", name: "GitHub", reconnect: false },
+    ])
+  })
+
   it("ne montre rien sans connecteur connecté", () => {
     expect(connectorLines({ total: 1, connected: 0, categories: [{ category: "DEV", label: "Dev", tools: [tool("github", "GitHub", false)] }] }, []))
       .toEqual([])

@@ -34,7 +34,6 @@ import com.taskforce.tf_api.core.service.integration.ConnectorPreset;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.util.LogSafe;
-import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,11 +88,15 @@ public class McpOAuthService {
     private final SecureRandom random = new SecureRandom();
 
     /** La garde anti-SSRF des adresses du flux : toujours levée, sauf dans les essais de contrat (faux serveur local). */
-    private java.util.function.Consumer<String> urlGuard = SsrfGuard::assertPublicHttpUrl;
+    private java.util.function.Consumer<String> urlGuard = ConnectFailure::assertPublicAddress;
+
+    /** La même garde pour une adresse que l'éditeur donne dans ses métadonnées : refusée, sa connexion n'est pas sûre. */
+    private java.util.function.Consumer<String> vendorGuard = ConnectFailure::assertVendorAddress;
 
     /** Essais de contrat seulement : le faux serveur d'autorisation écoute sur 127.0.0.1. */
     void allowLocalServersForContractTests() {
         urlGuard = url -> { };
+        vendorGuard = url -> { };
     }
 
     /** L'émetteur et l'adresse de l'API d'un éditeur, remplacés par ceux d'un faux éditeur (essais de contrat seulement). */
@@ -206,7 +209,7 @@ public class McpOAuthService {
         String base = fake != null ? fake[1] : api.base();
         urlGuard.accept(issuer);
         DiscoveredAuth auth = discovery.discoverIssuer(issuer);
-        urlGuard.accept(auth.authorizationEndpoint());
+        vendorGuard.accept(auth.authorizationEndpoint());
         String redirectUri = settings.redirectUri();
         McpClientRegistrar.RegisteredClient registered = registrar.clientForApi(ws.getId(), preset.key(), api.app());
 
@@ -274,8 +277,9 @@ public class McpOAuthService {
         DiscoveredAuth auth = discovery.discover(mcpUrl);
         // Le navigateur sera redirige vers authorization_endpoint (issu de la metadata d'un serveur
         // semi-fiable) : on le valide comme http(s) PUBLIC (jamais une cible interne, jamais un schema
-        // exotique type javascript:). Les autres endpoints sont deja gardes au moment du fetch serveur.
-        urlGuard.accept(auth.authorizationEndpoint());
+        // exotique type javascript:). Les autres endpoints sont deja gardes au moment du fetch serveur. Refusée, c'est la
+        // connexion de l'éditeur qui n'est pas sûre, pas l'adresse que la personne a saisie (R159).
+        vendorGuard.accept(auth.authorizationEndpoint());
         String redirectUri = settings.redirectUri();
         // L'émetteur épinglé : celui que désigne le serveur officiel du préréglage, ou, pour un serveur que l'entreprise
         // tient, celui épinglé sur son application. Lui seul reçoit un client enregistré.

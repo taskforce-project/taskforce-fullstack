@@ -353,7 +353,7 @@
       },
       "admin": {
         "required": true,
-        "text": "Create an internal Slack app for TaskForce at api.slack.com/apps: turn on its MCP access (is_mcp_enabled), add the redirect address {redirectUri} and the read user scopes, install it in your workspace, then enter its client ID and client secret in TaskForce: Settings, Integrations, Slack.",
+        "text": "Create an internal Slack app for TaskForce at api.slack.com/apps and turn on its MCP access (is_mcp_enabled). Add the redirect address {redirectUri} and these user scopes: search:read.public, search:read.private, search:read.mpim, search:read.im, search:read.files, search:read.users, channels:history, groups:history, mpim:history, im:history, channels:read, groups:read, im:read, mpim:read, users:read, files:read, canvases:read, lists:read, reactions:read, emoji:read; for Cortex to also write: chat:write, reactions:write, canvases:write and files:write. Install it in your workspace, then enter its client ID and client secret in TaskForce: Settings, Integrations, Slack.",
         "link": "https://docs.slack.dev/ai/slack-mcp-server/"
       },
       "tools": {
@@ -514,7 +514,7 @@
       "website": "https://www.figma.com",
       "mcpUrl": "https://mcp.figma.com/mcp",
       "connection": "our-app",
-      "blocked": "Figma's remote server only admits the clients of its MCP catalog; new clients join a waitlist. On the desktop app, Figma's local server (http://127.0.0.1:3845/mcp) connects by its address.",
+      "blocked": "Figma admits only the apps it has approved; new apps join a waitlist, and TaskForce isn't approved yet. In TaskForce's desktop app, you can connect Figma's local server instead: turn it on in Figma, then add its address with Connect an MCP server.",
       "tools": {
         "read": ["download_assets", "get_code_connect_map", "get_code_connect_suggestions", "get_context_for_code_connect", "get_design_context", "get_figjam", "get_generative_plugin", "get_libraries", "get_metadata", "get_motion_context", "get_screenshot", "get_shader", "get_variable_defs", "list_file_shaders", "list_generative_plugins", "list_shaders", "search_design_system", "whoami"],
         "write": ["add_code_connect_map", "send_code_connect_mappings", "create_generative_plugin", "update_generative_plugin", "create_new_file", "create_shader", "update_shader", "generate_diagram", "generate_figma_design", "generate_image", "html_to_figma", "send_code_to_figma", "upload_assets", "use_figma"]
@@ -649,7 +649,7 @@
       "connection": "company-app",
       "admin": {
         "required": true,
-        "text": "A Box admin enables the Box MCP server integration (Admin Console, Integrations), turns it on, chooses its access scopes and adds the redirect address {redirectUri}, then enters its client ID and client secret in TaskForce: Settings, Integrations, Box.",
+        "text": "In the Box Admin Console (Integrations), enable the Box MCP server integration, turn it on, choose its access scopes and add the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, Box. Only a Box admin can do this.",
         "link": "https://developer.box.com/guides/box-mcp/remote/"
       },
       "tried": null,
@@ -740,7 +740,7 @@
       "connection": "company-app",
       "admin": {
         "required": true,
-        "text": "A Wrike admin creates an OAuth app for TaskForce in Wrike's app console with the redirect address {redirectUri}, then enters its client ID and client secret in TaskForce: Settings, Integrations, Wrike.",
+        "text": "Create an OAuth app for TaskForce in Wrike's app console with the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, Wrike. Only a Wrike admin can create it.",
         "link": "https://developers.wrike.com/docs/wrike-mcp-server-overview"
       },
       "apiKey": {
@@ -807,7 +807,7 @@
       "connection": "company-app",
       "admin": {
         "required": true,
-        "text": "A Zoom admin creates a General app in the Zoom App Marketplace (Develop, Build app) with the redirect address {redirectUri} and the meeting scopes TaskForce may read, then enters its client ID and client secret in TaskForce: Settings, Integrations, Zoom.",
+        "text": "Create a General app in the Zoom App Marketplace (Develop, Build app) with the redirect address {redirectUri} and the meeting scopes TaskForce may read, then enter its client ID and client secret in TaskForce: Settings, Integrations, Zoom. Only a Zoom admin can create it.",
         "link": "https://developers.zoom.us/docs/mcp/servers/connect-to-zoom-mcp-servers/"
       },
       "tried": null,
@@ -1090,7 +1090,7 @@
       "connection": "company-app",
       "admin": {
         "required": true,
-        "text": "A PagerDuty admin registers an app with Scoped OAuth in PagerDuty with the redirect address {redirectUri}, then enters its client ID and client secret in TaskForce: Settings, Integrations, PagerDuty.",
+        "text": "Register an app with Scoped OAuth in PagerDuty with the redirect address {redirectUri}, then enter its client ID and client secret in TaskForce: Settings, Integrations, PagerDuty. Only a PagerDuty admin can register it.",
         "link": "https://developer.pagerduty.com/docs/register-an-app"
       },
       "apiKey": {

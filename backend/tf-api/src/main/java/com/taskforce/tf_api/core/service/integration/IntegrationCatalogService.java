@@ -25,6 +25,7 @@ import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
 import com.taskforce.tf_api.core.enums.ConnectorAuthType;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorAppRepository;
 import com.taskforce.tf_api.core.repository.IntegrationRepository;
@@ -49,6 +50,9 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class IntegrationCatalogService {
+
+    /** L'étape de l'administrateur revient à la personne qui regarde : « Set it up », pas une attente. */
+    static final String NEEDS_SETUP = "NEEDS_SETUP";
 
     private final ConnectorCatalog          catalog;
     private final WorkspaceRepository       workspaceRepository;
@@ -79,19 +83,31 @@ public class IntegrationCatalogService {
         }
         Set<String> companyApps = connectorApps.findByWorkspaceId(ws.getId()).stream()
             .map(a -> a.getConnectorKey()).collect(Collectors.toSet());
+        // Propriétaire ou administrateur : l'étape de l'administrateur lui revient, il ne l'attend pas (R160).
+        boolean manager = workspaceMemberRepository.findByWorkspaceIdAndUserId(ws.getId(), userId)
+            .map(m -> m.getRole() == WorkspaceRole.OWNER || m.getRole() == WorkspaceRole.ADMIN).orElse(false);
 
-        // Groupement par catégorie, dans l'ordre du registre : chaque outil du catalogue.
+        // Groupement par catégorie, dans l'ordre du registre : chaque outil du catalogue, une carte par outil. Le
+        // préréglage MCP de GitHub, Slack ou Plane est le second accès de sa native, dans sa carte (R160).
         Map<ConnectorCategory, List<ConnectorView>> groups = new EnumMap<>(ConnectorCategory.class);
         int shown = 0;
         int connected = 0;
         for (ConnectorDescriptor d : catalog.all()) {
+            if (catalog.isLiveAccess(d.key())) continue;
             ConnectedServer server = d.preset() == null ? null : used.get(d.key());
             boolean isConnected = d.preset() == null ? natives.contains(d.key())
                 : server != null && server.state() == ConnectionState.CONNECTED;
+            ConnectorView live = d.preset() != null ? null : catalog.liveAccessOf(d.key())
+                .map(l -> {
+                    ConnectedServer s = used.get(l.key());
+                    return view(l, s != null && s.state() == ConnectionState.CONNECTED, s,
+                        companyApps.contains(l.key()), manager, null);
+                })
+                .orElse(null);
             shown++;
-            if (isConnected) connected++;
+            if (isConnected || (live != null && live.connected())) connected++;
             groups.computeIfAbsent(d.category(), k -> new ArrayList<>())
-                .add(view(d, isConnected, server, companyApps.contains(d.key())));
+                .add(view(d, isConnected, server, companyApps.contains(d.key()), manager, live));
         }
 
         // Serveurs hors catalogue : ajoutés à la main (custom-…), ou connexions MCP héritées des tuiles retirées
@@ -109,23 +125,28 @@ public class IntegrationCatalogService {
         return new IntegrationCatalogResponse(shown + custom.size(), connected + customConnected, out);
     }
 
-    /** La fiche d'un outil du catalogue pour cette personne : l'état de sa connexion, et ce qu'il faut pour la faire. */
-    private ConnectorView view(ConnectorDescriptor d, boolean connected, ConnectedServer server, boolean companyApp) {
+    /**
+     * La fiche d'un outil du catalogue pour cette personne : l'état de sa connexion, et ce qu'il faut pour la faire.
+     * Un outil qui attend l'application de l'entreprise dit « en attente » à un membre, et {@value #NEEDS_SETUP} à un
+     * propriétaire ou un administrateur, qui la saisit.
+     */
+    private ConnectorView view(ConnectorDescriptor d, boolean connected, ConnectedServer server, boolean companyApp,
+                               boolean manager, ConnectorView live) {
         ConnectorPreset p = d.preset();
         String state = p == null ? (connected ? "CONNECTED" : "NOT_CONNECTED")
             : server == null ? "NOT_CONNECTED" : server.state().name();
         if (p != null && server == null && p.connection() == ConnectionPath.COMPANY_APP && !companyApp) {
-            state = ConnectionState.WAITING_FOR_ADMIN.name();
+            state = manager ? NEEDS_SETUP : ConnectionState.WAITING_FOR_ADMIN.name();
         }
         AdminStep admin = p == null || p.admin() == null ? null
-            : new AdminStep(adminText(p.admin().text()), adminLink(p), p.admin().required());
+            : new AdminStep(adminText(p.admin().text()), adminLink(p), p.admin().required(), redirectToRegister(p));
         KeyGuide key = p == null || p.apiKey() == null ? null : new KeyGuide(p.apiKey().hint(), p.apiKey().link());
         boolean writeChoice = p != null && (p.readUrl() != null || !p.scopesFor(false).equals(p.scopesFor(true)));
         return new ConnectorView(d.key(), d.name(), d.category().name(), d.authType().name(), connected, d.fields(),
             d.capabilities(), d.description(), d.docsUrl(), d.setupHint(), d.websiteUrl(), d.mcpSuggestedUrl(),
             state, server == null ? null : server.accountLabel(), server == null ? null : server.scope().name(),
             p == null ? null : p.connection().wire(), admin, key, companyApp, writeChoice,
-            p == null ? null : p.blocked(), p == null || p.isTried());
+            p == null ? null : p.blocked(), p == null || p.isTried(), live);
     }
 
     /**
@@ -137,6 +158,11 @@ public class IntegrationCatalogService {
         if (link == null || !link.contains("{clientId}")) return link;
         String id = p.api() == null ? null : oauthSettings.apiClientId(p.api().app());
         return id == null ? null : link.replace("{clientId}", java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /** L'adresse de retour que l'étape de l'administrateur demande d'enregistrer chez l'éditeur ; nulle sinon (R161). */
+    private String redirectToRegister(ConnectorPreset p) {
+        return p.admin().text().contains("{redirectUri}") ? oauthSettings.redirectUri() : null;
     }
 
     private String adminText(String text) {

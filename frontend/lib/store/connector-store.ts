@@ -1,6 +1,7 @@
 import { create } from "zustand"
 
 import { getErrorMessage } from "../api/client"
+import { failureOf, type ConnectFailure } from "../integrations/connect-failure"
 import {
   approveMcpTools,
   connectTool,
@@ -28,6 +29,8 @@ interface ConnectorState {
   waiting: string | null
   /** Le dernier échec, dit pour la personne. */
   error: string | null
+  /** Le dernier geste « Connect » qui a échoué : sa raison, pour la phrase du panneau (R160), et le texte brut à part. */
+  failure: ConnectFailure | null
 
   connect: (slug: string, key: string, payload: ConnectPayload) => Promise<ConnectOutcome | null>
   /** Attend que la connexion apparaisse, le temps que la personne finisse dans son navigateur. */
@@ -38,6 +41,8 @@ interface ConnectorState {
   saveCompanyApp: (slug: string, key: string, clientId: string, clientSecret: string) => Promise<boolean>
   servers: (slug: string) => Promise<McpServerStatus[] | null>
   forget: (key: string) => void
+  /** Efface l'échec de cet outil seulement : son panneau se ferme, le dialogue rouvert repart sans lui (R161). */
+  clearFailure: (key: string) => void
 }
 
 export interface WaitOptions {
@@ -54,15 +59,16 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
   busy: null,
   waiting: null,
   error: null,
+  failure: null,
 
   connect: async (slug, key, payload) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       const outcome = await connectTool(slug, key, payload)
       set((s) => ({ outcomes: { ...s.outcomes, [key]: outcome }, busy: null }))
       return outcome
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key) })
       return null
     }
   },
@@ -91,7 +97,7 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
   stopWaiting: () => set({ waiting: null }),
 
   disconnect: async (slug, key, shared) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       const result = await disconnectMcpServer(slug, key, shared)
       set((s) => {
@@ -101,31 +107,31 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
       })
       return result
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key, "notDisconnected") })
       return null
     }
   },
 
   approveTools: async (slug, key, shared) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       const list = await approveMcpTools(slug, key, shared)
       set({ busy: null })
       return list
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key, "notApproved") })
       return null
     }
   },
 
   saveCompanyApp: async (slug, key, clientId, clientSecret) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       await saveCompanyApp(slug, key, clientId, clientSecret)
       set({ busy: null })
       return true
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key, "appNotSaved") })
       return false
     }
   },
@@ -143,6 +149,8 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
     set((s) => {
       const outcomes = { ...s.outcomes }
       delete outcomes[key]
-      return { outcomes, error: null }
+      return { outcomes, error: null, failure: s.failure?.key === key ? null : s.failure }
     }),
+
+  clearFailure: (key) => set((s) => (s.failure?.key === key ? { failure: null, error: null } : {})),
 }))

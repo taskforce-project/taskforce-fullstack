@@ -72,9 +72,28 @@ describe("AddRuleDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
 
     expect(await screen.findByText(/can only make TaskForce stricter/)).toBeInTheDocument()
-    expect(screen.getByText("A case doesn't hold, so TaskForce won't add the rule as it is written.")).toBeInTheDocument()
+    // Aucun cas n'a été joué : le refus finit sur sa raison, sans accuser « un cas » (R160).
+    expect(screen.queryByText(/A case doesn't hold/)).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Add the rule" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument()
+  })
+
+  it("only a case that was played and broke is blamed: a missing approver ends on its own reason (R160)", async () => {
+    draftRule.mockResolvedValueOnce(draft({ passed: false, cases: [], problems: [{ code: "badApprover", detail: null }] }))
+    open()
+    await write(CEO_RULE)
+    await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
+
+    expect(await screen.findByText("TaskForce doesn't know who should approve. Choose them below.")).toBeInTheDocument()
+    expect(screen.queryByText(/A case doesn't hold/)).not.toBeInTheDocument()
+
+    // Un cas joué qui casse : la ligne le dit.
+    draftRule.mockResolvedValueOnce(draft({ passed: false, cases: [{ ...draft().cases[0]!, passed: false }] }))
+    await write(`${CEO_RULE}.`)
+    await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
+    // Le dialogue dit quoi faire, pas seulement que la règle n'entre pas (R161).
+    expect(await screen.findByText("A case doesn't hold, so TaskForce won't add the rule as it is written. Say more precisely which actions it covers, then check it again."))
+      .toBeInTheDocument()
   })
 
   it("when TaskForce doesn't know who approves, it asks, then checks the same rule again without the model", async () => {
@@ -98,6 +117,22 @@ describe("AddRuleDialog", () => {
       cases: unresolved.modelCases,
     }))
     expect(await screen.findByRole("button", { name: "Add the rule" })).toBeInTheDocument()
+  })
+
+  it("a rule refused for its approver never prints the raw reference: the rule's words name the person (R161)", async () => {
+    const asks = draft().cases[0]!
+    draftRule.mockResolvedValueOnce(draft({ passed: false, approverNeeded: "the head of finance",
+      problems: [{ code: "badApprover", detail: null }],
+      rules: [{ when: { action: "file.write", path: "**/accounting/**" }, effect: "ask", require: { approvers: ["head-of-finance"] } }],
+      cases: [{ ...asks, decision: { ...asks.decision, approvers: [[{ ref: "head-of-finance", name: null, detail: null }]] } }] }))
+    open()
+    await write(CEO_RULE)
+    await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
+
+    expect(await screen.findByText("Asks the head of finance first when anyone changes a file under any accounting folder."))
+      .toBeInTheDocument()
+    expect(screen.getByRole("list", { name: "Its cases" })).toHaveTextContent("Asks the head of finance first")
+    expect(screen.queryByText(/head-of-finance/)).not.toBeInTheDocument()
   })
 
   it("a rule refused at save time shows its check again", async () => {
