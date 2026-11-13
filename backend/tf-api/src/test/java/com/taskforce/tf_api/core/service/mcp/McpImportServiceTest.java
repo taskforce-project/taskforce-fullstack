@@ -86,10 +86,26 @@ class McpImportServiceTest {
         lenient().when(workspaces.findById(10L)).thenReturn(Optional.of(ws));
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
+        // La personne qui importe (7) est propriétaire de l'espace : le service vérifie lui-même le rôle.
+        lenient().when(members.findByWorkspaceIdAndUserId(10L, 7L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.OWNER).build()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
             new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm),
             new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
-            approvers());
+            approvers(), new com.taskforce.tf_api.core.service.AuthorizationService(members));
+    }
+
+    @Test
+    @DisplayName("import : un membre qui n'administre pas l'espace est refusé par le service, avant toute lecture ni projet")
+    void a_member_cannot_import() {
+        when(members.findByWorkspaceIdAndUserId(10L, 8L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.MEMBER).build()));
+
+        assertThatThrownBy(() -> service.importProject(ws, 8L, "linear", "X")).isInstanceOf(ForbiddenException.class);
+        verify(workspaceMcp, never()).toolFor(any(), any(), any());
+        verify(workspaceMcp, never()).toolsFor(any());
+        verify(records, never()).open(any(), any(), any());
+        verify(projectService, never()).createProject(anyString(), anyLong(), any());
     }
 
     private RuleApprovers approvers() {
@@ -171,7 +187,8 @@ class McpImportServiceTest {
         CortexGate deny = Mockito.mock(CortexGate.class);
         when(deny.judge(any(), any(Map.class))).thenReturn(new CortexGate.Verdict("deny", "frozen", "Imports are frozen.", Map.of()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
-            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), deny, records, approvers());
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), deny, records, approvers(),
+            new com.taskforce.tf_api.core.service.AuthorizationService(members));
 
         assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X")).hasMessageContaining("Imports are frozen.");
         verify(mcp, never()).callTool(any(), any(), any());
@@ -180,7 +197,7 @@ class McpImportServiceTest {
     }
 
     @Test
-    @DisplayName("import : une règle qui désigne qui accorde vaut comme dans la console ; un membre seul n'y suffit pas")
+    @DisplayName("import : une règle qui désigne qui accorde vaut comme dans la console ; un administrateur seul n'y suffit pas")
     @SuppressWarnings("unchecked")
     void the_approvers_a_rule_designates_are_enforced() throws Exception {
         connectorWithTools("list_issues");
@@ -193,10 +210,12 @@ class McpImportServiceTest {
         when(gate.judge(any(), any(Map.class))).thenAnswer(inv -> "project.create".equals(
             ((Map<String, String>) inv.getArgument(1)).get("action")) ? ownerOnly
             : new CortexGate.Verdict("allow", "read-company-tools", "Read.", Map.of()));
+        // Un administrateur peut importer, mais la règle désigne le propriétaire.
         when(members.findByWorkspaceIdAndUserId(10L, 7L)).thenReturn(Optional.of(
-            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.MEMBER).build()));
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.ADMIN).build()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
-            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), gate, records, approvers());
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), gate, records, approvers(),
+            new com.taskforce.tf_api.core.service.AuthorizationService(members));
 
         assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X"))
             .isInstanceOf(ForbiddenException.class)

@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.UserRepository;
-import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.mcp.ConnectorAppService;
 import com.taskforce.tf_api.core.service.mcp.McpActionService;
@@ -53,7 +52,6 @@ public class McpActionController {
     private final WorkspaceMcpService  workspaceMcp;
     private final UserRepository       userRepository;
     private final BrainAccessGuard     access;
-    private final AuthorizationService authorizationService;
     private final McpOAuthService      mcpOAuthService;
     private final McpImportService     mcpImportService;
     private final McpActionService     mcpActionService;
@@ -221,7 +219,8 @@ public class McpActionController {
 
     /**
      * Importe un projet externe (issues d'un connecteur MCP) dans un nouveau projet natif TaskForce, par la connexion
-     * de la personne, jugé par les règles et gardé au dossier.
+     * de la personne, jugé par les règles et gardé au dossier. Un propriétaire ou un administrateur : le service le
+     * vérifie.
      */
     @PostMapping("/import")
     public ResponseEntity<ApiResponse<McpImportService.ImportResult>> importProject(
@@ -229,7 +228,7 @@ public class McpActionController {
         @Valid @RequestBody McpImportRequest body,
         @AuthenticationPrincipal Jwt jwt
     ) {
-        Workspace ws = authorizeManager(slug, jwt);
+        Workspace ws = authorizeMember(slug, jwt);
         McpImportService.ImportResult result =
             mcpImportService.importProject(ws, resolveUserId(jwt), body.connectorKey(), body.targetName());
         return ResponseEntity.ok(ApiResponse.success(result));
@@ -238,13 +237,6 @@ public class McpActionController {
     /** Membre du workspace (sinon 403). Plus de garde de plan : chaque instance a toutes les fonctionnalités (ADR-016). */
     private Workspace authorizeMember(String slug, Jwt jwt) {
         return access.resolveAndAuthorize(slug, resolveUserId(jwt));
-    }
-
-    /** Ce qui touche l'espace entier = action de gestion : membre + rôle OWNER/ADMIN (sinon 403). */
-    private Workspace authorizeManager(String slug, Jwt jwt) {
-        Workspace ws = authorizeMember(slug, jwt);
-        authorizationService.requireManager(ws.getId(), resolveUserId(jwt));
-        return ws;
     }
 
     private Long resolveUserId(Jwt jwt) {

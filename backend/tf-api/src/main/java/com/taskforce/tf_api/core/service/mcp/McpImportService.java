@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.AiMeter;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
@@ -41,8 +42,9 @@ import lombok.extern.slf4j.Slf4j;
  * les <b>normalise</b> en une passe LLM (générique, quel que soit le serveur), crée un projet <b>natif</b>
  * TaskForce et y recrée les issues en masse. C'est le « importer son boulot ici » du wizard.
  *
- * <p>Autorisation (membre + gestionnaire) faite en amont par le contrôleur. Réutilise
- * {@link WorkspaceMcpService} pour le fetch (session + token OAuth gérés), donc aucun code par service.
+ * <p>Un projet créé vaut pour tout l'espace : le service vérifie lui-même que la personne en est propriétaire ou
+ * administratrice (règle 3). Réutilise {@link WorkspaceMcpService} pour le fetch (session + token OAuth gérés), donc
+ * aucun code par service.
  */
 @Service
 @RequiredArgsConstructor
@@ -62,6 +64,7 @@ public class McpImportService {
     private final CortexGate gate;
     private final CortexRecordService records;
     private final RuleApprovers approvers;
+    private final AuthorizationService authorization;
 
     /** Résultat d'un import : le projet créé + le nombre d'issues importées / trouvées. */
     public record ImportResult(Long projectId, String projectIdentifier, String projectName,
@@ -77,6 +80,7 @@ public class McpImportService {
      * arrête l'import ; une action demandée est accordée par le clic « Import » de la personne, qui entre au dossier.
      */
     public ImportResult importProject(Workspace ws, Long userId, String connectorKey, String targetName) {
+        authorization.requireForConnection(ws.getId(), userId, true);
         if (connectorKey == null || connectorKey.isBlank()) throw new BusinessException("connectorKey is required");
         if (targetName == null || targetName.isBlank()) throw new BusinessException("The target project name is required");
 
