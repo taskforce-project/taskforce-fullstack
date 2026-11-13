@@ -572,6 +572,8 @@ export const CONSTANTS_EN = {
       approverAdmin: "An admin of the workspace",
       approverOwner: "The workspace's owner",
       approverLead: "The project's lead",
+      // Who approves, when TaskForce doesn't know the person the rule names and has no words for them
+      approverToChoose: "the person you choose below",
       edited: "Your words changed: check the rule again.",
     },
     problems: {
