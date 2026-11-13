@@ -342,14 +342,23 @@ function argWords(key: string): string {
 
 const TITLE_KEYS = new Set(["title", "name", "subject", "summary"])
 const ID_WORD = /(^| )(id|ids|uuid|guid|token|cursor|url|uri|href|key|secret|password)$/
-/** Un argument dont le nom dit un secret : sa valeur ne se montre nulle part, ni dans la phrase, ni sous « Details ». */
-const SECRET_WORD = /(^| )(password|passwd|passphrase|pass|pin|secret|secrets|token|tokens|key|keys|apikey|credential|credentials|auth|authorization|cookie|otp)$/
+/**
+ * Un argument dont le nom dit un secret : sa valeur ne se montre nulle part, ni dans la phrase, ni sous « Details ».
+ * « auth » seul en est un ; `oauth` et `author` n'en sont pas.
+ */
+const SECRET_WORD = /(^| )(password|passwd|passphrase|pass|pin|secret|secrets|token|tokens|apikey|credential|credentials|auth|authorization|cookie|otp)$/
+/**
+ * « key » n'est un secret que seul, ou après un mot qui en fait un (`apiKey`, `privateKey`) : `issueKey` ou
+ * `projectKey` disent où l'action arrive, et restent montrés.
+ */
+const SECRET_KEY = /^keys?$|(^| )(api|access|secret|private|client|signing|encryption|ssh|license|session|auth) keys?$/
 /** Où l'action arrive : un canal, un dépôt, une page, un projet. Toujours dit, même quand c'est un identifiant. */
 const PLACE_WORD = /^(channel|channels|conversation|thread|repo|repository|page|parent|project|database|board|folder|space|team|list|calendar|site|drive|table|sheet|base|workspace)( (id|ids|name|key|slug))?$/
 
 /** Le nom de cet argument dit-il un secret (`password`, `apiKey`, `pin`) ? */
 export function namesSecret(key: string): boolean {
-  return SECRET_WORD.test(argWords(key)) || SECRET_WORD.test(key.toLowerCase())
+  const words = argWords(key)
+  return SECRET_WORD.test(words) || SECRET_KEY.test(words) || SECRET_WORD.test(key.toLowerCase())
 }
 
 /** Une valeur qui identifie plutôt qu'elle ne dit : un id, une adresse, un jeton opaque (« e3b0c442-98fc-1c14 »). */

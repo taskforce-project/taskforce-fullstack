@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest"
 import type { AssistantAnswer, AssistantRead, AssistantToolCall } from "@/lib/api/assistant-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import {
-  actionArguments, actionRaw, actionWords, amountText, articleFor, didWork, mainValues, outcomeLine, plainOutput, proposal,
-  proposalLine, serviceOf, stepLine, toolWords, workedLine, workedTime, workSentences,
+  actionArguments, actionRaw, actionWords, amountText, articleFor, didWork, mainValues, namesSecret, outcomeLine, plainOutput,
+  proposal, proposalLine, serviceOf, stepLine, toolWords, workedLine, workedTime, workSentences,
 } from "./work-lines"
 
 const t = CONSTANTS_EN.thread
@@ -267,6 +267,17 @@ describe("proposalLine : la carte d'une action demandée, sans nom d'outil", () 
     const raw = actionRaw(input, t) ?? ""
     expect(raw).not.toMatch(/hunter2|1234|sk_live_1|t-1/)
     expect(raw).toContain("\"password\": \"Hidden\"")
+  })
+
+  it("hides a key only when its name makes it a secret: a key that says where the action lands stays shown", () => {
+    for (const shown of ["issueKey", "issueIdOrKey", "projectKey", "sortKey", "author"]) expect(namesSecret(shown), shown).toBe(false)
+    for (const masked of ["apiKey", "api_key", "accessKey", "privateKey", "client_secret", "password", "pin", "token", "key"]) {
+      expect(namesSecret(masked), masked).toBe(true)
+    }
+    // Une carte de Jira dit quel ticket elle change sous « Details », et le projet dans sa phrase.
+    const edit = JSON.stringify({ issueIdOrKey: "FIN-42", projectKey: "FIN", summary: "Fix VAT rounding" })
+    expect(actionArguments(edit, t).find((r) => r.key === "issueIdOrKey")).toMatchObject({ secret: false, value: "FIN-42" })
+    expect(mainValues(edit, "atlassian__editJiraIssue").map((v) => v.text)).toContain("FIN")
   })
 
   it("keeps three short values at most, the title first, and reads only an object", () => {
