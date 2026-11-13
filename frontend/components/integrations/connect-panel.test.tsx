@@ -229,6 +229,31 @@ describe("ConnectPanel", () => {
     expect(useConnectorStore.getState().outcomes["slack-mcp"]).toBeUndefined()
   })
 
+  it("a refused company app and a failed disconnection say so in the panel, never as raw text in a toast (R161)", async () => {
+    saveCompanyApp.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "zoom", kind: "appNotSaved", raw: "Enter the client ID of your company's app" } })
+      return false
+    })
+    const view = show(notion({ key: "zoom", name: "Zoom", connection: "company-app", state: "NEEDS_SETUP",
+      admin: { text: "Create a Zoom app.", link: null, required: true } }), true)
+    fireEvent.change(screen.getByLabelText(t.clientId), { target: { value: "c-1" } })
+    fireEvent.click(screen.getByRole("button", { name: t.saveAndConnect }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failures.appNotSaved.replace("{name}", "Zoom"))
+    expect(toast.error).not.toHaveBeenCalled()
+    expect((screen.getByLabelText(t.clientId) as HTMLInputElement).value).toBe("c-1")
+    view.unmount()
+
+    disconnect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "notion", kind: "notDisconnected", raw: "HTTP 500" } })
+      return null
+    })
+    show(notion({ connected: true, state: "CONNECTED", scope: "PERSONAL" }))
+    fireEvent.click(screen.getByRole("button", { name: t.disconnect }))
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect Notion" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failures.notDisconnected.replace("{name}", "Notion"))
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
   it("a failure keeps what the person typed: the step stays mounted when its note appears (R161)", async () => {
     useConnectorStore.setState({ outcomes: { stripe: { next: "key", authorizeUrl: null, message: null } } })
     connect.mockImplementation(async () => {

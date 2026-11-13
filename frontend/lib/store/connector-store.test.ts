@@ -47,6 +47,20 @@ describe("useConnectorStore", () => {
     expect(useConnectorStore.getState().failure).toEqual({ key: "notion", kind: "unknown", raw: "Only owners and admins can do this." })
   })
 
+  it("the other gestures keep their failure with the reason that suits them (R161)", async () => {
+    vi.mocked(service.saveCompanyApp).mockRejectedValue(new Error("Enter the client ID"))
+    expect(await useConnectorStore.getState().saveCompanyApp("acme", "zoom", "", "")).toBe(false)
+    expect(useConnectorStore.getState().failure).toEqual({ key: "zoom", kind: "appNotSaved", raw: "Enter the client ID" })
+
+    vi.mocked(service.approveMcpTools).mockRejectedValue(new Error("boom"))
+    expect(await useConnectorStore.getState().approveTools("acme", "notion", false)).toBeNull()
+    expect(useConnectorStore.getState().failure?.kind).toBe("notApproved")
+
+    vi.mocked(service.disconnectMcpServer).mockRejectedValue(new Error("boom"))
+    expect(await useConnectorStore.getState().disconnect("acme", "notion", false)).toBeNull()
+    expect(useConnectorStore.getState().failure?.kind).toBe("notDisconnected")
+  })
+
   it("a new gesture, or forgetting the tool, clears its failure; another tool's stays", async () => {
     useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
     useConnectorStore.getState().forget("linear")

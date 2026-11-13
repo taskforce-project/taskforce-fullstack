@@ -16,7 +16,6 @@ import { BrandLogo } from "@/components/ui/brand-logo"
 import { DesktopGitHubConnect } from "@/components/desktop/desktop-github-connect"
 import { cn } from "@/lib/utils"
 import { IS_DESKTOP, type DesktopToolsStatus } from "@/lib/desktop"
-import { getErrorMessage } from "@/lib/api/client"
 import { fillText } from "@/lib/delivery/result-card"
 import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { useDesktopToolsStore } from "@/lib/store/desktop-tools-store"
@@ -843,16 +842,18 @@ function NativeOAuthPanel({ slug, tool, manager, onClose, second }: PanelProps) 
   const { disconnectGitHub, disconnectSlack } = useIntegrationStore()
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [failure, setFailure] = useState<ConnectFailure | null>(null)
 
   async function handleDisconnect() {
     setBusy(true)
+    setFailure(null)
     try {
       if (tool.key === "github") await disconnectGitHub(slug)
       else await disconnectSlack(slug)
       toast.success(`${tool.name} disconnected`)
       onClose()
     } catch (e) {
-      toast.error(getErrorMessage(e))
+      setFailure(failureOf(e, tool.key, "notDisconnected"))
     } finally {
       setBusy(false)
     }
@@ -860,6 +861,7 @@ function NativeOAuthPanel({ slug, tool, manager, onClose, second }: PanelProps) 
 
   return (
     <div className="flex flex-col gap-3">
+      {failure && <FailureNote failure={failure} name={tool.name} />}
       <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
         <Check className="size-4 shrink-0" />
         <span>{fillText(c.nativeConnected, { name: tool.name })}</span>
@@ -1103,7 +1105,8 @@ function McpServerForm({
         : list.find((x) => x.connectorKey === tool.key) ?? null
       const label = isCustom ? name.trim() : tool.name
       if (s?.reachable) toast.success(`${label}: ${s.tools.length} tool(s) live in Cortex`)
-      else toast.error(`${label} is saved, but the server can't be reached${s?.error ? `: ${s.error}` : ""}`)
+      // Sans le texte du serveur : il reste dans le dialogue du serveur, à deux clics (R161).
+      else toast.error(fillText(texts.savedUnreachableToast, { name: label }))
       onChanged()
       // Un nouveau serveur prend sa clé définitive côté serveur : sa carte apparaît au catalogue.
       if (isNew) onClose()
@@ -1137,7 +1140,7 @@ function McpServerForm({
       onChanged()
       if (isCustom) onClose()
     } catch (e) {
-      toast.error(getErrorMessage(e))
+      setFailure(failureOf(e, tool.key, "notDisconnected"))
     } finally {
       setBusy(false)
     }
@@ -1172,11 +1175,10 @@ function McpServerForm({
             )}
           </div>
         ) : (
-          <div className="flex items-start gap-2 rounded-md border border-shape-yellow/25 bg-shape-yellow/10 p-3 text-xs text-ink-yellow">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <span>Server saved but <span className="font-medium">unreachable</span>{status.error ? `: ${status.error}` : ""}.</span>
-          </div>
+          // La cause d'abord ; le texte du serveur, qui peut porter son adresse entière, à deux clics (R161).
+          <FailureNote failure={{ key: tool.key, kind: "savedUnreachable", raw: status.error }} name={tool.name} />
         )}
+        {failure && <FailureNote failure={failure} name={tool.name} />}
         <DialogFooter className="sm:justify-between">
           <Button variant="outline" size="sm"
                   className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"

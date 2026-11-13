@@ -4,7 +4,7 @@ import { CONSTANTS_EN } from "@/lib/constants_en"
 import { fillText } from "@/lib/delivery/result-card"
 
 type ConnectTexts = (typeof CONSTANTS_EN)["connect"]
-type FailureKind = keyof ConnectTexts["failures"]
+export type FailureKind = keyof ConnectTexts["failures"]
 
 /**
  * Une connexion à un outil qui n'a pas abouti (revue des écrans de J2, séance n°23, R160) : la raison que le serveur
@@ -24,17 +24,20 @@ export interface ConnectFailure {
 const isKind = (code: unknown): code is FailureKind =>
   typeof code === "string" && Object.prototype.hasOwnProperty.call(CONSTANTS_EN.connect.failures, code)
 
-/** L'échec d'un geste de connexion, lu dans l'erreur de l'appel : sa raison, et le texte brut à part. */
-export function failureOf(error: unknown, key: string): ConnectFailure {
+/**
+ * L'échec d'un geste, lu dans l'erreur de l'appel : sa raison, et le texte brut à part. `fallback` : ce que le geste
+ * dit quand le serveur ne donne pas de raison connue (« Your company's app wasn't saved » plutôt qu'une connexion).
+ */
+export function failureOf(error: unknown, key: string, fallback: FailureKind = "unknown"): ConnectFailure {
   if (axios.isAxiosError(error)) {
     if (!error.response) return { key, kind: "network", raw: error.message || null }
     const data = error.response.data as { error?: unknown; message?: unknown } | undefined
     const raw = typeof data?.message === "string" && data.message ? data.message : error.message || null
     if (error.response.status === 403) return { key, kind: "forbidden", raw }
     const code = data?.error
-    return { key, kind: isKind(code) ? code : "unknown", raw }
+    return { key, kind: isKind(code) ? code : fallback, raw }
   }
-  return { key, kind: "unknown", raw: error instanceof Error && error.message ? error.message : null }
+  return { key, kind: fallback, raw: error instanceof Error && error.message ? error.message : null }
 }
 
 /**

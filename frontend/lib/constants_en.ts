@@ -920,6 +920,8 @@ export const CONSTANTS_EN = {
     liveWaitingForAdmin: "Cortex waits for your admin",
     liveReturnedConnected: "Cortex is connected to {name}.",
     nativeConnected: "{name} is connected for this workspace.",
+    // A server saved but not reached: the toast says it once, the server's own words stay in its dialog
+    savedUnreachableToast: "{name} is saved, but TaskForce can't reach it yet. Open it in Integrations to see why.",
     // An added server not yet named, in a failure sentence
     thisServer: "This server",
     // A member: who connects a built-in integration, instead of a button refused to them (R161)
@@ -1006,6 +1008,11 @@ export const CONSTANTS_EN = {
       network: "TaskForce's server can't be reached, so {name} wasn't connected. Check your connection, then try again.",
       forbidden: "Only owners and admins can do this. Ask one of them to connect {name}.",
       unknown: "{name} wasn't connected, and TaskForce can't tell why. Try again; if it fails again, show the details to your admin.",
+      // The dialogs' other gestures
+      appNotSaved: "Your company's app for {name} wasn't saved. Check its client ID and secret, then save it again.",
+      notApproved: "The changed tools of {name} weren't approved. Try again in a moment.",
+      notDisconnected: "{name} wasn't disconnected. Try again in a moment; if it fails again, show the details to your admin.",
+      savedUnreachable: "{name} is saved, but TaskForce can't reach it. Check that the server runs and that its address is right, then connect again.",
     },
     // The same failures when the tool offers a key, and the panel offers it too (R161)
     failuresWithKey: {
@@ -1028,6 +1035,10 @@ export const CONSTANTS_EN = {
       network: "reaching TaskForce's server",
       forbidden: "checking your role in this workspace",
       unknown: "connecting {name}",
+      appNotSaved: "saving your company's app",
+      notApproved: "approving the changed tools",
+      notDisconnected: "disconnecting {name}",
+      savedUnreachable: "reaching {name}",
     },
     failureDetails: "Details",
     failureHideDetails: "Hide the details",

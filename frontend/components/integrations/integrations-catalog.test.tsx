@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { AxiosError, AxiosHeaders } from "axios"
 
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
-import { connectMcpServer, getIntegrationCatalog } from "@/lib/api/integration-service"
+import { connectMcpServer, getIntegrationCatalog, getMcpServers } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useConnectorStore } from "@/lib/store/connector-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -194,6 +194,25 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     // Le cadre de Cortex vient avant les champs, que leur bouton suit directement.
     expect(cortex.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     unmount()
+  })
+
+  it("an added server that can't be reached says why first, its full address two clicks away (R161)", async () => {
+    const docs: ConnectorView = { key: "custom-docs", name: "Docs", category: "CUSTOM_MCP", authType: "MCP", connected: true,
+      fields: [], capabilities: ["mcp"], description: "docs.corp.example", docsUrl: null, setupHint: null, websiteUrl: null,
+      mcpSuggestedUrl: null, state: "CONNECTED", scope: "PERSONAL", connection: null }
+    vi.mocked(getIntegrationCatalog).mockResolvedValue({ total: 1, connected: 1,
+      categories: [{ category: "CUSTOM_MCP", label: "Your MCP servers", tools: [docs] }] })
+    vi.mocked(getMcpServers).mockResolvedValue([{ connectorKey: "custom-docs", name: "Docs", host: "docs.corp.example",
+      scope: "PERSONAL", state: "CONNECTED", accountLabel: null, reachable: false, tools: [], changedTools: [],
+      error: "Unreachable MCP server (https://docs.corp.example/mcp?key=k-1): timeout" }])
+    render(<IntegrationsCatalog slug="acme" />)
+
+    fireEvent.click(await screen.findByRole("button", { name: t.manage }))
+    expect(await within(dialog()).findByRole("alert")).toHaveTextContent(c.failures.savedUnreachable.replace("{name}", "Docs"))
+    expect(within(dialog()).queryByText(/https:\/\/docs\.corp\.example/)).toBeNull()
+    fireEvent.click(within(dialog()).getByRole("button", { name: c.failureDetails }))
+    fireEvent.click(within(dialog()).getByRole("button", { name: c.failureRaw }))
+    expect(within(dialog()).getByText(/https:\/\/docs\.corp\.example\/mcp/)).toBeInTheDocument()
   })
 
   it("a connected built-in integration says so with the sentence kept in the texts (R160)", async () => {

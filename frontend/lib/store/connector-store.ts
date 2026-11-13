@@ -95,7 +95,7 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
   stopWaiting: () => set({ waiting: null }),
 
   disconnect: async (slug, key, shared) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       const result = await disconnectMcpServer(slug, key, shared)
       set((s) => {
@@ -105,31 +105,31 @@ export const useConnectorStore = create<ConnectorState>((set, get) => ({
       })
       return result
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key, "notDisconnected") })
       return null
     }
   },
 
   approveTools: async (slug, key, shared) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       const list = await approveMcpTools(slug, key, shared)
       set({ busy: null })
       return list
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key, "notApproved") })
       return null
     }
   },
 
   saveCompanyApp: async (slug, key, clientId, clientSecret) => {
-    set({ busy: key, error: null })
+    set({ busy: key, error: null, failure: null })
     try {
       await saveCompanyApp(slug, key, clientId, clientSecret)
       set({ busy: null })
       return true
     } catch (e) {
-      set({ busy: null, error: getErrorMessage(e) })
+      set({ busy: null, error: getErrorMessage(e), failure: failureOf(e, key, "appNotSaved") })
       return false
     }
   },

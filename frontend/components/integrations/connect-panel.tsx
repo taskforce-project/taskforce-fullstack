@@ -311,11 +311,10 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
   const [clientId, setClientId] = useState("")
   const [secret, setSecret] = useState("")
   async function submit() {
+    // Un refus se dit dans le panneau, au-dessus du formulaire, qui garde ce que la personne a saisi (R161).
     if (await save(slug, tool.key, clientId.trim(), secret.trim())) {
       toast.success(t.companyAppSaved)
       onSaved()
-    } else {
-      toast.error(useConnectorStore.getState().error ?? t.failedAdmin)
     }
   }
   return (
@@ -400,6 +399,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   const [tools, setTools] = useState<McpToolInfo[] | null>(null)
   const [showConsole, setShowConsole] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const failure = useConnectorStore((s) => (s.failure?.key === tool.key ? s.failure : null))
   const shared = tool.scope === "WORKSPACE"
   const mayChange = !shared || manager
 
@@ -423,7 +423,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
 
   async function approve() {
     const list = await approveTools(slug, tool.key, shared)
-    if (!list) { toast.error(useConnectorStore.getState().error ?? t.failedAdmin); return }
+    if (!list) return
     setStatus(list.find((s) => s.connectorKey === tool.key) ?? null)
     toast.success(t.changesApproved)
     onChanged()
@@ -432,7 +432,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   async function onDisconnect() {
     setConfirming(false)
     const result = await disconnect(slug, tool.key, shared)
-    if (!result) { toast.error(useConnectorStore.getState().error ?? t.failedAdmin); return }
+    if (!result) return
     toast.success(fillText(result.revoked ? t.disconnectedRevoked : t.disconnectedHere, { name: tool.name }))
     onChanged()
   }
@@ -440,6 +440,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
   const changed = status?.changedTools ?? []
   return (
     <div className="flex flex-col gap-3">
+      {failure && <FailureNote failure={failure} name={tool.name} />}
       <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-sm text-ink-green">
         <Check className="size-4 shrink-0" />
         <span>
