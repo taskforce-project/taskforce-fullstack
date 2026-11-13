@@ -561,10 +561,13 @@ function ConnectorDetailView({
   const connection = connectionOf(tool, t, IS_DESKTOP, c)
   const action = cardAction(tool, t, IS_DESKTOP, c, manager)
   const connected = isConnected(tool)
-  // Ce que fait la native, puis ce qu'ajoute Cortex : un préréglage, ou le second accès d'une native.
+  // Ce que fait la native, puis ce qu'ajoute Cortex : un préréglage, ou le second accès d'une native. Un accès que
+  // l'éditeur ferme encore ne promet rien : la connexion dit pourquoi, plus bas (R161).
+  const admits = (x: ConnectorView) => !x.blocked || x.connected
+  const cortexReads = (tool.capabilities.includes("mcp") && admits(tool)) || (tool.live != null && admits(tool.live))
   const lines = [
     ...tool.capabilities.filter((cap) => cap !== "mcp").map((cap) => capabilityOf(cap, t)),
-    ...(tool.capabilities.includes("mcp") || tool.live ? [{ label: null, text: t.capabilities.mcp.text }] : []),
+    ...(cortexReads ? [{ label: null, text: t.capabilities.mcp.text }] : []),
   ]
   const live = tool.live ? connectionOf(tool.live, t, IS_DESKTOP, c) : null
   return (
@@ -601,17 +604,19 @@ function ConnectorDetailView({
       </div>
 
       {/* Ce que ça permet */}
-      <section className="flex flex-col gap-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What this integration can do</h4>
-        <ul className="flex flex-col gap-1.5">
-          {lines.map((line) => (
-            <li key={line.text} className="flex items-start gap-2 text-sm text-foreground">
-              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
-              <span>{line.label ? <><span className="font-medium">{line.label}</span>: {line.text}</> : line.text}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {lines.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What this integration can do</h4>
+          <ul className="flex flex-col gap-1.5">
+            {lines.map((line) => (
+              <li key={line.text} className="flex items-start gap-2 text-sm text-foreground">
+                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/60" />
+                <span>{line.label ? <><span className="font-medium">{line.label}</span>: {line.text}</> : line.text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Connexion : une phrase simple par chemin ; un outil que l'éditeur ferme encore dit pourquoi (R15, R160) */}
       <section className="flex flex-col gap-2">

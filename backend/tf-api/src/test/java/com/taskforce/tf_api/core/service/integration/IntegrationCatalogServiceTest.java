@@ -234,7 +234,8 @@ class IntegrationCatalogServiceTest {
         ConnectorView jira = tools.stream().filter(t -> t.key().equals("jira")).findFirst().orElseThrow();
         assertThat(jira.admin().text()).contains("https://api.example.test/**").doesNotContain("{redirectHost}");
         ConnectorView figma = tools.stream().filter(t -> t.key().equals("figma")).findFirst().orElseThrow();
-        assertThat(figma.blocked()).contains("waitlist");
+        // Pourquoi l'outil est fermé, en mots : ni le catalogue de l'éditeur, ni une adresse locale (R161).
+        assertThat(figma.blocked()).contains("waitlist").doesNotContain("127.0.0.1").doesNotContain("MCP catalog");
         ConnectorView stripe = tools.stream().filter(t -> t.key().equals("stripe")).findFirst().orElseThrow();
         assertThat(stripe.apiKey().link()).startsWith("https://");
         assertThat(stripe.category()).isEqualTo("FINANCE_HR");

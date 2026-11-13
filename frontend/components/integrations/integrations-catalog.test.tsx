@@ -144,6 +144,19 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(pill()).toBeInTheDocument()
   })
 
+  it("the page of a tool its vendor still keeps closed promises nothing: it says why, and no more (R161)", async () => {
+    const figma = preset("figma", "Figma", { category: "DESIGN", blocked: "Figma admits only the apps it has approved." })
+    vi.mocked(getIntegrationCatalog).mockResolvedValue({ total: 1, connected: 0,
+      categories: [{ category: "DESIGN", label: "Design", tools: [figma] }] })
+    render(<IntegrationsCatalog slug="acme" />)
+
+    fireEvent.click(await screen.findByRole("button", { name: "Learn more about Figma" }))
+    expect(screen.getByText(/Figma admits only the apps it has approved\./)).toBeInTheDocument()
+    expect(screen.getByText(c.notAvailable)).toBeInTheDocument()
+    expect(screen.queryByText(t.capabilities.mcp.text)).toBeNull()
+    expect(screen.queryByText("What this integration can do")).toBeNull()
+  })
+
   it("a server on the local network asks for the person's approval, from its name or from the server's reason", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("linear", "Linear")))
     vi.mocked(connectMcpServer).mockRejectedValue(refused("CONNECT_LOCAL_NEEDS_APPROVAL", "This server runs on your local network."))

@@ -479,7 +479,7 @@
       "website": "https://www.figma.com",
       "mcpUrl": "https://mcp.figma.com/mcp",
       "connection": "our-app",
-      "blocked": "Figma's remote server only admits the clients of its MCP catalog; new clients join a waitlist. On the desktop app, Figma's local server (http://127.0.0.1:3845/mcp) connects by its address.",
+      "blocked": "Figma admits only the apps it has approved; new apps join a waitlist, and TaskForce isn't approved yet. In TaskForce's desktop app, you can connect Figma's local server instead: turn it on in Figma, then add its address with Connect an MCP server.",
       "tools": {
         "read": ["download_assets", "get_code_connect_map", "get_code_connect_suggestions", "get_context_for_code_connect", "get_design_context", "get_figjam", "get_generative_plugin", "get_libraries", "get_metadata", "get_motion_context", "get_screenshot", "get_shader", "get_variable_defs", "list_file_shaders", "list_generative_plugins", "list_shaders", "search_design_system", "whoami"],
         "write": ["add_code_connect_map", "send_code_connect_mappings", "create_generative_plugin", "update_generative_plugin", "create_new_file", "create_shader", "update_shader", "generate_diagram", "generate_figma_design", "generate_image", "html_to_figma", "send_code_to_figma", "upload_assets", "use_figma"]
