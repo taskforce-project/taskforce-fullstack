@@ -163,6 +163,11 @@ describe("ConnectPanel", () => {
     expect(screen.queryByText(t.waitingForAdmin)).toBeNull()
     view.unmount()
 
+    // NEEDS_SETUP suffit, même avant que la liste des membres ne dise le rôle de la personne.
+    const early = show(slack, false)
+    expect(screen.getByText(t.companyAppTitle)).toBeTruthy()
+    early.unmount()
+
     show({ ...slack, state: "WAITING_FOR_ADMIN" }, false)
     expect(screen.getByText(t.waitingForAdmin)).toBeTruthy()
     expect(screen.queryByText(t.companyAppTitle)).toBeNull()

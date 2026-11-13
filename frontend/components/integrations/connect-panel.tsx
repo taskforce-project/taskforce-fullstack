@@ -135,8 +135,11 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
   // up ») ; un membre l'attend, avec le message à lui envoyer (R160).
   const adminTurn = tool.state === "NEEDS_SETUP"
     || (tool.state === "WAITING_FOR_ADMIN" && tool.connection === "company-app" && !tool.companyApp)
+  // NEEDS_SETUP suffit : le serveur ne le rend qu'à un propriétaire ou un administrateur, sans attendre la liste des
+  // membres de l'écran (R160).
   const step = byKey ? "key" : outcome?.next
-    ?? (adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
+    ?? (tool.state === "NEEDS_SETUP" ? "company-app"
+      : adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
   // La cause d'abord, puis le geste qui la suit (R133 : un échec dit ce qui s'est passé et quoi faire).
   const note = failure ? <FailureNote failure={failure} name={name} withKey={Boolean(tool.apiKey)} /> : null
