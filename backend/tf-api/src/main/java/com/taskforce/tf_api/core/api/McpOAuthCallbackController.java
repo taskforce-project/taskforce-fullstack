@@ -9,21 +9,33 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthService;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthSettings;
+import com.taskforce.tf_api.shared.dto.ApiResponse;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
 /**
  * Le retour OAuth des serveurs MCP (TF-MCP-02) et nos documents de métadonnées client (CIMD, norme MCP du
  * 28/07/2026). Endpoints <b>publics</b> : le serveur d'autorisation y redirige le navigateur après consentement, ou y lit
  * qui est TaskForce. Le retour résout tout depuis le {@code state} (stocké côté serveur, anti-CSRF), jamais depuis un
- * paramètre devinable, et répond <b>toujours</b> par une redirection vers l'UI (succès ou erreur).
+ * paramètre devinable, garde le code et répond <b>toujours</b> par une redirection vers l'UI (succès ou erreur) ; l'app,
+ * connectée, finit ensuite par {@code POST /complete}, réservé à la personne qui a lancé le flux.
  *
  * <p>Les deux documents CIMD sont servis par chaque instance en HTTPS ; leur adresse est l'identifiant du client.
  * {@code client.json} : le serveur, qui reçoit le retour sur sa propre adresse. {@code desktop-client.json} : l'app
@@ -37,17 +49,43 @@ public class McpOAuthCallbackController {
 
     private final McpOAuthService mcpOAuthService;
     private final McpOAuthSettings settings;
+    private final UserRepository userRepository;
 
     @GetMapping("/callback")
     public ResponseEntity<Void> callback(
         @RequestParam(required = false) String code,
         @RequestParam(required = false) String state,
         @RequestParam(required = false) String error,
-        @RequestParam(required = false) String iss
+        @RequestParam(required = false) String iss,
+        @RequestParam(name = "error_description", required = false) String errorDescription,
+        @RequestParam(name = "admin_consent", required = false) String adminConsent
     ) {
-        String redirect = mcpOAuthService.callback(state, code, error, iss);
+        // L'administrateur d'une entreprise vient d'accorder notre application chez Microsoft (TF-J2-14) : pas de flux de
+        // connexion à finir, l'app tout court.
+        if (adminConsent != null && (state == null || state.isBlank())) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(settings.appBase() + "/")).build();
+        }
+        String redirect = mcpOAuthService.callback(state, code, error, iss, errorDescription);
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(redirect)).build();
     }
+
+    /**
+     * La fin d'une connexion, par l'app connectée (pas un endpoint public) : le retour a gardé le code avec son
+     * {@code state} ; l'app présente ce {@code state} et le jeton {@code finish} que seul le navigateur revenu a reçu, et
+     * seule la personne qui a lancé le flux le finit. Rend {@code connected} ou {@code error}, et l'outil.
+     */
+    @PostMapping("/complete")
+    public ResponseEntity<ApiResponse<McpOAuthService.Completion>> complete(
+        @Valid @RequestBody CompleteRequest body,
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        User person = userRepository.findByEmail(jwt.getClaimAsString("email"))
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        return ResponseEntity.ok(ApiResponse.success(mcpOAuthService.complete(person.getId(), body.state(), body.finish())));
+    }
+
+    /** Ce que l'app présente pour finir : le {@code state} du flux et le jeton à usage unique du retour. */
+    public record CompleteRequest(@NotBlank @Size(max = 64) String state, @NotBlank @Size(max = 64) String finish) {}
 
     /** Le document de métadonnées client du serveur : son adresse est l'identifiant de TaskForce. */
     @GetMapping(value = "/client.json", produces = MediaType.APPLICATION_JSON_VALUE)

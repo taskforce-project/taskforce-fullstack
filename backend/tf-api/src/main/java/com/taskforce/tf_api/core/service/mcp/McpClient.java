@@ -258,7 +258,7 @@ public class McpClient {
         try {
             SsrfGuard.assertPublicHttpUrl(url);
         } catch (IllegalArgumentException ex) {
-            throw new BusinessException("MCP server refused: " + ex.getMessage());
+            throw ConnectFailure.refused(ConnectFailure.ADDRESS_NOT_ALLOWED, "MCP server refused: " + ex.getMessage());
         }
     }
 

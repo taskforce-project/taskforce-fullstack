@@ -162,6 +162,37 @@ class AuthorizationServiceTest {
 
     // =========================================================================
     @Nested
+    @DisplayName("requireForConnection")
+    class RequireForConnection {
+
+        @ParameterizedTest(name = "{0}, pour tout l'espace : {1}")
+        @CsvSource({"OWNER, true", "ADMIN, true", "MEMBER, false"})
+        @DisplayName("ce qui vaut pour tout l'espace : un propriétaire ou un administrateur, jamais un membre")
+        void workspace_wide_needs_a_manager(WorkspaceRole role, boolean allowed) {
+            stubMember(role);
+
+            if (allowed) {
+                assertThat(service.requireForConnection(WS_ID, USER_ID, true).getRole()).isEqualTo(role);
+            } else {
+                assertThatThrownBy(() -> service.requireForConnection(WS_ID, USER_ID, true))
+                    .isInstanceOf(ForbiddenException.class);
+            }
+        }
+
+        @Test
+        @DisplayName("sa propre connexion : un membre suffit ; une personne hors de l'espace est refusée")
+        void own_connection_needs_a_member() {
+            stubMember(WorkspaceRole.MEMBER);
+            assertThat(service.requireForConnection(WS_ID, USER_ID, false).getRole()).isEqualTo(WorkspaceRole.MEMBER);
+
+            stubNoMember();
+            assertThatThrownBy(() -> service.requireForConnection(WS_ID, USER_ID, false))
+                .isInstanceOf(ForbiddenException.class).hasMessageContaining("not a member");
+        }
+    }
+
+    // =========================================================================
+    @Nested
     @DisplayName("isMember")
     class IsMember {
 

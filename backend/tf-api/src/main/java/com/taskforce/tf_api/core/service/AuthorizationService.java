@@ -46,6 +46,16 @@ public class AuthorizationService {
         return requireRole(workspaceId, userId, WorkspaceRole.OWNER, WorkspaceRole.ADMIN);
     }
 
+    /**
+     * Le droit sur les connexions aux outils (séance n°22, R154) : sa propre connexion, un membre de l'espace ; ce qui
+     * vaut pour tout l'espace ({@code workspaceWide} : une connexion partagée, l'application de l'entreprise), un
+     * propriétaire ou un administrateur. Sinon 403. Les services des connexions le vérifient eux-mêmes (règle 3), sans
+     * s'en remettre au contrôleur.
+     */
+    public WorkspaceMember requireForConnection(Long workspaceId, Long userId, boolean workspaceWide) {
+        return workspaceWide ? requireManager(workspaceId, userId) : requireMember(workspaceId, userId);
+    }
+
     /** true si l'utilisateur est OWNER ou ADMIN du workspace (sans lever d'exception). */
     public boolean isManager(Long workspaceId, Long userId) {
         return workspaceMemberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)

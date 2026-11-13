@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.enums.ConnectionPath;
 import com.taskforce.tf_api.core.enums.ConnectorAuthType;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
 import com.taskforce.tf_api.core.enums.ToolClass;
+import com.taskforce.tf_api.core.service.mcp.ConnectFailure;
 
 import jakarta.annotation.PostConstruct;
 
@@ -43,6 +44,16 @@ public class ConnectorCatalog {
 
     /** Le fichier des préréglages, dans les ressources du backend. */
     static final String PRESETS = "connectors/presets.json";
+
+    /**
+     * Le second accès d'une native (revue des écrans de J2, séance n°23, R160) : le préréglage MCP du même outil, par
+     * lequel Cortex le lit en direct avec la connexion de chaque personne. Une carte par outil : la native le porte, il
+     * n'a pas la sienne.
+     */
+    private static final Map<String, String> LIVE_ACCESS = Map.of(
+        "github", "github-mcp",
+        "slack", "slack-mcp",
+        "plane", "plane-mcp");
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -99,6 +110,18 @@ public class ConnectorCatalog {
         return byKey(key).map(d -> d.authType() == ConnectorAuthType.MCP).orElse(false);
     }
 
+    /** Le second accès de cette native, quand elle en a un : le préréglage MCP du même outil. */
+    public Optional<ConnectorDescriptor> liveAccessOf(String nativeKey) {
+        return Optional.ofNullable(nativeKey == null ? null : LIVE_ACCESS.get(nativeKey)).flatMap(this::byKey)
+            .filter(d -> d.preset() != null);
+    }
+
+    /** Ce préréglage est-il le second accès d'une native, montré dans sa carte plutôt qu'à côté ? */
+    public boolean isLiveAccess(String key) {
+        return key != null && LIVE_ACCESS.entrySet().stream()
+            .anyMatch(e -> e.getValue().equals(key) && byKey.containsKey(e.getKey()));
+    }
+
     /** Préréglage essayé de bout en bout ? (faux pour une native, une clé inconnue et un préréglage jamais essayé) */
     public boolean isTriedPreset(String key) {
         return preset(key).map(ConnectorPreset::isTried).orElse(false);
@@ -110,6 +133,50 @@ public class ConnectorCatalog {
      */
     public ToolClass classOf(String connectorKey, String tool) {
         return preset(connectorKey).map(p -> p.classOf(tool)).orElse(ToolClass.WRITE);
+    }
+
+    /**
+     * La classe d'un outil servi par ce serveur : celle du préréglage seulement quand le serveur est le sien (son serveur
+     * officiel) ; tout autre serveur, même enregistré sous la clé d'un préréglage, n'a que des écritures. Sur l'adresse de
+     * lecture seule que l'éditeur documente comme ne servant que des lectures, chaque outil est une lecture (séance n°23,
+     * R160) ; sur l'adresse entière, la liste documentée vaut.
+     */
+    public ToolClass classOn(String connectorKey, String serverUrl, String tool) {
+        return preset(connectorKey).filter(p -> p.serves(serverUrl)).map(p -> p.classAt(serverUrl, tool))
+            .orElse(ToolClass.WRITE);
+    }
+
+    /**
+     * L'adresse que joint une connexion de cette clé : pour un préréglage qui a un serveur officiel, toujours celui-ci (sa
+     * lecture seule quand l'écriture n'est pas accordée), et une demande qui nomme une autre adresse est refusée ; pour un
+     * serveur ajouté à la main, ou celui que l'entreprise crée chez l'éditeur, l'adresse demandée (nulle si elle manque).
+     */
+    public String serverFor(String connectorKey, String requested, boolean writes) {
+        String asked = requested == null || requested.isBlank() ? null : requested.strip();
+        Optional<ConnectorPreset> preset = preset(connectorKey);
+        if (preset.isEmpty()) return asked;
+        assertAddress(preset.get(), asked);
+        return preset.get().hasOfficialServer() ? preset.get().urlFor(writes) : asked;
+    }
+
+    /**
+     * Refuse une adresse que la clé d'un préréglage ne peut pas joindre : autre chose que son serveur officiel, ou une
+     * adresse pour un outil que TaskForce sert par l'API de son éditeur. Sans effet pour une autre clé.
+     */
+    public void assertAddress(String connectorKey, String url) {
+        preset(connectorKey).ifPresent(p -> assertAddress(p, url == null || url.isBlank() ? null : url.strip()));
+    }
+
+    private static void assertAddress(ConnectorPreset preset, String url) {
+        if (url == null) return;
+        if (preset.api() != null) {
+            throw ConnectFailure.of(ConnectFailure.OFFICIAL_SERVER_ONLY,
+                preset.name() + " connects through its own sign-in, not by an address.");
+        }
+        if (preset.hasOfficialServer() && !preset.serves(url)) {
+            throw ConnectFailure.of(ConnectFailure.OFFICIAL_SERVER_ONLY, preset.name() + " connects only to its official server ("
+                + java.net.URI.create(preset.mcpUrl()).getHost() + ").");
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -138,7 +205,8 @@ public class ConnectorCatalog {
         String key = required(n, "key");
         ConnectionPath connection = ConnectionPath.of(required(n, "connection"));
         String mcpUrl = text(n, "mcpUrl");
-        if (mcpUrl == null && connection != ConnectionPath.SERVER_URL) {
+        ConnectorPreset.Api api = api(key, n.path("api"));
+        if (mcpUrl == null && connection != ConnectionPath.SERVER_URL && api == null) {
             throw new IllegalStateException("Preset " + key + " has no mcpUrl");
         }
         if (mcpUrl != null && !mcpUrl.startsWith("https://")) {
@@ -149,12 +217,19 @@ public class ConnectorCatalog {
         Set<String> both = new LinkedHashSet<>(read);
         both.retainAll(write);
         if (!both.isEmpty()) throw new IllegalStateException("Preset " + key + " classes a tool twice: " + both);
+        source(key, "its tool list", text(n.path("tools"), "source"), text(n.path("tools"), "checked"));
+        String readUrl = text(n, "readUrl");
+        ConnectorPreset.Source readUrlSource = source(key, "its read-only address", text(n, "readUrlSource"),
+            text(n, "readUrlChecked"));
+        if (readUrlSource != null && readUrl == null) {
+            throw new IllegalStateException("Preset " + key + " documents a read-only address it does not have");
+        }
         JsonNode scopes = n.path("scopes");
         JsonNode admin = n.path("admin");
         JsonNode apiKey = n.path("apiKey");
         JsonNode tried = n.path("tried");
         return new ConnectorPreset(key, required(n, "name"), ConnectorCategory.valueOf(required(n, "category")),
-            required(n, "description"), required(n, "website"), mcpUrl, text(n, "readUrl"), connection,
+            required(n, "description"), required(n, "website"), mcpUrl, readUrl, readUrlSource, connection,
             scopes.isObject() ? new ConnectorPreset.Scopes(list(scopes.path("read")), list(scopes.path("write")))
                 : ConnectorPreset.Scopes.NONE,
             admin.isObject() ? new ConnectorPreset.Admin(admin.path("required").asBoolean(false),
@@ -163,7 +238,45 @@ public class ConnectorCatalog {
                 text(apiKey, "header")) : null,
             Collections.unmodifiableSet(read), Collections.unmodifiableSet(write),
             tried.isObject() ? new ConnectorPreset.Tried(required(tried, "date"), required(tried, "proof")) : null,
-            text(n, "blocked"), list(n.path("sources")), list(n.path("unverified")));
+            text(n, "blocked"), list(n.path("sources")), list(n.path("unverified")), api);
+    }
+
+    /**
+     * Une page publique de l'éditeur et la date de sa lecture (séance n°23, R160), l'une avec l'autre : en HTTPS, datée
+     * AAAA-MM-JJ ; nulle quand le préréglage n'en donne pas. Pour la liste des outils ({@code tools.source},
+     * {@code tools.checked}) : un outil n'y est en lecture que si l'éditeur le documente ainsi, le reste demande. Pour
+     * l'adresse de lecture seule ({@code readUrlSource}, {@code readUrlChecked}) : l'éditeur y écrit qu'elle ne sert que
+     * des outils de lecture.
+     */
+    private static ConnectorPreset.Source source(String key, String what, String page, String checked) {
+        if ((page == null) != (checked == null)) {
+            throw new IllegalStateException("Preset " + key + " gives the page of " + what + " and the date it was read "
+                + "together, or neither");
+        }
+        if (page == null) return null;
+        if (!page.startsWith("https://")) {
+            throw new IllegalStateException("Preset " + key + " must read " + what + " on an HTTPS page");
+        }
+        try {
+            java.time.LocalDate.parse(checked);
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalStateException("Preset " + key + " dates " + what + " as YYYY-MM-DD: " + checked, e);
+        }
+        return new ConnectorPreset.Source(page, checked);
+    }
+
+    /** L'API d'un éditeur que TaskForce sert lui-même : son émetteur et son adresse, en HTTPS. */
+    private static ConnectorPreset.Api api(String key, JsonNode a) {
+        if (a == null || !a.isObject()) return null;
+        String issuer = required(a, "issuer");
+        String base = required(a, "base");
+        if (!issuer.startsWith("https://") || !base.startsWith("https://")) {
+            throw new IllegalStateException("Preset " + key + " must use an HTTPS sign-in server and API");
+        }
+        Map<String, String> authorize = new LinkedHashMap<>();
+        a.path("authorize").fields().forEachRemaining(f -> authorize.put(f.getKey(), f.getValue().asText()));
+        return new ConnectorPreset.Api(required(a, "kind"), issuer, base, required(a, "app"),
+            Collections.unmodifiableMap(authorize));
     }
 
     private static String required(JsonNode n, String field) {

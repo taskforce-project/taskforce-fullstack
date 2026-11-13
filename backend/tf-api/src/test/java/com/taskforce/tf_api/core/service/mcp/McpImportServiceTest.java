@@ -22,9 +22,12 @@ import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.ToolClass;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.IssueService;
@@ -32,7 +35,9 @@ import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -69,6 +74,7 @@ class McpImportServiceTest {
     @Mock private com.taskforce.tf_api.core.repository.IssueRepository issueRepository;
     @Mock private CortexRecordService records;
     @Mock private McpClient mcp;
+    @Mock private com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers;
 
     private McpImportService service;
     private final ObjectMapper json = new ObjectMapper();
@@ -80,9 +86,30 @@ class McpImportServiceTest {
         lenient().when(workspaces.findById(10L)).thenReturn(Optional.of(ws));
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
+        // La personne qui importe (7) est propriétaire de l'espace : le service vérifie lui-même le rôle.
+        lenient().when(members.findByWorkspaceIdAndUserId(10L, 7L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.OWNER).build()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
             new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm),
-            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records);
+            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
+            approvers(), new com.taskforce.tf_api.core.service.AuthorizationService(members));
+    }
+
+    @Test
+    @DisplayName("import : un membre qui n'administre pas l'espace est refusé par le service, avant toute lecture ni projet")
+    void a_member_cannot_import() {
+        when(members.findByWorkspaceIdAndUserId(10L, 8L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.MEMBER).build()));
+
+        assertThatThrownBy(() -> service.importProject(ws, 8L, "linear", "X")).isInstanceOf(ForbiddenException.class);
+        verify(workspaceMcp, never()).toolFor(any(), any(), any());
+        verify(workspaceMcp, never()).toolsFor(any());
+        verify(records, never()).open(any(), any(), any());
+        verify(projectService, never()).createProject(anyString(), anyLong(), any());
+    }
+
+    private RuleApprovers approvers() {
+        return new RuleApprovers(members, projectMembers);
     }
 
     private ExternalMcpTool listTool(ToolClass cls) throws Exception {
@@ -134,17 +161,21 @@ class McpImportServiceTest {
     }
 
     @Test
-    @DisplayName("import : un outil de liste dont TaskForce ne sait pas la classe -> demandé, accordé par le clic, au dossier")
-    void an_unknown_list_tool_is_approved_by_the_click() throws Exception {
-        connectorWithTools("list_issues");
-        readReturns(listTool(ToolClass.WRITE), "[]");
-        when(llm.isConfigured()).thenReturn(false);
-        when(projectService.createProject(eq("acme"), eq(7L), any()))
-            .thenReturn(ProjectResponse.builder().id(99L).identifier("X").name("X").build());
+    @DisplayName("import : seul un outil classé en lecture est choisi ; une écriture qui parle d'issues ne l'est jamais")
+    void only_a_tool_classed_as_read_is_picked() throws Exception {
+        connectorWithTools("delete_issue", "list_issues", "search_issues");
+        ExternalMcpTool delete = new ExternalMcpTool(mcp, new McpClient.ServerRef("linear", "http://x/mcp", "AT"),
+            new McpClient.ToolDef("delete_issue", "Deletes an issue", json.readTree("{\"type\":\"object\"}"), true),
+            json, ToolClass.WRITE, ConnectionScope.PERSONAL);
+        when(workspaceMcp.toolFor(10L, 7L, "linear__list_issues")).thenReturn(Optional.of(listTool(ToolClass.WRITE)));
+        when(workspaceMcp.toolFor(10L, 7L, "linear__delete_issue")).thenReturn(Optional.of(delete));
+        when(workspaceMcp.toolFor(10L, 7L, "linear__search_issues")).thenReturn(Optional.empty());
 
-        service.importProject(ws, 7L, "linear", "X");
-
-        verify(records).append(eq(RECORD), eq("human.decision"), eq(CortexRecordService.Actor.person(7L)), any());
+        assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X"))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("only reads");
+        verify(mcp, never()).callTool(any(), any(), any());
+        verify(mcp, never()).initialize(any());
+        verify(projectService, never()).createProject(anyString(), anyLong(), any());
     }
 
     @Test
@@ -156,12 +187,43 @@ class McpImportServiceTest {
         CortexGate deny = Mockito.mock(CortexGate.class);
         when(deny.judge(any(), any(Map.class))).thenReturn(new CortexGate.Verdict("deny", "frozen", "Imports are frozen.", Map.of()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
-            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), deny, records);
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), deny, records, approvers(),
+            new com.taskforce.tf_api.core.service.AuthorizationService(members));
 
         assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X")).hasMessageContaining("Imports are frozen.");
         verify(mcp, never()).callTool(any(), any(), any());
         verify(projectService, never()).createProject(anyString(), anyLong(), any());
         verify(records).append(eq(RECORD), eq("action.result"), any(), any());
+    }
+
+    @Test
+    @DisplayName("import : une règle qui désigne qui accorde vaut comme dans la console ; un administrateur seul n'y suffit pas")
+    @SuppressWarnings("unchecked")
+    void the_approvers_a_rule_designates_are_enforced() throws Exception {
+        connectorWithTools("list_issues");
+        ExternalMcpTool tool = listTool(ToolClass.READ);
+        when(workspaceMcp.toolFor(10L, 7L, "linear__list_issues")).thenReturn(Optional.of(tool));
+        CortexGate gate = Mockito.mock(CortexGate.class);
+        when(gate.personFacts(any(), any())).thenReturn(Map.of("action", "mcp.read"));
+        CortexGate.Verdict ownerOnly = new CortexGate.Verdict("ask", "ws-owner-projects", "Only the owner creates projects.",
+            Map.of(), new RulesEngine.Obligations(List.of(List.of("role:owner")), 1, false));
+        when(gate.judge(any(), any(Map.class))).thenAnswer(inv -> "project.create".equals(
+            ((Map<String, String>) inv.getArgument(1)).get("action")) ? ownerOnly
+            : new CortexGate.Verdict("allow", "read-company-tools", "Read.", Map.of()));
+        // Un administrateur peut importer, mais la règle désigne le propriétaire.
+        when(members.findByWorkspaceIdAndUserId(10L, 7L)).thenReturn(Optional.of(
+            WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.ADMIN).build()));
+        service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
+            new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm), gate, records, approvers(),
+            new com.taskforce.tf_api.core.service.AuthorizationService(members));
+
+        assertThatThrownBy(() -> service.importProject(ws, 7L, "linear", "X"))
+            .isInstanceOf(ForbiddenException.class)
+            .hasMessageContaining("the workspace's owner").hasMessageContaining("Only the owner creates projects.");
+        verify(mcp, never()).callTool(any(), any(), any());
+        verify(projectService, never()).createProject(anyString(), anyLong(), any());
+        verify(records).append(eq(RECORD), eq("action.result"), any(), any());
+        verify(records, never()).append(eq(RECORD), eq("human.decision"), any(), any());
     }
 
     @Test

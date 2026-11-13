@@ -87,10 +87,13 @@ public final class RuleValidator {
                 problems.add(new Problem("unknownCondition", key));
             }
         }
+        // Une règle de l'entreprise nomme toujours son action : sans elle, elle couvrirait aussi celles que TaskForce garde.
         Object action = when.get("action");
-        if ("harness.change".equals(action)) {
+        if (action == null) {
+            problems.add(Problem.of("noAction"));
+        } else if (RulesEngine.HARNESS_CHANGE.equals(action)) {
             problems.add(Problem.of("rulesAreTaskForce"));
-        } else if (action != null && !(action instanceof String a && FACTS.containsKey(a))) {
+        } else if (!(action instanceof String a && FACTS.containsKey(a))) {
             problems.add(new Problem("unknownAction", String.valueOf(action)));
         }
         if (when.containsKey("sensitivity")) {
@@ -129,26 +132,13 @@ public final class RuleValidator {
         }
     }
 
-    /** Chaque condition porte sur un fait que TaskForce produit pour au moins une action que la règle couvre. */
+    /** Chaque condition porte sur un fait que TaskForce produit pour l'action que la règle nomme. */
     private static void checkProduced(Map<String, Object> when, List<Problem> problems) {
-        List<String> facts = new ArrayList<>();
+        Set<String> produced = FACTS.get((String) when.get("action"));
         for (String key : when.keySet()) {
-            if (!"action".equals(key) && !"actor".equals(key)) {
-                facts.add(key);
+            if (!"action".equals(key) && !"actor".equals(key) && !produced.contains(key)) {
+                problems.add(new Problem("neverApplies", key));
             }
-        }
-        Object action = when.get("action");
-        if (action instanceof String a) {
-            for (String fact : facts) {
-                if (!FACTS.get(a).contains(fact)) {
-                    problems.add(new Problem("neverApplies", fact));
-                }
-            }
-            return;
-        }
-        boolean someAction = FACTS.values().stream().anyMatch(produced -> produced.containsAll(facts));
-        if (!someAction) {
-            problems.add(new Problem("neverApplies", String.join(",", facts)));
         }
     }
 

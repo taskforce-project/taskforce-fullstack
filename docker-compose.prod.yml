@@ -242,6 +242,25 @@ services:
       TF_MCP_ASANA_CLIENT_SECRET: ${TF_MCP_ASANA_CLIENT_SECRET:-}
       TF_MCP_GITHUB_MCP_CLIENT_ID: ${TF_MCP_GITHUB_MCP_CLIENT_ID:-}
       TF_MCP_GITHUB_MCP_CLIENT_SECRET: ${TF_MCP_GITHUB_MCP_CLIENT_SECRET:-}
+      TF_MCP_HUBSPOT_CLIENT_ID: ${TF_MCP_HUBSPOT_CLIENT_ID:-}
+      TF_MCP_HUBSPOT_CLIENT_SECRET: ${TF_MCP_HUBSPOT_CLIENT_SECRET:-}
+      TF_MCP_DROPBOX_CLIENT_ID: ${TF_MCP_DROPBOX_CLIENT_ID:-}
+      TF_MCP_DROPBOX_CLIENT_SECRET: ${TF_MCP_DROPBOX_CLIENT_SECRET:-}
+      # Xero : une application PKCE, sans secret.
+      TF_MCP_XERO_CLIENT_ID: ${TF_MCP_XERO_CLIENT_ID:-}
+      TF_MCP_DOCUSIGN_CLIENT_ID: ${TF_MCP_DOCUSIGN_CLIENT_ID:-}
+      TF_MCP_DOCUSIGN_CLIENT_SECRET: ${TF_MCP_DOCUSIGN_CLIENT_SECRET:-}
+      TF_MCP_CANVA_CLIENT_ID: ${TF_MCP_CANVA_CLIENT_ID:-}
+      TF_MCP_CANVA_CLIENT_SECRET: ${TF_MCP_CANVA_CLIENT_SECRET:-}
+      # Google Drive et Microsoft 365 (TF-J2-14, R156) : notre client OAuth Google (« Web application ») et la clé du
+      # navigateur et le numéro du projet pour le sélecteur de Google ; notre application Entra multilocataire.
+      TF_GOOGLE_CLIENT_ID: ${TF_GOOGLE_CLIENT_ID:-}
+      TF_GOOGLE_CLIENT_SECRET: ${TF_GOOGLE_CLIENT_SECRET:-}
+      TF_GOOGLE_API_KEY: ${TF_GOOGLE_API_KEY:-}
+      TF_GOOGLE_APP_ID: ${TF_GOOGLE_APP_ID:-}
+      TF_MICROSOFT_CLIENT_ID: ${TF_MICROSOFT_CLIENT_ID:-}
+      TF_MICROSOFT_CLIENT_SECRET: ${TF_MICROSOFT_CLIENT_SECRET:-}
+      TF_MICROSOFT_TENANT: ${TF_MICROSOFT_TENANT:-common}
 
       # Chiffrement au repos des données personnelles (RGPD).
       # Le nom DOIT être TF_ENCRYPTION_KEY : c'est celui que lit `security.encryption-key`.

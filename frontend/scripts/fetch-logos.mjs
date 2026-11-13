@@ -1,7 +1,9 @@
 // @ts-check
 /**
- * Vendorise les logos de marque depuis l'API SVGL (https://svgl.app) vers `public/logos/`,
- * et génère le manifeste typé `lib/brand-logos.generated.ts`.
+ * Vendorise les logos de marque depuis l'API SVGL (https://svgl.app), puis, pour les marques qu'elle n'a pas,
+ * Simple Icons (https://simpleicons.org, licence CC0, version épinglée), vers `public/logos/`, et génère le
+ * manifeste typé `lib/brand-logos.generated.ts`. Chaque outil du catalogue du backend (`connectors/presets.json`)
+ * est cherché par son nom, en plus de la liste ci-dessous.
  *
  * Pourquoi vendoriser (plutôt que taper l'API au runtime) :
  *  - SVGL recommande de mettre en cache côté client (rate-limit).
@@ -11,7 +13,7 @@
  * Lancer :  npm run logos
  * Les clés correspondent aux `key` du catalogue backend (ConnectorCatalog.java).
  */
-import { writeFile, mkdir, rm } from "node:fs/promises"
+import { writeFile, mkdir, rm, readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 
@@ -19,6 +21,10 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const LOGOS_DIR = join(HERE, "..", "public", "logos")
 const MANIFEST = join(HERE, "..", "lib", "brand-logos.generated.ts")
 const API = "https://api.svgl.app"
+/** Le second fournisseur, pour les marques absentes de SVGL : Simple Icons, version épinglée (publiée le 25/10/2026). */
+const SIMPLE_ICONS = "https://cdn.jsdelivr.net/npm/simple-icons@16.36.0"
+/** Le catalogue du backend : chaque outil qu'il montre a sa chance d'avoir un logo, sans liste à tenir à la main. */
+const PRESETS = join(HERE, "..", "..", "backend", "tf-api", "src", "main", "resources", "connectors", "presets.json")
 
 /**
  * key   = clé du connecteur (doit matcher ConnectorCatalog.java)
@@ -174,9 +180,12 @@ const BRANDS = [
   { key: "shadcn", search: "shadcn", match: "shadcn/ui" },
   { key: "radix-ui", search: "radix", match: "Radix UI" },
   { key: "magic-ui", search: "magic ui", match: "Magic UI" },
-  // Absents de SVGL / pas de marque unique → fallback initiales : plane, vps, mail-smtp, granola,
-  // jenkins, zapier, hubspot, intercom, elevenlabs, google-ads, microsoft-clarity, zoho,
-  // square, wix, 21st-dev, aceternity-ui, origin-ui.
+  // Un outil du catalogue dont le nom n'est pas celui de la marque : Excalidraw+ porte le logo d'Excalidraw.
+  { key: "excalidraw-plus", search: "Excalidraw" },
+  // L'intégration native Plane (hors de presets.json) ; son serveur MCP, « plane-mcp », vient du catalogue.
+  { key: "plane", search: "Plane" },
+  // Les marques absentes de SVGL passent par Simple Icons (plane, jenkins, zapier, hubspot, intercom, zoho, square,
+  // wix...). Le script dit à la fin celles qui n'ont de logo chez aucun des deux : elles gardent leurs initiales.
 ]
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -250,10 +259,41 @@ function hasWholeWord(text, word) {
   return false
 }
 
+/**
+ * Les outils du catalogue du backend absents de BRANDS, cherchés par leur nom. BRANDS reste prioritaire : il fixe le
+ * terme de recherche quand le nom de l'outil n'est pas celui de la marque.
+ */
+async function catalogBrands(known) {
+  let raw
+  try {
+    raw = JSON.parse(await readFile(PRESETS, "utf8"))
+  } catch {
+    console.log(`Catalogue du backend illisible (${PRESETS}) : seule la liste du script est cherchée`)
+    return []
+  }
+  const presets = Array.isArray(raw) ? raw : Array.isArray(raw.presets) ? raw.presets : []
+  const seen = new Set(known.map((b) => b.key))
+  return presets
+    .filter((p) => typeof p.key === "string" && typeof p.name === "string" && !seen.has(p.key))
+    .map((p) => ({ key: p.key, search: p.name }))
+}
+
+/**
+ * Le logo d'une marque chez Simple Icons : son titre exact, ou l'un de ses autres noms, jamais une ressemblance.
+ * Ses logos n'ont qu'une couleur : ils sont rendus en `mono` (masque CSS et `currentColor`), lisibles dans les deux thèmes.
+ */
+function pickSimpleIcon(icons, want) {
+  const w = want.toLowerCase()
+  const names = (i) => [i.title, ...(i.aliases?.aka ?? []), ...Object.values(i.aliases?.loc ?? {})]
+  return icons.find((i) => (i.title ?? "").toLowerCase() === w)
+    ?? icons.find((i) => names(i).some((n) => typeof n === "string" && n.toLowerCase() === w))
+    ?? null
+}
+
 async function main() {
   await rm(LOGOS_DIR, { recursive: true, force: true }) // repartir propre (retire les logos périmés)
   await mkdir(LOGOS_DIR, { recursive: true })
-  /** @type {Record<string, "single" | "themed">} */
+  /** @type {Record<string, "single" | "themed" | "mono">} */
   const manifest = {}
   const missing = []
 
@@ -264,7 +304,8 @@ async function main() {
   if (!Array.isArray(catalog) || catalog.length === 0) throw new Error("Catalogue SVGL vide/inattendu")
   console.log(`Catalogue SVGL : ${catalog.length} logos\n`)
 
-  for (const b of BRANDS) {
+  const brands = [...BRANDS, ...(await catalogBrands(BRANDS))]
+  for (const b of brands) {
     try {
       const needle = b.search.toLowerCase()
       const list = catalog.filter((s) => (s.title ?? "").toLowerCase().includes(needle))
@@ -293,10 +334,31 @@ async function main() {
     await sleep(300) // politesse rate-limit (SVGL 404 sous cadence trop rapide)
   }
 
+  // Le second fournisseur, pour ce que SVGL n'a pas : un seul appel pour ses données, puis le même choix strict et le
+  // même contrôle du SVG.
+  if (missing.length) {
+    const icons = await fetchJson(`${SIMPLE_ICONS}/data/simple-icons.json`)
+    if (!Array.isArray(icons) || icons.length === 0) throw new Error("Données Simple Icons vides/inattendues")
+    console.log(`\nSimple Icons : ${icons.length} logos, pour ${missing.length} marques sans logo SVGL\n`)
+    for (const key of [...missing]) {
+      const b = brands.find((x) => x.key === key)
+      const icon = b ? pickSimpleIcon(icons, b.match ?? b.search) : null
+      if (!icon?.slug) continue
+      try {
+        await downloadSvg(`${SIMPLE_ICONS}/icons/${icon.slug}.svg`, join(LOGOS_DIR, `${key}.svg`))
+        manifest[key] = "mono"
+        missing.splice(missing.indexOf(key), 1)
+        console.log(`✓ ${key} - mono (Simple Icons : ${icon.title})`)
+      } catch (e) {
+        console.log(`✗ ${key} - Simple Icons : ${e.message}`)
+      }
+    }
+  }
+
   // Manifeste trié (clés alpha) → diff stable
   const ordered = Object.fromEntries(Object.keys(manifest).sort().map((k) => [k, manifest[k]]))
   const ts = `// AUTOGÉNÉRÉ par scripts/fetch-logos.mjs - ne pas éditer à la main.
-// Logos de marque (SVGL - https://svgl.app) vendorisés dans public/logos/.
+// Logos de marque (SVGL - https://svgl.app, puis Simple Icons - https://simpleicons.org) vendorisés dans public/logos/.
 // Régénérer : npm run logos
 
 export type BrandLogoKind = "single" | "themed" | "mono"

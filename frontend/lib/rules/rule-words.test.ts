@@ -105,6 +105,8 @@ describe("rule-words: a rule said back in words", () => {
       .toBe("TaskForce couldn't turn this into a rule. Emails aren't actions TaskForce sees.")
     expect(problemWords({ code: "nothing", detail: null }, t)).toBe("TaskForce couldn't turn this into a rule.")
     expect(problemWords({ code: "somethingNew", detail: null }, t)).toBe("TaskForce can't add this rule as it is written.")
+    // Une règle de l'entreprise nomme son action : sans elle, l'écran le dit en mots.
+    expect(problemWords({ code: "noAction", detail: null }, t)).toContain("which kind of action this rule is about")
   })
 
   it("what a mission's request waits for, when a company rule names who approves", () => {

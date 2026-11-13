@@ -549,7 +549,9 @@ public class RulesService {
             case WORKSPACE -> "the whole workspace";
             case PROJECT -> "the project \"" + context.nameOf(key) + "\" only (its repository and its issues)";
             case PROCESS -> "the process \"" + key.ref() + "\" only";
-            case ROLE -> "the work of the workspace's " + key.ref().toLowerCase(Locale.ROOT) + "s, and of their agents";
+            // La couche d'ADMIN vaut aussi pour les propriétaires, comme role:admin parmi ceux qui accordent.
+            case ROLE -> "ADMIN".equals(key.ref()) ? "the work of the workspace's admins and owners, and of their agents"
+                : "the work of the workspace's " + key.ref().toLowerCase(Locale.ROOT) + "s, and of their agents";
             case PERSON -> "the work of " + context.nameOf(key) + ", and of their agents";
         };
     }

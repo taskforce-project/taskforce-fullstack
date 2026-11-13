@@ -17,6 +17,7 @@ import {
   Check,
   X,
   Scale,
+  HardDrive,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ import { Separator } from "@/components/ui/separator"
 import { ProjectMembersManager } from "@/components/projects/project-members-manager"
 import { ProjectRepositoryCard } from "@/components/projects/project-repository-card"
 import { RulesPanel } from "@/components/rules/rules-panel"
+import { StoragePanel } from "@/components/storage/storage-panel"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import {
@@ -66,6 +68,8 @@ const SECTIONS = [
   { key: "integrations", label: "Integrations", icon: GitBranch },
   // Les règles de ce projet (R157), au-dessus de celles de l'espace.
   { key: "rules",        label: CONSTANTS_EN.rules.settingsLabel, icon: Scale },
+  // Où TaskForce range les documents de ce projet (R156), sinon le choix de l'espace.
+  { key: "storage",      label: CONSTANTS_EN.storage.settingsLabel, icon: HardDrive },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -496,6 +500,12 @@ export default function ProjectSettingsPage() {
       {section === "rules" && (
       <section>
         <RulesPanel projectId={projectId} slug={workspace} />
+      </section>
+      )}
+
+      {section === "storage" && (
+      <section>
+        <StoragePanel projectId={projectId} slug={workspace} />
       </section>
       )}
 

@@ -288,7 +288,7 @@ class DeliveryActivityServiceTest {
     @CsvSource({"0, true", "2, false"})
     void answering_the_last_open_request_reads_its_notifications(long stillOpen, boolean read) {
         DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
-        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
         when(approvalRepository.countByRunIdAndStatus(100L, DeliveryApprovalStatus.PENDING)).thenReturn(stillOpen);
         when(userRepository.getReferenceById(7L)).thenReturn(delegator);
 
@@ -312,7 +312,7 @@ class DeliveryActivityServiceTest {
     @Test
     void the_delegator_allows_a_pending_action() {
         DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
-        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
         when(userRepository.getReferenceById(7L)).thenReturn(delegator);
 
         service.decide("acme", 100L, 9L, true, 7L);
@@ -334,7 +334,8 @@ class DeliveryActivityServiceTest {
     })
     void the_scope_of_an_answer(boolean allow, boolean forMission, String scope) {
         DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
-        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
+        lenient().when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
         when(userRepository.getReferenceById(7L)).thenReturn(delegator);
 
         service.decide("acme", 100L, 9L, allow, forMission, 7L);
@@ -346,7 +347,7 @@ class DeliveryActivityServiceTest {
     @Test
     void a_teammate_cannot_answer_for_the_delegator() {
         DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
-        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
 
         assertThatThrownBy(() -> service.decide("acme", 100L, 9L, true, 8L))
             .isInstanceOf(ForbiddenException.class)
@@ -365,11 +366,23 @@ class DeliveryActivityServiceTest {
     @MethodSource("closedRequests")
     void a_closed_request_cannot_be_decided(DeliveryApprovalStatus status, LocalDateTime expiresAt, DeliveryRunStatus runStatus, String message) {
         run.setStatus(runStatus);
-        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(approval(status, expiresAt)));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval(status, expiresAt)));
 
         assertThatThrownBy(() -> service.decide("acme", 100L, 9L, false, 7L))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining(message);
+    }
+
+    @Test
+    void an_answer_reads_the_request_on_its_locked_row_so_two_signatures_never_cross() {
+        DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        service.decide("acme", 100L, 9L, true, 7L);
+
+        verify(approvalRepository).findByIdAndRunIdForUpdate(9L, 100L);
+        verify(approvalRepository, never()).findByIdAndRunId(any(), any());
     }
 
     @Test

@@ -19,7 +19,7 @@ const status = (state: McpServerStatus["state"]): McpServerStatus => ({
 
 describe("useConnectorStore", () => {
   beforeEach(() => {
-    useConnectorStore.setState({ outcomes: {}, busy: null, waiting: null, error: null })
+    useConnectorStore.setState({ outcomes: {}, busy: null, waiting: null, error: null, failure: null })
     vi.clearAllMocks()
   })
 
@@ -43,6 +43,44 @@ describe("useConnectorStore", () => {
 
     expect(await useConnectorStore.getState().connect("acme", "notion", { shared: true })).toBeNull()
     expect(useConnectorStore.getState().error).toBe("Only owners and admins can do this.")
+    // La raison du geste qui a échoué, pour la phrase du panneau (R160).
+    expect(useConnectorStore.getState().failure).toEqual({ key: "notion", kind: "unknown", raw: "Only owners and admins can do this." })
+  })
+
+  it("the other gestures keep their failure with the reason that suits them (R161)", async () => {
+    vi.mocked(service.saveCompanyApp).mockRejectedValue(new Error("Enter the client ID"))
+    expect(await useConnectorStore.getState().saveCompanyApp("acme", "zoom", "", "")).toBe(false)
+    expect(useConnectorStore.getState().failure).toEqual({ key: "zoom", kind: "appNotSaved", raw: "Enter the client ID" })
+
+    vi.mocked(service.approveMcpTools).mockRejectedValue(new Error("boom"))
+    expect(await useConnectorStore.getState().approveTools("acme", "notion", false)).toBeNull()
+    expect(useConnectorStore.getState().failure?.kind).toBe("notApproved")
+
+    vi.mocked(service.disconnectMcpServer).mockRejectedValue(new Error("boom"))
+    expect(await useConnectorStore.getState().disconnect("acme", "notion", false)).toBeNull()
+    expect(useConnectorStore.getState().failure?.kind).toBe("notDisconnected")
+  })
+
+  it("closing a tool's panel clears its failure, not another tool's (R161)", () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null }, error: "x" })
+    useConnectorStore.getState().clearFailure("linear")
+    expect(useConnectorStore.getState().failure?.key).toBe("notion")
+    useConnectorStore.getState().clearFailure("notion")
+    expect(useConnectorStore.getState().failure).toBeNull()
+    expect(useConnectorStore.getState().error).toBeNull()
+  })
+
+  it("a new gesture, or forgetting the tool, clears its failure; another tool's stays", async () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+    useConnectorStore.getState().forget("linear")
+    expect(useConnectorStore.getState().failure?.key).toBe("notion")
+    useConnectorStore.getState().forget("notion")
+    expect(useConnectorStore.getState().failure).toBeNull()
+
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: null } })
+    vi.mocked(service.connectTool).mockResolvedValue({ next: "connected", authorizeUrl: null, message: null })
+    await useConnectorStore.getState().connect("acme", "notion", {})
+    expect(useConnectorStore.getState().failure).toBeNull()
   })
 
   it("waits until the connection shows up, then stops", async () => {

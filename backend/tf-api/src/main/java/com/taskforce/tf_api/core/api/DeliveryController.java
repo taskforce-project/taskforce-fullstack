@@ -178,9 +178,18 @@ public class DeliveryController {
         @Valid @RequestBody ApprovalDecisionRequest request
     ) {
         boolean allow = "ALLOW".equals(request.decision());
-        activityService.decide(slug, runId, approvalId, allow, request.forMission(), resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success(
-            allow ? (request.forMission() ? "Allowed for this mission" : "Action allowed") : "Action denied", null));
+        String scope = activityService.decide(slug, runId, approvalId, allow, request.forMission(), resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success(decisionMessage(allow, scope), null));
+    }
+
+    /**
+     * Ce que la réponse dit d'une décision, d'après ce qui a été enregistré : un accord pour la mission, un accord pour
+     * une fois (une décision qui lie ne s'accorde pas autrement), ou une signature qui attend celles des autres personnes.
+     */
+    static String decisionMessage(boolean allow, String scope) {
+        if (!allow) return "Action denied";
+        if (scope == null) return "Approval recorded: the request waits for the other approvers";
+        return DeliveryActivityService.SCOPE_MISSION.equals(scope) ? "Allowed for this mission" : "Allowed once";
     }
 
     /**

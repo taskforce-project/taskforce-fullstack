@@ -165,6 +165,13 @@ export interface DesktopBridge {
   };
   /** Ouvre le dossier des journaux de l'app (à joindre à un signalement). */
   openLogs(): Promise<void>;
+  /**
+   * Le dossier où TaskForce range ce qu'il écrit (R156), choisi dans la boîte du système ; null quand la personne la
+   * ferme. Absent d'une coque plus ancienne.
+   */
+  readonly storage?: {
+    chooseFolder(): Promise<string | null>;
+  };
   /** Ouvre le dossier des copies de la base faites avant chaque mise à jour. */
   openBackups(): Promise<void>;
   /**

@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
@@ -34,6 +35,7 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -307,6 +309,17 @@ class CortexGateTest {
     }
 
     @Test
+    @DisplayName("les nombres des objets imbriqués se lisent aussi, sous leur nom ; le plus fort compte pour un seuil")
+    void nested_numbers_are_read_for_a_threshold() throws Exception {
+        CortexGate.Verdict verdict = gate.judge(defaults, external("stripe", false),
+            "{\"amount\": 10, \"payment\": {\"amount\": 9000, \"meta\": {\"fee\": 2.50}}, \"note\": {\"text\": \"x\"}}",
+            CortexGate.Exposure.none());
+
+        assertThat(verdict.facts()).containsEntry("arg.amount", "9000").containsEntry("arg.fee", "2.5")
+            .doesNotContainKey("arg.text").doesNotContainKey("arg.payment");
+    }
+
+    @Test
     @DisplayName("une règle de l'entreprise qui désigne qui accorde : la décision porte ses obligations, et sa phrase")
     void a_company_rule_carries_its_obligations() {
         RulesBundle.Rule finance = new RulesBundle.Rule("ws-accounting",
@@ -321,6 +334,21 @@ class CortexGateTest {
         assertThat(verdict.effect()).isEqualTo("ask");
         assertThat(verdict.reason()).isEqualTo("No change without the finance lead");
         assertThat(verdict.require().approvers()).containsExactly(List.of("person:42"));
+    }
+
+    @Test
+    @DisplayName("ce qu'un outil dit de son appel entre dans ses faits, jamais l'acteur ni un fait du socle")
+    void a_tool_gives_its_server_only() {
+        AgentTool gesture = internal("save_document");
+        when(gesture.action()).thenReturn("mcp.write");
+        when(gesture.facts(any(), any())).thenReturn(Map.of("server", "google-drive", "actor", "person",
+            "untrusted", "false"));
+        AgentContext ctx = new AgentContext("acme", 1L, 7L);
+
+        CortexGate.Verdict verdict = gate.judge(defaults, gesture, "{}", CortexGate.Exposure.none(), ctx);
+
+        assertThat(verdict.facts()).containsEntry("server", "google-drive").containsEntry("actor", "agent")
+            .doesNotContainKey("untrusted");
     }
 
     @Test
@@ -364,5 +392,121 @@ class CortexGateTest {
         assertThat(gate.judge(gate.rulesFor(ctx, 13L), internal("create_issue")).allowed()).isTrue();
         assertThat(gate.judge(gate.rulesFor(new AgentContext("acme", 1L, 7L, new Screen(12L, null)), null),
             internal("create_issue")).denied()).isTrue();
+    }
+
+    /** La couche du projet 12 : ni nouvelle issue, ni écriture dans Linear. */
+    private void projectTwelveRefuses() {
+        Map<String, Object> noIssues = new java.util.LinkedHashMap<>();
+        noIssues.put("id", "prj12-no-issues");
+        noIssues.put("when", Map.of("action", "issue.create"));
+        noIssues.put("class", "reversible-exit");
+        noIssues.put("effect", "deny");
+        noIssues.put("owner", "owner@acme.test");
+        noIssues.put("reason", "No new issue in accounting.");
+        noIssues.put("review", "2027-05-11");
+        Map<String, Object> noWrites = new java.util.LinkedHashMap<>(noIssues);
+        noWrites.put("id", "prj12-no-linear-writes");
+        noWrites.put("when", Map.of("action", "mcp.write", "server", "linear"));
+        noWrites.put("reason", "Nothing written in Linear from accounting.");
+        HarnessRuleSet layer = HarnessRuleSet.builder().version(3).scope(RuleScope.PROJECT)
+            .project(Project.builder().id(12L).build()).rules(List.of(noIssues, noWrites))
+            .digest("sha256:" + "c".repeat(64)).build();
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(layer));
+        Workspace ws = Workspace.builder().id(1L).build();
+        org.mockito.Mockito.lenient().when(projects.findByIdAndWorkspaceId(12L, 1L))
+            .thenReturn(Optional.of(Project.builder().id(12L).workspace(ws).build()));
+        org.mockito.Mockito.lenient().when(projects.findByIdAndWorkspaceId(13L, 1L))
+            .thenReturn(Optional.of(Project.builder().id(13L).workspace(ws).build()));
+    }
+
+    @Test
+    @DisplayName("le projet dont les règles jugent vient du travail en cours, jamais des arguments d'un outil")
+    void the_project_comes_from_the_work_at_hand() throws Exception {
+        projectTwelveRefuses();
+        AgentContext work = new AgentContext("acme", 1L, 7L, new Screen(12L, null));
+        java.util.function.Function<Long, RulesBundle> bundles = p -> gate.rulesFor(work, p);
+
+        // Un outil de l'entreprise qui nomme un autre projet : ses arguments parlent de l'outil, le travail juge.
+        CortexGate.Judged write = gate.judgeWork(work, CortexGate.workProject(work), external("linear", false),
+            "{\"projectId\": 13}", CortexGate.Exposure.none(), bundles);
+        assertThat(write.verdict().denied()).isTrue();
+        assertThat(write.verdict().ruleId()).isEqualTo("prj12-no-linear-writes");
+        assertThat(write.project()).isEqualTo(12L);
+    }
+
+    /** La couche d'un projet : une nouvelle issue s'y accorde par le responsable du projet. */
+    private static HarnessRuleSet theLeadApproves(long project) {
+        Map<String, Object> rule = new java.util.LinkedHashMap<>();
+        rule.put("id", "prj" + project + "-lead-approves");
+        rule.put("when", Map.of("action", "issue.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "ask");
+        rule.put("owner", "owner@acme.test");
+        rule.put("reason", "The project's lead approves new issues.");
+        rule.put("review", "2027-05-11");
+        rule.put("require", Map.of("approvers", List.of("project-lead")));
+        return HarnessRuleSet.builder().version((int) project).scope(RuleScope.PROJECT)
+            .project(Project.builder().id(project).build()).rules(List.of(rule)).digest("sha256:" + "e".repeat(64)).build();
+    }
+
+    @Test
+    @DisplayName("deux projets dont les règles désignent qui accorde : chacun se lit chez lui, jamais dans le seul projet du travail")
+    void the_approvers_of_each_project_are_read_in_that_project() {
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(theLeadApproves(13), theLeadApproves(12)));
+        Workspace ws = Workspace.builder().id(1L).build();
+        when(projects.findByIdAndWorkspaceId(12L, 1L)).thenReturn(Optional.of(Project.builder().id(12L).workspace(ws).build()));
+        when(members.findByWorkspaceIdAndUserId(1L, 7L)).thenReturn(Optional.of(
+            com.taskforce.tf_api.core.model.WorkspaceMember.builder().role(com.taskforce.tf_api.core.enums.WorkspaceRole.MEMBER)
+                .build()));
+        // La personne est responsable du projet de la conversation (13), pas de celui que l'outil nomme (12).
+        com.taskforce.tf_api.core.repository.ProjectMemberRepository projectMembers =
+            Mockito.mock(com.taskforce.tf_api.core.repository.ProjectMemberRepository.class);
+        when(projectMembers.findByProjectIdAndUserId(13L, 7L)).thenReturn(Optional.of(
+            com.taskforce.tf_api.core.model.ProjectMember.builder().role(com.taskforce.tf_api.core.enums.ProjectRole.LEAD)
+                .build()));
+        com.taskforce.tf_api.core.service.rules.RuleApprovers approvers =
+            new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers);
+        AgentContext inThirteen = new AgentContext("acme", 1L, 7L, new Screen(13L, null));
+
+        CortexGate.Judged judged = gate.judgeWork(inThirteen, 13L, internal("create_issue"), "{\"projectId\": 12}",
+            CortexGate.Exposure.none(), p -> gate.rulesFor(inThirteen, p));
+
+        assertThat(judged.checks()).extracting(CortexGate.Check::project).containsExactly(13L, 12L);
+        assertThat(judged.aloneSuffices(approvers, 1L, 7L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("un outil de TaskForce qui nomme un autre projet : jugé avec les deux, la décision la plus stricte l'emporte")
+    void a_taskforce_tool_that_names_a_project_is_judged_by_both() {
+        projectTwelveRefuses();
+        AgentContext inTwelve = new AgentContext("acme", 1L, 7L, new Screen(12L, null));
+        AgentContext inThirteen = new AgentContext("acme", 1L, 7L, new Screen(13L, null));
+
+        CortexGate.Judged fromTwelve = gate.judgeWork(inTwelve, 12L, internal("create_issue"), "{\"projectId\": 13}",
+            CortexGate.Exposure.none(), p -> gate.rulesFor(inTwelve, p));
+        CortexGate.Judged fromThirteen = gate.judgeWork(inThirteen, 13L, internal("create_issue"), "{\"projectId\": 12}",
+            CortexGate.Exposure.none(), p -> gate.rulesFor(inThirteen, p));
+
+        assertThat(fromTwelve.verdict().ruleId()).isEqualTo("prj12-no-issues");
+        assertThat(fromTwelve.project()).isEqualTo(12L);
+        assertThat(fromThirteen.verdict().denied()).isTrue();
+        assertThat(fromThirteen.verdict().ruleId()).isEqualTo("prj12-no-issues");
+        assertThat(fromThirteen.project()).isEqualTo(12L);
+    }
+
+    @Test
+    @DisplayName("deux demandes : la plus stricte réunit leurs obligations ; un refus l'emporte sur une demande")
+    void the_stricter_of_two_decisions() {
+        RulesEngine.Obligations owner = new RulesEngine.Obligations(List.of(List.of("role:owner")), 1, false);
+        RulesEngine.Obligations twoLead = new RulesEngine.Obligations(List.of(List.of("project-lead")), 2, true);
+        CortexGate.Verdict plain = new CortexGate.Verdict("ask", "write-company-tools", "Asks.", Map.of());
+        CortexGate.Verdict byOwner = new CortexGate.Verdict("ask", "ws-owner", "The owner.", Map.of(), owner);
+        CortexGate.Verdict byLeads = new CortexGate.Verdict("ask", "prj-leads", "Two leads.", Map.of(), twoLead);
+        CortexGate.Verdict refused = new CortexGate.Verdict("deny", "frozen", "Frozen.", Map.of());
+
+        assertThat(CortexGate.stricter(plain, byOwner)).isSameAs(byOwner);
+        assertThat(CortexGate.stricter(byOwner, refused)).isSameAs(refused);
+        assertThat(CortexGate.stricter(byOwner, byLeads).require())
+            .isEqualTo(new RulesEngine.Obligations(List.of(List.of("role:owner"), List.of("project-lead")), 2, true));
     }
 }
