@@ -953,11 +953,17 @@ export const CONSTANTS_EN = {
     openAdminPage: "Open the admin page",
     // The company's app (path C), entered once by an owner or admin
     companyAppTitle: "Your company's app",
-    companyAppText: "Create the app in {name} as described below, then enter its details here once. Everyone in the workspace then connects with their own account.",
+    companyAppText: "Create the app in {name} with the steps below, or send them to a {name} admin, then enter its client ID and secret here once. Everyone in the workspace then connects with their own account.",
     clientId: "Client ID",
     clientSecret: "Client secret",
     clientSecretKept: "A secret is saved. Leave empty to keep it.",
     redirectAddress: "Redirect address to register",
+    // The steps point to the redirect address, given apart: whole, never cut, with its own Copy button (R161)
+    redirectInSteps: "below",
+    copy: "Copy",
+    copyRedirect: "Copy the redirect address",
+    copySteps: "Copy the steps",
+    companyAppGuide: "Open {name}'s guide",
     saveAndConnect: "Save and connect",
     companyAppSaved: "Your company's app is saved.",
     // The guided key (path D)

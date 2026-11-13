@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse.CategoryGroup;
 import com.taskforce.tf_api.core.dto.response.IntegrationCatalogResponse.ConnectorView;
+import com.taskforce.tf_api.core.enums.ConnectionPath;
 import com.taskforce.tf_api.core.enums.ConnectionScope;
 import com.taskforce.tf_api.core.enums.ConnectionState;
 import com.taskforce.tf_api.core.enums.ConnectorCategory;
@@ -188,6 +189,28 @@ class IntegrationCatalogServiceTest {
         assertThat(cloudflare.tried()).isFalse();
         assertThat(catalog.total()).isEqualTo((int) cards());
         assertThat(catalog.connected()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("l'étape d'une application d'entreprise parle à qui la lit, donne l'adresse de retour à part, et Slack nomme ses portées (R161)")
+    void the_company_app_step_speaks_to_its_reader_and_gives_the_redirect_address() {
+        when(workspaceMemberRepository.existsByWorkspaceIdAndUserId(1L, 7L)).thenReturn(true);
+        when(integrationRepository.findByWorkspaceId(1L)).thenReturn(List.of());
+        when(workspaceMcp.connectedServers(1L, 7L)).thenReturn(List.of());
+
+        IntegrationCatalogResponse response = service.getCatalog("acme", 7L);
+
+        // L'adresse se copie à part, entière ; une étape qui n'en demande pas n'en donne pas.
+        ConnectorView slack = tool(response, "slack").live();
+        assertThat(slack.admin().redirectUri()).isEqualTo("https://api.example.test/api/mcp/oauth/callback");
+        assertThat(tool(response, "linear").admin().redirectUri()).isNull();
+        // Les portées que la connexion demandera, lecture comme écriture, chacune nommée dans les étapes.
+        assertThat(slack.admin().text()).contains(catalog.preset("slack-mcp").orElseThrow().scopesFor(true));
+        // Une application d'entreprise : ses étapes s'adressent à qui les suit, jamais à « un administrateur » tiers.
+        assertThat(catalog.all()).filteredOn(d -> d.preset() != null && d.preset().admin() != null
+                && d.preset().connection() == ConnectionPath.COMPANY_APP)
+            .isNotEmpty()
+            .allSatisfy(d -> assertThat(d.preset().admin().text()).doesNotContain("then enters"));
     }
 
     @Test

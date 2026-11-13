@@ -339,6 +339,8 @@ export interface AdminStep {
   link: string | null;
   /** Rien ne se connecte avant elle. */
   required: boolean;
+  /** L'adresse de retour que `text` demande d'enregistrer chez l'éditeur ; nulle quand il n'en demande pas. */
+  redirectUri?: string | null;
 }
 
 export interface KeyGuide {

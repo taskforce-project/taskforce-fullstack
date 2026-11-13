@@ -313,6 +313,10 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
   const busy = useConnectorStore((s) => s.busy === tool.key)
   const [clientId, setClientId] = useState("")
   const [secret, setSecret] = useState("")
+  // L'adresse de retour se donne à part, entière et copiable : les étapes y renvoient au lieu de la couper (R161).
+  const redirect = tool.admin?.redirectUri ?? null
+  const steps = instructions && redirect ? instructions.split(redirect).join(t.redirectInSteps) : instructions
+  const guide = tool.admin?.link ?? null
   async function submit() {
     // Un refus se dit dans le panneau, au-dessus du formulaire, qui garde ce que la personne a saisi (R161).
     if (await save(slug, tool.key, clientId.trim(), secret.trim())) {
@@ -324,8 +328,32 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
     <div className="flex flex-col gap-3">
       <p className="text-sm font-medium text-foreground">{t.companyAppTitle}</p>
       <p className="text-sm text-muted-foreground">{fillText(t.companyAppText, { name: tool.name })}</p>
-      {instructions && (
-        <p className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground">{instructions}</p>
+      {steps && (
+        <p className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground">{steps}</p>
+      )}
+      {redirect && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">{t.redirectAddress}</span>
+          <div className="flex items-center gap-2">
+            {/* D'un seul tenant : elle défile plutôt que de passer à la ligne au milieu (R161). */}
+            <code tabIndex={0} className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded-md border border-border bg-muted/40 px-2 py-1.5 font-mono text-xs text-foreground">
+              {redirect}
+            </code>
+            <CopyButton text={redirect} label={t.copy} name={t.copyRedirect} />
+          </div>
+        </div>
+      )}
+      {(instructions || guide) && (
+        <div className="flex flex-wrap gap-2">
+          {/* Les étapes entières, l'adresse comprise : pour les envoyer à qui administre l'outil. */}
+          {instructions && <CopyButton text={instructions} label={t.copySteps} />}
+          {guide && (
+            <a href={guide} target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted">
+              {fillText(t.companyAppGuide, { name: tool.name })} <ExternalLink className="size-3" />
+            </a>
+          )}
+        </div>
       )}
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">{t.clientId}</span>
@@ -341,6 +369,25 @@ function CompanyAppForm({ slug, tool, instructions, onSaved, onUseKey }: Readonl
         <Button onClick={submit} disabled={busy || !clientId.trim()}>{busy ? t.connecting : t.saveAndConnect}</Button>
       </DialogFooter>
     </div>
+  )
+}
+
+/** Copie un texte ; le bouton dit « Copied » une fois fait. `name` : ce qu'il copie, quand son libellé ne le dit pas. */
+function CopyButton({ text, label, name }: Readonly<{ text: string; label: string; name?: string }>) {
+  const t = usePreferencesStore((s) => s.t.connect)
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+    } catch {
+      setCopied(false)
+    }
+  }
+  return (
+    <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={copy} aria-label={copied ? t.copied : name}>
+      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : label}
+    </Button>
   )
 }
 

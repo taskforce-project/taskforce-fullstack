@@ -22735,6 +22735,9 @@
           },
           "required": {
             "type": "boolean"
+          },
+          "redirectUri": {
+            "type": "string"
           }
         }
       },

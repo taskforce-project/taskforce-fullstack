@@ -139,7 +139,7 @@ public class IntegrationCatalogService {
             state = manager ? NEEDS_SETUP : ConnectionState.WAITING_FOR_ADMIN.name();
         }
         AdminStep admin = p == null || p.admin() == null ? null
-            : new AdminStep(adminText(p.admin().text()), adminLink(p), p.admin().required());
+            : new AdminStep(adminText(p.admin().text()), adminLink(p), p.admin().required(), redirectToRegister(p));
         KeyGuide key = p == null || p.apiKey() == null ? null : new KeyGuide(p.apiKey().hint(), p.apiKey().link());
         boolean writeChoice = p != null && (p.readUrl() != null || !p.scopesFor(false).equals(p.scopesFor(true)));
         return new ConnectorView(d.key(), d.name(), d.category().name(), d.authType().name(), connected, d.fields(),
@@ -158,6 +158,11 @@ public class IntegrationCatalogService {
         if (link == null || !link.contains("{clientId}")) return link;
         String id = p.api() == null ? null : oauthSettings.apiClientId(p.api().app());
         return id == null ? null : link.replace("{clientId}", java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /** L'adresse de retour que l'étape de l'administrateur demande d'enregistrer chez l'éditeur ; nulle sinon (R161). */
+    private String redirectToRegister(ConnectorPreset p) {
+        return p.admin().text().contains("{redirectUri}") ? oauthSettings.redirectUri() : null;
     }
 
     private String adminText(String text) {

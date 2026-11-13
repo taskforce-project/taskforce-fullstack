@@ -229,6 +229,28 @@ describe("ConnectPanel", () => {
     expect(useConnectorStore.getState().outcomes["slack-mcp"]).toBeUndefined()
   })
 
+  it("the company app form gives its owner the guide, the whole redirect address to copy, and steps to send (R161)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+    const redirect = "https://api.example.test/api/mcp/oauth/callback"
+    const text = `Create a General app with the redirect address ${redirect} and the meeting scopes, then enter its client ID.`
+    show(notion({ key: "zoom", name: "Zoom", connection: "company-app", state: "NEEDS_SETUP",
+      admin: { text, link: "https://developers.zoom.us/docs/mcp/", required: true, redirectUri: redirect } }), true)
+
+    expect(screen.getByText(t.companyAppText.replaceAll("{name}", "Zoom"))).toBeInTheDocument()
+    // Les étapes renvoient à l'adresse, donnée à part et entière dans son propre élément.
+    expect(screen.getByText("Create a General app with the redirect address below and the meeting scopes, then enter its client ID."))
+      .toBeInTheDocument()
+    expect(screen.getByText(redirect).tagName).toBe("CODE")
+    expect(screen.getByRole("link", { name: new RegExp(t.companyAppGuide.replace("{name}", "Zoom")) }).getAttribute("href"))
+      .toBe("https://developers.zoom.us/docs/mcp/")
+
+    fireEvent.click(screen.getByRole("button", { name: t.copyRedirect }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(redirect))
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.copySteps) }))
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith(text))
+  })
+
   it("a refused company app and a failed disconnection say so in the panel, never as raw text in a toast (R161)", async () => {
     saveCompanyApp.mockImplementation(async () => {
       useConnectorStore.setState({ failure: { key: "zoom", kind: "appNotSaved", raw: "Enter the client ID of your company's app" } })

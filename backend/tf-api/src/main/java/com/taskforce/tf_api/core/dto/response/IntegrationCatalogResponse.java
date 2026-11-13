@@ -13,8 +13,12 @@ public record IntegrationCatalogResponse(
 ) {
     public record CategoryGroup(String category, String label, List<ConnectorView> tools) {}
 
-    /** L'étape de l'administrateur d'un outil : la phrase à lui envoyer, le lien de sa page. */
-    public record AdminStep(String text, String link, boolean required) {}
+    /**
+     * L'étape de l'administrateur d'un outil : la phrase à lui envoyer, le lien de sa page, et l'adresse de retour que
+     * la phrase demande d'enregistrer chez l'éditeur (nulle quand elle n'en demande pas) : le formulaire de
+     * l'application de l'entreprise la donne à part, entière, avec un bouton qui la copie (R161).
+     */
+    public record AdminStep(String text, String link, boolean required, String redirectUri) {}
 
     /** La clé guidée d'un outil : où la créer. */
     public record KeyGuide(String hint, String link) {}
