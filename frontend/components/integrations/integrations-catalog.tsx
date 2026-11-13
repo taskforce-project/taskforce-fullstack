@@ -193,8 +193,9 @@ export function filterCatalog(catalog: IntegrationCatalog, filters: CatalogFilte
       ...g,
       tools: g.tools
         .filter((tool) => filters.status === "all" || (filters.status === "connected" ? isConnected(tool) : !isConnected(tool)))
+        // La description du second accès aussi : « channels » trouve Slack par ce que Cortex y lit (R160).
         .filter((tool) => !q || g.label.toLowerCase().includes(q) || tool.name.toLowerCase().includes(q)
-          || (tool.description ?? "").toLowerCase().includes(q))
+          || (tool.description ?? "").toLowerCase().includes(q) || (tool.live?.description ?? "").toLowerCase().includes(q))
         // Ce qui se connecte d'abord ; un outil que l'éditeur ferme encore vient en dernier (tri stable).
         .sort((a, b) => Number(Boolean(a.blocked)) - Number(Boolean(b.blocked))),
     }))

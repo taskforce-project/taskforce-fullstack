@@ -155,6 +155,12 @@ describe("filterCatalog et folds (plus de cent outils, R153)", () => {
       .toEqual(["github", "plane"])
   })
 
+  it("la recherche lit aussi la description du second accès (R160)", () => {
+    const slack = { ...tool("slack", false), live: { ...tool("slack-mcp", false, "MCP"), description: "Search and read your channels" } } as ConnectorView
+    const chat = { total: 1, connected: 0, categories: [{ category: "chat", label: "Chat", tools: [slack] }] } as IntegrationCatalog
+    expect(filterCatalog(chat, { ...all, query: "read your channels" }).flatMap((g) => g.tools.map((x) => x.key))).toEqual(["slack"])
+  })
+
   it("une catégorie, un état : les catégories vides disparaissent", () => {
     expect(filterCatalog(catalog, { ...all, category: "chat" }).map((g) => g.category)).toEqual(["chat"])
     expect(filterCatalog(catalog, { ...all, status: "connected" }).flatMap((g) => g.tools.map((x) => x.key)))
