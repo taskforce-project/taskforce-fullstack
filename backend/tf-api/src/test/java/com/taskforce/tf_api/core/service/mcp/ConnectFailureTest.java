@@ -129,7 +129,34 @@ class ConnectFailureTest {
     }
 
     @Test
-    @DisplayName("un serveur de connexion qui ne répond pas : SIGN_IN_UNREACHABLE ; une adresse interne : ADDRESS_NOT_ALLOWED")
+    @DisplayName("une inscription en panne chez l'éditeur (5xx) ne répond pas, elle ne refuse rien : SIGN_IN_UNREACHABLE (R159)")
+    void aRegistrationThatFailsAtTheVendor() throws IOException {
+        vendor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        vendor.createContext("/register", exchange -> {
+            exchange.sendResponseHeaders(503, -1);
+            exchange.close();
+        });
+        vendor.start();
+        String url = "http://127.0.0.1:" + vendor.getAddress().getPort() + "/register";
+
+        BusinessException down = (BusinessException) catchThrowable(() -> new McpOAuthClient(om, 5000L, true).postJson(url, Map.of()));
+
+        assertThat(down.getErrorCode()).isEqualTo(ConnectFailure.SIGN_IN_UNREACHABLE);
+        assertThat(down).hasMessageContaining("HTTP 503");
+    }
+
+    @Test
+    @DisplayName("une adresse de l'éditeur que la garde refuse : sa connexion n'est pas sûre (SIGN_IN_UNTRUSTED), pas l'adresse saisie (R159)")
+    void aVendorAddressThatTheGuardRefuses() {
+        assertThat(code(catchThrowable(() -> ConnectFailure.assertVendorAddress("http://169.254.169.254/authorize"))))
+            .isEqualTo(ConnectFailure.SIGN_IN_UNTRUSTED);
+        assertThat(code(catchThrowable(
+            () -> new McpOAuthClient(om, 2000L).postForm("http://127.0.0.1:9/token", Map.of("grant_type", "x")))))
+            .isEqualTo(ConnectFailure.SIGN_IN_UNTRUSTED);
+    }
+
+    @Test
+    @DisplayName("un serveur de connexion qui ne répond pas : SIGN_IN_UNREACHABLE ; une adresse d'inscription interne : SIGN_IN_UNTRUSTED")
     void anUnreachableSignIn() throws IOException {
         int closed;
         try (ServerSocket socket = new ServerSocket(0)) {
@@ -140,9 +167,10 @@ class ConnectFailureTest {
         assertThat(unreachable.getErrorCode()).isEqualTo(ConnectFailure.SIGN_IN_UNREACHABLE);
         assertThat(unreachable).hasMessageContaining("failed").hasMessageNotContaining("echoue");
 
+        // L'adresse d'inscription vient des métadonnées de l'éditeur : refusée, c'est sa connexion qui n'est pas sûre.
         assertThat(code(catchThrowable(
             () -> new McpOAuthClient(om, 2000L).postJson("http://127.0.0.1:" + closed + "/register", Map.of()))))
-            .isEqualTo(ConnectFailure.ADDRESS_NOT_ALLOWED);
+            .isEqualTo(ConnectFailure.SIGN_IN_UNTRUSTED);
     }
 
     @Test

@@ -51,4 +51,17 @@ public final class ConnectFailure {
             throw of(ADDRESS_NOT_ALLOWED, e.getMessage());
         }
     }
+
+    /**
+     * La même garde pour une adresse que l'éditeur donne dans ses métadonnées (sa page de connexion, son inscription,
+     * son échange de jetons) : refusée, c'est la connexion de l'éditeur qui n'est pas sûre ({@link #SIGN_IN_UNTRUSTED}),
+     * pas l'adresse que la personne a saisie (R159).
+     */
+    public static void assertVendorAddress(String url) {
+        try {
+            SsrfGuard.assertPublicHttpUrl(url);
+        } catch (IllegalArgumentException e) {
+            throw of(SIGN_IN_UNTRUSTED, e.getMessage());
+        }
+    }
 }

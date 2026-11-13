@@ -121,12 +121,15 @@ public class McpOAuthClient {
                     .header("Content-Type", "application/json"),
                 url, "application/json");
             JsonNode node = readJson(r);
-            requireSuccess(r, node, "DCR " + url, ConnectFailure.REGISTRATION_REFUSED);
+            // Un 5xx : l'inscription de l'éditeur ne répond pas ; elle ne refuse rien (R159).
+            requireSuccess(r, node, "DCR " + url,
+                r.statusCode() / 100 == 5 ? ConnectFailure.SIGN_IN_UNREACHABLE : ConnectFailure.REGISTRATION_REFUSED);
             return node;
         } catch (BusinessException be) {
             throw be;
         } catch (IllegalArgumentException e) {
-            throw ConnectFailure.of(ConnectFailure.ADDRESS_NOT_ALLOWED, "OAuth DCR " + url + " refused: " + e.getMessage());
+            // L'adresse d'inscription vient des métadonnées de l'éditeur : refusée, c'est sa connexion qui n'est pas sûre.
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "OAuth DCR " + url + " refused: " + e.getMessage());
         } catch (Exception e) {
             throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNREACHABLE, "OAuth DCR " + url + " failed: " + e.getMessage());
         }
@@ -141,6 +144,9 @@ public class McpOAuthClient {
             return node;
         } catch (BusinessException be) {
             throw be;
+        } catch (IllegalArgumentException e) {
+            // L'adresse d'échange des jetons vient de l'éditeur, comme celle de son inscription (R159).
+            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "OAuth token " + url + " refused: " + e.getMessage());
         } catch (Exception e) {
             throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNREACHABLE, "OAuth token " + url + " failed: " + e.getMessage());
         }
