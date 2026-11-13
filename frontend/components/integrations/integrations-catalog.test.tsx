@@ -136,6 +136,10 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     const pill = () => screen.queryByRole("button", { name: /^Chat, mail and meetings/ })
     const search = await screen.findByPlaceholderText("Search integrations…")
     expect(pill()).toBeInTheDocument()
+    // Le nombre de la pastille se lit : la couleur atténuée du thème, sans opacité qui l'efface (R161).
+    const count = within(pill()!).getByText("1")
+    expect(count).toHaveClass("text-muted-foreground")
+    expect(count.className).not.toMatch(/opacity/)
 
     fireEvent.change(search, { target: { value: "slack" } })
     expect(pill()).toBeNull()

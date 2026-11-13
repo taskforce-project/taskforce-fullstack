@@ -48,6 +48,14 @@ const NEW_CUSTOM_SERVER: ConnectorView = {
 }
 
 /** Puce de filtre par catégorie (façon marketplace). */
+/**
+ * Le nombre d'une pastille : la couleur atténuée du thème, sans opacité par-dessus, pour tenir 4,5:1 dans les deux
+ * thèmes, sur une pastille choisie comme sur les autres (R161).
+ */
+function PillCount({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <span className="font-normal tabular-nums text-muted-foreground">{children}</span>
+}
+
 function CatPill({ active, onClick, children }: Readonly<{ active: boolean; onClick: () => void; children: React.ReactNode }>) {
   return (
     <button
@@ -390,13 +398,13 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-1.5">
             <CatPill active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>
-              All <span className="tabular-nums opacity-60">{catalog.total}</span>
+              All <PillCount>{catalog.total}</PillCount>
             </CatPill>
             <CatPill active={statusFilter === "connected"} onClick={() => setStatusFilter("connected")}>
-              Connected <span className="tabular-nums opacity-60">{catalog.connected}</span>
+              Connected <PillCount>{catalog.connected}</PillCount>
             </CatPill>
             <CatPill active={statusFilter === "disconnected"} onClick={() => setStatusFilter("disconnected")}>
-              Not connected <span className="tabular-nums opacity-60">{Math.max(0, catalog.total - catalog.connected)}</span>
+              Not connected <PillCount>{Math.max(0, catalog.total - catalog.connected)}</PillCount>
             </CatPill>
           </div>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setDialog({ key: NEW_CUSTOM_MCP_KEY, live: false })}>
@@ -421,11 +429,11 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
         {(!query.trim() || activeCat !== "all") && (
           <div className="flex flex-wrap gap-1.5">
             <CatPill active={activeCat === "all"} onClick={() => setActiveCat("all")}>
-              All <span className="tabular-nums opacity-60">{catalog.total}</span>
+              All <PillCount>{catalog.total}</PillCount>
             </CatPill>
             {catalog.categories.map((g) => (
               <CatPill key={g.category} active={activeCat === g.category} onClick={() => setActiveCat(g.category)}>
-                {g.label} <span className="tabular-nums opacity-60">{g.tools.length}</span>
+                {g.label} <PillCount>{g.tools.length}</PillCount>
               </CatPill>
             ))}
           </div>
