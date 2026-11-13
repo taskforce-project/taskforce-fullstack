@@ -82,6 +82,27 @@ class ConnectorAppServiceTest {
     }
 
     @Test
+    @DisplayName("le journal dit qu'un émetteur a été effacé seulement quand il y en avait un d'épinglé")
+    void theJournalSaysAnIssuerWasClearedOnlyWhenOneWasPinned() {
+        ConnectorApp unpinned = ConnectorApp.builder().id(4L).workspace(ws).connectorKey("glean").clientId("old-id").build();
+        ConnectorApp pinned = ConnectorApp.builder().id(5L).workspace(ws).connectorKey("zoho").clientId("old-id")
+            .issuer("https://accounts.zoho.example").build();
+        when(apps.findByWorkspaceIdAndConnectorKey(1L, "glean")).thenReturn(Optional.of(unpinned));
+        when(apps.findByWorkspaceIdAndConnectorKey(1L, "zoho")).thenReturn(Optional.of(pinned));
+
+        service.save(ws, ada, "glean", "new-id", "");
+        service.save(ws, ada, "zoho", "new-id", "");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit, org.mockito.Mockito.times(2)).record(eq(1L), eq(7L), eq(AuditService.COMPANY_APP_CHANGED),
+            eq("connector_app"), any(), details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("connectorKey", "glean").containsEntry("issuerCleared", false);
+        assertThat(details.getAllValues().get(1)).containsEntry("connectorKey", "zoho").containsEntry("issuerCleared", true);
+        assertThat(pinned.getIssuer()).isNull();
+    }
+
+    @Test
     @DisplayName("un membre refusé n'écrit rien au journal")
     void aRefusalIsNotRecorded() {
         assertThatThrownBy(() -> service.save(ws, bob, "slack-mcp", "cid", "s")).isInstanceOf(ForbiddenException.class);

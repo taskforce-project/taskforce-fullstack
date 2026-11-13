@@ -67,8 +67,9 @@ public class ConnectorAppService {
         if (secret.length() > MAX_SECRET) throw new BusinessException("This client secret is too long");
         ConnectorApp app = apps.findByWorkspaceIdAndConnectorKey(ws.getId(), connectorKey)
             .orElseGet(() -> ConnectorApp.builder().workspace(ws).connectorKey(connectorKey).build());
-        boolean otherApp = app.getClientId() != null && !app.getClientId().equals(id);
-        if (otherApp) app.setIssuer(null);
+        // Un autre identifiant efface l'émetteur épinglé ; le journal ne le dit que s'il y en avait un.
+        boolean issuerCleared = app.getIssuer() != null && app.getClientId() != null && !app.getClientId().equals(id);
+        if (issuerCleared) app.setIssuer(null);
         app.setClientId(id);
         if (!secret.isEmpty()) app.setClientSecret(secret);
         app.setSavedBy(admin);
@@ -79,7 +80,7 @@ public class ConnectorAppService {
         details.put("connectorKey", connectorKey);
         details.put("clientId", id);
         details.put("secretChanged", !secret.isEmpty());
-        details.put("issuerCleared", otherApp);
+        details.put("issuerCleared", issuerCleared);
         audit.record(ws.getId(), admin.getId(), AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey, details);
         return new CompanyApp(connectorKey, id, app.getClientSecret() != null && !app.getClientSecret().isBlank());
     }
