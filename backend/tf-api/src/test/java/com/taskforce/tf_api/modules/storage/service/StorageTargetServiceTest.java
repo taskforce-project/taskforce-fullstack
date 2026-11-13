@@ -2,6 +2,7 @@ package com.taskforce.tf_api.modules.storage.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,7 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.modules.ged.service.ObjectStorage;
@@ -34,6 +36,8 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,6 +58,7 @@ class StorageTargetServiceTest {
     private final ProjectVisibilityGuard visibility = Mockito.mock(ProjectVisibilityGuard.class);
     private final AuthorizationService authorization = Mockito.mock(AuthorizationService.class);
     private final UserRepository users = Mockito.mock(UserRepository.class);
+    private final AuditService audit = Mockito.mock(AuditService.class);
     private final Project project = Project.builder().id(30L).build();
 
     private StorageTargetService service;
@@ -74,7 +79,74 @@ class StorageTargetServiceTest {
             .displayName("Ada").build()));
         when(targets.save(any())).thenAnswer(i -> i.getArgument(0));
         service = new StorageTargetService(targets, documents, workspaces, projects, members, visibility, authorization,
-            users, List.of(new ServerDocumentWriter(Mockito.mock(ObjectStorage.class)), new MachineDocumentWriter(false)));
+            users, List.of(new ServerDocumentWriter(Mockito.mock(ObjectStorage.class)), new MachineDocumentWriter(false)),
+            audit);
+    }
+
+    @Test
+    @DisplayName("un dossier de la machine entre au journal par son seul nom ; une racine, sans nom ni chemin")
+    void aMachineFolderIsRecordedByItsNameOnly() {
+        // L'écrivain de la machine, sur l'app desktop : pour une racine, il nomme le dossier par son chemin entier.
+        DocumentWriter machine = Mockito.mock(DocumentWriter.class);
+        when(machine.kind()).thenReturn(StorageKind.MACHINE);
+        when(machine.offered()).thenReturn(true);
+        when(machine.check(any(), any(), any())).thenAnswer(i -> {
+            String path = ((StorageTarget) i.getArgument(2)).getLocalPath();
+            String name = path.equals("C:\\") ? path : "Reports";
+            return StorageTarget.builder().workspaceId(WS).kind(StorageKind.MACHINE).localPath(path).folderName(name).build();
+        });
+        StorageTargetService desktop = new StorageTargetService(targets, documents, workspaces, projects, members,
+            visibility, authorization, users, List.of(machine), audit);
+
+        desktop.choose("acme", ADA, null, new StorageTargetService.TargetRequest("machine", null, null, "C:\\"));
+        desktop.choose("acme", ADA, null, new StorageTargetService.TargetRequest("machine", null, null,
+            "C:\\Users\\ada\\Reports"));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit, Mockito.times(2)).recordAfterCommit(eq(WS), eq(ADA), eq(AuditService.STORAGE_TARGET_CHANGED),
+            eq("storage_target"), isNull(), details.capture());
+        assertThat(details.getAllValues().get(0)).containsEntry("storage", "machine").doesNotContainKey("folderName");
+        assertThat(details.getAllValues().get(1)).containsEntry("folderName", "Reports");
+        assertThat(details.getAllValues().toString()).doesNotContain("C:\\").doesNotContain("Users");
+    }
+
+    @Test
+    @DisplayName("le dernier segment d'un dossier : nul pour une racine, sous Windows comme ailleurs")
+    void lastSegment() {
+        assertThat(StorageTargetService.lastSegment("C:\\")).isNull();
+        assertThat(StorageTargetService.lastSegment("C:")).isNull();
+        assertThat(StorageTargetService.lastSegment("\\\\host\\share\\")).isNull();
+        assertThat(StorageTargetService.lastSegment("\\\\host")).isNull();
+        assertThat(StorageTargetService.lastSegment("/")).isNull();
+        assertThat(StorageTargetService.lastSegment("\\\\host\\share\\Team docs")).isEqualTo("Team docs");
+        assertThat(StorageTargetService.lastSegment("C:\\Users\\ada\\Reports\\")).isEqualTo("Reports");
+        assertThat(StorageTargetService.lastSegment("/home/ada/Reports")).isEqualTo("Reports");
+    }
+
+    @Test
+    @DisplayName("choisir l'endroit, puis revenir au choix du dessus, entre au journal de l'espace")
+    void choosingIsRecorded() {
+        service.choose("acme", ADA, null, new StorageTargetService.TargetRequest("server", null, null, null));
+        StorageTarget own = StorageTarget.builder().workspaceId(WS).projectId(30L).kind(StorageKind.SERVER).build();
+        when(targets.findByWorkspaceIdAndProjectId(WS, 30L)).thenReturn(Optional.of(own));
+        service.reset("acme", BOB, 30L);
+        // Rien à défaire : rien n'entre au journal.
+        service.reset("acme", ADA, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(audit).recordAfterCommit(eq(WS), eq(ADA), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"),
+            isNull(),
+            details.capture());
+        assertThat(details.getValue()).containsEntry("change", "chosen").containsEntry("scope", "workspace")
+            .containsEntry("storage", "server");
+        verify(audit).recordAfterCommit(eq(WS), eq(BOB), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"),
+            eq("30"),
+            details.capture());
+        assertThat(details.getValue()).containsEntry("change", "reset").containsEntry("scope", "project")
+            .containsEntry("projectId", 30L).containsEntry("previous", "server");
+        Mockito.verifyNoMoreInteractions(audit);
     }
 
     @Test
@@ -163,6 +235,30 @@ class StorageTargetServiceTest {
         assertThat(view.version()).isEqualTo("3");
         assertThat(view.savedFor()).isEqualTo("Ada");
         assertThat(view.approvedBy()).isEqualTo("Ada");
+    }
+
+    @Test
+    @DisplayName("un document sans projet (son projet supprimé) : la ligne reste, pour les gestionnaires et la personne qui l'a demandé")
+    void aDocumentWithoutProjectStaysWithItsPerson() {
+        // Le projet supprimé laisse project_id nul (ON DELETE SET NULL, V127) : le document est gardé, pas montré à tous.
+        StoredDocument bobs = StoredDocument.builder().id(11L).workspaceId(WS).projectId(null).title("Bob's notes")
+            .fileName("Bob.md").kind(StorageKind.SERVER).sizeBytes(1L).requestedBy(BOB).via("cortex").build();
+        StoredDocument others = StoredDocument.builder().id(12L).workspaceId(WS).projectId(null).title("Old plan")
+            .fileName("Plan.md").kind(StorageKind.SERVER).sizeBytes(1L).requestedBy(42L).via("cortex").build();
+        when(documents.findTop100ByWorkspaceIdOrderByCreatedAtDesc(WS)).thenReturn(List.of(bobs, others));
+        when(documents.findByIdAndWorkspaceId(11L, WS)).thenReturn(Optional.of(bobs));
+        when(documents.findByIdAndWorkspaceId(12L, WS)).thenReturn(Optional.of(others));
+
+        assertThat(service.overview("acme", CAL, null).documents()).isEmpty();
+        assertThat(service.overview("acme", BOB, null).documents()).extracting(StorageTargetService.DocumentView::id)
+            .containsExactly(11L);
+        assertThat(service.overview("acme", ADA, null).documents()).extracting(StorageTargetService.DocumentView::id)
+            .containsExactly(11L, 12L);
+
+        assertThatThrownBy(() -> service.document("acme", CAL, 11L)).isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.document("acme", BOB, 12L)).isInstanceOf(ResourceNotFoundException.class);
+        assertThat(service.document("acme", BOB, 11L)).isSameAs(bobs);
+        assertThat(service.document("acme", ADA, 12L)).isSameAs(others);
     }
 
     @Test

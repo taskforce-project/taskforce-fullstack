@@ -8,7 +8,8 @@
 //   3. reconstruit le tableau `tags` racine, ORDONNÉ + décrit → pilote l'ordre des sections Fern ;
 //   4. pose une info.description si absente ;
 //   5. remplace l'adresse du backend qui a servi la spec (servers) par celle de l'API hébergée, puis celle d'une
-//      instance auto-hébergée.
+//      instance auto-hébergée ;
+//   6. retire les schémas que seuls des chemins retirés emploient.
 //
 // Lancé automatiquement par generate-openapi.ps1 après la récupération. Rejouable sans risque.
 
@@ -55,6 +56,8 @@ const TAG_MAP = {
   "skill-suggestion-controller": "Skill suggestions",
   "ai-usage-controller": "AI usage",
   "mcp-action-controller": "MCP actions",
+  // La fin d'une connexion revenue du navigateur, avec les autres routes des connexions.
+  "mcp-o-auth-callback-controller": "MCP actions",
   "integration-controller": "Integrations",
   "webhook-controller": "Webhooks",
   "gdpr-controller": "GDPR",
@@ -142,8 +145,6 @@ for (const p of Object.keys(spec.paths ?? {})) {
 const HIDE = new Set([
   "client-log-controller",
   "gdpr-controller",
-  // Retour du navigateur après le consentement OAuth d'un serveur MCP : une redirection, pas une API à appeler.
-  "mcp-o-auth-callback-controller",
   // Endpoints MACHINE du runner local de délégation (ADR-013) : réservés à un compte de service
   // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
   "delivery-runner-controller",
@@ -155,8 +156,21 @@ const HIDE = new Set([
   // L'accord de la personne et ses sessions, eux, restent documentés (DesktopSessionController).
   "desktop-sign-in-controller",
 ]);
+// Ce que lisent le navigateur et les serveurs d'autorisation, pas une API à appeler : le retour après le consentement
+// OAuth d'un serveur MCP (une redirection), et nos documents de métadonnées client (CIMD). La fin d'une connexion,
+// `POST /api/mcp/oauth/complete`, que l'app connectée appelle, reste documentée.
+const HIDE_PATHS = new Set([
+  "/api/mcp/oauth/callback",
+  "/api/mcp/oauth/client.json",
+  "/api/mcp/oauth/desktop-client.json",
+]);
 let removedInternal = 0;
 for (const [p, item] of Object.entries(spec.paths ?? {})) {
+  if (HIDE_PATHS.has(p)) {
+    removedInternal += Object.keys(item).filter((m) => ["get", "post", "put", "patch", "delete"].includes(m)).length;
+    delete spec.paths[p];
+    continue;
+  }
   for (const method of Object.keys(item)) {
     const op = item[method];
     if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
@@ -209,7 +223,31 @@ spec.servers = [
   },
 ];
 
+// 6. Les schémas que seuls des chemins retirés emploient (l'actuator, les routes internes, le retour du navigateur, nos
+// documents CIMD) sortent aussi : la référence ne décrit pas ce qu'elle ne montre pas. Un schéma reste quand un chemin
+// gardé l'atteint, directement ou par un autre composant ($ref suivis de proche en proche).
+const reached = new Set();
+const follow = (node) => {
+  if (Array.isArray(node)) { node.forEach(follow); return; }
+  if (!node || typeof node !== "object") return;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "$ref" && typeof value === "string" && value.startsWith("#/components/")) {
+      if (reached.has(value)) continue;
+      reached.add(value);
+      const [, , type, name] = value.split("/");
+      follow(spec.components?.[type]?.[name]);
+    } else {
+      follow(value);
+    }
+  }
+};
+follow(spec.paths);
+let removedSchemas = 0;
+for (const name of Object.keys(spec.components?.schemas ?? {})) {
+  if (!reached.has(`#/components/schemas/${name}`)) { delete spec.components.schemas[name]; removedSchemas++; }
+}
+
 writeFileSync(SPEC, JSON.stringify(spec, null, 2) + "\n", { encoding: "utf8" });
 
 console.log(`OK clean-openapi : -${removedPaths} chemins actuator, -${removedInternal} opérations internes, ` +
-  `${used.size} sections, ${Object.keys(spec.paths).length} chemins restants.`);
+  `-${removedSchemas} schémas sans chemin gardé, ${used.size} sections, ${Object.keys(spec.paths).length} chemins restants.`);

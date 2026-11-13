@@ -119,7 +119,12 @@ class CompanyFilesContractTest {
         McpClient mcp = new McpClient(om, 2000, 5000, true);
         ConnectorConnectionRepository repo = connections();
         tokens = new McpTokenService(http, repo, om, catalog, apps());
-        workspaceMcp = new WorkspaceMcpService(repo, mcp, om, tokens, catalog);
+        AuthorizationService members = Mockito.mock(AuthorizationService.class);
+        lenient().when(members.isMember(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
+            .thenReturn(true);
+        lenient().when(members.isManager(WS, ada.getId())).thenReturn(true);
+        workspaceMcp = new WorkspaceMcpService(repo, mcp, om, tokens, catalog, members,
+            Mockito.mock(com.taskforce.tf_api.core.service.AuditService.class));
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 0L);
         CompanyApiHttp api = new CompanyApiHttp(om, true);
         drive = new GoogleDriveApi(api);
@@ -133,10 +138,6 @@ class CompanyFilesContractTest {
         UserRepository users = Mockito.mock(UserRepository.class);
         lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
         lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
-        AuthorizationService members = Mockito.mock(AuthorizationService.class);
-        lenient().when(members.isMember(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyLong()))
-            .thenReturn(true);
-        lenient().when(members.isManager(WS, ada.getId())).thenReturn(true);
         McpOAuthService service = new McpOAuthService(new McpOAuthDiscovery(http), http, stateRepository(),
             workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), repo, om, members);
         service.allowLocalServersForContractTests();
@@ -147,7 +148,7 @@ class CompanyFilesContractTest {
 
     /** Le geste « Connect » de Google Drive : le navigateur chez Google, l'accord, le retour. */
     private String connectGoogle(User person) {
-        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, person, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, person, new McpOAuthService.ConnectRequest(
             "google-drive", null, null, null, null, false, false, false, null));
         assertThat(outcome.next()).isEqualTo("browser");
         Map<String, String> back = google.approve(outcome.authorizeUrl());
@@ -167,7 +168,7 @@ class CompanyFilesContractTest {
     @Test
     @DisplayName("Google Drive se connecte par notre application : PKCE S256, drive.file, le jeton de renouvellement, sans resource")
     void googleConnects() {
-        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, new McpOAuthService.ConnectRequest(
             "google-drive", null, null, null, null, false, false, false, null));
         Map<String, String> q = FakeGoogle.query(java.net.URI.create(outcome.authorizeUrl()).getRawQuery());
         assertThat(outcome.authorizeUrl()).startsWith(google.base() + "/o/oauth2/v2/auth?");
@@ -195,9 +196,9 @@ class CompanyFilesContractTest {
     @DisplayName("sans notre application sur l'instance : l'étape de l'administrateur, ou l'application de l'entreprise")
     void withoutOurAppTheAdminActsFirst() {
         env.setProperty("TF_GOOGLE_CLIENT_ID", "");
-        McpOAuthService.ConnectOutcome member = oauth.connect(ws, bob, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome member = oauth.connect(ws, bob, new McpOAuthService.ConnectRequest(
             "google-drive", null, null, null, null, false, false, false, null));
-        McpOAuthService.ConnectOutcome manager = oauth.connect(ws, ada, true, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome manager = oauth.connect(ws, ada, new McpOAuthService.ConnectRequest(
             "google-drive", null, null, null, null, false, false, false, null));
         assertThat(member.next()).isEqualTo("admin");
         assertThat(manager.next()).isEqualTo("company-app");
@@ -293,7 +294,7 @@ class CompanyFilesContractTest {
 
     /** Le geste « Connect » de Microsoft 365, l'écriture accordée ou non. */
     private String connectMicrosoft(User person, boolean allowWrites) {
-        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, person, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, person, new McpOAuthService.ConnectRequest(
             "microsoft-365", null, null, null, null, false, allowWrites, false, null));
         assertThat(outcome.next()).isEqualTo("browser");
         Map<String, String> back = microsoft.approve(outcome.authorizeUrl(), false);
@@ -304,7 +305,7 @@ class CompanyFilesContractTest {
     @Test
     @DisplayName("Microsoft 365 se connecte par notre application Entra : droits délégués, PKCE S256, la lecture par défaut, sans resource")
     void microsoftConnects() {
-        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, new McpOAuthService.ConnectRequest(
             "microsoft-365", null, null, null, null, false, false, false, null));
         Map<String, String> q = FakeGoogle.query(java.net.URI.create(outcome.authorizeUrl()).getRawQuery());
         assertThat(q).containsEntry("client_id", FakeMicrosoft.CLIENT_ID).containsEntry("code_challenge_method", "S256")
@@ -325,7 +326,7 @@ class CompanyFilesContractTest {
     @Test
     @DisplayName("quand la politique de l'entreprise réserve ces droits à son administrateur : l'étape de l'administrateur")
     void microsoftAdminFirst() {
-        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, bob, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, bob, new McpOAuthService.ConnectRequest(
             "microsoft-365", null, null, null, null, false, false, false, null));
         Map<String, String> back = microsoft.approve(outcome.authorizeUrl(), true);
 
@@ -336,7 +337,7 @@ class CompanyFilesContractTest {
             assertThat(c.getState()).isEqualTo(com.taskforce.tf_api.core.enums.ConnectionState.WAITING_FOR_ADMIN));
 
         // Une personne qui refuse elle-même n'attend pas l'administrateur.
-        McpOAuthService.ConnectOutcome again = oauth.connect(ws, ada, false, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome again = oauth.connect(ws, ada, new McpOAuthService.ConnectRequest(
             "microsoft-365", null, null, null, null, false, false, false, null));
         Map<String, String> declined = FakeGoogle.query(java.net.URI.create(again.authorizeUrl()).getRawQuery());
         assertThat(oauth.callback(declined.get("state"), null, "access_denied", null,
@@ -369,7 +370,7 @@ class CompanyFilesContractTest {
     @Test
     @DisplayName("Microsoft 365 partagé avec l'espace : les canaux pour tous, les conversations de la personne pour elle seule")
     void aSharedConnectionKeepsItsChatsToItsPerson() {
-        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, true, new McpOAuthService.ConnectRequest(
+        McpOAuthService.ConnectOutcome outcome = oauth.connect(ws, ada, new McpOAuthService.ConnectRequest(
             "microsoft-365", null, null, null, null, true, false, false, null));
         Map<String, String> back = microsoft.approve(outcome.authorizeUrl(), false);
         assertThat(McpConnectContractTest.finish(oauth, ada, oauth.callback(back.get("state"), back.get("code"), null,
@@ -584,7 +585,8 @@ class CompanyFilesContractTest {
                     new ServerDocumentWriter(Mockito.mock(com.taskforce.tf_api.modules.ged.service.ObjectStorage.class)),
                     new MachineDocumentWriter(desktop),
                     new GoogleDriveDocumentWriter(access, connections, drive),
-                    new OneDriveDocumentWriter(access, connections, graph)));
+                    new OneDriveDocumentWriter(access, connections, graph)),
+                Mockito.mock(com.taskforce.tf_api.core.service.AuditService.class));
             CortexRecordService records = Mockito.mock(CortexRecordService.class);
             lenient().when(records.open(any(), anyString(), any())).thenAnswer(i -> {
                 trace.add(new ArrayList<>(List.of("mission.started")));

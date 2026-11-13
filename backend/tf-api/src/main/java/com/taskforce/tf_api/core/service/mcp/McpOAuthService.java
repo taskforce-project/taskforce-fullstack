@@ -58,7 +58,15 @@ import lombok.extern.slf4j.Slf4j;
 public class McpOAuthService {
 
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
-    /** Les erreurs d'un éditeur qui disent que son administrateur doit d'abord agir. */
+    /**
+     * Les erreurs d'un éditeur qui disent que son administrateur doit d'abord agir. Relu le 13/11/2026 (séance n°23,
+     * R160) sur la documentation OAuth publique des éditeurs des 12 préréglages {@code admin.required} et de Google :
+     * aucun n'y documente un autre code de ce sens rendu à l'adresse de retour. {@code admin_policy_enforced} de Google
+     * s'affiche sur la page de Google
+     * (https://developers.google.com/identity/protocols/oauth2/web-server) ; {@code app_not_admin_approved} de Slack
+     * répond à l'échange du code (https://docs.slack.dev/reference/methods/oauth.v2.user.access/), pas au retour.
+     * Le refus de la personne ({@code access_denied}) n'en est jamais une.
+     */
     private static final Set<String> ADMIN_ERRORS = Set.of("consent_required", "admin_consent_required",
         "admin_approval_required", "unauthorized_client", "interaction_required", "access_restricted");
 
@@ -121,10 +129,15 @@ public class McpOAuthService {
     /**
      * Le geste « Connect » : TaskForce choisit le chemin. Une clé donnée se garde (D) ; un préréglage par clé seule
      * demande la clé ; un outil qui exige l'application de l'entreprise l'attend ; un serveur public se connecte tel
-     * quel ; sinon l'OAuth, avec le premier client possible. Rôle vérifié en amont pour une connexion partagée.
+     * quel ; sinon l'OAuth, avec le premier client possible. Le rôle est vérifié ici : un membre pour sa connexion, un
+     * propriétaire ou un administrateur pour celle de l'espace ; et c'est lui qui dit, à l'étape de l'administrateur,
+     * si la personne saisit l'application de l'entreprise ou l'attend.
      */
     @Transactional
-    public ConnectOutcome connect(Workspace ws, User person, boolean manager, ConnectRequest req) {
+    public ConnectOutcome connect(Workspace ws, User person, ConnectRequest req) {
+        Long personId = person == null ? null : person.getId();
+        authorization.requireForConnection(ws.getId(), personId, req.shared());
+        boolean manager = authorization.isManager(ws.getId(), personId);
         Optional<ConnectorPreset> preset = catalog.preset(req.connectorKey());
         // Un préréglage joint toujours son serveur officiel ; une autre adresse demandée pour sa clé est refusée.
         String url = catalog.serverFor(req.connectorKey(), req.mcpUrl(), req.allowWrites());
@@ -189,6 +202,7 @@ public class McpOAuthService {
      */
     @Transactional
     public String startApi(Workspace ws, Long userId, ConnectRequest req, ConnectorPreset preset) {
+        authorization.requireForConnection(ws.getId(), userId, req.shared());
         ConnectorPreset.Api api = preset.api();
         String[] fake = apiForContractTests.get(preset.key());
         String issuer = fake != null ? fake[0] : settings.apiIssuer(api.issuer());
@@ -241,8 +255,8 @@ public class McpOAuthService {
     }
 
     /**
-     * Demarre le flux et renvoie l'URL d'autorisation (le front y envoie le navigateur). Autorisation (membre, et
-     * gestionnaire pour une connexion partagée) faite en amont par le controleur. La cle est celle d'un prereglage du
+     * Demarre le flux et renvoie l'URL d'autorisation (le front y envoie le navigateur). Autorisation vérifiée ici (un
+     * membre, et un propriétaire ou un administrateur pour une connexion partagée). La cle est celle d'un prereglage du
      * catalogue ou d'un serveur personnalise, dont le nom est garde jusqu'au callback (cf.
      * {@link WorkspaceMcpService#resolveServer}).
      */
@@ -254,6 +268,7 @@ public class McpOAuthService {
 
     @Transactional
     public String start(Workspace ws, Long userId, ConnectRequest req, String requestedUrl) {
+        authorization.requireForConnection(ws.getId(), userId, req.shared());
         // La clé d'un préréglage mène toujours à son serveur officiel : une autre adresse est refusée avant tout appel.
         String mcpUrl = catalog.serverFor(req.connectorKey(), requestedUrl, req.allowWrites());
         if (mcpUrl == null) throw new BusinessException("Required field: mcpUrl");
@@ -325,27 +340,32 @@ public class McpOAuthService {
      *
      * <p>Le code n'est pas échangé ici : il est gardé avec son {@code state}, et l'adresse de retour porte un jeton à
      * usage unique que seul ce navigateur reçoit ({@code finish}). L'app, connectée, le présente pour finir ; seule la
-     * personne qui a lancé le flux le peut. Le retour ne retire jamais le flux : un second retour le laisse tel quel, et
-     * un flux qui n'aboutit pas s'efface à son échéance.</p>
+     * personne qui a lancé le flux le peut. Le retour ne retire jamais le flux, mais le premier le clôt, quel qu'il soit
+     * : un second retour, même une erreur, ne change plus rien, et un flux qui n'aboutit pas s'efface à son échéance.</p>
      */
     @Transactional
     public String callback(String state, String code, String error, String iss, String errorDescription) {
         McpOAuthState row = (state == null || state.isBlank()) ? null
             : stateRepository.findById(state).orElse(null);
         if (row == null) return settings.appBase() + "/?mcp=error"; // state inconnu/expire : retour generique
+        boolean open = false;
         try {
+            // Un state ne revient qu'une fois, et pas après son échéance : un second retour, même une erreur, ne change
+            // plus rien.
+            if (row.getCode() != null || row.getFinishHash() != null) throw new BusinessException("retour deja recu");
+            if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
+            open = true;
             if (error != null && !error.isBlank()) {
-                if (ADMIN_ERRORS.contains(error) || adminRequired(row.getConnectorKey())
-                        || microsoftAdminFirst(row.getConnectorKey(), errorDescription)) {
+                // L'administrateur n'est attendu que si l'éditeur le dit (ses erreurs d'administrateur, les codes de
+                // Microsoft) ; jamais sur le refus de la personne elle-même (access_denied, son « Cancel »).
+                if (ADMIN_ERRORS.contains(error) || microsoftAdminFirst(row.getConnectorKey(), errorDescription)) {
+                    close(row);
                     markWaitingForAdmin(row);
                     return appRedirect(row, "admin");
                 }
                 throw new BusinessException("refus : " + error);
             }
-            if (row.getExpiresAt().isBefore(LocalDateTime.now())) throw new BusinessException("state expire");
             if (code == null || code.isBlank()) throw new BusinessException("code manquant");
-            // Un state ne revient qu'une fois.
-            if (row.getCode() != null || row.getFinishHash() != null) throw new BusinessException("retour deja recu");
             // RFC 9207 : le retour doit venir de l'émetteur attendu (attaque par mélange de serveurs).
             if (iss != null && !iss.isBlank() && !sameIssuer(iss, row.getIssuer())) {
                 throw new BusinessException("emetteur inattendu");
@@ -359,8 +379,19 @@ public class McpOAuthService {
             return appRedirect(row, "finish") + "&state=" + enc(row.getState()) + "&finish=" + enc(finish);
         } catch (Exception e) {
             log.warn("Callback OAuth MCP echoue (connector={}) : {}", LogSafe.of(row.getConnectorKey()), LogSafe.of(e.getMessage()));
+            if (open && row.getFinishHash() == null) close(row);
             return appRedirect(row, "error");
         }
+    }
+
+    /**
+     * Clôt un flux revenu sans code à finir (une erreur, un retour incomplet, un autre émetteur) : il porte l'empreinte
+     * d'un jeton que personne ne reçoit, donc un second retour le trouve déjà reçu et aucune app ne peut le finir. Il
+     * s'efface à son échéance, comme un flux qui n'aboutit pas.
+     */
+    private void close(McpOAuthState row) {
+        row.setFinishHash(sha256Hex(urlSafe(24)));
+        stateRepository.save(row);
     }
 
     /** Comment l'app a fini une connexion : {@code connected} ou {@code error}, et l'outil, pour son message. */
@@ -415,6 +446,15 @@ public class McpOAuthService {
                     && authorization.isManager(row.getWorkspaceId(), userId)) {
                 registrar.pinCompanyIssuer(row.getWorkspaceId(), row.getConnectorKey(), row.getIssuer());
             }
+            // Une connexion partagée avec l'espace entre à son journal, après la dernière étape qui peut échouer et une fois
+            // la transaction validée : l'outil, l'hôte, l'écriture accordée ou non.
+            if (row.isShared()) {
+                Map<String, Object> details = WorkspaceMcpService.sharedDetails("connected",
+                    new WorkspaceMcpService.ServerIdentity(row.getConnectorKey(), row.getMcpName()), row.getMcpUrl(),
+                    "oauth");
+                details.put("writes", row.isAllowWrites());
+                workspaceMcp.recordShared(row.getWorkspaceId(), userId, row.getConnectorKey(), details);
+            }
             return new Completion("connected", row.getConnectorKey());
         } catch (Exception e) {
             log.warn("Fin de connexion MCP echouee (connector={}) : {}", LogSafe.of(row.getConnectorKey()),
@@ -467,6 +507,13 @@ public class McpOAuthService {
         conn.setState(ConnectionState.WAITING_FOR_ADMIN);
         connections.save(conn);
         workspaceMcp.invalidate(row.getWorkspaceId());
+        // La connexion de l'espace qui attend son administrateur entre au journal, une fois validée.
+        if (row.isShared()) {
+            workspaceMcp.recordShared(row.getWorkspaceId(), row.getUserId(), row.getConnectorKey(),
+                WorkspaceMcpService.sharedDetails("waiting-for-admin",
+                    new WorkspaceMcpService.ServerIdentity(row.getConnectorKey(), row.getMcpName()), row.getMcpUrl(),
+                    "oauth"));
+        }
     }
 
     /**
@@ -482,10 +529,6 @@ public class McpOAuthService {
 
     private static final java.util.regex.Pattern MICROSOFT_ADMIN =
         java.util.regex.Pattern.compile("AADSTS(65001|90094|90095|900941)\\b");
-
-    private boolean adminRequired(String connectorKey) {
-        return catalog.preset(connectorKey).map(p -> p.admin() != null && p.admin().required()).orElse(false);
-    }
 
     /**
      * Le compte chez l'éditeur, pour « Connected as ... » : ce que la réponse du jeton en dit (le jeton d'identité

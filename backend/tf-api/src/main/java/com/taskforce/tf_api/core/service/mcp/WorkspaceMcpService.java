@@ -32,6 +32,8 @@ import com.taskforce.tf_api.core.model.ConnectorConnection;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.ConnectorConnectionRepository;
+import com.taskforce.tf_api.core.service.AuditService;
+import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
@@ -157,6 +159,10 @@ public class WorkspaceMcpService {
     private final ObjectMapper objectMapper;
     private final McpTokenService tokenService; // OAuth (TF-MCP-02) : access token géré + refresh auto
     private final ConnectorCatalog catalog;
+    /** Sa propre connexion : un membre ; une connexion partagée : un propriétaire ou un administrateur (règle 3). */
+    private final AuthorizationService authorization;
+    /** Une connexion partagée faite ou défaite entre au journal de l'espace (séance n°23, R160). */
+    private final AuditService audit;
 
     @Value("${integrations.mcp.tools-cache-ttl-ms:60000}")
     private long cacheTtlMs;
@@ -283,14 +289,16 @@ public class WorkspaceMcpService {
                                 String allow, boolean shared, boolean localApproved) {}
 
     /**
-     * Connecte (ou reconfigure) un serveur MCP : pour la personne (par défaut), ou partagé avec l'espace (contrôle du
-     * rôle fait en amont par le contrôleur). Persiste {@code mcpUrl}, le nom d'un serveur personnalisé et, au choix, un
-     * jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé, en JSON <b>chiffré</b>, puis fige la liste
-     * de ses outils et invalide le cache. Un serveur local (la machine, le réseau local) ne se connecte que sur une
-     * instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom retenus.
+     * Connecte (ou reconfigure) un serveur MCP : pour la personne (par défaut, un membre), ou partagé avec l'espace (un
+     * propriétaire ou un administrateur, vérifié ici). Persiste {@code mcpUrl}, le nom d'un serveur personnalisé et, au
+     * choix, un jeton relayé en {@code Authorization: Bearer} ou dans l'en-tête nommé, en JSON <b>chiffré</b>, puis fige
+     * la liste de ses outils et invalide le cache. Un serveur local (la machine, le réseau local) ne se connecte que sur
+     * une instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom
+     * retenus.
      */
     @Transactional
     public ServerIdentity connectServer(Workspace ws, User person, ServerRequest req) {
+        authorization.requireForConnection(ws.getId(), person == null ? null : person.getId(), req.shared());
         String mcpUrl = req.mcpUrl() == null ? "" : req.mcpUrl().trim();
         if (mcpUrl.isEmpty()) throw new BusinessException("Required field: mcpUrl");
         // La clé d'un préréglage ne mène qu'à son serveur officiel : ses classes d'outils ne valent que là (R158).
@@ -321,7 +329,36 @@ public class WorkspaceMcpService {
         repository.save(conn);
         pinQuietly(conn);
         invalidate(ws.getId());
+        if (req.shared()) {
+            recordShared(ws.getId(), person.getId(), id.connectorKey(), sharedDetails("connected", id, mcpUrl,
+                token.isEmpty() ? "address" : "key"));
+        }
         return id;
+    }
+
+    /**
+     * Ce qu'une connexion partagée faite garde au journal : l'outil, le nom d'un serveur ajouté à la main, l'hôte du
+     * serveur (jamais son adresse entière : celle d'un serveur Zoho vaut une clé), et comment elle s'est faite. Jamais un
+     * jeton.
+     */
+    static Map<String, Object> sharedDetails(String change, ServerIdentity id, String url, String via) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("change", change);
+        details.put("connectorKey", id.connectorKey());
+        if (id.name() != null) details.put("name", id.name());
+        String host = host(url);
+        if (host != null) details.put("host", host);
+        details.put("via", via);
+        return details;
+    }
+
+    /**
+     * Une connexion partagée faite ou défaite, au journal de l'espace, une fois le changement validé (best-effort, cf.
+     * {@link AuditService#recordAfterCommit}).
+     */
+    void recordShared(Long workspaceId, Long userId, String connectorKey, Map<String, Object> details) {
+        audit.recordAfterCommit(workspaceId, userId, AuditService.SHARED_CONNECTION_CHANGED, "connector_connection",
+            connectorKey, details);
     }
 
     /**
@@ -371,12 +408,13 @@ public class WorkspaceMcpService {
     }
 
     /**
-     * Déconnecte un serveur MCP : la connexion de la personne, ou celle de l'espace ({@code shared}, rôle vérifié en
-     * amont). Révoque d'abord le jeton chez l'éditeur quand il offre la révocation (RFC 7009), puis supprime la ligne
-     * et invalide le cache. Dit ce qui a été révoqué.
+     * Déconnecte un serveur MCP : la connexion de la personne, ou celle de l'espace ({@code shared}, par un propriétaire
+     * ou un administrateur, vérifié ici). Révoque d'abord le jeton chez l'éditeur quand il offre la révocation
+     * (RFC 7009), puis supprime la ligne et invalide le cache. Dit ce qui a été révoqué.
      */
     @Transactional
     public DisconnectResult disconnectServer(Long workspaceId, Long userId, String connectorKey, boolean shared) {
+        authorization.requireForConnection(workspaceId, userId, shared);
         ConnectorConnection conn = (shared
             ? repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(workspaceId, connectorKey)
             : repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(workspaceId, connectorKey, userId))
@@ -386,16 +424,25 @@ public class WorkspaceMcpService {
         boolean revoked = revocable && tokenService.revoke(conn);
         repository.delete(conn);
         invalidate(workspaceId);
+        if (shared) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("change", "disconnected");
+            details.put("connectorKey", connectorKey);
+            details.put("revoked", revoked);
+            details.put("revocable", revocable);
+            recordShared(workspaceId, userId, connectorKey, details);
+        }
         return new DisconnectResult(revoked, revocable);
     }
 
     /**
      * Redonne l'accord à la liste actuelle des outils d'une connexion (R158) : les outils qui avaient changé, ou qui
      * sont apparus, sont de nouveau servis. La personne pour sa connexion ; un propriétaire ou un administrateur pour
-     * celle de l'espace (vérifié en amont).
+     * celle de l'espace (vérifié ici), et ce nouvel accord entre au journal de l'espace.
      */
     @Transactional
     public void approveTools(Long workspaceId, Long userId, String connectorKey, boolean shared) {
+        authorization.requireForConnection(workspaceId, userId, shared);
         ConnectorConnection conn = (shared
             ? repository.findByWorkspaceIdAndConnectorKeyAndOwnerIsNull(workspaceId, connectorKey)
             : repository.findByWorkspaceIdAndConnectorKeyAndOwnerId(workspaceId, connectorKey, userId))
@@ -403,12 +450,22 @@ public class WorkspaceMcpService {
         McpClient.ServerRef ref = toServerRef(conn);
         if (ref == null) throw new BusinessException("The connector " + connectorKey + " is not an MCP server");
         McpClient.Session session = client.initialize(ref);
+        int tools;
         try {
-            pin(conn, client.listTools(session));
+            List<McpClient.ToolDef> defs = client.listTools(session);
+            pin(conn, defs);
+            tools = defs == null ? 0 : defs.size();
         } finally {
             client.close(session);
         }
         invalidate(workspaceId);
+        if (shared) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("change", "tools-approved");
+            details.put("connectorKey", connectorKey);
+            details.put("tools", tools);
+            recordShared(workspaceId, userId, connectorKey, details);
+        }
     }
 
     // -------------------------------------------------------------------------

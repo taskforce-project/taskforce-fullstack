@@ -107,7 +107,8 @@ class McpConnectContractTest {
             @Override
             public Optional<ConnectorPreset> preset(String asked) {
                 return super.preset(asked).map(p -> key.equals(asked) ? new ConnectorPreset(p.key(), p.name(),
-                    p.category(), p.description(), p.website(), officialUrl, null, p.connection(), p.scopes(), p.admin(),
+                    p.category(), p.description(), p.website(), officialUrl, null, null, p.connection(), p.scopes(),
+                    p.admin(),
                     p.apiKey(), p.readTools(), p.writeTools(), p.tried(), p.blocked(), p.sources(), p.unverified(),
                     p.api()) : p);
             }
@@ -123,15 +124,16 @@ class McpConnectContractTest {
         McpClient mcp = new McpClient(om, 2000, 5000, true);
         ConnectorConnectionRepository connections = connections();
         tokens = new McpTokenService(http, connections, om, catalog, apps());
-        workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog);
+        AuthorizationService members = Mockito.mock(AuthorizationService.class);
+        lenient().when(members.isMember(anyLong(), anyLong())).thenReturn(true);
+        lenient().when(members.isManager(anyLong(), anyLong())).thenReturn(true);
+        workspaceMcp = new WorkspaceMcpService(connections, mcp, om, tokens, catalog, members,
+            Mockito.mock(com.taskforce.tf_api.core.service.AuditService.class));
         ReflectionTestUtils.setField(workspaceMcp, "cacheTtlMs", 60_000L);
         McpClientRegistrar registrar = new McpClientRegistrar(apps(), registrationRepository(), http, settings, env);
         UserRepository users = Mockito.mock(UserRepository.class);
         lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
         lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
-        AuthorizationService members = Mockito.mock(AuthorizationService.class);
-        lenient().when(members.isMember(anyLong(), anyLong())).thenReturn(true);
-        lenient().when(members.isManager(anyLong(), anyLong())).thenReturn(true);
         McpOAuthService oauth = new McpOAuthService(new McpOAuthDiscovery(http), http, stateRepository(),
             workspaceRepository(), users, tokens, workspaceMcp, registrar, settings, catalog, apps(), connections, om,
             members);

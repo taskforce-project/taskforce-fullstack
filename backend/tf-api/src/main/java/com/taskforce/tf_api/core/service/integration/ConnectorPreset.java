@@ -13,6 +13,9 @@ import com.taskforce.tf_api.core.enums.ToolClass;
  * @param mcpUrl     le serveur officiel ; nul quand l'entreprise crée le sien ({@link ConnectionPath#SERVER_URL})
  * @param readUrl    l'adresse du même serveur qui n'expose que la lecture, quand l'éditeur en a une ; la lecture
  *                   est le défaut (R158)
+ * @param readUrlSource la page publique où l'éditeur écrit que cette adresse ne sert que des outils de lecture, et la
+ *                   date de sa lecture ; nulle tant que personne ne l'a lue : les outils de l'adresse gardent alors la
+ *                   classe de leur nom
  * @param scopes     les portées strictement utiles, en lecture puis avec l'écriture ; vides = on n'en demande aucune
  * @param admin      l'étape de l'administrateur, en une phrase et un lien ; {@code required} quand rien ne se connecte
  *                   avant elle
@@ -32,6 +35,7 @@ public record ConnectorPreset(
     String website,
     String mcpUrl,
     String readUrl,
+    Source readUrlSource,
     ConnectionPath connection,
     Scopes scopes,
     Admin admin,
@@ -67,9 +71,26 @@ public record ConnectorPreset(
     /** L'essai de bout en bout : sa date et sa preuve. */
     public record Tried(String date, String proof) {}
 
+    /** Une page publique de l'éditeur, et la date (AAAA-MM-JJ) où elle a été lue. */
+    public record Source(String page, String checked) {}
+
     /** La classe d'un outil de ce serveur, par son nom d'origine : lecture s'il est nommé comme tel, écriture sinon. */
     public ToolClass classOf(String tool) {
         return tool != null && readTools.contains(tool) ? ToolClass.READ : ToolClass.WRITE;
+    }
+
+    /**
+     * La classe d'un outil servi à cette adresse : sur l'adresse de lecture seule que l'éditeur documente comme ne servant
+     * que des outils de lecture ({@code readUrlSource}), une lecture, quel que soit son nom ; ailleurs, celle de son nom
+     * ({@link #classOf}).
+     */
+    public ToolClass classAt(String url, String tool) {
+        return isDocumentedReadOnly(url) ? ToolClass.READ : classOf(tool);
+    }
+
+    /** Cette adresse est-elle l'adresse de lecture seule que l'éditeur documente comme ne servant que des lectures ? */
+    public boolean isDocumentedReadOnly(String url) {
+        return readUrlSource != null && url != null && readUrl != null && !readUrl.isBlank() && bare(url).equals(bare(readUrl));
     }
 
     /** Les portées à demander : celles de la lecture, ou celles de l'écriture quand elle est accordée. */

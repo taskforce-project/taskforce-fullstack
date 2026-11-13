@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import com.taskforce.tf_api.core.repository.ProjectMemberRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.modules.storage.domain.StorageKind;
@@ -38,7 +40,9 @@ import lombok.RequiredArgsConstructor;
  * Un document va à la cible de son projet, sinon à celle de l'espace, sinon au serveur de TaskForce.
  *
  * <p>Les propriétaires et administrateurs choisissent pour l'espace ; eux et le responsable d'un projet, pour ce projet.
- * Chaque membre voit la cible, et si lui peut y ranger : le stockage de l'entreprise s'écrit par sa propre connexion.</p>
+ * Chaque membre voit la cible, et si lui peut y ranger : le stockage de l'entreprise s'écrit par sa propre connexion.
+ * Un document se voit avec son projet ; sans projet, par les propriétaires, les administrateurs et la personne pour qui
+ * il a été écrit.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -58,6 +62,7 @@ public class StorageTargetService {
     private final AuthorizationService authorization;
     private final UserRepository users;
     private final List<DocumentWriter> writers;
+    private final AuditService audit;
 
     /** La cible qui vaut, et d'où elle vient : {@code project}, {@code workspace} ou {@code default}. */
     public record Resolved(StorageTarget target, String from) {}
@@ -144,6 +149,13 @@ public class StorageTargetService {
         row.setLocalPath(checked.getLocalPath());
         row.setChosenBy(userId);
         targets.save(row);
+        Map<String, Object> details = changeDetails("chosen", projectId);
+        details.put("storage", kind.wire());
+        if (row.getConnectorKey() != null) details.put("connectorKey", row.getConnectorKey());
+        // Un dossier de la machine : son seul nom, jamais son chemin ; une racine (C:\, \\hôte\partage\) n'en a pas.
+        String folderName = kind == StorageKind.MACHINE ? lastSegment(row.getLocalPath()) : row.getFolderName();
+        if (folderName != null) details.put("folderName", folderName);
+        record(ws, userId, projectId, details);
         return overview(slug, userId, projectId);
     }
 
@@ -153,12 +165,18 @@ public class StorageTargetService {
         Workspace ws = member(slug, userId);
         Project project = projectId == null ? null : visibleProject(ws, projectId, userId);
         requireEdit(ws, project, userId);
-        (projectId == null ? targets.findByWorkspaceIdAndProjectIdIsNull(ws.getId())
-            : targets.findByWorkspaceIdAndProjectId(ws.getId(), projectId)).ifPresent(targets::delete);
+        Optional<StorageTarget> chosen = projectId == null ? targets.findByWorkspaceIdAndProjectIdIsNull(ws.getId())
+            : targets.findByWorkspaceIdAndProjectId(ws.getId(), projectId);
+        chosen.ifPresent(row -> {
+            targets.delete(row);
+            Map<String, Object> details = changeDetails("reset", projectId);
+            details.put("previous", row.getKind().wire());
+            record(ws, userId, projectId, details);
+        });
         return overview(slug, userId, projectId);
     }
 
-    /** Un document rangé, s'il est de cet espace et que la personne peut le voir. */
+    /** Un document rangé, s'il est de cet espace et que la personne peut le voir ({@link #canSee}). */
     @Transactional(readOnly = true)
     public StoredDocument document(String slug, Long userId, Long documentId) {
         Workspace ws = member(slug, userId);
@@ -168,8 +186,19 @@ public class StorageTargetService {
             projects.findByIdAndWorkspaceId(doc.getProjectId(), ws.getId())
                 .filter(p -> visibility.canView(p, userId))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found"));
+        } else if (!canSee(doc, userId, authorization.isManager(ws.getId(), userId))) {
+            throw new ResourceNotFoundException("Document not found");
         }
         return doc;
+    }
+
+    /**
+     * Un document sans projet (rangé hors d'un projet, ou dont le projet a été supprimé : la ligne reste, son projet
+     * devient nul, V127) ne se montre qu'aux propriétaires et administrateurs de l'espace, et à la personne pour qui il a
+     * été écrit ; jamais à tout membre.
+     */
+    private static boolean canSee(StoredDocument doc, Long userId, boolean manager) {
+        return manager || (userId != null && userId.equals(doc.getRequestedBy()));
     }
 
     /** L'espace de ce slug, si la personne en est membre. */
@@ -191,10 +220,11 @@ public class StorageTargetService {
             ? documents.findTop100ByWorkspaceIdOrderByCreatedAtDesc(ws.getId())
             : documents.findTop50ByWorkspaceIdAndProjectIdOrderByCreatedAtDesc(ws.getId(), projectId);
         Set<Long> viewable = new HashSet<>(visibility.viewableProjectIds(ws.getId(), userId));
+        boolean manager = authorization.isManager(ws.getId(), userId);
         Map<Long, String> names = new HashMap<>();
         List<DocumentView> out = new ArrayList<>();
         for (StoredDocument d : rows) {
-            if (d.getProjectId() != null && !viewable.contains(d.getProjectId())) continue;
+            if (d.getProjectId() != null ? !viewable.contains(d.getProjectId()) : !canSee(d, userId, manager)) continue;
             out.add(new DocumentView(d.getId(), d.getTitle(), d.getFileName(), d.getKind().wire(), d.getFolderName(),
                 d.getWebUrl(), d.getVersion(), d.getSizeBytes() == null ? 0 : d.getSizeBytes(),
                 d.getCreatedAt() == null ? null : d.getCreatedAt().toString(), d.getProjectId(),
@@ -254,5 +284,45 @@ public class StorageTargetService {
 
     private static String blank(String s) {
         return s == null || s.isBlank() ? null : s.strip();
+    }
+
+    /**
+     * Le dernier segment d'un dossier de la machine, sous Windows comme ailleurs, sans le reste de son chemin ; nul pour
+     * une racine ({@code C:\}, {@code \\hôte\partage\}, {@code /}), qui n'a pas de nom à elle.
+     */
+    static String lastSegment(String path) {
+        if (path == null) return null;
+        String p = path.strip();
+        int end = p.length();
+        while (end > 0 && (p.charAt(end - 1) == '\\' || p.charAt(end - 1) == '/')) end--;
+        p = p.substring(0, end);
+        if (p.isEmpty()) return null;
+        if (p.length() == 2 && Character.isLetter(p.charAt(0)) && p.charAt(1) == ':') return null;
+        if (p.startsWith("\\\\") || p.startsWith("//")) {
+            String share = p.substring(2);
+            long separators = share.chars().filter(c -> c == '\\' || c == '/').count();
+            if (separators <= 1) return null;
+        }
+        int cut = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/'));
+        String last = p.substring(cut + 1);
+        return last.isEmpty() ? null : last;
+    }
+
+    /** Le début du détail d'un choix : ce qui a changé, et pour quoi (l'espace, ou un projet). */
+    private static Map<String, Object> changeDetails(String change, Long projectId) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("change", change);
+        details.put("scope", projectId == null ? "workspace" : "project");
+        if (projectId != null) details.put("projectId", projectId);
+        return details;
+    }
+
+    /**
+     * L'endroit choisi entre au journal de l'espace (séance n°23, R160) : la cible, le connecteur et le nom du dossier,
+     * jamais le chemin d'un dossier de la machine ni un identifiant chez l'éditeur.
+     */
+    private void record(Workspace ws, Long userId, Long projectId, Map<String, Object> details) {
+        audit.recordAfterCommit(ws.getId(), userId, AuditService.STORAGE_TARGET_CHANGED, "storage_target",
+            projectId == null ? null : String.valueOf(projectId), details);
     }
 }

@@ -228,6 +228,113 @@ class ConnectorCatalogTest {
         assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
     }
 
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"github-mcp", "gitlab", "notion", "confluence", "jira", "slack-mcp", "linear", "excalidraw",
+        "stripe", "zoho", "asana"})
+    @DisplayName("chaque liste d'outils de la première vague dit sa page publique et la date de sa lecture (séance n°23, R160)")
+    void lesListesDeLaPremiereVagueDisentLeurSource(String cle) throws IOException {
+        JsonNode tools = null;
+        for (JsonNode p : fichier()) if (cle.equals(p.path("key").asText())) tools = p.path("tools");
+        assertThat(tools).as(cle).isNotNull();
+        assertThat(tools.path("source").asText()).as(cle).startsWith("https://");
+        assertThat(java.time.LocalDate.parse(tools.path("checked").asText())).as(cle)
+            .isAfterOrEqualTo(java.time.LocalDate.of(2026, 11, 12));
+    }
+
+    @ParameterizedTest(name = "{0} / {1} -> {2}")
+    @CsvSource({
+        // Asana publie ses outils par groupe : la lecture sert, l'écriture et l'interactif demandent.
+        "asana,      get_task,                READ",
+        "asana,      search_objects,          READ",
+        "asana,      create_tasks,            WRITE",
+        "asana,      search_tasks_preview,    WRITE",
+        // Atlassian : la lecture de Teamwork Graph et du code ; executeRead lance n'importe quel outil différé.
+        "jira,       getTeamworkGraphContext, READ",
+        "confluence, searchCode,              READ",
+        "jira,       executeRead,             WRITE",
+        "confluence, executeRead,             WRITE",
+        // Linear ne publie pas de liste : sur son adresse entière, seul ce que son journal des changements dit en lecture
+        // sert sans demander (son adresse de lecture seule : voir laLectureSeuleDocumentee).
+        "linear,     list_customer_needs,     READ",
+        "linear,     get_issue,               WRITE",
+        "gitlab,     list_pipeline_schedules, READ",
+        "stripe,     stripe_analytics,        WRITE",
+        "notion,     notion-wait-session,     WRITE",
+        "slack-mcp,  slack_search_public,     WRITE",
+    })
+    @DisplayName("la première vague, relue le 12/11/2026 : lecture seulement si l'éditeur le dit, le doute demande (R160)")
+    void laPremiereVagueRelue(String cle, String outil, ToolClass classe) {
+        assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
+    @ParameterizedTest(name = "{0} / {1} -> {2}")
+    @CsvSource({
+        // Excalidraw : create_view garde chaque dessin chez l'éditeur ; read_checkpoint lit ce dépôt, pour l'app seule.
+        "excalidraw,      read_me,                 READ",
+        "excalidraw,      create_view,             WRITE",
+        "excalidraw,      read_checkpoint,         WRITE",
+        "excalidraw,      export_to_excalidraw,    WRITE",
+        // Confluence : un export fabriqué chez Atlassian, avec un lien dont l'accès n'est pas documenté.
+        "confluence,      exportConfluenceContent, WRITE",
+        "confluence,      getConfluenceContent,    READ",
+        // Excalidraw+ : deux outils sans description sur la page de l'éditeur.
+        "excalidraw-plus, list_invites,            WRITE",
+        "excalidraw-plus, get_invite,              WRITE",
+        "excalidraw-plus, get_scene,               READ",
+    })
+    @DisplayName("un outil qui garde ou envoie un contenu chez l'éditeur, ou que sa page ne décrit pas, demande (revue de la PR #532)")
+    void ceQuiGardeOuEnvoieDemande(String cle, String outil, ToolClass classe) {
+        assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
+    @ParameterizedTest(name = "{0} / {1} -> {2}")
+    @CsvSource({
+        // La page range les outils par intention, sans dire ce qu'un groupe permet : chacun reste une lecture sur sa
+        // propre description (relue le 13/11/2026).
+        "jira,       getJiraIssue,                  READ",
+        "jira,       getJiraWorkflows,              READ",
+        "jira,       getJiraScreen,                 READ",
+        "jira,       getJiraWorkflowEditorLink,     WRITE",
+        "confluence, diffConfluenceContentVersions, READ",
+    })
+    @DisplayName("Atlassian : une lecture sur la description de l'outil, pas sur le seul nom de son groupe (revue de la PR #532)")
+    void atlassianParLaDescriptionDeChaqueOutil(String cle, String outil, ToolClass classe) {
+        assertThat(catalogue.classOf(cle, outil)).isEqualTo(classe);
+    }
+
+    @ParameterizedTest(name = "{0} / {1} / {2} -> {3}")
+    @CsvSource({
+        // L'éditeur écrit que l'adresse de lecture seule ne sert que des lectures : chaque outil qu'elle sert en est une.
+        "linear,     https://mcp.linear.app/mcp/readonly,         get_issue,    READ",
+        "linear,     https://mcp.linear.app/mcp/readonly,         anything_new, READ",
+        "github-mcp, https://api.githubcopilot.com/mcp/readonly,  get_me,       READ",
+        "neon,       https://mcp.neon.tech/mcp?readonly=true,     run_sql,      READ",
+        // Sur l'adresse entière, la liste documentée vaut.
+        "linear,     https://mcp.linear.app/mcp,                  get_issue,    WRITE",
+        "linear,     https://mcp.linear.app/mcp,                  list_issues,  READ",
+        "neon,       https://mcp.neon.tech/mcp,                   run_sql,      WRITE",
+        // Une adresse de lecture seule que l'éditeur ne documente pas ainsi : la classe du nom.
+        "supabase,   https://mcp.supabase.com/mcp?read_only=true, execute_sql,  WRITE",
+        "lucid,      https://mcp.lucid.app/mcp/readonly,          search,       WRITE",
+    })
+    @DisplayName("l'adresse de lecture seule que l'éditeur documente ne sert que des lectures (revue de la PR #532)")
+    void laLectureSeuleDocumentee(String cle, String adresse, String outil, ToolClass classe) {
+        assertThat(catalogue.classOn(cle, adresse, outil)).isEqualTo(classe);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"linear", "github-mcp", "neon", "posthog", "klaviyo"})
+    @DisplayName("chaque adresse de lecture seule tenue pour lecture cite la page de l'éditeur et la date de sa lecture")
+    void lesAdressesDeLectureSeuleCitentLeurPage(String cle) {
+        ConnectorPreset preset = catalogue.preset(cle).orElseThrow();
+        assertThat(preset.readUrlSource()).as(cle).isNotNull();
+        assertThat(preset.readUrlSource().page()).as(cle).startsWith("https://");
+        assertThat(java.time.LocalDate.parse(preset.readUrlSource().checked())).as(cle)
+            .isAfterOrEqualTo(java.time.LocalDate.of(2026, 11, 13));
+        assertThat(preset.isDocumentedReadOnly(preset.readUrl())).as(cle).isTrue();
+        assertThat(preset.isDocumentedReadOnly(preset.mcpUrl())).as(cle).isFalse();
+    }
+
     @Test
     @DisplayName("la lecture par défaut : portées et adresse de lecture seule, l'écriture seulement accordée")
     void laLectureParDefaut() {
