@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { AxiosError, AxiosHeaders } from "axios"
 
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
-import { getIntegrationCatalog } from "@/lib/api/integration-service"
+import { connectMcpServer, getIntegrationCatalog } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { useConnectorStore } from "@/lib/store/connector-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -18,7 +19,15 @@ vi.mock("@/lib/api/integration-service", async (actual) => ({
   getIntegrationCatalog: vi.fn(),
   getMcpServers: vi.fn().mockResolvedValue([]),
   getMcpServerTools: vi.fn().mockResolvedValue([]),
+  connectMcpServer: vi.fn(),
 }))
+
+/** Une réponse d'erreur de l'API avec sa raison, telle qu'axios la rend. */
+function refused(error: string, message: string): AxiosError {
+  const config = { headers: new AxiosHeaders() }
+  return new AxiosError("Request failed", "ERR_BAD_REQUEST", config, null,
+    { status: 400, statusText: "", headers: {}, config, data: { status: 400, error, message } })
+}
 
 const c = CONSTANTS_EN.connect
 const t = CONSTANTS_EN.integrations
@@ -116,6 +125,26 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(within(dialog()).queryByText(c.waitingForAdmin)).toBeNull()
     fireEvent.click(within(dialog()).getByRole("button", { name: c.liveBack.replace("{name}", "Slack") }))
     expect(within(dialog()).getByText(c.liveTitle.replace("{name}", "Slack"))).toBeInTheDocument()
+  })
+
+  it("a server on the local network asks for the person's approval, from its name or from the server's reason", async () => {
+    vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("linear", "Linear")))
+    vi.mocked(connectMcpServer).mockRejectedValue(refused("CONNECT_LOCAL_NEEDS_APPROVAL", "This server runs on your local network."))
+    render(<IntegrationsCatalog slug="acme" />)
+
+    fireEvent.click(await screen.findByRole("button", { name: /Connect an MCP server/ }))
+    fireEvent.change(within(dialog()).getByPlaceholderText("Team docs"), { target: { value: "Printer" } })
+    const address = within(dialog()).getByPlaceholderText("https://.../mcp")
+    fireEvent.change(address, { target: { value: "https://printer.local/mcp" } })
+    expect(within(dialog()).getByRole("checkbox", { name: new RegExp(c.localConfirm) })).toBeInTheDocument()
+
+    // Un nom que le motif ne connaît pas : le serveur dit qu'il est local, la case apparaît avec la phrase.
+    fireEvent.change(address, { target: { value: "https://mcp.corp.lan/mcp" } })
+    expect(within(dialog()).queryByRole("checkbox", { name: new RegExp(c.localConfirm) })).toBeNull()
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Use a token instead" }))
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Connect" }))
+    expect(await within(dialog()).findByRole("alert")).toHaveTextContent(c.failures.CONNECT_LOCAL_NEEDS_APPROVAL)
+    expect(within(dialog()).getByRole("checkbox", { name: new RegExp(c.localConfirm) })).toBeInTheDocument()
   })
 
   it("an owner or admin reads « Set it up » on a tool that needs the company's app, never a wait", async () => {

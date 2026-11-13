@@ -35,8 +35,11 @@ import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { DisconnectConfirmDialog, DISCONNECT_CONSEQUENCES } from "@/components/integrations/disconnect-confirm-dialog"
 
-/** Une adresse sur la machine ou le réseau local (Docker Desktop, le serveur local de Figma) : l'accord se demande. */
-const LOCAL_URL = /^https?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|[^./:]+(:|\/|$))/i
+/**
+ * Une adresse sur la machine ou le réseau local (Docker Desktop, le serveur local de Figma) : l'accord se demande. Les
+ * noms en `.local`, `.internal` et `.localhost` en sont, comme pour le serveur (`McpClient.isLocal`).
+ */
+const LOCAL_URL = /^https?:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\]|[^./:]+(:|\/|$)|[^/:]+\.(local|internal|localhost)(:|\/|$))/i
 
 /** Fiche vide d'un serveur MCP ajouté à la main : le backend dérive sa clé `custom-<slug>` du nom saisi. */
 const NEW_CUSTOM_SERVER: ConnectorView = {
@@ -974,11 +977,11 @@ function McpServerForm({
   const [mcpToken, setMcpToken] = useState("")
   // Un serveur sur cette machine ou le réseau local (app desktop) : la personne voit son adresse et l'accepte.
   const [localOk, setLocalOk] = useState(false)
-  const local = LOCAL_URL.test(mcpUrl.trim())
+  const [failure, setFailure] = useState<ConnectFailure | null>(null)
+  // Un nom que le motif ne reconnaît pas peut viser le réseau local : le serveur le dit, la case apparaît alors.
+  const local = LOCAL_URL.test(mcpUrl.trim()) || failure?.kind === "CONNECT_LOCAL_NEEDS_APPROVAL"
   const [status, setStatus] = useState<McpServerStatus | null>(null)
   const [busy, setBusy] = useState(false)
-  // Un geste qui n'a pas abouti se dit dans le dialogue, en mots, le texte du serveur à deux clics (R160).
-  const [failure, setFailure] = useState<ConnectFailure | null>(null)
   // Console d'actions (TF-MCP-06) : dépliée sous le statut d'un serveur joignable.
   const [showConsole, setShowConsole] = useState(false)
 

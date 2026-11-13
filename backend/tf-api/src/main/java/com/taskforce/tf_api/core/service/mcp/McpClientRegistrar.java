@@ -56,7 +56,7 @@ public class McpClientRegistrar {
     /** Aucun chemin d'inscription : ni client enregistré, ni CIMD, ni DCR. */
     public static class NoClient extends BusinessException {
         public NoClient(String message) {
-            super(message);
+            super(ConnectFailure.NO_CLIENT, message);
         }
     }
 

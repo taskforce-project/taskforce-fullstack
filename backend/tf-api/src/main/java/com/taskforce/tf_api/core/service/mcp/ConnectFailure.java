@@ -25,6 +25,12 @@ public final class ConnectFailure {
     public static final String SIGN_IN_UNSUPPORTED = "CONNECT_SIGN_IN_UNSUPPORTED";
     /** L'éditeur refuse d'inscrire TaskForce (inscription dynamique). */
     public static final String REGISTRATION_REFUSED = "CONNECT_REGISTRATION_REFUSED";
+    /** L'éditeur ne laisse pas TaskForce s'inscrire seul : une clé, ou une application que l'administrateur crée. */
+    public static final String NO_CLIENT = "CONNECT_NO_CLIENT";
+    /** L'en-tête choisi pour le jeton ne peut pas le porter, ou sa valeur manque. */
+    public static final String HEADER_NOT_ALLOWED = "CONNECT_HEADER_NOT_ALLOWED";
+    /** Un serveur sur la machine ou le réseau local attend l'accord de la personne qui l'a lancé. */
+    public static final String LOCAL_NEEDS_APPROVAL = "CONNECT_LOCAL_NEEDS_APPROVAL";
 
     private ConnectFailure() {}
 

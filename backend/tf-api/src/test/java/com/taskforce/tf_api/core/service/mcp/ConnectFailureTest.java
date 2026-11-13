@@ -146,6 +146,32 @@ class ConnectFailureTest {
     }
 
     @Test
+    @DisplayName("sans client possible, un en-tête qui ne porte pas le jeton, un serveur local à accorder : chacun son code")
+    void theOtherKnownCauses() {
+        McpOAuthSettings settings = new McpOAuthSettings("https://api.example.test", "", "https://app.example.test",
+            "TaskForce", "web", "");
+        McpClientRegistrar registrar = new McpClientRegistrar(Mockito.mock(ConnectorAppRepository.class),
+            Mockito.mock(McpOAuthRegistrationRepository.class), Mockito.mock(McpOAuthClient.class), settings,
+            new MockEnvironment());
+        DiscoveredAuth noRegistration = new DiscoveredAuth("https://as.ex", "https://as.ex/a", "https://as.ex/t", null, null);
+
+        assertThat(code(catchThrowable(() -> registrar.clientFor(1L, "custom-docs", noRegistration,
+            "https://api.example.test/cb", false, false)))).isEqualTo(ConnectFailure.NO_CLIENT);
+        assertThat(code(catchThrowable(() -> registrar.clientForApi(1L, "google-drive", "TF_GOOGLE"))))
+            .isEqualTo(ConnectFailure.NO_CLIENT);
+        assertThat(code(catchThrowable(() -> WorkspaceMcpService.checkTokenHeader("Host", "t-1"))))
+            .isEqualTo(ConnectFailure.HEADER_NOT_ALLOWED);
+        assertThat(code(catchThrowable(() -> WorkspaceMcpService.checkTokenHeader("X API Key", "t-1"))))
+            .isEqualTo(ConnectFailure.HEADER_NOT_ALLOWED);
+        assertThat(code(catchThrowable(() -> WorkspaceMcpService.checkTokenHeader("X-API-Key", ""))))
+            .isEqualTo(ConnectFailure.HEADER_NOT_ALLOWED);
+        WorkspaceMcpService.checkTokenHeader("X-API-Key", "t-1");
+        WorkspaceMcpService.checkTokenHeader("", "");
+        assertThat(new WorkspaceMcpService.LocalServerNeedsApproval("printer.local").getErrorCode())
+            .isEqualTo(ConnectFailure.LOCAL_NEEDS_APPROVAL);
+    }
+
+    @Test
     @DisplayName("une inscription qui ne rend pas d'identifiant : REGISTRATION_REFUSED")
     void aRegistrationWithoutClientId() {
         McpOAuthClient client = Mockito.mock(McpOAuthClient.class);
