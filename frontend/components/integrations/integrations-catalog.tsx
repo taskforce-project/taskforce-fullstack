@@ -1176,7 +1176,7 @@ function McpServerForm({
       >
         {withToken ? "Sign in with OAuth instead" : "Use a token instead"}
       </button>
-      {failure && <FailureNote failure={failure} name={(isCustom ? name.trim() : tool.name) || "This server"} />}
+      {failure && <FailureNote failure={failure} name={(isCustom ? name.trim() : tool.name) || "This server"} withKey />}
       {/* Une action principale, en bas à droite (R133) : celle de la façon de se connecter choisie. */}
       <DialogFooter>
         {withToken ? (

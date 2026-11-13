@@ -130,6 +130,24 @@ describe("ConnectPanel", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull())
   })
 
+  it("a failure offers a key only when the tool has one, and then the panel has its button (R161)", async () => {
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "stripe", kind: "CONNECT_REGISTRATION_REFUSED", raw: null } })
+      return null
+    })
+    const view = show(notion({ key: "stripe", name: "Stripe", apiKey: { hint: "Create a restricted key.", link: null } }))
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failuresWithKey.CONNECT_REGISTRATION_REFUSED.replaceAll("{name}", "Stripe"))
+    fireEvent.click(screen.getByRole("button", { name: t.useKeyInstead }))
+    expect(screen.getByLabelText(t.keyLabel)).toBeTruthy()
+    view.unmount()
+
+    useConnectorStore.setState({ failure: { key: "notion", kind: "CONNECT_REGISTRATION_REFUSED", raw: null } })
+    show(notion())
+    expect(screen.getByRole("alert")).not.toHaveTextContent(/key/i)
+    expect(screen.queryByRole("button", { name: t.useKeyInstead })).toBeNull()
+  })
+
   it("an owner or admin sets up a tool that needs the company's app: no wait on his own step (R160)", () => {
     const slack = notion({ key: "slack-mcp", name: "Slack", connection: "company-app", state: "NEEDS_SETUP",
       admin: { text: "Create an internal app.", link: null, required: true } })

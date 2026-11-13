@@ -13,7 +13,7 @@ import { DisconnectConfirmDialog } from "@/components/integrations/disconnect-co
 import { IS_DESKTOP } from "@/lib/desktop"
 import { fillText } from "@/lib/delivery/result-card"
 import { getMcpServerTools, type ConnectorView, type McpServerStatus, type McpToolInfo } from "@/lib/api/integration-service"
-import { failureSentence, failureStep, type ConnectFailure } from "@/lib/integrations/connect-failure"
+import { failureSentence, failureStep, keyHelps, type ConnectFailure } from "@/lib/integrations/connect-failure"
 import { useConnectorStore } from "@/lib/store/connector-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { toolLabel } from "@/lib/utils/tool-label"
@@ -137,7 +137,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
     ?? (adminTurn || tool.state === "WAITING_FOR_ADMIN" ? (manager && adminTurn ? "company-app" : "admin") : "start")
   const adminMessage = outcome?.message ?? tool.admin?.text ?? null
   // La cause d'abord, puis le geste qui la suit (R133 : un échec dit ce qui s'est passé et quoi faire).
-  const note = failure ? <FailureNote failure={failure} name={name} /> : null
+  const note = failure ? <FailureNote failure={failure} name={name} withKey={Boolean(tool.apiKey)} /> : null
   // Toujours le même conteneur : une note qui apparaît ne remonte pas l'étape, ce que la personne a saisi reste (R161).
   const withNote = (content: React.ReactNode) => <div className="flex flex-col gap-3">{note}{content}</div>
 
@@ -186,6 +186,10 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
         </label>
       )}
       <DialogFooter>
+        {/* La phrase propose une clé : le panneau aussi (R161). */}
+        {failure && tool.apiKey && keyHelps(failure, t) && (
+          <Button variant="ghost" onClick={() => setByKey(true)}>{t.useKeyInstead}</Button>
+        )}
         <Button onClick={() => go()} disabled={busy} className="gap-1.5">
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
           {busy ? t.connecting : failure ? t.tryAgain : reconnecting ? t.reconnect : t.connect}
@@ -199,7 +203,7 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide }: PanelPr
  * Un geste qui n'a pas abouti (R160) : ce qui s'est passé et quoi faire, en une phrase ; où il s'est arrêté, un clic
  * plus loin ; ce que le serveur a dit, tel quel, à deux clics (R133).
  */
-export function FailureNote({ failure, name }: Readonly<{ failure: ConnectFailure; name: string }>) {
+export function FailureNote({ failure, name, withKey = false }: Readonly<{ failure: ConnectFailure; name: string; withKey?: boolean }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [details, setDetails] = useState(false)
   const [raw, setRaw] = useState(false)
@@ -207,7 +211,7 @@ export function FailureNote({ failure, name }: Readonly<{ failure: ConnectFailur
     <div className="flex flex-col gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
       <p role="alert" className="flex items-start gap-2 text-foreground">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
-        <span>{failureSentence(failure, name, t)}</span>
+        <span>{failureSentence(failure, name, t, withKey)}</span>
       </p>
       <button type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}
               className="w-fit text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">

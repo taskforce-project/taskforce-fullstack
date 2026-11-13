@@ -37,9 +37,18 @@ export function failureOf(error: unknown, key: string): ConnectFailure {
   return { key, kind: "unknown", raw: error instanceof Error && error.message ? error.message : null }
 }
 
-/** Ce qui s'est passé et quoi faire, en une phrase pour la personne (R133). */
-export function failureSentence(failure: Pick<ConnectFailure, "kind">, name: string, t: ConnectTexts): string {
-  return fillText(t.failures[failure.kind], { name })
+/**
+ * Ce qui s'est passé et quoi faire, en une phrase pour la personne (R133). Une clé n'est proposée que si l'outil en offre
+ * une (`withKey`), et alors le panneau offre aussi son bouton.
+ */
+export function failureSentence(failure: Pick<ConnectFailure, "kind">, name: string, t: ConnectTexts, withKey = false): string {
+  const keyed = withKey ? (t.failuresWithKey as Readonly<Record<string, string | undefined>>)[failure.kind] : undefined
+  return fillText(keyed ?? t.failures[failure.kind], { name })
+}
+
+/** Cet échec se répare-t-il par une clé, quand l'outil en offre une ? Le panneau montre alors son bouton. */
+export function keyHelps(failure: Pick<ConnectFailure, "kind">, t: ConnectTexts): boolean {
+  return Object.prototype.hasOwnProperty.call(t.failuresWithKey, failure.kind)
 }
 
 /** Où le geste s'est arrêté, un clic plus loin. */

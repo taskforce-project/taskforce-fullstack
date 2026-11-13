@@ -981,18 +981,25 @@ export const CONSTANTS_EN = {
     // the server's own words two clicks away. Keyed by the reason the server gives.
     failures: {
       CONNECT_OFFICIAL_SERVER_ONLY: "{name} only connects to its own server, so TaskForce didn't use this address. Connect {name} from its card, without an address.",
-      CONNECT_ADDRESS_NOT_ALLOWED: "This address points inside a private network, which TaskForce doesn't reach from here. Use the tool's public address, or the desktop app for a server on your computer.",
-      CONNECT_NO_SIGN_IN: "{name} offers no sign-in that TaskForce can use. Connect with a key if {name} gives you one.",
+      CONNECT_ADDRESS_NOT_ALLOWED: "TaskForce can't use this address: its name doesn't resolve, it isn't a web address, or it points inside a private network. Check the address; for a server on your computer, use the desktop app.",
+      CONNECT_NO_SIGN_IN: "{name} offers no sign-in that TaskForce can use, so it can't connect this way.",
       CONNECT_SIGN_IN_UNREACHABLE: "{name}'s sign-in didn't answer. Check your connection, then try again in a moment.",
       CONNECT_SIGN_IN_UNTRUSTED: "{name}'s sign-in didn't identify itself as expected, so TaskForce stopped to keep your account safe. Try again later, and tell your admin if it happens again.",
-      CONNECT_SIGN_IN_UNSUPPORTED: "{name}'s sign-in lacks what TaskForce needs to connect safely. Connect with a key if {name} gives you one.",
-      CONNECT_REGISTRATION_REFUSED: "{name} refused to register TaskForce, so its sign-in couldn't open. Ask your {name} admin whether outside apps may connect, or connect with a key.",
-      CONNECT_NO_CLIENT: "{name} doesn't let TaskForce register on its own. Connect with a token instead, or ask your admin to set up an app for TaskForce in {name}.",
+      CONNECT_SIGN_IN_UNSUPPORTED: "{name}'s sign-in lacks what TaskForce needs to connect safely, so it can't connect this way yet.",
+      CONNECT_REGISTRATION_REFUSED: "{name} refused to register TaskForce, so its sign-in couldn't open. Ask your {name} admin whether outside apps may connect.",
+      CONNECT_NO_CLIENT: "{name} doesn't let TaskForce register on its own. Ask your admin to set up an app for TaskForce in {name}.",
       CONNECT_HEADER_NOT_ALLOWED: "TaskForce can't send the token in this header. Choose another header name and enter its value, or send the token as Authorization: Bearer.",
       CONNECT_LOCAL_NEEDS_APPROVAL: "This server runs on your computer or your local network. Check its address, tick “I started this server myself”, then connect again.",
       network: "TaskForce's server can't be reached, so {name} wasn't connected. Check your connection, then try again.",
       forbidden: "Only owners and admins can do this. Ask one of them to connect {name}.",
       unknown: "{name} wasn't connected, and TaskForce can't tell why. Try again; if it fails again, show the details to your admin.",
+    },
+    // The same failures when the tool offers a key, and the panel offers it too (R161)
+    failuresWithKey: {
+      CONNECT_NO_SIGN_IN: "{name} offers no sign-in that TaskForce can use. Connect with a key instead.",
+      CONNECT_SIGN_IN_UNSUPPORTED: "{name}'s sign-in lacks what TaskForce needs to connect safely. Connect with a key instead.",
+      CONNECT_REGISTRATION_REFUSED: "{name} refused to register TaskForce, so its sign-in couldn't open. Connect with a key instead, or ask your {name} admin whether outside apps may connect.",
+      CONNECT_NO_CLIENT: "{name} doesn't let TaskForce register on its own. Connect with a key instead, or ask your admin to set up an app for TaskForce in {name}.",
     },
     failureSteps: {
       CONNECT_OFFICIAL_SERVER_ONLY: "checking the address",

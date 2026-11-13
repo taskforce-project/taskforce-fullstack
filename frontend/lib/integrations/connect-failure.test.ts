@@ -2,7 +2,7 @@ import { AxiosError, AxiosHeaders } from "axios"
 import { describe, expect, it } from "vitest"
 
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { failureOf, failureSentence, failureStep } from "./connect-failure"
+import { failureOf, failureSentence, failureStep, keyHelps } from "./connect-failure"
 
 const t = CONSTANTS_EN.connect
 
@@ -38,9 +38,26 @@ describe("failureSentence et failureStep : ce qui s'est passé, quoi faire, puis
     const sentence = failureSentence({ kind: "CONNECT_REGISTRATION_REFUSED" }, "Jira", t)
 
     expect(sentence).toBe("Jira refused to register TaskForce, so its sign-in couldn't open. "
-      + "Ask your Jira admin whether outside apps may connect, or connect with a key.")
+      + "Ask your Jira admin whether outside apps may connect.")
     expect(sentence).not.toMatch(/CONNECT_|https?:|invalid_/)
     expect(failureStep({ kind: "CONNECT_REGISTRATION_REFUSED" }, "Jira", t)).toBe("Where it stopped: registering TaskForce with Jira.")
+  })
+
+  it("the refused address names its three causes, since its code doesn't tell which (R160)", () => {
+    const sentence = failureSentence({ kind: "CONNECT_ADDRESS_NOT_ALLOWED" }, "Docs", t)
+    expect(sentence).toContain("its name doesn't resolve")
+    expect(sentence).toContain("it isn't a web address")
+    expect(sentence).toContain("it points inside a private network")
+  })
+
+  it("offers a key only when the tool has one (R161)", () => {
+    for (const kind of ["CONNECT_NO_SIGN_IN", "CONNECT_SIGN_IN_UNSUPPORTED", "CONNECT_REGISTRATION_REFUSED", "CONNECT_NO_CLIENT"] as const) {
+      expect(failureSentence({ kind }, "Jira", t)).not.toMatch(/key|token/i)
+      expect(failureSentence({ kind }, "Jira", t, true)).toContain("Connect with a key instead")
+      expect(keyHelps({ kind }, t)).toBe(true)
+    }
+    expect(failureSentence({ kind: "network" }, "Jira", t, true)).toBe(failureSentence({ kind: "network" }, "Jira", t))
+    expect(keyHelps({ kind: "network" }, t)).toBe(false)
   })
 
   it("every reason has a sentence and a step", () => {

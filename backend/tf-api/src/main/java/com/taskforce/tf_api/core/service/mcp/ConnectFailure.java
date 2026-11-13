@@ -40,8 +40,9 @@ public final class ConnectFailure {
     }
 
     /**
-     * La garde anti-SSRF d'une adresse du flux de connexion : une adresse refusée devient un échec qui dit pourquoi
-     * ({@link #ADDRESS_NOT_ALLOWED}), au lieu d'une erreur sans code.
+     * La garde anti-SSRF d'une adresse du flux de connexion : une adresse refusée devient un échec à code stable
+     * ({@link #ADDRESS_NOT_ALLOWED}), au lieu d'une erreur sans code. Le code ne distingue pas ses trois causes (un nom
+     * qui ne se résout pas, une adresse qui n'est pas web, le réseau interne) : la phrase de l'écran les dit toutes.
      */
     public static void assertPublicAddress(String url) {
         try {
