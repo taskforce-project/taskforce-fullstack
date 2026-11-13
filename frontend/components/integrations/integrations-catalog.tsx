@@ -790,14 +790,14 @@ function NativeConnectPanel({ slug, tool, manager, second }: Readonly<{
     <div className="flex flex-col gap-3">
       {failure && <FailureNote failure={failure} name={tool.name} />}
       {tool.description && <p className="text-sm text-muted-foreground">{tool.description}</p>}
-      {/* Un membre : une phrase dit qui la connecte, sans un bouton qui lui serait refusé (R161). */}
-      {!manager && <p className="text-sm text-foreground">{fillText(c.nativeManagersOnly, { name: tool.name })}</p>}
+      {/* Qui la connecte, et pour qui : une fois, pour tout l'espace ; un membre n'a pas le bouton (R161). */}
+      <p className="text-sm text-foreground">{fillText(c.nativeManagersOnly, { name: tool.name })}</p>
       {second}
       {manager && failure?.kind !== "forbidden" && (
         <DialogFooter>
           <Button onClick={go} disabled={busy} className="gap-1.5">
             {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-            {busy ? c.connecting : failure ? c.tryAgain : c.connect}
+            {busy ? c.connecting : failure ? c.tryAgain : c.connectForWorkspace}
           </Button>
         </DialogFooter>
       )}
@@ -966,6 +966,7 @@ function PlaneForm({ slug, tool, manager, onClose, onChanged, second }: PanelPro
   if (!connected) {
     return (
       <div className="flex flex-col gap-3">
+        {second}
         {tool.setupHint && (
           <div className="flex gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 size-3.5 shrink-0" />
@@ -996,7 +997,6 @@ function PlaneForm({ slug, tool, manager, onClose, onChanged, second }: PanelPro
             />
           </label>
         ))}
-        {second}
         <DialogFooter>
           <Button onClick={handleConnect} disabled={connecting} className="gap-1.5">
             {connecting ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
@@ -1009,6 +1009,7 @@ function PlaneForm({ slug, tool, manager, onClose, onChanged, second }: PanelPro
 
   return (
     <div className="flex flex-col gap-3">
+      {second}
       <p className="text-xs text-muted-foreground">
         {status?.planeWorkspace && <>Workspace <span className="font-medium text-foreground">{status.planeWorkspace}</span> · </>}
         {status?.ingestedNodes ?? 0} item(s) added to the workspace&apos;s knowledge.
@@ -1022,7 +1023,6 @@ function PlaneForm({ slug, tool, manager, onClose, onChanged, second }: PanelPro
           </SelectContent>
         </Select>
       </label>
-      {second}
       <DialogFooter className="sm:justify-between">
         <Button variant="outline" size="sm"
                 className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"

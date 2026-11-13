@@ -905,8 +905,8 @@ export const CONSTANTS_EN = {
       "api-key": "you create a key in {name} and paste it here.",
       "server-url": "your company creates its {name} server, and you paste its address here.",
       open: "{name} needs no sign-in, so it connects in one click.",
-      oauth: "you sign in to {name} in your browser, then come back connected.",
-      key: "you create a key in {name} and paste it here, with your workspace's name.",
+      oauth: "an owner or admin signs in to {name} once, for everyone in this workspace.",
+      key: "an owner or admin pastes a {name} key and the {name} workspace slug once, for everyone in this workspace.",
       custom: "Cortex reads it through the address you gave.",
     },
     // GitHub, Slack and Plane: the second access, inside their card, named by what it adds (R160)
@@ -923,7 +923,9 @@ export const CONSTANTS_EN = {
     // An added server not yet named, in a failure sentence
     thisServer: "This server",
     // A member: who connects a built-in integration, instead of a button refused to them (R161)
-    nativeManagersOnly: "An owner or admin connects {name} for this workspace.",
+    nativeManagersOnly: "An owner or admin connects {name} once, for everyone in this workspace.",
+    // The built-in integration's gesture says for whom it connects (R161)
+    connectForWorkspace: "Connect for the workspace",
     // The button of a tool that waits for the admin: the message to send them
     seeWhatToSend: "See what to send",
     // Options before connecting

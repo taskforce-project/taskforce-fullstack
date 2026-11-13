@@ -80,8 +80,11 @@ describe("connectionOf", () => {
   })
 
   it("une phrase simple par chemin, qui ne contredit pas le chemin (R160)", () => {
-    expect(connectionOf(tool("github", false), t, false, c).help).toBe("you sign in to github in your browser, then come back connected.")
-    expect(connectionOf(tool("plane", false, "API_KEY"), t, false, c).help).toContain("paste it here")
+    // La native se connecte une fois, pour tout l'espace ; son second accès, par chacun : deux phrases (R161).
+    expect(connectionOf(tool("github", false), t, false, c).help).toBe("an owner or admin signs in to github once, for everyone in this workspace.")
+    expect(connectionOf(tool("plane", false, "API_KEY"), t, false, c).help).toContain("the plane workspace slug")
+    expect(connectionOf({ ...tool("github-mcp", false, "MCP"), name: "github", connection: "our-app" } as ConnectorView, t, false, c).help)
+      .not.toBe(connectionOf(tool("github", false), t, false, c).help)
     const zoom = { ...tool("zoom", false, "MCP"), name: "Zoom", connection: "company-app" } as ConnectorView
     expect(connectionOf(zoom, t, false, c)).toEqual({ label: "Admin first",
       help: "an owner or admin of this workspace sets up Zoom once, then everyone connects with their own account.", canConnect: true })

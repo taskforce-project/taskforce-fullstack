@@ -174,6 +174,28 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(within(dialog()).getByRole("button", { name: c.liveConnect })).toBeInTheDocument()
   })
 
+  it("a built-in integration says it connects once for the workspace; Cortex's box never splits a form from its button (R161)", async () => {
+    const plane: ConnectorView = { key: "plane", name: "Plane", category: "TICKETS_PROJECTS", authType: "API_KEY", connected: false,
+      fields: [{ key: "apiKey", label: "Plane API key", secret: true, required: true }], capabilities: ["observe"],
+      description: "Syncs your Plane projects.", docsUrl: null, setupHint: null, websiteUrl: null, mcpSuggestedUrl: null,
+      state: "NOT_CONNECTED", live: preset("plane-mcp", "Plane") }
+    vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(slack, plane))
+    const { unmount } = render(<IntegrationsCatalog slug="acme" />)
+
+    fireEvent.click((await screen.findAllByRole("button", { name: c.connect }))[1]!)
+    expect(within(dialog()).getByText(c.nativeManagersOnly.replace("{name}", "Slack"))).toBeInTheDocument()
+    expect(within(dialog()).getByRole("button", { name: c.connectForWorkspace })).toBeInTheDocument()
+    fireEvent.keyDown(dialog(), { key: "Escape" })
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+
+    fireEvent.click(screen.getAllByRole("button", { name: c.connect })[0]!)
+    const cortex = within(dialog()).getByText(c.liveTitle.replace("{name}", "Plane"))
+    const field = within(dialog()).getByText("Plane API key", { exact: false })
+    // Le cadre de Cortex vient avant les champs, que leur bouton suit directement.
+    expect(cortex.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+  })
+
   it("a connected built-in integration says so with the sentence kept in the texts (R160)", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog({ ...slack, connected: true, state: "CONNECTED" }))
     render(<IntegrationsCatalog slug="acme" />)
