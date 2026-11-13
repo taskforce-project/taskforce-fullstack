@@ -286,5 +286,6 @@ function isRole(ref: string): boolean {
 /** Un cas joué, dont les personnes que TaskForce ne connaît pas se disent par les mots de la règle (R161). */
 function spokenCase(c: RuleCaseView, unknown: string): RuleCaseView {
   const spoken = (a: RuleApprover): RuleApprover => (a.name || isRole(a.ref) ? a : { ...a, name: unknown })
-  return { ...c, decision: { ...c.decision, approvers: c.decision.approvers.map((set) => set.map(spoken)) } }
+  return { ...c, decision: { ...c.decision, approvers: c.decision.approvers.map((set) => set.map(spoken)) },
+    expectApprovers: c.expectApprovers?.map(spoken) ?? null }
 }

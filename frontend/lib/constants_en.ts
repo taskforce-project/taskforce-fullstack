@@ -459,6 +459,8 @@ export const CONSTANTS_EN = {
     casesTitle: "Its cases",
     casePasses: "Holds",
     caseFails: "Doesn't hold",
+    // A case that doesn't hold says what the rule expected of it
+    caseExpected: " (expected: {decision})",
     historyShow: "Show the history",
     historyHide: "Hide the history",
     historyRow: "Version {version}: {layer}, by {who} on {date}",
@@ -564,7 +566,7 @@ export const CONSTANTS_EN = {
       saving: "Adding…",
       added: "Rule added",
       passes: "Its cases hold: you can add it.",
-      fails: "A case doesn't hold, so TaskForce won't add the rule as it is written.",
+      fails: "A case doesn't hold, so TaskForce won't add the rule as it is written. Say more precisely which actions it covers, then check it again.",
       breaks: "It would change what these rules already do:",
       unclear: "What TaskForce couldn't say with its rules: {text}",
       approverTitle: "Who approves? (“{words}”)",

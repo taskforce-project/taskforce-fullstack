@@ -73,7 +73,7 @@ describe("AddRuleDialog", () => {
 
     expect(await screen.findByText(/can only make TaskForce stricter/)).toBeInTheDocument()
     // Aucun cas n'a été joué : le refus finit sur sa raison, sans accuser « un cas » (R160).
-    expect(screen.queryByText("A case doesn't hold, so TaskForce won't add the rule as it is written.")).not.toBeInTheDocument()
+    expect(screen.queryByText(/A case doesn't hold/)).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Add the rule" })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument()
   })
@@ -91,7 +91,9 @@ describe("AddRuleDialog", () => {
     draftRule.mockResolvedValueOnce(draft({ passed: false, cases: [{ ...draft().cases[0]!, passed: false }] }))
     await write(`${CEO_RULE}.`)
     await userEvent.click(screen.getByRole("button", { name: "Check the rule" }))
-    expect(await screen.findByText("A case doesn't hold, so TaskForce won't add the rule as it is written.")).toBeInTheDocument()
+    // Le dialogue dit quoi faire, pas seulement que la règle n'entre pas (R161).
+    expect(await screen.findByText("A case doesn't hold, so TaskForce won't add the rule as it is written. Say more precisely which actions it covers, then check it again."))
+      .toBeInTheDocument()
   })
 
   it("when TaskForce doesn't know who approves, it asks, then checks the same rule again without the model", async () => {
