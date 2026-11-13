@@ -98,6 +98,40 @@ describe("describeActivity : qui a fait quoi sur une issue", () => {
     expect(line).toMatchObject({ who: "Cortex · qwen3:8b", what: "commented", forWhom: "for Pierre" });
     expect(describeActivity(activity({ via: "Cortex", model: "qwen3:8b" }), t).what).toBe("created, prepared by Cortex · qwen3:8b");
   });
+
+  // R166 : un lien entre deux issues entre à l'activité de chacune, dit de son côté.
+  it.each([
+    ["BLOCKS WEB-12", "added a link: this issue blocks WEB-12"],
+    ["BLOCKED_BY WEB-11", "added a link: this issue is blocked by WEB-11"],
+    ["DUPLICATE_OF WEB-12", "added a link: this issue is a duplicate of WEB-12"],
+    ["DUPLICATED_BY WEB-11", "added a link: this issue is duplicated by WEB-11"],
+    ["RELATES_TO WEB-12", "added a link: this issue relates to WEB-12"],
+  ])("a link added, read from this issue: %s", (newValue, what) => {
+    const line = describeActivity(activity({ action: "RELATION_ADDED", newValue }), t);
+
+    expect(line).toEqual({ who: "Pierre", what, change: null, link: null, forWhom: null });
+  });
+
+  it.each([
+    ["BLOCKS WEB-12", "removed a link: this issue no longer blocks WEB-12"],
+    ["BLOCKED_BY WEB-11", "removed a link: this issue is no longer blocked by WEB-11"],
+    ["DUPLICATE_OF WEB-12", "removed a link: this issue is no longer a duplicate of WEB-12"],
+  ])("a link removed, read from this issue: %s", (oldValue, what) => {
+    expect(describeActivity(activity({ action: "RELATION_REMOVED", oldValue }), t).what).toBe(what);
+  });
+
+  it("a link that reads in no known words says only that a link changed, never the raw value", () => {
+    expect(describeActivity(activity({ action: "RELATION_ADDED", newValue: "SPAWNS WEB-12" }), t).what)
+      .toBe("added a link to another issue");
+    expect(describeActivity(activity({ action: "RELATION_REMOVED", oldValue: null }), t).what)
+      .toBe("removed a link to another issue");
+  });
+
+  it("an agent that links issues for a person says it, for that person", () => {
+    const line = describeActivity(activity({ action: "RELATION_ADDED", newValue: "BLOCKS WEB-12", via: "Claude Code" }), t);
+
+    expect(line).toMatchObject({ who: "Claude Code", what: "added a link: this issue blocks WEB-12", forWhom: "for Pierre" });
+  });
 });
 
 describe("agentName", () => {

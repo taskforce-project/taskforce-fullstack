@@ -16,6 +16,9 @@ import {
   type IssueType,
   type IssueComment,
   type IssueActivity,
+  type IssueSummary,
+  type ProjectIssueRelation,
+  type ProjectIssueRelations,
   type CreateIssuePayload,
   type UpdateIssuePayload,
   type CreateIssueStatusPayload,
@@ -37,6 +40,7 @@ import {
   updateComment as updateCommentApi,
   deleteComment as deleteCommentApi,
   listActivity,
+  listProjectRelations,
 } from "../api/issue-service";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +58,13 @@ interface IssueState {
   error: string | null;
   /** Projet dont les issues sont en cache (évite le refetch au changement d'onglet - PROD-2.7). */
   loadedProjectId: number | null;
+  /**
+   * Les liens entre les issues d'un projet (R166) : ses relations, et ses sous-issues avec leur parent, que `issues` ne
+   * porte pas (le premier niveau seul). `null` tant qu'ils ne sont pas lus ; le temps réel du projet les tient à jour.
+   */
+  projectRelations: ProjectIssueRelations | null;
+  /** Le projet dont `projectRelations` sont les liens. */
+  relationsProjectId: number | null;
 
   // Issues
   fetchIssues: (slug: string, projectId: number) => Promise<Issue[]>;
@@ -73,6 +84,14 @@ interface IssueState {
   upsertIssueLocal: (issue: Issue) => void;
   /** Retrait local (événement temps réel STOMP). */
   removeIssueLocal: (issueId: number) => void;
+
+  // Liens entre issues (R166)
+  /** Lit les liens entre les issues du projet ; `null` en cas d'échec, où les liens d'avant restent. */
+  fetchProjectRelations: (slug: string, projectId: number) => Promise<ProjectIssueRelations | null>;
+  /** Un lien posé (événement temps réel STOMP) : ajouté, ou mis à jour s'il est déjà là ; rien pour un autre projet. */
+  upsertRelationLocal: (projectId: number, relation: ProjectIssueRelation) => void;
+  /** Un lien retiré (événement temps réel STOMP) ; rien pour un autre projet. */
+  removeRelationLocal: (projectId: number, relationId: number) => void;
 
   // Statuts & types
   fetchStatuses: (slug: string, projectId: number) => Promise<IssueStatus[]>;
@@ -94,6 +113,40 @@ interface IssueState {
 }
 
 // ---------------------------------------------------------------------------
+// Liens entre issues : ce qu'une issue qui change ou disparaît leur fait
+// ---------------------------------------------------------------------------
+
+/** L'issue telle qu'un lien la nomme. */
+function summaryOf(issue: Issue): IssueSummary {
+  return { id: issue.id, sequenceNumber: issue.sequenceNumber, identifier: issue.identifier, title: issue.title, status: issue.status };
+}
+
+/**
+ * Les liens après qu'une issue a changé (créée, éditée) : son nom et son statut à jour sur ses liens, et son parent tel
+ * qu'elle le dit. Une issue archivée quitte les liens, comme la lecture du serveur la laisse de côté.
+ */
+function linksWithIssue(links: ProjectIssueRelations, issue: Issue): ProjectIssueRelations {
+  if (issue.archived) return linksWithout(links, issue.id);
+  const named = (end: IssueSummary): IssueSummary => (end.id === issue.id ? summaryOf(issue) : end);
+  const subIssues = links.subIssues
+    .filter((link) => link.issue.id !== issue.id)
+    .map((link) => ({ parent: named(link.parent), issue: link.issue }));
+  if (issue.parent) subIssues.push({ parent: issue.parent, issue: summaryOf(issue) });
+  return {
+    relations: links.relations.map((r) => ({ ...r, source: named(r.source), target: named(r.target) })),
+    subIssues,
+  };
+}
+
+/** Les liens sans ceux d'une issue supprimée (ses relations partent avec elle ; ses sous-issues n'ont plus de parent). */
+function linksWithout(links: ProjectIssueRelations, issueId: number): ProjectIssueRelations {
+  return {
+    relations: links.relations.filter((r) => r.source.id !== issueId && r.target.id !== issueId),
+    subIssues: links.subIssues.filter((link) => link.issue.id !== issueId && link.parent.id !== issueId),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -107,8 +160,13 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   isLoading: false,
   error: null,
   loadedProjectId: null,
+  projectRelations: null,
+  relationsProjectId: null,
 
-  clearIssues: () => set({ issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null }),
+  clearIssues: () => set({
+    issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null,
+    projectRelations: null, relationsProjectId: null,
+  }),
 
   setActiveIssue: (issue) => set({ activeIssue: issue }),
 
@@ -285,11 +343,13 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   upsertIssueLocal: (issue) =>
     set((state) => {
       const exists = state.issues.some((i) => i.id === issue.id);
+      const linked = state.projectRelations !== null && state.relationsProjectId === issue.projectId;
       return {
         issues: exists
           ? state.issues.map((i) => (i.id === issue.id ? issue : i))
           : [issue, ...state.issues],
         activeIssue: state.activeIssue?.id === issue.id ? issue : state.activeIssue,
+        ...(linked && state.projectRelations ? { projectRelations: linksWithIssue(state.projectRelations, issue) } : {}),
       };
     }),
 
@@ -297,7 +357,43 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     set((state) => ({
       issues: state.issues.filter((i) => i.id !== issueId),
       activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
+      ...(state.projectRelations ? { projectRelations: linksWithout(state.projectRelations, issueId) } : {}),
     })),
+
+  fetchProjectRelations: async (slug, projectId) => {
+    try {
+      const projectRelations = await listProjectRelations(slug, projectId);
+      set({ projectRelations, relationsProjectId: projectId });
+      return projectRelations;
+    } catch {
+      // Une lecture de fond : l'écran garde les liens d'avant, l'appelant branche sur `null`.
+      return null;
+    }
+  },
+
+  upsertRelationLocal: (projectId, relation) =>
+    set((state) => {
+      if (state.relationsProjectId !== projectId || !state.projectRelations) return {};
+      const { relations, subIssues } = state.projectRelations;
+      const known = relations.some((r) => r.id === relation.id);
+      return {
+        projectRelations: {
+          relations: known ? relations.map((r) => (r.id === relation.id ? relation : r)) : [...relations, relation],
+          subIssues,
+        },
+      };
+    }),
+
+  removeRelationLocal: (projectId, relationId) =>
+    set((state) => {
+      if (state.relationsProjectId !== projectId || !state.projectRelations) return {};
+      return {
+        projectRelations: {
+          relations: state.projectRelations.relations.filter((r) => r.id !== relationId),
+          subIssues: state.projectRelations.subIssues,
+        },
+      };
+    }),
 
   fetchStatuses: async (slug, projectId) => {
     try {

@@ -21,6 +21,8 @@ import {
   askForChanges,
   sendCorrection,
   stopRun,
+  listProjectRuns,
+  getProjectRun,
 } from './delivery-service';
 import { apiClient } from './client';
 import { DELIVERY_ROUTES } from '../config/api-routes';
@@ -126,6 +128,36 @@ describe('delivery-service', () => {
     const res = await listWorkspaceRuns(SLUG);
     expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.RUNS(SLUG), { silentError: true });
     expect(res).toEqual(runs);
+  });
+
+  it('listProjectRuns GET une page des missions du projet (page, taille), sans toast', async () => {
+    const page = { content: [{ run: { id: 9 }, step: null, links: {}, approvals: [] }], pageNumber: 1, last: true };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(page));
+
+    const result = await listProjectRuns(SLUG, 12, 1, 30);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.PROJECT_RUNS(SLUG, 12), { params: { page: 1, size: 30 }, silentError: true });
+    expect(DELIVERY_ROUTES.PROJECT_RUNS(SLUG, 12)).toBe('/api/workspaces/acme/delivery/projects/12/runs');
+    expect(result).toEqual(page);
+  });
+
+  it('listProjectRuns lit la première page de 20 par défaut', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ content: [] }));
+
+    await listProjectRuns(SLUG, 12);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.PROJECT_RUNS(SLUG, 12), { params: { page: 0, size: 20 }, silentError: true });
+  });
+
+  it('getProjectRun GET une mission du projet, sans toast', async () => {
+    const row = { run: { id: 9 }, step: { seq: 4, kind: 'tool', tool: 'Edit', at: null }, links: {}, approvals: [] };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(row));
+
+    const result = await getProjectRun(SLUG, 12, 9);
+
+    expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.PROJECT_RUN(SLUG, 12, 9), { silentError: true });
+    expect(DELIVERY_ROUTES.PROJECT_RUN(SLUG, 12, 9)).toBe('/api/workspaces/acme/delivery/projects/12/runs/9');
+    expect(result).toEqual(row);
   });
 
   it('listWorkspaceRuns retourne [] si data null', async () => {

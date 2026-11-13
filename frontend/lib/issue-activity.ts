@@ -39,6 +39,20 @@ export function agentName(via: string | null | undefined, model: string | null |
   return name && name !== agent ? `${agent} · ${name}` : agent;
 }
 
+type LinkKey = keyof ActivityTexts["links"];
+
+/** Le lien que garde la ligne : ce qu'il est vu de cette issue (`BLOCKED_BY`), puis la clé de l'autre (`WEB-11`). */
+const LINK = /^([A-Z_]+) (\S+)$/;
+
+/** Les mots d'un lien posé ou retiré ; sans lien lisible (une valeur d'une autre forme), la phrase seule. */
+function linkWords(a: IssueActivity, t: ActivityTexts): string {
+  const added = a.action === "RELATION_ADDED";
+  const link = LINK.exec((added ? a.newValue : a.oldValue) ?? "");
+  const words = added ? t.links : t.unlinks;
+  if (!link || !(link[1] in words)) return added ? t.linkAddedPlain : t.linkRemovedPlain;
+  return fill(added ? t.linkAdded : t.linkRemoved, { link: words[link[1] as LinkKey], issue: link[2] });
+}
+
 /** La ligne d'activité, dans les mots de l'interface. */
 export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLine {
   const actor = a.actor ? (a.actor.displayName ?? a.actor.email) : t.system;
@@ -80,6 +94,10 @@ export function describeActivity(a: IssueActivity, t: ActivityTexts): ActivityLi
       return { ...line, what: t.markedDone };
     case "MISSION_CHANGES_ASKED":
       return { ...line, what: t.askedForChanges };
+    // Un lien entre deux issues, dit du côté de l'issue lue : « Pierre added a link: this issue is blocked by WEB-11 ».
+    case "RELATION_ADDED":
+    case "RELATION_REMOVED":
+      return { ...line, what: linkWords(a, t) };
     default:
       return {
         ...line,

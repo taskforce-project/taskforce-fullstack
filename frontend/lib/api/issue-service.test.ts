@@ -33,6 +33,7 @@ import {
   smartAssignBulk,
   reorderStatuses,
   listRelations,
+  listProjectRelations,
   addRelation,
   deleteRelation,
 } from './issue-service';
@@ -490,6 +491,19 @@ describe('issue-service', () => {
   });
 
   // --- Relations ---
+  describe('listProjectRelations', () => {
+    it('GET les liens du projet en une lecture, sans toast (lecture de fond)', async () => {
+      const links = { relations: [{ id: 1, relationType: 'BLOCKS' }], subIssues: [] };
+      vi.mocked(apiClient.get).mockResolvedValue(envelope(links));
+
+      const result = await listProjectRelations(SLUG, PID);
+
+      expect(apiClient.get).toHaveBeenCalledWith(ISSUE_ROUTES.PROJECT_RELATIONS(SLUG, PID), { silentError: true });
+      expect(ISSUE_ROUTES.PROJECT_RELATIONS(SLUG, PID)).toBe('/api/workspaces/acme/projects/3/issues/relations');
+      expect(result).toEqual(links);
+    });
+  });
+
   describe('listRelations', () => {
     it('GET les relations', async () => {
       const relations = [{ id: 1, relationType: 'BLOCKS' }] as any;
