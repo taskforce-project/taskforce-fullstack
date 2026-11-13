@@ -146,23 +146,37 @@ const liveShown = (tool: ConnectorView) => shownAccess(tool) !== tool
  * un outil branché, « Set it up » quand l'étape de l'administrateur revient à la personne, « Reconnect » quand l'accès
  * montré doit se refaire ; null quand rien ne se connecte ici (un outil que l'éditeur ferme encore).
  */
-export function cardAction(tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts): string | null {
+export function cardAction(
+  tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts, manager = true,
+): string | null {
   if (isConnected(tool)) return t.manage
   if (tool.blocked) return null
-  if (!connectionOf(tool, t, desktop, c).canConnect && !tool.live) return null
-  const shown = shownAccess(tool)
+  const native = nativeConnects(tool, t, desktop, c, manager)
+  if (!native && !tool.live) return null
+  // La native que la personne ne connecte pas : la carte ouvre le second accès, le sien.
+  const shown = !native && tool.live ? tool.live : shownAccess(tool)
   if (shown.state === "NEEDS_SETUP") return t.setUp
   if (shown.state === "NEEDS_RECONNECT") return c.reconnect
+  // Un outil qui attend l'administrateur : le geste montre le message à lui envoyer (R161).
+  if (shown.state === "WAITING_FOR_ADMIN") return c.seeWhatToSend
   return c.connect
+}
+
+/**
+ * La personne connecte-t-elle elle-même cet outil ici ? Une native (GitHub, Slack, Plane) se connecte pour tout l'espace,
+ * par un propriétaire ou un administrateur seulement ; un préréglage, par chacun, avec son propre compte.
+ */
+export function nativeConnects(tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts, manager: boolean): boolean {
+  return connectionOf(tool, t, desktop, c).canConnect && (manager || tool.authType === "MCP")
 }
 
 /**
  * Le chemin que la carte dit, à côté de son geste : celui de la native, ou, quand elle ne se connecte pas ici (Slack
  * dans l'app desktop), celui du second accès, que « Connect » ouvre (R160).
  */
-export function cardPathLabel(tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts): string {
+export function cardPathLabel(tool: ConnectorView, t: IntegrationTexts, desktop: boolean, c: ConnectTexts, manager = true): string {
   const native = connectionOf(tool, t, desktop, c)
-  return !native.canConnect && tool.live ? connectionOf(tool.live, t, desktop, c).label : native.label
+  return !nativeConnects(tool, t, desktop, c, manager) && tool.live ? connectionOf(tool.live, t, desktop, c).label : native.label
 }
 
 /** Le badge d'un outil branché : « Connected » pour sa native, « Cortex connected » quand seul le second accès l'est. */
@@ -211,7 +225,7 @@ export function folds(filters: CatalogFilters, count: number): boolean {
 }
 
 /** L'état de la connexion que la personne utilise, sur la carte : branché, à reconnecter, en attente, ou le chemin. */
-function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
+function CardState({ tool, manager }: Readonly<{ tool: ConnectorView; manager: boolean }>) {
   const t = usePreferencesStore((s) => s.t.integrations)
   const c = usePreferencesStore((s) => s.t.connect)
   // Un outil que l'éditeur ferme encore ne promet pas un chemin qu'il ne tient pas (R15).
@@ -247,7 +261,7 @@ function CardState({ tool }: Readonly<{ tool: ConnectorView }>) {
       </span>
     )
   }
-  return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{cardPathLabel(tool, t, IS_DESKTOP, c)}</span>
+  return <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{cardPathLabel(tool, t, IS_DESKTOP, c, manager)}</span>
 }
 
 /**
@@ -329,7 +343,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
   /** « Connect » depuis la carte ou la fiche : le panneau s'ouvre tout de suite (R160), sur le second accès quand la
    *  native ne se connecte pas ici (Slack dans l'app desktop). */
   function openConnection(tool: ConnectorView) {
-    const nativeHere = connectionOf(tool, t, IS_DESKTOP, connectTexts).canConnect
+    const nativeHere = nativeConnects(tool, t, IS_DESKTOP, connectTexts, manager)
     setDialog({ key: tool.key, live: Boolean(tool.live) && (!nativeHere || liveShown(tool)) })
   }
 
@@ -365,6 +379,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
           <ConnectorDetailView
             tool={detailTool}
             categoryLabel={catalog.categories.find((c) => c.category === detailTool.category)?.label ?? detailTool.category}
+            manager={manager}
             onBack={() => setDetailKey(null)}
             onConnect={() => openConnection(detailTool)}
           />
@@ -428,7 +443,7 @@ export function IntegrationsCatalog({ slug }: Readonly<{ slug: string }>) {
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group.label}</h4>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   {(folded ? group.tools.slice(0, FOLDED_COUNT) : group.tools).map((tool) => (
-                    <ConnectorCard key={tool.key} tool={tool} onOpenDetail={() => setDetailKey(tool.key)}
+                    <ConnectorCard key={tool.key} tool={tool} manager={manager} onOpenDetail={() => setDetailKey(tool.key)}
                                    onConnect={() => openConnection(tool)} />
                   ))}
                 </div>
@@ -471,13 +486,13 @@ function shownCapabilities(tool: ConnectorView): string[] {
  * Tuile d'un connecteur (R160) : logo, état, description, capacités, puis « Connect », qui ouvre la connexion tout de
  * suite, et « Learn more », qui ouvre la fiche (toute la tuile y mène aussi).
  */
-function ConnectorCard({ tool, onOpenDetail, onConnect }: Readonly<{
-  tool: ConnectorView; onOpenDetail: () => void; onConnect: () => void
+function ConnectorCard({ tool, manager, onOpenDetail, onConnect }: Readonly<{
+  tool: ConnectorView; manager: boolean; onOpenDetail: () => void; onConnect: () => void
 }>) {
   const t = usePreferencesStore((s) => s.t.integrations)
   const c = usePreferencesStore((s) => s.t.connect)
   const caps = shownCapabilities(tool)
-  const action = cardAction(tool, t, IS_DESKTOP, c)
+  const action = cardAction(tool, t, IS_DESKTOP, c, manager)
   return (
     <div className="relative flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all focus-within:border-foreground/20 hover:border-foreground/20 hover:shadow-sm">
       {/* Ligne haute : logo + état */}
@@ -485,7 +500,7 @@ function ConnectorCard({ tool, onOpenDetail, onConnect }: Readonly<{
         <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted p-2 text-[11px]">
           <BrandLogo slug={tool.key} name={tool.name} className="size-full" />
         </div>
-        <CardState tool={tool} />
+        <CardState tool={tool} manager={manager} />
       </div>
 
       {/* Nom + description */}
@@ -536,12 +551,12 @@ function capabilityOf(cap: string, t: IntegrationTexts): { label: string; text: 
  * chemin de connexion (le second accès compris), catégorie et liens officiels.
  */
 function ConnectorDetailView({
-  tool, categoryLabel, onBack, onConnect,
-}: Readonly<{ tool: ConnectorView; categoryLabel: string; onBack: () => void; onConnect: () => void }>) {
+  tool, categoryLabel, manager, onBack, onConnect,
+}: Readonly<{ tool: ConnectorView; categoryLabel: string; manager: boolean; onBack: () => void; onConnect: () => void }>) {
   const c = usePreferencesStore((s) => s.t.connect)
   const t = usePreferencesStore((s) => s.t.integrations)
   const connection = connectionOf(tool, t, IS_DESKTOP, c)
-  const action = cardAction(tool, t, IS_DESKTOP, c)
+  const action = cardAction(tool, t, IS_DESKTOP, c, manager)
   const connected = isConnected(tool)
   // Ce que fait la native, puis ce qu'ajoute Cortex : un préréglage, ou le second accès d'une native.
   const lines = [
@@ -700,7 +715,9 @@ function NativeAccess({ slug, tool, startLive, manager, onClose, onChanged, onWi
     )
   }
   const second = tool.live ? <LiveAccessRow tool={tool} onOpen={() => setLive(true)} /> : null
-  if (tool.key === "plane") return <PlaneForm slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} second={second} />
+  if (tool.key === "plane") {
+    return <PlaneForm slug={slug} tool={tool} manager={manager} onClose={onClose} onChanged={onChanged} second={second} />
+  }
   if (throughGitHubCli(tool, IS_DESKTOP)) return <DesktopGitHubPanel second={second} />
   if (laterOnDesktop(tool, IS_DESKTOP)) {
     return (
@@ -710,8 +727,8 @@ function NativeAccess({ slug, tool, startLive, manager, onClose, onChanged, onWi
       </div>
     )
   }
-  if (!tool.connected) return <NativeConnectPanel slug={slug} tool={tool} second={second} />
-  return <NativeOAuthPanel slug={slug} tool={tool} onClose={onClose} onChanged={onChanged} second={second} />
+  if (!tool.connected) return <NativeConnectPanel slug={slug} tool={tool} manager={manager} second={second} />
+  return <NativeOAuthPanel slug={slug} tool={tool} manager={manager} onClose={onClose} onChanged={onChanged} second={second} />
 }
 
 /** Le second accès d'une native, dans son dialogue : ce qu'il ajoute, son état, et le geste qui ouvre sa connexion. */
@@ -728,7 +745,8 @@ function LiveAccessRow({ tool, onOpen }: Readonly<{ tool: ConnectorView; onOpen:
   const label = live.connected ? t.manage
     : live.state === "NEEDS_SETUP" ? t.setUp
       : live.state === "NEEDS_RECONNECT" ? c.reconnect
-        : c.liveConnect
+        : live.state === "WAITING_FOR_ADMIN" ? c.seeWhatToSend
+          : c.liveConnect
   return (
     <section className="flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
@@ -748,7 +766,9 @@ function LiveAccessRow({ tool, onOpen }: Readonly<{ tool: ConnectorView; onOpen:
  * GitHub ou Slack pas encore connecté, sur le web : ce que la native fait, puis « Connect », qui mène au
  * consentement de l'éditeur. Un échec se dit dans le dialogue, pas dans un toast (R160).
  */
-function NativeConnectPanel({ slug, tool, second }: Readonly<{ slug: string; tool: ConnectorView; second: React.ReactNode }>) {
+function NativeConnectPanel({ slug, tool, manager, second }: Readonly<{
+  slug: string; tool: ConnectorView; manager: boolean; second: React.ReactNode
+}>) {
   const c = usePreferencesStore((s) => s.t.connect)
   const { connectGitHub, connectSlack } = useIntegrationStore()
   const [busy, setBusy] = useState(false)
@@ -770,13 +790,17 @@ function NativeConnectPanel({ slug, tool, second }: Readonly<{ slug: string; too
     <div className="flex flex-col gap-3">
       {failure && <FailureNote failure={failure} name={tool.name} />}
       {tool.description && <p className="text-sm text-muted-foreground">{tool.description}</p>}
+      {/* Un membre : une phrase dit qui la connecte, sans un bouton qui lui serait refusé (R161). */}
+      {!manager && <p className="text-sm text-foreground">{fillText(c.nativeManagersOnly, { name: tool.name })}</p>}
       {second}
-      <DialogFooter>
-        <Button onClick={go} disabled={busy} className="gap-1.5">
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-          {busy ? c.connecting : failure ? c.tryAgain : c.connect}
-        </Button>
-      </DialogFooter>
+      {manager && failure?.kind !== "forbidden" && (
+        <DialogFooter>
+          <Button onClick={go} disabled={busy} className="gap-1.5">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+            {busy ? c.connecting : failure ? c.tryAgain : c.connect}
+          </Button>
+        </DialogFooter>
+      )}
     </div>
   )
 }
@@ -802,16 +826,19 @@ function DesktopGitHubPanel({ second }: Readonly<{ second?: React.ReactNode }>) 
   )
 }
 
-/** `second` : le second accès de la native (R160), posé avant les gestes du bas. */
+/**
+ * `second` : le second accès de la native (R160), posé avant les gestes du bas. `manager` : un propriétaire ou un
+ * administrateur, seul à connecter ou déconnecter une native.
+ */
 type PanelProps = Readonly<{
-  slug: string; tool: ConnectorView; onClose: () => void; onChanged: () => void; second?: React.ReactNode
+  slug: string; tool: ConnectorView; manager: boolean; onClose: () => void; onChanged: () => void; second?: React.ReactNode
 }>
 
 /**
  * GitHub ou Slack connecté : état et déconnexion par leur propre route (pas une connexion MCP). La déconnexion
  * passe par le store, qui fait relire le catalogue.
  */
-function NativeOAuthPanel({ slug, tool, onClose, second }: PanelProps) {
+function NativeOAuthPanel({ slug, tool, manager, onClose, second }: PanelProps) {
   const { disconnectGitHub, disconnectSlack } = useIntegrationStore()
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -840,13 +867,15 @@ function NativeOAuthPanel({ slug, tool, onClose, second }: PanelProps) {
         <p className="text-xs text-muted-foreground">Each project links its repository in its own settings (Integrations, Code repository).</p>
       )}
       {second}
-      <DialogFooter>
-        <Button variant="outline" size="sm"
-                className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setConfirming(true)} disabled={busy}>
-          {busy && <Loader2 className="size-3.5 animate-spin" />} Disconnect
-        </Button>
-      </DialogFooter>
+      {manager && (
+        <DialogFooter>
+          <Button variant="outline" size="sm"
+                  className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={() => setConfirming(true)} disabled={busy}>
+            {busy && <Loader2 className="size-3.5 animate-spin" />} Disconnect
+          </Button>
+        </DialogFooter>
+      )}
       <DisconnectConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -859,13 +888,14 @@ function NativeOAuthPanel({ slug, tool, onClose, second }: PanelProps) {
 }
 
 /** Plane : clé API et slug de workspace, puis synchronisation d'un projet dans le Brain OS. */
-function PlaneForm({ slug, tool, onClose, onChanged, second }: PanelProps) {
+function PlaneForm({ slug, tool, manager, onClose, onChanged, second }: PanelProps) {
   const [form, setForm] = useState<Record<string, string>>({})
   const [connecting, setConnecting] = useState(false)
   const [status, setStatus] = useState<PlaneStatus | null>(null)
   const [projects, setProjects] = useState<PlaneProject[]>([])
   const [projectId, setProjectId] = useState("")
   const [syncing, setSyncing] = useState(false)
+  const connectTexts = usePreferencesStore((s) => s.t.connect)
   const connected = tool.connected || Boolean(status?.connected)
 
   const loadConnected = useCallback(async () => {
@@ -917,6 +947,19 @@ function PlaneForm({ slug, tool, onClose, onChanged, second }: PanelProps) {
     } catch {
       toast.error("Could not disconnect")
     }
+  }
+
+  // Un membre : Plane se connecte et se synchronise par un propriétaire ou un administrateur (R161).
+  if (!manager) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">{tool.description}</p>
+        <p className="text-sm text-foreground">
+          {connected ? fillText(connectTexts.nativeConnected, { name: tool.name }) : fillText(connectTexts.nativeManagersOnly, { name: tool.name })}
+        </p>
+        {second}
+      </div>
+    )
   }
 
   if (!connected) {
@@ -1001,7 +1044,7 @@ function PlaneForm({ slug, tool, onClose, onChanged, second }: PanelProps) {
  */
 function McpServerForm({
   slug, tool, onClose, onChanged, onWide,
-}: PanelProps & Readonly<{ onWide: (wide: boolean) => void }>) {
+}: Omit<PanelProps, "manager"> & Readonly<{ onWide: (wide: boolean) => void }>) {
   const isNew = tool.key === NEW_CUSTOM_MCP_KEY
   const isCustom = tool.category === CUSTOM_MCP_CATEGORY
   const texts = usePreferencesStore((s) => s.t.connect)

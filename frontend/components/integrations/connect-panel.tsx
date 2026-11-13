@@ -147,7 +147,8 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
   const withNote = (content: React.ReactNode) => <div className="flex flex-col gap-3">{note}{content}</div>
 
   if (step === "admin") {
-    return withNote(<AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy} onRetry={() => go()}
+    return withNote(<AdminStep name={name} message={adminMessage} link={tool.admin?.link ?? null} busy={busy}
+      tried={Boolean(outcome) && failure?.kind !== "forbidden"} onRetry={() => go()}
       onUseKey={tool.apiKey ? () => setByKey(true) : undefined} />)
   }
   if (step === "company-app") {
@@ -195,10 +196,13 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
         {failure && tool.apiKey && keyHelps(failure, t) && (
           <Button variant="ghost" onClick={() => setByKey(true)}>{t.useKeyInstead}</Button>
         )}
-        <Button onClick={() => go()} disabled={busy} className="gap-1.5">
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
-          {busy ? t.connecting : failure ? t.tryAgain : reconnecting ? t.reconnect : t.connect}
-        </Button>
+        {/* Après un refus pour le rôle, réessayer n'y change rien : pas de « Try again » (R161). */}
+        {failure?.kind !== "forbidden" && (
+          <Button onClick={() => go()} disabled={busy} className="gap-1.5">
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plug className="size-3.5" />}
+            {busy ? t.connecting : failure ? t.tryAgain : reconnecting ? t.reconnect : t.connect}
+          </Button>
+        )}
       </DialogFooter>
     </div>
   )
@@ -244,9 +248,13 @@ export function FailureNote({ failure, name, withKey = false }: Readonly<{ failu
   )
 }
 
-/** L'étape de l'administrateur : une phrase, le message à lui envoyer, sa page, et « Try again ». */
-function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
-  name: string; message: string | null; link: string | null; busy: boolean; onRetry: () => void; onUseKey?: () => void
+/**
+ * L'étape de l'administrateur : une phrase, le message à lui envoyer, sa page. « Try again » seulement après un essai :
+ * avant, réessayer n'y change rien, et le geste principal est de copier le message (R161).
+ */
+function AdminStep({ name, message, link, busy, tried, onRetry, onUseKey }: Readonly<{
+  name: string; message: string | null; link: string | null; busy: boolean; tried: boolean; onRetry: () => void
+  onUseKey?: () => void
 }>) {
   const t = usePreferencesStore((s) => s.t.connect)
   const [copied, setCopied] = useState(false)
@@ -267,7 +275,7 @@ function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
         <blockquote className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-foreground">{message}</blockquote>
       )}
       <div className="flex flex-wrap gap-2">
-        {message && (
+        {message && tried && (
           <Button variant="outline" size="sm" className="gap-1.5" onClick={copy}>
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : t.copyMessage}
           </Button>
@@ -281,7 +289,13 @@ function AdminStep({ name, message, link, busy, onRetry, onUseKey }: Readonly<{
       </div>
       <DialogFooter>
         {onUseKey && <Button variant="ghost" onClick={onUseKey}>{t.useKeyInstead}</Button>}
-        <Button onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
+        {tried ? (
+          <Button onClick={onRetry} disabled={busy}>{busy ? t.connecting : t.tryAgain}</Button>
+        ) : message && (
+          <Button onClick={copy} className="gap-1.5">
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? t.copied : t.copyMessage}
+          </Button>
+        )}
       </DialogFooter>
     </div>
   )

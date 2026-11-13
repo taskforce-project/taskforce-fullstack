@@ -161,6 +161,19 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(within(dialog()).getByRole("button", { name: c.liveBack.replace("{name}", "Slack") })).toBeInTheDocument()
   })
 
+  it("a member is offered only what they can do: their own access, and who connects the built-in one (R161)", async () => {
+    useWorkspaceStore.setState({ members: [{ userId: 7, role: "MEMBER" }] as never })
+    vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog({ ...slack, live: { ...slack.live!, state: "NOT_CONNECTED" } }))
+    render(<IntegrationsCatalog slug="acme" />)
+
+    fireEvent.click(await screen.findByRole("button", { name: c.connect }))
+    // Le dialogue s'ouvre sur son propre accès ; la native dit qui la connecte, sans bouton.
+    fireEvent.click(within(dialog()).getByRole("button", { name: c.liveBack.replace("{name}", "Slack") }))
+    expect(within(dialog()).getByText(c.nativeManagersOnly.replace("{name}", "Slack"))).toBeInTheDocument()
+    expect(within(dialog()).queryByRole("button", { name: c.connect })).toBeNull()
+    expect(within(dialog()).getByRole("button", { name: c.liveConnect })).toBeInTheDocument()
+  })
+
   it("an owner or admin reads « Set it up » on a tool that needs the company's app, never a wait", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("zoom", "Zoom", { connection: "company-app", state: "NEEDS_SETUP" })))
     render(<IntegrationsCatalog slug="acme" />)

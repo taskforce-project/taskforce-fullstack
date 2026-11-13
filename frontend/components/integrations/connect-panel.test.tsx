@@ -190,6 +190,27 @@ describe("ConnectPanel", () => {
     expect(connect).toHaveBeenCalled()
   })
 
+  it("no Try again where retrying can't help: before any try, and after a refusal for the role (R161)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true })
+    const zoom = notion({ key: "zoom", name: "Zoom", connection: "company-app", state: "WAITING_FOR_ADMIN",
+      admin: { text: "Create a Zoom app.", link: null, required: true } })
+    const view = show(zoom)
+    expect(screen.queryByRole("button", { name: t.tryAgain })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(t.copyMessage) }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Create a Zoom app."))
+    view.unmount()
+
+    connect.mockImplementation(async () => {
+      useConnectorStore.setState({ failure: { key: "notion", kind: "forbidden", raw: "Access denied" } })
+      return null
+    })
+    show(notion())
+    fireEvent.click(screen.getByRole("button", { name: t.connect }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(t.failures.forbidden.replace("{name}", "Notion"))
+    expect(screen.queryByRole("button", { name: t.tryAgain })).toBeNull()
+  })
+
   it("an owner or admin enters the company's app once; the catalog is read again and the panel offers to connect (R161)", async () => {
     saveCompanyApp.mockResolvedValue(true)
     useConnectorStore.setState({ outcomes: { "slack-mcp": { next: "company-app", authorizeUrl: null, message: "Create an internal app." } } })

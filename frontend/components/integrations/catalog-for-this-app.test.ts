@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { ConnectorView, IntegrationCatalog } from "@/lib/api/integration-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import {
-  cardAction, cardPathLabel, catalogForThisApp, connectedLabel, connectionOf, filterCatalog, folds, FOLDED_COUNT, isConnected, shownAccess,
+  cardAction, cardPathLabel, catalogForThisApp, connectedLabel, connectionOf, nativeConnects, filterCatalog, folds, FOLDED_COUNT, isConnected, shownAccess,
 } from "./integrations-catalog"
 
 const t = CONSTANTS_EN.integrations
@@ -133,6 +133,16 @@ describe("une carte par outil, et « Connect » depuis la carte (R160)", () => {
     expect(cardPathLabel(slack(), t, true, c)).toBe("Admin first")
     expect(cardPathLabel(tool("slack", false), t, true, c)).toBe("Web app only")
     expect(cardPathLabel(slack(), t, false, c)).toBe("One click")
+  })
+
+  it("un membre : la native n'est pas à lui, la carte ouvre son propre accès ; une attente montre quoi envoyer (R161)", () => {
+    expect(nativeConnects(tool("slack", false), t, false, c, false)).toBe(false)
+    expect(nativeConnects(tool("slack", false), t, false, c, true)).toBe(true)
+    expect(nativeConnects(tool("linear", false, "MCP"), t, false, c, false)).toBe(true)
+    expect(cardAction(slack(), t, false, c, false)).toBe("Connect")
+    expect(cardAction(tool("slack", false), t, false, c, false)).toBeNull()
+    expect(cardPathLabel(slack(), t, false, c, false)).toBe("Admin first")
+    expect(cardAction({ ...tool("zoom", false, "MCP"), state: "WAITING_FOR_ADMIN" } as ConnectorView, t, false, c, false)).toBe("See what to send")
   })
 
   it("Slack dans l'app desktop : la native ne se connecte pas ici, son second accès oui", () => {
