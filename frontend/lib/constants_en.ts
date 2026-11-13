@@ -998,6 +998,11 @@ export const CONSTANTS_EN = {
     disconnectConsequence: "Cortex stops reading {name} through this connection, and TaskForce asks {name} to revoke its access.",
     disconnectedRevoked: "Disconnected. Your access was revoked at {name}.",
     disconnectedHere: "Disconnected here. {name} doesn't let TaskForce revoke the access: remove TaskForce in your {name} settings.",
+    // A tool with no sign-in, or connected by a key or an address: what is left at the vendor, if anything (R161)
+    disconnectConsequenceOpen: "Cortex stops reading {name} through this connection.",
+    disconnectedOpen: "Disconnected. {name} asked for no sign-in or key, so there is nothing to remove in {name}.",
+    disconnectedKey: "Disconnected here. The key still works in {name}: delete it there if nothing else uses it.",
+    disconnectedAddress: "Disconnected here. Your server still runs in {name}: delete it there if nothing else uses it.",
     // Not available
     notAvailable: "Not available yet",
     // Failures say what happened and what to do

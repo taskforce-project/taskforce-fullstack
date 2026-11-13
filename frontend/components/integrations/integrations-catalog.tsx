@@ -28,7 +28,7 @@ import {
   type IntegrationCatalog, type ConnectorView, type PlaneProject, type PlaneStatus, type McpServerStatus,
 } from "@/lib/api/integration-service"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
-import { ConnectPanel, FailureNote, pathLabel, pathSentence } from "@/components/integrations/connect-panel"
+import { ConnectPanel, disconnectedSentence, FailureNote, pathLabel, pathSentence } from "@/components/integrations/connect-panel"
 import { failureOf, type ConnectFailure } from "@/lib/integrations/connect-failure"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -1153,7 +1153,7 @@ function McpServerForm({
       const result = await disconnectMcpServer(slug, tool.key, status?.scope === "WORKSPACE")
       setStatus(null)
       setMcpUrl(tool.mcpSuggestedUrl ?? ""); setMcpToken("")
-      toast.success((result.revoked ? texts.disconnectedRevoked : texts.disconnectedHere).replaceAll("{name}", tool.name))
+      toast.success(disconnectedSentence(tool, result.revoked, texts))
       onChanged()
       if (isCustom) onClose()
     } catch (e) {

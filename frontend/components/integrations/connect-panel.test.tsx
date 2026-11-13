@@ -435,6 +435,23 @@ describe("ConnectPanel", () => {
     expect(toast.success).toHaveBeenCalledWith(t.disconnectedRevoked.replace("{name}", "Notion"))
   })
 
+  it("disconnecting a tool with no sign-in says nothing is left to remove; a key's tool says the key still works (R161)", async () => {
+    disconnect.mockResolvedValue({ revoked: false, revocable: false, servers: [] })
+    const view = show(notion({ key: "excalidraw", name: "Excalidraw", connection: "open", connected: true, state: "CONNECTED",
+      scope: "PERSONAL" }))
+    fireEvent.click(screen.getByRole("button", { name: t.disconnect }))
+    expect(await screen.findByText(t.disconnectConsequenceOpen.replace("{name}", "Excalidraw"))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect Excalidraw" }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith(t.disconnectedOpen.replaceAll("{name}", "Excalidraw")))
+    expect(toast.success).not.toHaveBeenCalledWith(expect.stringContaining("settings"))
+    view.unmount()
+
+    show(notion({ key: "render", name: "Render", connection: "api-key", connected: true, state: "CONNECTED", scope: "PERSONAL" }))
+    fireEvent.click(screen.getByRole("button", { name: t.disconnect }))
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect Render" }))
+    await waitFor(() => expect(toast.success).toHaveBeenLastCalledWith(t.disconnectedKey.replace("{name}", "Render")))
+  })
+
   it("a shared source: only owners and admins change it", async () => {
     show(notion({ connected: true, state: "CONNECTED", scope: "WORKSPACE" }), false)
 

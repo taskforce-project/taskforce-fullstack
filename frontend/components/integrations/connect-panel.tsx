@@ -230,6 +230,20 @@ export function ConnectPanel({ slug, tool, manager, onChanged, onWide, live = fa
 }
 
 /**
+ * Ce que la déconnexion a fait, en une phrase (R161) : l'accès révoqué chez l'éditeur ; rien à retirer quand l'outil ne
+ * demandait ni compte ni clé (Excalidraw) ; la clé, ou le serveur, qui reste chez l'éditeur ; sinon TaskForce à retirer
+ * de ses réglages, quand l'éditeur ne laisse pas révoquer l'accès.
+ */
+export function disconnectedSentence(tool: ConnectorView, revoked: boolean, t: ConnectTexts): string {
+  const text = revoked ? t.disconnectedRevoked
+    : tool.connection === "open" ? t.disconnectedOpen
+      : tool.connection === "api-key" ? t.disconnectedKey
+        : tool.connection === "server-url" ? t.disconnectedAddress
+          : t.disconnectedHere
+  return fillText(text, { name: tool.name })
+}
+
+/**
  * Un geste qui n'a pas abouti (R160) : ce qui s'est passé et quoi faire, en une phrase ; où il s'est arrêté, un clic
  * plus loin ; ce que le serveur a dit, tel quel, à deux clics (R133).
  */
@@ -514,7 +528,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
     setConfirming(false)
     const result = await disconnect(slug, tool.key, shared)
     if (!result) return
-    toast.success(fillText(result.revoked ? t.disconnectedRevoked : t.disconnectedHere, { name: tool.name }))
+    toast.success(disconnectedSentence(tool, result.revoked, t))
     onChanged()
   }
 
@@ -578,7 +592,7 @@ function ConnectedView({ slug, tool, manager, onChanged, onWide }: PanelProps) {
         open={confirming}
         onOpenChange={setConfirming}
         name={tool.name}
-        consequence={fillText(t.disconnectConsequence, { name: tool.name })}
+        consequence={fillText(tool.connection === "open" ? t.disconnectConsequenceOpen : t.disconnectConsequence, { name: tool.name })}
         onConfirm={onDisconnect}
       />
     </div>
