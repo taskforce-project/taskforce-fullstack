@@ -8,7 +8,8 @@
 //   3. reconstruit le tableau `tags` racine, ORDONNÉ + décrit → pilote l'ordre des sections Fern ;
 //   4. pose une info.description si absente ;
 //   5. remplace l'adresse du backend qui a servi la spec (servers) par celle de l'API hébergée, puis celle d'une
-//      instance auto-hébergée.
+//      instance auto-hébergée ;
+//   6. retire les schémas que seuls des chemins retirés emploient.
 //
 // Lancé automatiquement par generate-openapi.ps1 après la récupération. Rejouable sans risque.
 
@@ -222,7 +223,31 @@ spec.servers = [
   },
 ];
 
+// 6. Les schémas que seuls des chemins retirés emploient (l'actuator, les routes internes, le retour du navigateur, nos
+// documents CIMD) sortent aussi : la référence ne décrit pas ce qu'elle ne montre pas. Un schéma reste quand un chemin
+// gardé l'atteint, directement ou par un autre composant ($ref suivis de proche en proche).
+const reached = new Set();
+const follow = (node) => {
+  if (Array.isArray(node)) { node.forEach(follow); return; }
+  if (!node || typeof node !== "object") return;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "$ref" && typeof value === "string" && value.startsWith("#/components/")) {
+      if (reached.has(value)) continue;
+      reached.add(value);
+      const [, , type, name] = value.split("/");
+      follow(spec.components?.[type]?.[name]);
+    } else {
+      follow(value);
+    }
+  }
+};
+follow(spec.paths);
+let removedSchemas = 0;
+for (const name of Object.keys(spec.components?.schemas ?? {})) {
+  if (!reached.has(`#/components/schemas/${name}`)) { delete spec.components.schemas[name]; removedSchemas++; }
+}
+
 writeFileSync(SPEC, JSON.stringify(spec, null, 2) + "\n", { encoding: "utf8" });
 
 console.log(`OK clean-openapi : -${removedPaths} chemins actuator, -${removedInternal} opérations internes, ` +
-  `${used.size} sections, ${Object.keys(spec.paths).length} chemins restants.`);
+  `-${removedSchemas} schémas sans chemin gardé, ${used.size} sections, ${Object.keys(spec.paths).length} chemins restants.`);
