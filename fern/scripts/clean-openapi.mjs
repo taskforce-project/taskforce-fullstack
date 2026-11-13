@@ -55,6 +55,8 @@ const TAG_MAP = {
   "skill-suggestion-controller": "Skill suggestions",
   "ai-usage-controller": "AI usage",
   "mcp-action-controller": "MCP actions",
+  // La fin d'une connexion revenue du navigateur, avec les autres routes des connexions.
+  "mcp-o-auth-callback-controller": "MCP actions",
   "integration-controller": "Integrations",
   "webhook-controller": "Webhooks",
   "gdpr-controller": "GDPR",
@@ -142,8 +144,6 @@ for (const p of Object.keys(spec.paths ?? {})) {
 const HIDE = new Set([
   "client-log-controller",
   "gdpr-controller",
-  // Retour du navigateur après le consentement OAuth d'un serveur MCP : une redirection, pas une API à appeler.
-  "mcp-o-auth-callback-controller",
   // Endpoints MACHINE du runner local de délégation (ADR-013) : réservés à un compte de service
   // Keycloak, sans intérêt pour un consommateur de l'API. La spec vient du backend DEV, où ils existent.
   "delivery-runner-controller",
@@ -155,8 +155,21 @@ const HIDE = new Set([
   // L'accord de la personne et ses sessions, eux, restent documentés (DesktopSessionController).
   "desktop-sign-in-controller",
 ]);
+// Ce que lisent le navigateur et les serveurs d'autorisation, pas une API à appeler : le retour après le consentement
+// OAuth d'un serveur MCP (une redirection), et nos documents de métadonnées client (CIMD). La fin d'une connexion,
+// `POST /api/mcp/oauth/complete`, que l'app connectée appelle, reste documentée.
+const HIDE_PATHS = new Set([
+  "/api/mcp/oauth/callback",
+  "/api/mcp/oauth/client.json",
+  "/api/mcp/oauth/desktop-client.json",
+]);
 let removedInternal = 0;
 for (const [p, item] of Object.entries(spec.paths ?? {})) {
+  if (HIDE_PATHS.has(p)) {
+    removedInternal += Object.keys(item).filter((m) => ["get", "post", "put", "patch", "delete"].includes(m)).length;
+    delete spec.paths[p];
+    continue;
+  }
   for (const method of Object.keys(item)) {
     const op = item[method];
     if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;

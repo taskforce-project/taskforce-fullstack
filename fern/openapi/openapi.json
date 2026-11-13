@@ -6673,6 +6673,36 @@
         }
       }
     },
+    "/api/mcp/oauth/complete": {
+      "post": {
+        "tags": [
+          "MCP actions"
+        ],
+        "operationId": "complete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseCompletion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/invitations/{token}/accept": {
       "post": {
         "tags": [
@@ -19292,6 +19322,54 @@
           "code"
         ]
       },
+      "CompleteRequest": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "finish": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "finish",
+          "state"
+        ]
+      },
+      "ApiResponseCompletion": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Completion"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Completion": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "connectorKey": {
+            "type": "string"
+          }
+        }
+      },
       "ClientLogRequest": {
         "type": "object",
         "properties": {
@@ -23298,6 +23376,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "binding": {
+            "type": "boolean"
           }
         }
       },
