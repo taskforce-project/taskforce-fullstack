@@ -298,7 +298,7 @@ public class StorageTargetService {
      * jamais le chemin d'un dossier de la machine ni un identifiant chez l'éditeur.
      */
     private void record(Workspace ws, Long userId, Long projectId, Map<String, Object> details) {
-        audit.record(ws.getId(), userId, AuditService.STORAGE_TARGET_CHANGED, "storage_target",
+        audit.recordAfterCommit(ws.getId(), userId, AuditService.STORAGE_TARGET_CHANGED, "storage_target",
             projectId == null ? null : String.valueOf(projectId), details);
     }
 }

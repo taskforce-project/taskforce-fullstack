@@ -72,7 +72,7 @@ class ConnectorAppServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
-        verify(audit, org.mockito.Mockito.times(2)).record(eq(1L), eq(7L), eq(AuditService.COMPANY_APP_CHANGED),
+        verify(audit, org.mockito.Mockito.times(2)).recordAfterCommit(eq(1L), eq(7L), eq(AuditService.COMPANY_APP_CHANGED),
             eq("connector_app"), eq("slack-mcp"), details.capture());
         assertThat(details.getAllValues().get(0)).containsEntry("change", "saved").containsEntry("clientId", "1234.5678")
             .containsEntry("secretChanged", true);
@@ -95,7 +95,7 @@ class ConnectorAppServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
-        verify(audit, org.mockito.Mockito.times(2)).record(eq(1L), eq(7L), eq(AuditService.COMPANY_APP_CHANGED),
+        verify(audit, org.mockito.Mockito.times(2)).recordAfterCommit(eq(1L), eq(7L), eq(AuditService.COMPANY_APP_CHANGED),
             eq("connector_app"), any(), details.capture());
         assertThat(details.getAllValues().get(0)).containsEntry("connectorKey", "glean").containsEntry("issuerCleared", false);
         assertThat(details.getAllValues().get(1)).containsEntry("connectorKey", "zoho").containsEntry("issuerCleared", true);

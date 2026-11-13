@@ -81,7 +81,8 @@ public class ConnectorAppService {
         details.put("clientId", id);
         details.put("secretChanged", !secret.isEmpty());
         details.put("issuerCleared", issuerCleared);
-        audit.record(ws.getId(), admin.getId(), AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey, details);
+        audit.recordAfterCommit(ws.getId(), admin.getId(), AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey,
+            details);
         return new CompanyApp(connectorKey, id, app.getClientSecret() != null && !app.getClientSecret().isBlank());
     }
 
@@ -92,7 +93,7 @@ public class ConnectorAppService {
         ConnectorApp app = apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey)
             .orElseThrow(() -> new ResourceNotFoundException("No company app for " + connectorKey));
         apps.delete(app);
-        audit.record(workspaceId, userId, AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey,
+        audit.recordAfterCommit(workspaceId, userId, AuditService.COMPANY_APP_CHANGED, "connector_app", connectorKey,
             Map.of("change", "removed", "connectorKey", connectorKey));
     }
 }

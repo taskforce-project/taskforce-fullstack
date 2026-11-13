@@ -435,20 +435,21 @@ public class McpOAuthService {
             conn.setToolsPin(null);
             workspaceMcp.pinQuietly(conn);
             workspaceMcp.invalidate(row.getWorkspaceId());
-            // Une connexion partagée avec l'espace entre à son journal : l'outil, l'hôte, l'écriture accordée ou non.
-            if (row.isShared()) {
-                Map<String, Object> details = WorkspaceMcpService.sharedDetails("connected",
-                    new WorkspaceMcpService.ServerIdentity(row.getConnectorKey(), row.getMcpName()), row.getMcpUrl(),
-                    "oauth");
-                details.put("writes", row.isAllowWrites());
-                workspaceMcp.recordShared(row.getWorkspaceId(), userId, row.getConnectorKey(), details);
-            }
             // Un serveur que l'entreprise tient : la première connexion d'un propriétaire ou d'un administrateur qui aboutit
             // par l'application de l'entreprise épingle son émetteur sur elle.
             if (McpClientRegistrar.COMPANY.equals(row.getClientSource()) && api == null
                     && !catalog.preset(row.getConnectorKey()).map(p -> p.serves(row.getMcpUrl())).orElse(false)
                     && authorization.isManager(row.getWorkspaceId(), userId)) {
                 registrar.pinCompanyIssuer(row.getWorkspaceId(), row.getConnectorKey(), row.getIssuer());
+            }
+            // Une connexion partagée avec l'espace entre à son journal, après la dernière étape qui peut échouer et une fois
+            // la transaction validée : l'outil, l'hôte, l'écriture accordée ou non.
+            if (row.isShared()) {
+                Map<String, Object> details = WorkspaceMcpService.sharedDetails("connected",
+                    new WorkspaceMcpService.ServerIdentity(row.getConnectorKey(), row.getMcpName()), row.getMcpUrl(),
+                    "oauth");
+                details.put("writes", row.isAllowWrites());
+                workspaceMcp.recordShared(row.getWorkspaceId(), userId, row.getConnectorKey(), details);
             }
             return new Completion("connected", row.getConnectorKey());
         } catch (Exception e) {

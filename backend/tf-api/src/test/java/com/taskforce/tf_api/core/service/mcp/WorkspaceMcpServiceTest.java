@@ -677,7 +677,7 @@ class WorkspaceMcpServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
-        verify(audit, times(2)).record(eq(1L), eq(7L), eq(AuditService.SHARED_CONNECTION_CHANGED),
+        verify(audit, times(2)).recordAfterCommit(eq(1L), eq(7L), eq(AuditService.SHARED_CONNECTION_CHANGED),
             eq("connector_connection"), eq("custom-zoho-crm"), details.capture());
         assertThat(details.getAllValues().get(0)).containsEntry("change", "connected").containsEntry("name", "Zoho CRM")
             .containsEntry("host", "203.0.113.10:8443").containsEntry("via", "key");

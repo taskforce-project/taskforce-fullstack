@@ -1,12 +1,18 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.model.AuditLog;
@@ -20,7 +26,8 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>L'enregistrement est <b>best-effort</b> et en {@code REQUIRES_NEW} : un échec d'audit ne casse
  * jamais l'action métier, et l'entrée persiste même si la transaction métier est annulée (utile pour
- * auditer une tentative refusée).</p>
+ * auditer une tentative refusée). Une entrée qui décrit un changement s'écrit plutôt après sa validation
+ * ({@link #recordAfterCommit}).</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -46,6 +53,36 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
+    private final PlatformTransactionManager transactionManager;
+
+    /**
+     * Enregistre une action une fois validée la transaction qui la fait (séance n°23, R160) : une entrée ne décrit
+     * jamais un changement annulé ensuite. Elle s'écrit alors dans sa propre transaction ; sans transaction en cours,
+     * tout de suite. Best-effort, comme {@link #record} : un échec du journal ne remonte jamais.
+     */
+    public void recordAfterCommit(Long workspaceId, Long actorUserId, String action,
+                                  String entityType, String entityId, Map<String, Object> details) {
+        Map<String, Object> copy = details == null ? null : new LinkedHashMap<>(details);
+        Runnable write = () -> {
+            try {
+                TransactionTemplate own = new TransactionTemplate(transactionManager);
+                own.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                own.executeWithoutResult(status -> record(workspaceId, actorUserId, action, entityType, entityId, copy));
+            } catch (Exception ex) {
+                log.warn("Échec d'écriture du journal d'audit (action={}): {}", action, ex.getMessage());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    write.run();
+                }
+            });
+        } else {
+            write.run();
+        }
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(Long workspaceId, Long actorUserId, String action,

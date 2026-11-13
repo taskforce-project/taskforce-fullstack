@@ -95,11 +95,13 @@ class StorageTargetServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
-        verify(audit).record(eq(WS), eq(ADA), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"), isNull(),
+        verify(audit).recordAfterCommit(eq(WS), eq(ADA), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"),
+            isNull(),
             details.capture());
         assertThat(details.getValue()).containsEntry("change", "chosen").containsEntry("scope", "workspace")
             .containsEntry("storage", "server");
-        verify(audit).record(eq(WS), eq(BOB), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"), eq("30"),
+        verify(audit).recordAfterCommit(eq(WS), eq(BOB), eq(AuditService.STORAGE_TARGET_CHANGED), eq("storage_target"),
+            eq("30"),
             details.capture());
         assertThat(details.getValue()).containsEntry("change", "reset").containsEntry("scope", "project")
             .containsEntry("projectId", 30L).containsEntry("previous", "server");

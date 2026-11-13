@@ -343,10 +343,13 @@ public class WorkspaceMcpService {
         return details;
     }
 
-    /** Une connexion partagée faite ou défaite, au journal de l'espace (best-effort, cf. {@link AuditService}). */
+    /**
+     * Une connexion partagée faite ou défaite, au journal de l'espace, une fois le changement validé (best-effort, cf.
+     * {@link AuditService#recordAfterCommit}).
+     */
     void recordShared(Long workspaceId, Long userId, String connectorKey, Map<String, Object> details) {
-        audit.record(workspaceId, userId, AuditService.SHARED_CONNECTION_CHANGED, "connector_connection", connectorKey,
-            details);
+        audit.recordAfterCommit(workspaceId, userId, AuditService.SHARED_CONNECTION_CHANGED, "connector_connection",
+            connectorKey, details);
     }
 
     /**

@@ -293,6 +293,32 @@ class McpOAuthServiceTest {
     }
 
     @Test
+    @DisplayName("complete : l'entrée d'une connexion partagée vient après la dernière étape qui peut échouer")
+    void theSharedEntryComesAfterTheLastStepThatCanFail() throws Exception {
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        when(authorization.isMember(WS_ID, USER_ID)).thenReturn(true);
+        when(authorization.isManager(WS_ID, USER_ID)).thenReturn(true);
+        when(client.postForm(eq("https://as.ex/token"), any())).thenReturn(om.readTree("{\"access_token\":\"AT\"}"));
+        when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        when(workspaceMcp.ownConnection(ws, person, "glean", true)).thenReturn(ConnectorConnection.builder()
+            .workspace(ws).connectorKey("glean").scope(ConnectionScope.WORKSPACE).build());
+        McpOAuthState row = openState("st-pin");
+        row.setConnectorKey("glean");
+        row.setMcpUrl("https://203.0.113.20/mcp");
+        row.setClientSource(McpClientRegistrar.COMPANY);
+        row.setShared(true);
+        when(stateRepository.findById("st-pin")).thenReturn(Optional.of(row));
+        org.mockito.Mockito.doThrow(new IllegalStateException("database down"))
+            .when(registrar).pinCompanyIssuer(WS_ID, "glean", "https://as.ex");
+
+        String finish = finishOf(service.callback("st-pin", "code-p", null, "https://as.ex"));
+
+        assertThat(service.complete(USER_ID, "st-pin", finish).outcome()).isEqualTo("error");
+        verify(workspaceMcp, never()).recordShared(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("complete : un outil sans serveur officiel, fini par l'application de l'entreprise -> l'émetteur s'épingle "
         + "sur elle quand un propriétaire ou un administrateur aboutit, jamais pour un membre")
     void aManagerConnectionPinsTheIssuerOfTheCompanyApp() throws Exception {
