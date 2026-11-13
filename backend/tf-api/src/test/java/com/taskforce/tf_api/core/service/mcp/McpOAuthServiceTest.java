@@ -449,6 +449,20 @@ class McpOAuthServiceTest {
         verify(stateRepository, never()).deleteById(anyString());
     }
 
+    /**
+     * Ce qu'il faut pour que l'attente de l'administrateur aboutisse si le retour la choisissait : la personne et sa
+     * connexion. Sans ces réponses, l'attente échouerait sur la personne introuvable et l'essai passerait pour une
+     * mauvaise raison (revue indépendante de la PR #532).
+     */
+    private ConnectorConnection anAdminWaitCouldSucceed(String connectorKey) {
+        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        lenient().when(workspaceRepository.getReferenceById(WS_ID)).thenReturn(ws);
+        lenient().when(userRepository.findById(USER_ID)).thenReturn(Optional.of(person));
+        ConnectorConnection conn = ConnectorConnection.builder().workspace(ws).connectorKey(connectorKey).build();
+        lenient().when(workspaceMcp.ownConnection(ws, person, connectorKey, false)).thenReturn(conn);
+        return conn;
+    }
+
     @Test
     @DisplayName("callback : la personne refuse elle-même un outil qui exige l'administrateur -> erreur, jamais l'attente de l'administrateur")
     void aDeclineOnAnAdminRequiredToolIsNotAnAdminWait() {
@@ -456,11 +470,11 @@ class McpOAuthServiceTest {
         McpOAuthState row = openState("st-d");
         row.setConnectorKey("asana");
         when(stateRepository.findById("st-d")).thenReturn(Optional.of(row));
-        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        ConnectorConnection conn = anAdminWaitCouldSucceed("asana");
 
         assertThat(service.callback("st-d", null, "access_denied", null, "The user denied the request"))
             .contains("mcp=error").contains("connector=asana").doesNotContain("mcp=admin");
-        verify(workspaceMcp, never()).ownConnection(any(), any(), any(), anyBoolean());
+        assertThat(conn.getState()).isNotEqualTo(ConnectionState.WAITING_FOR_ADMIN);
         verify(connections, never()).save(any());
     }
 
@@ -469,7 +483,7 @@ class McpOAuthServiceTest {
     void anErrorAfterTheReturnChangesNothing() {
         McpOAuthState row = openState("st-1");
         when(stateRepository.findById("st-1")).thenReturn(Optional.of(row));
-        lenient().when(workspaceRepository.findById(WS_ID)).thenReturn(Optional.of(ws));
+        ConnectorConnection conn = anAdminWaitCouldSucceed("linear");
         service.callback("st-1", "code-xyz", null, "https://as.ex");
         String firstFinish = row.getFinishHash();
 
@@ -478,7 +492,7 @@ class McpOAuthServiceTest {
 
         assertThat(row.getCode()).isEqualTo("code-xyz");
         assertThat(row.getFinishHash()).isEqualTo(firstFinish);
-        verify(workspaceMcp, never()).ownConnection(any(), any(), any(), anyBoolean());
+        assertThat(conn.getState()).isNotEqualTo(ConnectionState.WAITING_FOR_ADMIN);
         verify(connections, never()).save(any());
     }
 

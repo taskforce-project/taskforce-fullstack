@@ -59,7 +59,15 @@ import lombok.extern.slf4j.Slf4j;
 public class McpOAuthService {
 
     private static final Duration STATE_TTL = Duration.ofMinutes(10);
-    /** Les erreurs d'un éditeur qui disent que son administrateur doit d'abord agir. */
+    /**
+     * Les erreurs d'un éditeur qui disent que son administrateur doit d'abord agir. Relu le 13/11/2026 (séance n°23,
+     * R160) sur la documentation OAuth publique des éditeurs des 12 préréglages {@code admin.required} et de Google :
+     * aucun n'y documente un autre code de ce sens rendu à l'adresse de retour. {@code admin_policy_enforced} de Google
+     * s'affiche sur la page de Google
+     * (https://developers.google.com/identity/protocols/oauth2/web-server) ; {@code app_not_admin_approved} de Slack
+     * répond à l'échange du code (https://docs.slack.dev/reference/methods/oauth.v2.user.access/), pas au retour.
+     * Le refus de la personne ({@code access_denied}) n'en est jamais une.
+     */
     private static final Set<String> ADMIN_ERRORS = Set.of("consent_required", "admin_consent_required",
         "admin_approval_required", "unauthorized_client", "interaction_required", "access_restricted");
 
