@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.mcp;
 
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.RefusedRequestException;
 import com.taskforce.tf_api.shared.security.SsrfGuard;
 
 /**
@@ -39,6 +40,11 @@ public final class ConnectFailure {
         return new BusinessException(code, message);
     }
 
+    /** Un refus de la garde des adresses : même code, journalisé en WARN comme une requête invalide (R159). */
+    public static BusinessException refused(String code, String message) {
+        return new RefusedRequestException(code, message);
+    }
+
     /**
      * La garde anti-SSRF d'une adresse du flux de connexion : une adresse refusée devient un échec à code stable
      * ({@link #ADDRESS_NOT_ALLOWED}), au lieu d'une erreur sans code. Le code ne distingue pas ses trois causes (un nom
@@ -48,7 +54,7 @@ public final class ConnectFailure {
         try {
             SsrfGuard.assertPublicHttpUrl(url);
         } catch (IllegalArgumentException e) {
-            throw of(ADDRESS_NOT_ALLOWED, e.getMessage());
+            throw refused(ADDRESS_NOT_ALLOWED, e.getMessage());
         }
     }
 
@@ -61,7 +67,7 @@ public final class ConnectFailure {
         try {
             SsrfGuard.assertPublicHttpUrl(url);
         } catch (IllegalArgumentException e) {
-            throw of(SIGN_IN_UNTRUSTED, e.getMessage());
+            throw refused(SIGN_IN_UNTRUSTED, e.getMessage());
         }
     }
 }

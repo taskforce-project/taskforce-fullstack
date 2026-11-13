@@ -129,7 +129,7 @@ public class McpOAuthClient {
             throw be;
         } catch (IllegalArgumentException e) {
             // L'adresse d'inscription vient des métadonnées de l'éditeur : refusée, c'est sa connexion qui n'est pas sûre.
-            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "OAuth DCR " + url + " refused: " + e.getMessage());
+            throw ConnectFailure.refused(ConnectFailure.SIGN_IN_UNTRUSTED, "OAuth DCR " + url + " refused: " + e.getMessage());
         } catch (Exception e) {
             throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNREACHABLE, "OAuth DCR " + url + " failed: " + e.getMessage());
         }
@@ -146,7 +146,7 @@ public class McpOAuthClient {
             throw be;
         } catch (IllegalArgumentException e) {
             // L'adresse d'échange des jetons vient de l'éditeur, comme celle de son inscription (R159).
-            throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNTRUSTED, "OAuth token " + url + " refused: " + e.getMessage());
+            throw ConnectFailure.refused(ConnectFailure.SIGN_IN_UNTRUSTED, "OAuth token " + url + " refused: " + e.getMessage());
         } catch (Exception e) {
             throw ConnectFailure.of(ConnectFailure.SIGN_IN_UNREACHABLE, "OAuth token " + url + " failed: " + e.getMessage());
         }

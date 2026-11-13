@@ -20,6 +20,7 @@ import com.taskforce.tf_api.core.repository.McpOAuthRegistrationRepository;
 import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.core.service.mcp.McpOAuthDiscovery.DiscoveredAuth;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.RefusedRequestException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,6 +62,19 @@ class ConnectFailureTest {
         assertThat(code(catchThrowable(
             () -> new McpClient(om, 2000L, 5000L, false).assertAllowed("http://10.0.0.5/mcp"))))
             .isEqualTo(ConnectFailure.ADDRESS_NOT_ALLOWED);
+    }
+
+    @Test
+    @DisplayName("les refus de la garde des adresses, la saisie comme celle de l'éditeur, se journalisent en WARN (R159)")
+    void theGuardRefusalsAreExpected() {
+        assertThat(catchThrowable(() -> ConnectFailure.assertPublicAddress("http://169.254.169.254/latest")))
+            .isInstanceOf(RefusedRequestException.class);
+        assertThat(catchThrowable(() -> ConnectFailure.assertVendorAddress("http://10.0.0.1/authorize")))
+            .isInstanceOf(RefusedRequestException.class);
+        assertThat(catchThrowable(() -> new McpOAuthClient(om, 2000L).postJson("http://127.0.0.1:9/register", Map.of())))
+            .isInstanceOf(RefusedRequestException.class);
+        assertThat(catchThrowable(() -> new McpClient(om, 2000L, 5000L, false).assertAllowed("http://127.0.0.1:9/mcp")))
+            .isInstanceOf(RefusedRequestException.class);
     }
 
     @Test
