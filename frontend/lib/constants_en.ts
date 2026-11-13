@@ -920,6 +920,8 @@ export const CONSTANTS_EN = {
     liveWaitingForAdmin: "Cortex waits for your admin",
     liveReturnedConnected: "Cortex is connected to {name}.",
     nativeConnected: "{name} is connected for this workspace.",
+    // An added server not yet named, in a failure sentence
+    thisServer: "This server",
     // A member: who connects a built-in integration, instead of a button refused to them (R161)
     nativeManagersOnly: "An owner or admin connects {name} for this workspace.",
     // The button of a tool that waits for the admin: the message to send them

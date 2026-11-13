@@ -174,6 +174,13 @@ describe("IntegrationsCatalog (revue des écrans de J2, R160)", () => {
     expect(within(dialog()).getByRole("button", { name: c.liveConnect })).toBeInTheDocument()
   })
 
+  it("a connected built-in integration says so with the sentence kept in the texts (R160)", async () => {
+    vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog({ ...slack, connected: true, state: "CONNECTED" }))
+    render(<IntegrationsCatalog slug="acme" />)
+    fireEvent.click(await screen.findByRole("button", { name: t.manage }))
+    expect(within(dialog()).getByText(c.nativeConnected.replace("{name}", "Slack"))).toBeInTheDocument()
+  })
+
   it("an owner or admin reads « Set it up » on a tool that needs the company's app, never a wait", async () => {
     vi.mocked(getIntegrationCatalog).mockResolvedValue(catalog(preset("zoom", "Zoom", { connection: "company-app", state: "NEEDS_SETUP" })))
     render(<IntegrationsCatalog slug="acme" />)

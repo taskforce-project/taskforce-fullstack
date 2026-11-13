@@ -839,6 +839,7 @@ type PanelProps = Readonly<{
  * passe par le store, qui fait relire le catalogue.
  */
 function NativeOAuthPanel({ slug, tool, manager, onClose, second }: PanelProps) {
+  const c = usePreferencesStore((s) => s.t.connect)
   const { disconnectGitHub, disconnectSlack } = useIntegrationStore()
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -861,7 +862,7 @@ function NativeOAuthPanel({ slug, tool, manager, onClose, second }: PanelProps) 
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2 rounded-md border border-shape-green/25 bg-shape-green/10 p-3 text-xs text-ink-green">
         <Check className="size-4 shrink-0" />
-        <span><span className="font-medium">{tool.name}</span> is connected for this workspace.</span>
+        <span>{fillText(c.nativeConnected, { name: tool.name })}</span>
       </div>
       {tool.key === "github" && (
         <p className="text-xs text-muted-foreground">Each project links its repository in its own settings (Integrations, Code repository).</p>
@@ -1255,7 +1256,7 @@ function McpServerForm({
       >
         {withToken ? "Sign in with OAuth instead" : "Use a token instead"}
       </button>
-      {failure && <FailureNote failure={failure} name={(isCustom ? name.trim() : tool.name) || "This server"} withKey />}
+      {failure && <FailureNote failure={failure} name={(isCustom ? name.trim() : tool.name) || texts.thisServer} withKey />}
       {/* Une action principale, en bas à droite (R133) : celle de la façon de se connecter choisie. */}
       <DialogFooter>
         {withToken ? (
