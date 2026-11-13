@@ -97,6 +97,23 @@ describe("ConnectPanel", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveFocus())
   })
 
+  it("the Details toggles look like controls, and the server's words wrap between words (R161)", () => {
+    useConnectorStore.setState({ failure: { key: "notion", kind: "unknown", raw: "invalid_client: the redirect address is not registered" } })
+    show(notion())
+
+    const details = screen.getByRole("button", { name: t.failureDetails })
+    // Un contrôle : souligné, avec son chevron, et il dit s'il est ouvert.
+    expect(details).toHaveClass("underline")
+    expect(details.querySelector("svg")).not.toBeNull()
+    expect(details).toHaveAttribute("aria-expanded", "false")
+    fireEvent.click(details)
+    expect(screen.getByRole("button", { name: t.failureHideDetails })).toHaveAttribute("aria-expanded", "true")
+    fireEvent.click(screen.getByRole("button", { name: t.failureRaw }))
+    const raw = screen.getByText(/invalid_client/)
+    expect(raw).toHaveClass("break-words")
+    expect(raw).not.toHaveClass("break-all")
+  })
+
   it("a panel that opens never takes the focus from where the person is", () => {
     render(<button type="button">elsewhere</button>)
     screen.getByRole("button", { name: "elsewhere" }).focus()

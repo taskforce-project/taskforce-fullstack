@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
+import { DisclosureButton } from "@/components/ui/disclosure-button"
 import { McpActionConsole } from "@/components/integrations/mcp-action-console"
 import { GoogleDriveFiles } from "@/components/storage/google-drive-files"
 import { DisconnectConfirmDialog } from "@/components/integrations/disconnect-confirm-dialog"
@@ -244,21 +245,20 @@ export function FailureNote({ failure, name, withKey = false }: Readonly<{ failu
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
         <span>{failureSentence(failure, name, t, withKey)}</span>
       </p>
-      <button type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}
-              className="w-fit text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+      <DisclosureButton open={details} onToggle={() => setDetails((v) => !v)}>
         {details ? t.failureHideDetails : t.failureDetails}
-      </button>
+      </DisclosureButton>
       {details && (
         <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
           <p>{failureStep(failure, name, t)}</p>
           {failure.raw && (
             <>
-              <button type="button" aria-expanded={raw} onClick={() => setRaw((v) => !v)}
-                      className="w-fit underline-offset-2 hover:text-foreground hover:underline">
+              <DisclosureButton open={raw} onToggle={() => setRaw((v) => !v)}>
                 {raw ? t.failureHideRaw : t.failureRaw}
-              </button>
+              </DisclosureButton>
               {raw && (
-                <pre tabIndex={0} className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">
+                // Entre les mots ; un mot plus long que la ligne seulement se coupe (R161).
+                <pre tabIndex={0} className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">
                   {failure.raw}
                 </pre>
               )}

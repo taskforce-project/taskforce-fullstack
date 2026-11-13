@@ -7,6 +7,7 @@ import {
   Sparkles, ChevronDown, ChevronUp, Plus, Trash2, Play, CircleAlert,
 } from "lucide-react"
 import { Message, TokenMeter } from "@/components/chat"
+import { DisclosureButton } from "@/components/ui/disclosure-button"
 import { cn } from "@/lib/utils"
 import { fillModelText } from "@/lib/ai/model-table"
 import {
@@ -129,10 +130,9 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
       <ProposalSentence said={proposal(call.name, t, call.input)} />
       {args.length > 0 && (
         <div className="flex flex-col gap-1">
-          <button type="button" aria-expanded={details} onClick={() => setDetails((v) => !v)}
-                  className="w-fit text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+          <DisclosureButton open={details} onToggle={() => setDetails((v) => !v)}>
             {details ? t.hideDetails : t.details}
-          </button>
+          </DisclosureButton>
           {details && (
             <>
               {/* Une hauteur bornée : un long argument défile dans la carte, au clavier aussi. */}
@@ -141,10 +141,9 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
               </div>
               {rawRequest && (
                 <>
-                  <button type="button" aria-expanded={rawShown} onClick={() => setRawShown((v) => !v)}
-                          className="w-fit text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                  <DisclosureButton open={rawShown} onToggle={() => setRawShown((v) => !v)}>
                     {rawShown ? t.hideRawRequest : t.rawRequest}
-                  </button>
+                  </DisclosureButton>
                   {rawShown && (
                     <pre tabIndex={0} className="max-h-48 overflow-auto whitespace-pre-wrap break-words bg-muted px-2 py-1.5 font-mono text-[11px] text-foreground">
                       {rawRequest}
