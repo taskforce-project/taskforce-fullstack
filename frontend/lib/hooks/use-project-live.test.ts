@@ -174,20 +174,25 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     expect(workflow.applyJobUpdate).toHaveBeenCalledWith(job)
   })
 
-  it("reads everything again after a cut, not at the first connection", async () => {
+  it("reads everything again at each connection, the first included", async () => {
     renderHook(() => useProjectLive("acme", 30))
     await vi.advanceTimersByTimeAsync(0)
     vi.clearAllMocks()
     delivery.fetchProjectRuns.mockResolvedValue([])
 
-    stomp.onConnect?.()
-    expect(delivery.fetchProjectRuns).not.toHaveBeenCalled()
-
+    // Ce qui est publié entre la lecture du montage et l'abonnement n'arrive pas par le topic : la première connexion relit.
     stomp.onConnect?.()
     await vi.advanceTimersByTimeAsync(0)
     expect(delivery.fetchProjectRuns).toHaveBeenCalledWith("acme", 30)
     expect(issues.fetchProjectRelations).toHaveBeenCalledWith("acme", 30)
     expect(workflow.fetchJobs).toHaveBeenCalledWith("acme")
+
+    // Après une coupure, de même.
+    stomp.onConnect?.()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(delivery.fetchProjectRuns).toHaveBeenCalledTimes(2)
+    expect(issues.fetchProjectRelations).toHaveBeenCalledTimes(2)
+    expect(workflow.fetchJobs).toHaveBeenCalledTimes(2)
   })
 
   it("closes the connection when the project is left, and reads nothing after", async () => {

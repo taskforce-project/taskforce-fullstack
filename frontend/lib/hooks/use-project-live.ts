@@ -36,8 +36,9 @@ function parse<T>(body: string): T | null {
  * - une étape de plus devient son étape en cours, et sa chronologie prend la suite : `missionSequence` en tire les cinq
  *   étapes, comme sur la vue du travail ;
  * - une analyse qui change remplace la sienne.
- * Après une coupure, tout se relit : ce qui a été publié pendant la coupure est perdu. Les événements des issues (et de
- * leurs liens) passent par `useProjectRealtime`, que l'écran du projet monte aussi.
+ * À chaque connexion, la première comprise, tout se relit, analyses comprises : ce qui a été publié entre la lecture du
+ * montage et l'abonnement, ou pendant une coupure, est perdu pour le topic. Les événements des issues (et de leurs liens)
+ * passent par `useProjectRealtime`, que l'écran du projet monte aussi.
  */
 export function useProjectLive(slug: string | null | undefined, projectId: number | null): void {
   const fetchProjectRuns = useDeliveryStore((s) => s.fetchProjectRuns)
@@ -87,12 +88,11 @@ export function useProjectLive(slug: string | null | undefined, projectId: numbe
     }
 
     void load()
-    let connections = 0
     const unsubscribe = subscribeTopics(
       { [deliveryTopic(projectId)]: onDelivery, [analysisTopic(projectId)]: onAnalysis },
       () => {
-        connections++
-        if (connections === 1) return
+        // À chaque connexion, la première comprise : ce qui a été publié avant l'abonnement, ou pendant une coupure,
+        // n'arrive jamais par le topic.
         void load()
         void fetchJobs(slug)
       },
