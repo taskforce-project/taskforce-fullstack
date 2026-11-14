@@ -18,7 +18,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "astro": "^7.4.0",
+    "astro": "^7.4.7",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "motion": "^12.43.0",
