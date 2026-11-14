@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.shared.config;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.Message;
@@ -49,15 +51,16 @@ import lombok.extern.slf4j.Slf4j;
 public class StompAuthInterceptor implements ChannelInterceptor {
 
     /** Topic dont la clé EST l'identité de l'abonné : {@code /topic/notifications.{userId}}. */
-    private static final String USER_TOPIC_PREFIX     = "/topic/notifications.";
+    private static final Pattern NOTIFICATIONS_TOPIC = Pattern.compile("/topic/notifications\\.([1-9]\\d*)");
     /** Les étapes des réponses de Cortex : même règle, {@code /topic/cortex.{userId}} n'est lu que par cette personne. */
-    private static final String CORTEX_TOPIC_PREFIX   = "/topic/cortex.";
+    private static final Pattern CORTEX_TOPIC = Pattern.compile("/topic/cortex\\.([1-9]\\d*)");
     /**
      * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board) et
      * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA).
      */
-    private static final String PROJECT_TOPIC_PREFIX  = "/topic/projects.";
-    private static final String ANALYSIS_SUFFIX       = ".analysis";
+    private static final Pattern PROJECT_TOPIC = Pattern.compile("/topic/projects\\.([1-9]\\d*)(?:\\.analysis)?");
+    /** Les caractères de motif n'appartiennent à aucune de ces formes. */
+    private static final Pattern PATTERN_CHARACTERS = Pattern.compile("[*?{}#]");
     /** Ancien flux d'analyse IA par espace, {@code /topic/analysis.{workspaceId}} : retiré, tout abonnement est refusé. */
     private static final String RETIRED_ANALYSIS_PREFIX = "/topic/analysis.";
 
@@ -152,12 +155,13 @@ public class StompAuthInterceptor implements ChannelInterceptor {
      * <p>Les workflows d'analyse IA passaient par {@code /topic/analysis.{workspaceId}}, ouvert à tout membre de
      * l'espace : le nom d'un projet privé et la question du modèle y sortaient du cercle du projet. Ils ont rejoint
      * les flux du projet (31/10/2026) ; plus rien n'est publié sur l'ancien canal, et tout abonnement y est refusé.</p>
+     *
+     * <p>Une destination n'est acceptée que si elle a exactement l'une de ces formes, chacune avec sa vérification.
+     * Toute autre est refusée : une autre forme sous {@code /topic} ou {@code /queue}, une destination hors de ces
+     * préfixes, une destination absente, et toute destination qui porte un caractère de motif.</p>
      */
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
-        if (destination == null) {
-            return;
-        }
         String principal = accessor.getUser() != null ? accessor.getUser().getName() : null;
         if (principal == null) {
             log.warn("STOMP SUBSCRIBE refusé sur {} : session non authentifiée", destination);
@@ -169,29 +173,36 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         } catch (NumberFormatException ex) {
             throw new MessageDeliveryException("Unreadable identity");
         }
+        if (destination == null || PATTERN_CHARACTERS.matcher(destination).find()) {
+            log.warn("STOMP SUBSCRIBE refusé : user {} sur une destination qui n'est pas celle de l'app", userId);
+            throw new MessageDeliveryException("Invalid channel");
+        }
 
-        String ownTopic = destination.startsWith(USER_TOPIC_PREFIX) ? USER_TOPIC_PREFIX
-            : destination.startsWith(CORTEX_TOPIC_PREFIX) ? CORTEX_TOPIC_PREFIX : null;
-        if (ownTopic != null) {
-            if (!principal.equals(destination.substring(ownTopic.length()))) {
+        Matcher notifications = NOTIFICATIONS_TOPIC.matcher(destination);
+        Matcher cortex = CORTEX_TOPIC.matcher(destination);
+        if (notifications.matches() || cortex.matches()) {
+            String owner = notifications.matches() ? notifications.group(1) : cortex.group(1);
+            if (!principal.equals(owner)) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire le canal personnel d'un autre", principal);
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
-        } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {
-            String channel = destination.substring(PROJECT_TOPIC_PREFIX.length());
-            String projectId = channel.endsWith(ANALYSIS_SUFFIX)
-                ? channel.substring(0, channel.length() - ANALYSIS_SUFFIX.length())
-                : channel;
-            if (!realtimeAuth.canSubscribeProject(userId, parseId(projectId))) {
+            return;
+        }
+        Matcher project = PROJECT_TOPIC.matcher(destination);
+        if (project.matches()) {
+            if (!realtimeAuth.canSubscribeProject(userId, parseId(project.group(1)))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
-        } else if (destination.startsWith(RETIRED_ANALYSIS_PREFIX)) {
+            return;
+        }
+        if (destination.startsWith(RETIRED_ANALYSIS_PREFIX)) {
             // Rien n'y est plus publié ; le refuser empêche de le rouvrir par mégarde à tout l'espace.
             log.warn("STOMP SUBSCRIBE refusé : user {} sur le canal retiré {}", userId, destination);
             throw new MessageDeliveryException("This channel no longer exists");
         }
-        // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ceux-ci).
+        log.warn("STOMP SUBSCRIBE refusé : user {} sur une destination qui n'est pas celle de l'app : {}", userId, destination);
+        throw new MessageDeliveryException("Invalid channel");
     }
 
     /** Id numérique d'un canal ; refuse une destination malformée. */

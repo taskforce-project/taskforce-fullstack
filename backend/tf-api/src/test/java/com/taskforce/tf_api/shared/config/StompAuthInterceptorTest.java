@@ -304,5 +304,44 @@ class StompAuthInterceptorTest {
                 .hasMessage("Invalid channel");
             verifyNoInteractions(realtimeAuth);
         }
+
+        @ParameterizedTest(name = "{0} → REFUSÉ, sans lire les droits")
+        @ValueSource(strings = {
+            // Un caractère de motif, où qu'il soit.
+            "/topic/*", "/topic/**", "/topic/#", "/topic/proj*", "/topic/{x}", "/topic/?rojects.3.delivery",
+            "/topic/projects.*", "/topic/projects.3.*", "/topic/projects.#", "/topic/projects.{id}",
+            "/topic/notifications.*", "/topic/notifications.7*", "/topic/cortex.?", "/queue/*",
+            // Une autre forme sous /topic ou /queue, ou hors de ces préfixes.
+            "/topic/x", "/topic", "/topic/", "/topic/projects.", "/topic/projects.07", "/topic/projects.3.delivery",
+            "/topic/projects.3/analysis", " /topic/projects.3", "/topic/projects.3 ", "/topic/notifications.",
+            "/topic/notifications.7.extra", "/topic/cortex.007", "/queue/x", "/queue/notifications.7",
+            "/user/queue/x", "/app/x", "/exchange/amq.topic/projects.3", ""
+        })
+        @DisplayName("🔒 seules les destinations de l'app sont acceptées : une autre forme, ou un motif, est refusée")
+        void only_the_destinations_of_the_app_are_accepted(String destination) {
+            assertThatThrownBy(() -> interceptor.preSend(subscribe(destination, "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessage("Invalid channel");
+            verifyNoInteractions(realtimeAuth);
+        }
+
+        @Test
+        @DisplayName("🔒 un SUBSCRIBE sans destination → REFUSÉ")
+        void a_subscribe_without_destination_is_rejected() {
+            assertThatThrownBy(() -> interceptor.preSend(subscribe(null, "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessage("Invalid channel");
+            verifyNoInteractions(realtimeAuth);
+        }
+
+        @ParameterizedTest(name = "{0} → autorisé")
+        @ValueSource(strings = {"/topic/notifications.7", "/topic/cortex.7", "/topic/projects.3", "/topic/projects.3.analysis"})
+        @DisplayName("chaque destination de l'app reste ouverte à qui y a droit")
+        void each_destination_of_the_app_stays_open_to_its_reader(String destination) {
+            lenient().when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(true);
+            Message<byte[]> msg = subscribe(destination, "7");
+
+            assertThat(interceptor.preSend(msg, channel)).isSameAs(msg);
+        }
     }
 }
