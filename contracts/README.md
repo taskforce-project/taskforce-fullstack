@@ -9,6 +9,7 @@ cases.
 | Rules bundle, `taskforce-rules/1` | `rules/taskforce-rules-1.schema.json`, `rules/default.rules.json` | the server publishes it and judges its own tools with it, the runner applies it to the agent's actions | `rules/cases.json`: the same actions must get the same decision on both sides |
 | Evidence file, `taskforce-evidence/1` | `evidence/taskforce-evidence-1.schema.json` | the server writes the chain, anyone can check an export | `evidence/chain-cases.json`: the same events must give the same hashes on both sides |
 | Agent adapter | `agent/adapter.md` | the runner, one adapter per agent | the adapter tests in `taskforce-runner` |
+| Process, `taskforce-process/1` | `process/README.md` (the BPMN 2.0 subset, the `tf:` extension), `process/taskforce-process-1.xsd`, `process/integrate-a-module.bpmn` | the server exports and imports it; any BPMN modeler opens it | `ProcessContractTest` (the XSD, the round trip, the subset frozen on E20) and `frontend/lib/process/bpmn-moddle.test.ts` (bpmn-moddle reads and rewrites it) |
 
 ## One engine for both sides
 

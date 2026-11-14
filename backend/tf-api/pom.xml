@@ -255,6 +255,23 @@
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!--
+		  Les schémas XSD de BPMN 2.0 (OMG), pour vérifier dans les tests l'export des processus (ADR-027, E23).
+		  Le jar du modèle BPMN d'Operaton (Apache 2.0) les porte ; on ne prend que ces fichiers, sans ses
+		  dépendances, et rien d'Operaton n'entre dans l'application (portée test).
+		-->
+		<dependency>
+			<groupId>org.operaton.bpm.model</groupId>
+			<artifactId>operaton-bpmn-model</artifactId>
+			<version>2.2.0</version>
+			<scope>test</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
 		<!-- Intégration DB réelle (Postgres pgvector + Flyway) — B-T4. -->
 		<!-- Boot 4 : slice @DataJpaTest dans un artefact dédié (modularisation des slices de test). -->
 		<dependency>
