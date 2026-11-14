@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taskforce-project.fr/schema/process/draft-1.json",
+  "title": "A draft of a TaskForce process (taskforce-process/1)",
+  "description": "What a model writes when it proposes a process (ADR-027, point 10): the process, in TaskForce's model, the questions a person answers before publishing, and the optional steps it left out, each with its reason. The schema gives the shape; TaskForce's validator then judges the draft, and a person accepts it step by step. Nobody writes code: a condition is a sentence plus the step and the result it depends on.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["process", "questions", "leftOut"],
+  "properties": {
+    "process": { "$ref": "#/$defs/process" },
+    "questions": {
+      "description": "What the person must answer before the process can be published.",
+      "type": "array",
+      "maxItems": 10,
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "leftOut": {
+      "description": "Optional steps the model judged too much for this objective. Never a locked step.",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/leftOut" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,79}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "text": { "type": "string", "maxLength": 2000 },
+    "line": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "person": {
+      "description": "Who: a person of the workspace (person:<id>), its owner (role:owner), its admins (role:admin), or the project's lead (project-lead).",
+      "type": "string",
+      "pattern": "^(person:[0-9]{1,19}|role:(owner|admin)|project-lead)$"
+    },
+    "duration": { "description": "An ISO 8601 duration, like P2D or PT4H.", "type": "string", "pattern": "^P[0-9YMWDTHS.]+$" },
+    "ruleRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref"],
+      "properties": {
+        "ref": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,79}$" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "rules": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/ruleRef" } },
+    "documents": { "type": "array", "maxItems": 10, "items": { "$ref": "#/$defs/line" } },
+    "lock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by"],
+      "properties": {
+        "by": { "enum": ["floor", "rule", "author", "pause-point"] },
+        "ref": { "type": "string", "maxLength": 80 }
+      }
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "key", "name", "steps", "flows"],
+      "properties": {
+        "format": { "const": "taskforce-process/1" },
+        "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,79}$" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "derivedFrom": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,79}$" },
+        "steps": { "type": "array", "minItems": 2, "maxItems": 60, "items": { "$ref": "#/$defs/topStep" } },
+        "flows": { "type": "array", "maxItems": 120, "items": { "$ref": "#/$defs/flow" } }
+      }
+    },
+    "topStep": {
+      "description": "At the top of the process: its start, its ends, its stages (the columns of the view), the decisions and the paths in parallel between stages, and the deadline or failure path of a stage.",
+      "anyOf": [
+        { "$ref": "#/$defs/start" },
+        { "$ref": "#/$defs/end" },
+        { "$ref": "#/$defs/stage" },
+        { "$ref": "#/$defs/decision" },
+        { "$ref": "#/$defs/parallel" },
+        { "$ref": "#/$defs/deadline" },
+        { "$ref": "#/$defs/failure" }
+      ]
+    },
+    "stageStep": {
+      "description": "Inside a stage: its start, its end, and its steps. An agent step is always inside an agent zone.",
+      "anyOf": [
+        { "$ref": "#/$defs/start" },
+        { "$ref": "#/$defs/end" },
+        { "$ref": "#/$defs/human" },
+        { "$ref": "#/$defs/decision" },
+        { "$ref": "#/$defs/wait" },
+        { "$ref": "#/$defs/zone" },
+        { "$ref": "#/$defs/parallel" },
+        { "$ref": "#/$defs/deadline" },
+        { "$ref": "#/$defs/failure" }
+      ]
+    },
+    "start": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "type": { "const": "start" }, "name": { "$ref": "#/$defs/name" } }
+    },
+    "end": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "end" },
+        "name": { "$ref": "#/$defs/name" },
+        "terminate": { "description": "At the top of the process only: this end stops the whole process.", "type": "boolean" }
+      }
+    },
+    "parallel": {
+      "description": "Splits one path into several that run at once, or joins them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": { "id": { "$ref": "#/$defs/id" }, "type": { "const": "parallel" }, "name": { "$ref": "#/$defs/name" } }
+    },
+    "deadline": {
+      "description": "When its step lasts longer than the duration, the step stops and the deadline's path is taken.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "attachedTo", "duration"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "deadline" },
+        "name": { "$ref": "#/$defs/name" },
+        "attachedTo": { "$ref": "#/$defs/id" },
+        "duration": { "$ref": "#/$defs/duration" }
+      }
+    },
+    "failure": {
+      "description": "When the agents of its zone or stage fail after their attempts, this path is taken.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "attachedTo"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "failure" },
+        "name": { "$ref": "#/$defs/name" },
+        "attachedTo": { "$ref": "#/$defs/id" }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "steps", "flows"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "stage" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "steps": { "type": "array", "minItems": 2, "maxItems": 40, "items": { "$ref": "#/$defs/stageStep" } },
+        "flows": { "type": "array", "maxItems": 80, "items": { "$ref": "#/$defs/flow" } }
+      }
+    },
+    "decision": {
+      "description": "Chooses a path. Each path out but one has a condition; the last one is taken in every other case.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "answeredBy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "decision" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "answeredBy": { "$ref": "#/$defs/person" }
+      }
+    },
+    "human": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "answeredBy", "human"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "human" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "answeredBy": { "$ref": "#/$defs/person" },
+        "lock": { "$ref": "#/$defs/lock" },
+        "rules": { "$ref": "#/$defs/rules" },
+        "documents": { "$ref": "#/$defs/documents" },
+        "issue": { "type": "string", "maxLength": 40 },
+        "human": { "$ref": "#/$defs/humanTask" }
+      }
+    },
+    "humanTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["who", "question", "kind"],
+      "properties": {
+        "who": { "$ref": "#/$defs/person" },
+        "question": { "$ref": "#/$defs/line" },
+        "kind": { "enum": ["approval", "input", "checklist"] },
+        "meaning": {
+          "description": "What signing it means. Required for an approval and a checklist.",
+          "enum": ["review", "approval", "responsibility", "authorship"]
+        },
+        "checklist": { "type": "array", "minItems": 1, "maxItems": 9, "items": { "$ref": "#/$defs/line" } },
+        "fields": { "type": "array", "minItems": 1, "maxItems": 12, "items": { "$ref": "#/$defs/field" } }
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "label": { "$ref": "#/$defs/line" },
+        "type": { "enum": ["text", "number", "date", "choice", "person", "document"] },
+        "choices": { "type": "array", "minItems": 2, "maxItems": 12, "items": { "$ref": "#/$defs/line" } }
+      }
+    },
+    "wait": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "answeredBy", "wait"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "wait" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "answeredBy": { "$ref": "#/$defs/person" },
+        "lock": { "$ref": "#/$defs/lock" },
+        "documents": { "$ref": "#/$defs/documents" },
+        "wait": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "duration"],
+              "properties": { "kind": { "const": "timer" }, "duration": { "$ref": "#/$defs/duration" } }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "what", "from"],
+              "properties": {
+                "kind": { "const": "message" },
+                "what": { "$ref": "#/$defs/line" },
+                "from": { "$ref": "#/$defs/person" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "zone": {
+      "description": "What an agent may do, in the order it chooses, under the zone's rules.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "answeredBy", "rules", "steps"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "zone" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "answeredBy": { "$ref": "#/$defs/person" },
+        "lock": { "$ref": "#/$defs/lock" },
+        "rules": { "$ref": "#/$defs/rules" },
+        "steps": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "$ref": "#/$defs/agent" } }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "answeredBy", "agent"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "agent" },
+        "name": { "$ref": "#/$defs/name" },
+        "description": { "$ref": "#/$defs/text" },
+        "answeredBy": { "$ref": "#/$defs/person" },
+        "lock": { "$ref": "#/$defs/lock" },
+        "rules": { "$ref": "#/$defs/rules" },
+        "issue": { "type": "string", "maxLength": 40 },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider"],
+          "properties": {
+            "provider": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
+            "model": { "type": "string", "maxLength": 120 },
+            "tools": { "type": "array", "maxItems": 20, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" } },
+            "attempts": { "type": "integer", "minimum": 1, "maximum": 3 },
+            "timeout": { "$ref": "#/$defs/duration" }
+          }
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/name" },
+        "otherwise": { "description": "Out of a decision: the path taken in every other case.", "type": "boolean" },
+        "condition": { "$ref": "#/$defs/condition" }
+      }
+    },
+    "condition": {
+      "description": "A rule in words, and what code judges: the result of an earlier step. An approval is approved or refused; an agent step or zone succeeded or failed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "step", "outcome"],
+      "properties": {
+        "text": { "$ref": "#/$defs/line" },
+        "step": { "$ref": "#/$defs/id" },
+        "outcome": { "enum": ["approved", "refused", "succeeded", "failed"] }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "answer"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "text": { "$ref": "#/$defs/line" },
+        "answer": { "enum": ["text", "choice", "date", "person"] },
+        "choices": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "$ref": "#/$defs/line" } }
+      }
+    },
+    "leftOut": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "step", "reason"],
+      "properties": {
+        "stage": { "$ref": "#/$defs/id" },
+        "step": { "$ref": "#/$defs/stageStep" },
+        "reason": { "$ref": "#/$defs/line" }
+      }
+    }
+  }
+}
