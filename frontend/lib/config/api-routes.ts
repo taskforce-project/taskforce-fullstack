@@ -413,6 +413,27 @@ export const RULES_ROUTES = {
 } as const;
 
 /**
+ * Les processus (ADR-027) : les workflows par défaut, et les processus d'un projet, leurs versions, leur vérification,
+ * l'import et l'export en BPMN 2.0, la publication d'une version. Backend: @RequestMapping("/api/workspaces/{slug}")
+ * de ProcessController.
+ */
+export const PROCESS_ROUTES = {
+  DEFAULTS: (slug: string) => `/api/workspaces/${slug}/processes/defaults`,
+  DEFAULT_BPMN: (slug: string, key: string) =>
+    `/api/workspaces/${slug}/processes/defaults/${encodeURIComponent(key)}/bpmn`,
+  /** Les processus du projet (GET) ; publier une version (POST, le modèle). */
+  PROCESSES: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/processes`,
+  CHECK: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/processes/check`,
+  IMPORT: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/processes/import`,
+  PROCESS: (slug: string, projectId: number, key: string) =>
+    `/api/workspaces/${slug}/projects/${projectId}/processes/${encodeURIComponent(key)}`,
+  VERSION: (slug: string, projectId: number, key: string, version: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/processes/${encodeURIComponent(key)}/versions/${version}`,
+  VERSION_BPMN: (slug: string, projectId: number, key: string, version: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/processes/${encodeURIComponent(key)}/versions/${version}/bpmn`,
+} as const;
+
+/**
  * Où TaskForce range ce qu'il écrit (R156) : la cible de l'espace et celle d'un projet, les documents rangés et leur
  * lien. Backend: @RequestMapping("/api/workspaces/{slug}") de StorageController.
  */
