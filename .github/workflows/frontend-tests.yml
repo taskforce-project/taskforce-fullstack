@@ -9,6 +9,8 @@ on:
       - 'fix/**'
     paths:
       - 'frontend/**'
+      # L'export BPMN des processus : bpmn-moddle le relit et le réécrit (frontend/lib/process/bpmn-moddle.test.ts).
+      - 'contracts/process/**'
       - '.github/workflows/frontend-tests.yml'
   pull_request:
     branches:
@@ -16,6 +18,7 @@ on:
       - dev
     paths:
       - 'frontend/**'
+      - 'contracts/process/**'
 
 jobs:
   test:

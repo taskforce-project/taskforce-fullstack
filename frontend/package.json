@@ -80,6 +80,7 @@
     "@types/three": "^0.184.1",
     "@vitejs/plugin-react": "^5.2.0",
     "@vitest/coverage-v8": "^4.1.12",
+    "bpmn-moddle": "^10.3.1",
     "eslint": "^9",
     "eslint-config-next": "^16.4.3",
     "happy-dom": "^21.0.4",
