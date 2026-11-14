@@ -112,6 +112,16 @@ class StompAuthInterceptorTest {
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
+    private Message<byte[]> send(String destination, String principalUserId) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SEND);
+        accessor.setLeaveMutable(true);
+        accessor.setDestination(destination);
+        if (principalUserId != null) {
+            accessor.setUser(new UsernamePasswordAuthenticationToken(principalUserId, null, java.util.List.of()));
+        }
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    }
+
     @Test
     @DisplayName("un message non-STOMP passe tel quel")
     void non_stomp_passes_through() {
@@ -342,6 +352,64 @@ class StompAuthInterceptorTest {
             Message<byte[]> msg = subscribe(destination, "7");
 
             assertThat(interceptor.preSend(msg, channel)).isSameAs(msg);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("SEND : un client ne publie sur aucune destination du broker")
+    class Send {
+
+        @ParameterizedTest(name = "{0} → REFUSÉ")
+        @ValueSource(strings = {
+            "/topic/projects.3", "/topic/projects.3.analysis", "/topic/notifications.7", "/topic/cortex.7",
+            "/topic/x", "/topic/*", "/topic", "/topic/", "/topicx",
+            "/queue/x", "/queue/notifications.7", "/queue", "/queuex",
+            "/user/queue/x", "/user/7/queue/notifications", "/user/7/topic/projects.3", "/user"
+        })
+        @DisplayName("un SEND sous /topic, /queue ou /user → REFUSÉ, même pour un membre")
+        void a_send_to_a_broker_destination_is_rejected(String destination) {
+            assertThatThrownBy(() -> interceptor.preSend(send(destination, "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessage("Sending to this destination is not allowed");
+            verifyNoInteractions(realtimeAuth);
+        }
+
+        @Test
+        @DisplayName("un SEND sans destination → REFUSÉ")
+        void a_send_without_destination_is_rejected() {
+            assertThatThrownBy(() -> interceptor.preSend(send(null, "7"), channel))
+                .isInstanceOf(MessageDeliveryException.class)
+                .hasMessage("Sending to this destination is not allowed");
+            verifyNoInteractions(realtimeAuth);
+        }
+
+        @Test
+        @DisplayName("un SEND vers le préfixe de l'app (/app) n'est pas visé : il passe")
+        void a_send_to_the_app_prefix_is_not_concerned() {
+            Message<byte[]> msg = send("/app/x", "7");
+
+            assertThat(interceptor.preSend(msg, channel)).isSameAs(msg);
+        }
+
+        @Test
+        @DisplayName("un membre se connecte et s'abonne comme avant")
+        void a_member_still_connects_and_subscribes() {
+            Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").claim("email", "dev@it.dev").build();
+            when(jwtDecoder.decode("tok")).thenReturn(jwt);
+            when(identityResolver.resolveEmail(jwt)).thenReturn("dev@it.dev");
+            when(userRepository.findByEmail("dev@it.dev"))
+                .thenReturn(Optional.of(User.builder().id(7L).email("dev@it.dev").build()));
+            when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(true);
+
+            Message<?> connected = interceptor.preSend(connect("Bearer tok"), channel);
+            String principal = SimpMessageHeaderAccessor.getUser(connected.getHeaders()).getName();
+            Message<byte[]> board = subscribe("/topic/projects.3", principal);
+            Message<byte[]> notifications = subscribe("/topic/notifications.7", principal);
+
+            assertThat(interceptor.preSend(board, channel)).isSameAs(board);
+            assertThat(interceptor.preSend(notifications, channel)).isSameAs(notifications);
+            verify(realtimeAuth).canSubscribeProject(7L, 3L);
         }
     }
 }

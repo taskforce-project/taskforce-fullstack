@@ -28,8 +28,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Authentifie les frames STOMP {@code CONNECT} et autorise les {@code SUBSCRIBE}.
- * Le client envoie {@code Authorization: Bearer <token>} dans les headers STOMP CONNECT.
+ * Authentifie les frames STOMP {@code CONNECT}, autorise les {@code SUBSCRIBE} et refuse les {@code SEND} d'un client
+ * vers les destinations du broker. Le client envoie {@code Authorization: Bearer <token>} dans les headers STOMP CONNECT.
  *
  * <p><b>Correctif {@code TF-RT-AUTH}.</b> Cette classe <i>documentait</i> son propre trou :
  * « STOMP CONNECT sans token JWT — connexion acceptée sans authentification », puis {@code return} —
@@ -63,6 +63,11 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     private static final Pattern PATTERN_CHARACTERS = Pattern.compile("[*?{}#]");
     /** Ancien flux d'analyse IA par espace, {@code /topic/analysis.{workspaceId}} : retiré, tout abonnement est refusé. */
     private static final String RETIRED_ANALYSIS_PREFIX = "/topic/analysis.";
+    /**
+     * Les destinations que le broker remet à leurs abonnés : {@code /topic} et {@code /queue}, et {@code /user}, qui s'y
+     * résout. Seul le serveur y publie. Le préfixe se compare comme le broker le compare : au début de la destination.
+     */
+    private static final List<String> BROKER_PREFIXES = List.of("/topic", "/queue", "/user");
 
     private final JwtDecoder                   jwtDecoder;
     private final UserRepository               userRepository;
@@ -81,8 +86,22 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             accessor.setUser(authenticateConnect(accessor));
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             authorizeSubscribe(accessor);
+        } else if (StompCommand.SEND.equals(accessor.getCommand())) {
+            refuseSendToBroker(accessor);
         }
         return message;
+    }
+
+    /**
+     * Un client ne publie sur aucune destination du broker : un {@code SEND} sous {@code /topic}, {@code /queue} ou
+     * {@code /user}, ou sans destination, est refusé. Le serveur seul y publie ; le front n'envoie aucun {@code SEND}.
+     */
+    private void refuseSendToBroker(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || BROKER_PREFIXES.stream().anyMatch(destination::startsWith)) {
+            log.warn("STOMP SEND refusé sur {} : seul le serveur publie sur les destinations du broker", destination);
+            throw new MessageDeliveryException("Sending to this destination is not allowed");
+        }
     }
 
     /** @return le Principal authentifié — ne rend jamais {@code null} : tout échec lève. */
