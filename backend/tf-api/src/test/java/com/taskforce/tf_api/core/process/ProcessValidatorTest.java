@@ -651,7 +651,7 @@ public class ProcessValidatorTest {
             .extracting(Problem::message).isEqualTo("“Write the module's scope” names someone who isn't a member of the "
                 + "workspace.");
         assertThat(problems).filteredOn(p -> p.code().equals("unknownRule")).extracting(Problem::message)
-            .contains("“Draft the specification” follows a rule that doesn't exist in this workspace: search-files.");
+            .contains("“Draft the specification” follows a rule that doesn't apply to this project: search-files.");
     }
 
     @Test

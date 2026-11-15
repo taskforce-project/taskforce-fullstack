@@ -1073,8 +1073,8 @@ public final class ProcessValidator {
                 add("unknownRule", step.id(), step.name(), "“" + step.label() + "” names a rule by an identifier "
                     + "TaskForce doesn't read: " + Objects.toString(rule.ref(), "none") + ".");
             } else if (context.knownRules() != null && !context.knownRules().contains(rule.ref())) {
-                add("unknownRule", step.id(), step.name(), "“" + step.label() + "” follows a rule that doesn't exist in "
-                    + "this workspace: " + rule.ref() + ".");
+                add("unknownRule", step.id(), step.name(), "“" + step.label() + "” follows a rule that doesn't apply to "
+                    + "this project: " + rule.ref() + ".");
             }
             if (rule.version() != null && rule.version() < 1) {
                 add("unknownRule", step.id(), step.name(), "“" + step.label() + "” names a version of the rules that "

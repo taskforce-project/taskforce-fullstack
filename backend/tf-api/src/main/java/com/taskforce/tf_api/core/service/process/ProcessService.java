@@ -148,7 +148,7 @@ public class ProcessService {
         Access access = access(slug, projectId, userId);
         ProcessModel candidate = withFormat(model);
         List<ProcessValidator.Problem> problems = ProcessValidator.check(candidate,
-            context(access, current(access, candidate.key()).map(this::modelOf).orElse(null)));
+            context(access, candidate.key(), current(access, candidate.key()).map(this::modelOf).orElse(null)));
         return check(candidate, problems);
     }
 
@@ -165,7 +165,7 @@ public class ProcessService {
         }
         ProcessModel model = read.model();
         List<ProcessValidator.Problem> problems = ProcessValidator.check(model,
-            context(access, current(access, model.key()).map(this::modelOf).orElse(null)), read.foreign());
+            context(access, model.key(), current(access, model.key()).map(this::modelOf).orElse(null)), read.foreign());
         ProcessResponse.Check check = check(model, problems);
         return new ProcessResponse.Import(check.passed(), check.digest(), model, check.problems(), read.notes());
     }
@@ -187,7 +187,7 @@ public class ProcessService {
         ProcessModel candidate = withFormat(model);
         Optional<ProcessVersion> current = current(access, candidate.key());
         List<ProcessValidator.Problem> problems = new ArrayList<>(ProcessValidator.check(candidate,
-            context(access, current.map(this::modelOf).orElse(null))));
+            context(access, candidate.key(), current.map(this::modelOf).orElse(null))));
         // L'empreinte d'un processus refusé ne se calcule pas ici : il peut être trop profond pour être parcouru.
         String digest = problems.isEmpty() ? ProcessFingerprint.of(candidate) : null;
         if (digest != null && current.isPresent() && digest.equals(current.get().getDigest())) {
@@ -307,21 +307,14 @@ public class ProcessService {
 
     /**
      * Ce que le vérificateur sait de l'endroit où le processus entre : la version en vigueur de sa clé, les workflows
-     * par défaut, les règles qui s'appliquent au travail du projet sous ce processus, et les personnes de l'espace.
+     * par défaut, les règles qui s'appliquent au travail du projet sous ce processus (le paquet de ce travail, et le
+     * socle ; jamais les couches d'un autre projet ou d'un autre processus), et les personnes de l'espace.
      */
-    private ProcessValidator.Context context(Access access, ProcessModel current) {
+    private ProcessValidator.Context context(Access access, String key, ProcessModel current) {
         Set<String> known = new HashSet<>();
-        RulesBundle bundle = rules.bundleFor(access.workspace(), new Work(access.project().getId(), null, null));
+        RulesBundle bundle = rules.bundleFor(access.workspace(), new Work(access.project().getId(), key, null));
         bundle.rules().forEach(r -> known.add(r.id()));
         RulesFloor.RULES.forEach(r -> known.add(r.id()));
-        rules.currentLayers(access.workspace().getId()).values().forEach(layer -> layer.rules().forEach(r -> {
-            if (r.get("id") != null) {
-                known.add(String.valueOf(r.get("id")));
-            }
-            if (r.get("group") != null) {
-                known.add(String.valueOf(r.get("group")));
-            }
-        }));
         Set<Long> members = workspaceMembers.findByWorkspaceId(access.workspace().getId()).stream()
             .map(m -> m.getUser().getId()).collect(Collectors.toSet());
         return new ProcessValidator.Context(current == null ? List.of() : List.of(current), defaults.byKey(), known,

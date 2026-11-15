@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -28,11 +29,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.response.ProcessResponse;
 import com.taskforce.tf_api.core.enums.ProjectRole;
+import com.taskforce.tf_api.core.enums.RuleScope;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
+import com.taskforce.tf_api.core.model.HarnessRuleSet;
 import com.taskforce.tf_api.core.model.ProcessDefinition;
 import com.taskforce.tf_api.core.model.ProcessVersion;
 import com.taskforce.tf_api.core.model.Project;
@@ -257,7 +261,7 @@ class ProcessServiceTest {
         assertThat(refused.refused().problems()).extracting(ProcessResponse.Problem::code)
             .containsExactlyInAnyOrder("noOwner", "unknownRule");
         assertThat(refused.refused().problems()).extracting(ProcessResponse.Problem::message)
-            .contains("“Build the module” follows a rule that doesn't exist in this workspace: no-such-rule.");
+            .contains("“Build the module” follows a rule that doesn't apply to this project: no-such-rule.");
         verify(versions, never()).saveAndFlush(any());
         verify(definitions, never()).saveAndFlush(any());
         verify(audit, never()).recordAfterCommit(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyMap());
@@ -369,6 +373,33 @@ class ProcessServiceTest {
             assertThat(p.code()).isEqualTo("notInSubset");
             assertThat(p.message()).startsWith("“Which suppliers?” takes several paths at once");
         });
+    }
+
+    private HarnessRuleSet layer(RuleScope scope, Project on, String processKey, String rule) {
+        return HarnessRuleSet.builder().workspace(ws).version(1).scope(scope).project(on).processKey(processKey)
+            .rules(List.of(Map.of("id", rule, "effect", "deny", "when", Map.of("action", "repo.push")))).build();
+    }
+
+    @Test
+    @DisplayName("le vérificateur ne connaît que les règles qui s'appliquent à ce projet et à ce processus")
+    void only_the_rules_that_apply_here() {
+        Project other = Project.builder().id(99L).name("Other").workspace(ws).build();
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(
+            layer(RuleScope.PROJECT, other, null, "billing-only"),
+            layer(RuleScope.PROCESS, null, "other-process", "other-process-only"),
+            layer(RuleScope.PROJECT, project, null, "this-project-only"),
+            layer(RuleScope.PROCESS, null, "integrate-a-module", "this-process-only")));
+        ObjectNode model = derived();
+        ArrayNode refs = (ArrayNode) ProcessValidatorTest.step(model, "spec-zone").get("rules");
+        for (String ref : List.of("billing-only", "other-process-only", "this-project-only", "this-process-only")) {
+            refs.addObject().put("ref", ref);
+        }
+
+        ProcessResponse.Check check = service.check("acme", PROJECT, model(model), MEMBER);
+
+        assertThat(check.problems()).extracting(ProcessResponse.Problem::message).containsExactlyInAnyOrder(
+            "“Draft the specification” follows a rule that doesn't apply to this project: billing-only.",
+            "“Draft the specification” follows a rule that doesn't apply to this project: other-process-only.");
     }
 
     /** Un processus de {@code levels} phases emboîtées, construit sans récursion. */
