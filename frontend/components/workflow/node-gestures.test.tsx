@@ -30,6 +30,8 @@ describe("nodeCan", () => {
     expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1, { status: "FAILED", error: "x" }))]), ME, [agent]).retry).toBe(true)
     expect(nodeCan(nodeOf([]), ME, [agent]).handToAgent).toBe(true)
     expect(nodeCan(nodeOf([]), ME, [{ ...agent, ready: false }]).handToAgent).toBe(false)
+    // Un membre en lecture seule ne déplace pas, et ne confie pas à un agent : deux écritures (R159, L6).
+    expect(nodeCan(nodeOf([]), ME, [agent], false)).toMatchObject({ move: false, handToAgent: false })
   })
 })
 

@@ -33,7 +33,13 @@ export interface NodeCan {
   readonly move: boolean
 }
 
-export function nodeCan(node: WorkflowNode, me: string | number | null | undefined, agents: readonly DeliveryProvider[]): NodeCan {
+/**
+ * Ce que la personne peut faire du nœud. `canWrite` : son droit d'écrire dans le projet (`canWriteProject`) ; sans lui,
+ * ni déplacer, ni confier à un agent, deux écritures que le serveur refuserait à un membre en lecture seule.
+ */
+export function nodeCan(
+  node: WorkflowNode, me: string | number | null | undefined, agents: readonly DeliveryProvider[], canWrite = true,
+): NodeCan {
   const run = node.run?.run ?? null
   const active = run !== null && (run.status === "RUNNING" || run.status === "QUEUED")
   const mine = run !== null && isMine(run, me)
@@ -43,8 +49,8 @@ export function nodeCan(node: WorkflowNode, me: string | number | null | undefin
     // Relancer : un échec de sa mission, après avoir lu la cause.
     retry: node.state === "failed" && mine,
     // Confier : une issue pas commencée, sans mission en cours, quand un agent est prêt pour ce projet.
-    handToAgent: !active && (node.state === "notStarted" || node.state === "stopped") && agents.some((a) => a.available && a.ready),
-    move: true,
+    handToAgent: canWrite && !active && (node.state === "notStarted" || node.state === "stopped") && agents.some((a) => a.available && a.ready),
+    move: canWrite,
   }
 }
 

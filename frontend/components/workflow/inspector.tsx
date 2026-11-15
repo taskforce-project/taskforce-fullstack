@@ -56,7 +56,7 @@ function Row({ label, children }: Readonly<{ label: string; children: ReactNode 
  */
 export function Inspector({
   slug, projectId, node, model, stages, agents, agent, me, tab, onTab, mode, width, onResize, onClose, onSelect, onOpen,
-  onOpenMission, gestures, menuOpen, onMenuOpen, now, focusRun = null,
+  onOpenMission, gestures, menuOpen, onMenuOpen, now, focusRun = null, canWrite = true,
 }: Readonly<{
   slug: string
   projectId: number
@@ -81,6 +81,8 @@ export function Inspector({
   now: Date
   /** Une mission que l'adresse nomme (`run-{id}`) : Activity et Evidence montrent celle-là, même plus ancienne. */
   focusRun?: ProjectRun | null
+  /** La personne peut écrire dans le projet : déplacer, confier à un agent. */
+  canWrite?: boolean
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
   const earlier = focusRun !== null && focusRun.run.id !== node.run?.run.id ? focusRun : null
@@ -93,7 +95,7 @@ export function Inspector({
     )
     : null
   const word = t.state[node.state]
-  const can = nodeCan(node, me, agents)
+  const can = nodeCan(node, me, agents, canWrite)
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault()

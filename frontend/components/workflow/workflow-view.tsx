@@ -25,9 +25,11 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useScreenStore } from "@/lib/store/screen-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { INSPECTOR_DEFAULT, useWorkflowViewStore } from "@/lib/store/workflow-view-store"
 import { replaceQuery } from "@/lib/window/address"
 import { buildWorkflow, issueKey, resolveNode, todayKey, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
+import { canWriteProject } from "@/lib/workflow/rights"
 import {
   governanceOf, nodeAction, nodeSentence, whoActs, type NodeAction, type SentenceTexts, type WorkflowTexts,
 } from "@/lib/workflow/sentence"
@@ -101,7 +103,10 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const runs = useDeliveryStore((s) => s.projectRuns[projectId]?.rows)
   const providers = useDeliveryStore((s) => s.projectProviders[projectId] ?? NO_PROVIDERS)
   const objective = useProjectStore((s) => s.objectives[projectId])
-  const projectStart = useProjectStore((s) => s.projects.find((p) => p.id === projectId)?.createdAt ?? null)
+  const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
+  const projectStart = project?.createdAt ?? null
+  const workspaceMembers = useWorkspaceStore((s) => s.members)
+  const canWrite = canWriteProject(project, me, workspaceMembers)
   const densities = useWorkflowViewStore((s) => s.densities)
   const setDensity = useWorkflowViewStore((s) => s.setDensity)
   const inspectorWidth = useWorkflowViewStore((s) => s.inspectorWidths[person] ?? INSPECTOR_DEFAULT)
@@ -412,6 +417,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             onMenuOpen={setMenuOpen}
             now={now}
             focusRun={focusRun}
+            canWrite={canWrite}
           />
         )}
       </div>
