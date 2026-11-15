@@ -266,6 +266,47 @@ public class ProcessValidatorTest {
             refusal("noName", "un processus sans nom", r -> r.remove("name")),
             refusal("noName", "une étape sans nom", r -> step(r, "write-scope").remove("name")),
             refusal("tooLong", "un nom trop long", r -> step(r, "write-scope").put("name", "x".repeat(201))),
+            // Les bornes du brouillon, tenues pour tout ce qui entre (R159, L6).
+            refusal("tooLong", "le modèle d'un agent trop long",
+                r -> ((ObjectNode) step(r, "draft-spec").get("agent")).put("model", "m".repeat(121))),
+            refusal("tooLong", "ce qui verrouille une étape, trop long",
+                r -> step(r, "write-scope").putObject("lock").put("by", "author").put("ref", "r".repeat(81))),
+            refusal("tooLong", "un choix trop long", r -> {
+                ObjectNode field = (ObjectNode) step(r, "write-scope").get("human").get("fields").get(0);
+                field.put("type", "choice").putArray("choices").add("Soon").add("c".repeat(301));
+            }),
+            refusal("tooLong", "le nom d'un chemin trop long", r -> flow(r, "requested-frame").put("name", "n".repeat(201))),
+            refusal("tooMany", "vingt et une règles", r -> {
+                ArrayNode rules = step(r, "spec-zone").putArray("rules");
+                for (int i = 0; i < 21; i++) {
+                    rules.addObject().put("ref", "rule-" + i);
+                }
+            }),
+            refusal("tooMany", "onze documents", r -> {
+                ArrayNode documents = step(r, "write-scope").putArray("documents");
+                for (int i = 0; i < 11; i++) {
+                    documents.add("Document " + i);
+                }
+            }),
+            refusal("tooMany", "treize champs", r -> {
+                ArrayNode fields = ((ObjectNode) step(r, "write-scope").get("human")).putArray("fields");
+                for (int i = 0; i < 13; i++) {
+                    fields.addObject().put("id", "field-" + i).put("label", "Field " + i).put("type", "text");
+                }
+            }),
+            refusal("tooMany", "treize choix", r -> {
+                ObjectNode field = (ObjectNode) step(r, "write-scope").get("human").get("fields").get(0);
+                ArrayNode choices = field.put("type", "choice").putArray("choices");
+                for (int i = 0; i < 13; i++) {
+                    choices.add("Choice " + i);
+                }
+            }),
+            refusal("tooMany", "vingt et un outils", r -> {
+                ArrayNode tools = ((ObjectNode) step(r, "draft-spec").get("agent")).putArray("tools");
+                for (int i = 0; i < 21; i++) {
+                    tools.add("tool-" + i);
+                }
+            }),
             refusal("badId", "un identifiant qui n'en est pas un", r -> {
                 step(r, "write-scope").put("id", "1 write");
                 flow(r, "frame-start-write-scope").put("to", "1 write");

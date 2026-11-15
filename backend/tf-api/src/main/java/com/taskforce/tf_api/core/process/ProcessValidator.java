@@ -77,6 +77,14 @@ public final class ProcessValidator {
     static final int MAX_NAME = 200;
     static final int MAX_TEXT = 2000;
     static final int MAX_LINE = 300;
+    // Les bornes du brouillon (taskforce-process-draft-1.schema.json), que le vérificateur tient pour tout ce qui entre.
+    static final int MAX_REF = 80;
+    static final int MAX_MODEL = 120;
+    static final int MAX_RULES = 20;
+    static final int MAX_DOCUMENTS = 10;
+    static final int MAX_FIELDS = 12;
+    static final int MAX_CHOICES = 12;
+    static final int MAX_TOOLS = 20;
     /** Une liste de contrôle a moins de dix lignes (Gawande, séance n°25). */
     public static final int MAX_CHECKLIST = 9;
     /** Une étape d'agent se tente trois fois au plus, puis l'incident (ADR-023). */
@@ -277,6 +285,10 @@ public final class ProcessValidator {
                         + ".");
                 } else if (flow.id().equals(model.key())) {
                     add("duplicateId", flow.id(), null, keyTaken("A path", flow.id()));
+                }
+                if (flow.name() != null && flow.name().length() > MAX_NAME) {
+                    add("tooLong", flow.id(), null, "The name of the path " + Objects.toString(flow.id(), "") + " is "
+                        + "longer than " + MAX_NAME + " characters.");
                 }
             }
         }
@@ -872,11 +884,13 @@ public final class ProcessValidator {
                 }
             }
             if (step.rules() != null) {
+                count(step, "“" + step.label() + "”", step.rules(), MAX_RULES, "rules");
                 for (RuleRef rule : step.rules()) {
                     rule(step, rule);
                 }
             }
             if (step.documents() != null) {
+                count(step, "“" + step.label() + "”", step.documents(), MAX_DOCUMENTS, "documents");
                 step.documents().forEach(d -> length(step, d, MAX_LINE, "A document “" + step.label() + "” expects"));
             }
             if (step.issue() != null && !ISSUE.matcher(step.issue()).matches()) {
@@ -905,7 +919,9 @@ public final class ProcessValidator {
                         + " times at most, then a person looks at it.");
                 }
                 duration(step, step.agent().timeout(), false);
+                length(step, step.agent().model(), MAX_MODEL, "The model of “" + step.label() + "”");
                 if (step.agent().tools() != null) {
+                    count(step, "“" + step.label() + "”", step.agent().tools(), MAX_TOOLS, "tools");
                     for (String tool : step.agent().tools()) {
                         if (!TOOL.matcher(tool).matches()) {
                             add("agentShape", step.id(), step.name(), "“" + step.label() + "” names a tool TaskForce "
@@ -968,6 +984,7 @@ public final class ProcessValidator {
                     add("humanShape", step.id(), step.name(), "“" + step.label() + "” asks for nothing: add what the "
                         + "person fills in.");
                 } else {
+                    count(step, "“" + step.label() + "”", human.fields(), MAX_FIELDS, "fields");
                     Set<String> ids = new HashSet<>();
                     for (Field field : human.fields()) {
                         field(step, field, ids);
@@ -993,6 +1010,11 @@ public final class ProcessValidator {
             } else if ("choice".equals(field.type()) && (field.choices() == null || field.choices().size() < 2)) {
                 add("fieldShape", step.id(), step.name(), "The field “" + label + "” of “" + step.label() + "” is a "
                     + "choice: give two choices at least.");
+            }
+            if (field.choices() != null) {
+                count(step, "The field “" + label + "” of “" + step.label() + "”", field.choices(), MAX_CHOICES,
+                    "choices");
+                field.choices().forEach(c -> length(step, c, MAX_LINE, "A choice of “" + label + "”"));
             }
         }
 
@@ -1025,6 +1047,7 @@ public final class ProcessValidator {
         }
 
         private void lock(Step step, Lock lock) {
+            length(step, lock.ref(), MAX_REF, "What locks “" + step.label() + "”");
             if (lock.by() == null || !ProcessModel.LOCK_SOURCES.contains(lock.by())) {
                 add("lockShape", step.id(), step.name(), "“" + step.label() + "” is locked: say by what, TaskForce's "
                     + "floor, a rule, the workflow's author or a pause point.");
@@ -1087,6 +1110,14 @@ public final class ProcessValidator {
             if (value != null && value.length() > max) {
                 add("tooLong", step == null ? null : step.id(), step == null ? null : step.name(),
                     what + " is longer than " + max + " characters.");
+            }
+        }
+
+        /** Une liste plus longue que ce que le brouillon permet ({@code taskforce-process-draft-1.schema.json}). */
+        private void count(Step step, String subject, List<?> values, int max, String what) {
+            if (values.size() > max) {
+                add("tooMany", step.id(), step.name(), subject + " has " + values.size() + " " + what + ": " + max
+                    + " at most.");
             }
         }
 
