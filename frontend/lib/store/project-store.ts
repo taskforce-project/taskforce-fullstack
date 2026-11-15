@@ -78,8 +78,10 @@ interface ProjectState {
    * peut le changer. Un objectif sans `goal` : le projet n'en a pas.
    */
   objectives: Record<number, ProjectObjective>;
-  /** Lit l'objectif d'un projet ; `null` en cas d'échec, où celui d'avant reste. */
+  /** Lit l'objectif d'un projet ; `null` en cas d'échec, où celui d'avant reste et `objectiveReadFailed` le dit. */
   fetchObjective: (slug: string, id: number) => Promise<ProjectObjective | null>;
+  /** La dernière lecture de l'objectif de ce projet a échoué : l'en-tête dit qu'il n'a pas pu se lire, jamais qu'il n'y en a pas. */
+  objectiveReadFailed: Record<number, boolean>;
   /** Pose ou remplace l'objectif ; `null` en cas d'échec, la raison du serveur (4xx) dans `objectiveError`. */
   saveObjective: (slug: string, id: number, payload: ProjectObjectivePayload) => Promise<ProjectObjective | null>;
   /** Retire l'objectif ; `false` en cas d'échec. */
@@ -102,17 +104,22 @@ export const useProjectStore = create<ProjectState>((set) => ({
   error: null,
   objectives: {},
   objectiveError: null,
+  objectiveReadFailed: {},
 
-  clearProjects: () => set({ projects: [], activeProject: null, error: null, objectives: {}, objectiveError: null }),
+  clearProjects: () => set({ projects: [], activeProject: null, error: null, objectives: {}, objectiveError: null, objectiveReadFailed: {} }),
 
   setActiveProject: (project) => set({ activeProject: project }),
 
   fetchObjective: async (slug, id) => {
     try {
       const objective = await getProjectObjective(slug, id);
-      set((state) => ({ objectives: { ...state.objectives, [id]: objective } }));
+      set((state) => ({
+        objectives: { ...state.objectives, [id]: objective },
+        objectiveReadFailed: { ...state.objectiveReadFailed, [id]: false },
+      }));
       return objective;
     } catch {
+      set((state) => ({ objectiveReadFailed: { ...state.objectiveReadFailed, [id]: true } }));
       return null;
     }
   },

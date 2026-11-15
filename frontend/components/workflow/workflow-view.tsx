@@ -103,6 +103,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const runs = useDeliveryStore((s) => s.projectRuns[projectId]?.rows)
   const providers = useDeliveryStore((s) => s.projectProviders[projectId] ?? NO_PROVIDERS)
   const objective = useProjectStore((s) => s.objectives[projectId])
+  const objectiveFailed = useProjectStore((s) => s.objectiveReadFailed[projectId] === true)
+  const fetchObjective = useProjectStore((s) => s.fetchObjective)
   const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
   const projectStart = project?.createdAt ?? null
   const workspaceMembers = useWorkspaceStore((s) => s.members)
@@ -329,6 +331,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         slug={slug}
         projectId={projectId}
         objective={objective}
+        readFailed={objectiveFailed}
+        onRetry={() => void fetchObjective(slug, projectId)}
         projectStart={projectStart}
         counts={model.counts}
         done={model.done}

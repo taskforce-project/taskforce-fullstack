@@ -47,6 +47,18 @@ describe("ObjectiveHeader", () => {
     expect(screen.queryByRole("button", { name: "Add an objective" })).toBeNull()
   })
 
+  it("a read that failed says so and offers to read again, never « no objective yet »", () => {
+    const onRetry = vi.fn()
+    render(
+      <ObjectiveHeader slug="acme" projectId={3} objective={undefined} readFailed onRetry={onRetry} projectStart="2026-11-01T09:00:00"
+        counts={counts} done={14} total={31} filter={null} onFilter={vi.fn()} now={now} narrow={false} t={t} />,
+    )
+    expect(screen.getByText("Couldn't load the objective.")).toBeInTheDocument()
+    expect(screen.queryByText("This project has no objective yet.")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }))
+    expect(onRetry).toHaveBeenCalled()
+  })
+
   it("with one: the goal, the target date, done of total, the criteria a click away; the counters are filters", () => {
     const onFilter = vi.fn()
     header(set, onFilter)

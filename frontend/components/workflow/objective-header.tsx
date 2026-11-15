@@ -38,10 +38,15 @@ const COUNTERS: readonly { filter: WorkflowFilter; key: keyof WorkflowCounts; in
  * d'un pixel pour aujourd'hui, entre le début du projet et la date visée : l'avance ou le retard se lit à la forme, jamais
  * à un pourcentage (R56). Sans objectif, il le dit et propose de l'écrire, à qui le peut.
  */
-export function ObjectiveHeader({ slug, projectId, objective, projectStart, counts, done, total, filter, onFilter, now, narrow, t }: Readonly<{
+export function ObjectiveHeader({
+  slug, projectId, objective, readFailed = false, onRetry, projectStart, counts, done, total, filter, onFilter, now, narrow, t,
+}: Readonly<{
   slug: string
   projectId: number
   objective: ProjectObjective | undefined
+  /** La lecture de l'objectif a échoué, et aucun n'est connu : l'en-tête le dit, avec « Try again ». */
+  readFailed?: boolean
+  onRetry?: () => void
   /** Le début du projet (sa création), d'où part le trait d'aujourd'hui. */
   projectStart: string | null | undefined
   counts: WorkflowCounts
@@ -85,6 +90,15 @@ export function ObjectiveHeader({ slug, projectId, objective, projectStart, coun
               </button>
             )}
           </div>
+        ) : readFailed && !objective ? (
+          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm text-foreground">
+            <span>{o.loadFailed}</span>
+            {onRetry && (
+              <button type="button" onClick={onRetry} className="text-ink-blue underline-offset-2 hover:underline">
+                {o.retry}
+              </button>
+            )}
+          </p>
         ) : (
           <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm text-foreground">
             <span>{o.none}</span>

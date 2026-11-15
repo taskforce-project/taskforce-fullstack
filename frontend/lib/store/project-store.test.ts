@@ -420,6 +420,11 @@ describe('project-store : l’objectif d’un projet', () => {
     await act(async () => { read = await useProjectStore.getState().fetchObjective('acme', 3); });
     expect(read).toBeNull();
     expect(useProjectStore.getState().objectives[3]).toEqual(objective);
+    // L'échec se garde, pour que l'en-tête le dise ; une lecture réussie l'efface.
+    expect(useProjectStore.getState().objectiveReadFailed[3]).toBe(true);
+    vi.mocked(svc.getProjectObjective).mockResolvedValue(objective);
+    await act(async () => { await useProjectStore.getState().fetchObjective('acme', 3); });
+    expect(useProjectStore.getState().objectiveReadFailed[3]).toBe(false);
   });
 
   it('pose l’objectif ; un refus du serveur garde sa raison', async () => {

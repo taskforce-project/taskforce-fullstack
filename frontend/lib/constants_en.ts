@@ -411,6 +411,8 @@ export const CONSTANTS_EN = {
     },
     objective: {
       none: "This project has no objective yet.",
+      loadFailed: "Couldn't load the objective.",
+      retry: "Try again",
       add: "Add an objective",
       change: "Change the objective",
       remove: "Remove the objective",
