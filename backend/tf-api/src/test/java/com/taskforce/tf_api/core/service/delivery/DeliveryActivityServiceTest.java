@@ -327,6 +327,40 @@ class DeliveryActivityServiceTest {
         assertThat(approval.getScope()).isEqualTo("ONCE");
     }
 
+    @ParameterizedTest(name = "accord={0} : la raison entre au dossier avec la décision")
+    @CsvSource({"true, ALLOWED", "false, DENIED"})
+    void the_reason_of_a_decision_reaches_the_evidence_trimmed(boolean allow, String decision) {
+        DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        String scope = service.decide("acme", 100L, 9L, allow, false, "  The build only reads the lock file  ", 7L);
+
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        assertThat(data.getValue()).containsEntry("decision", decision).containsEntry("scope", "ONCE")
+            .containsEntry("reason", "The build only reads the lock file");
+        // Rien d'autre ne change : la même décision, la même portée, la même personne.
+        assertThat(scope).isEqualTo("ONCE");
+        assertThat(approval.getStatus()).isEqualTo(allow ? DeliveryApprovalStatus.ALLOWED : DeliveryApprovalStatus.DENIED);
+        assertThat(approval.getDecidedBy()).isEqualTo(delegator);
+        verify(feed).approval(run, approval);
+    }
+
+    @ParameterizedTest(name = "raison « {0} » : rien au dossier")
+    @CsvSource(value = {"'   '", "''", "NULL"}, nullValues = "NULL")
+    void a_blank_reason_stays_out_of_the_evidence(String reason) {
+        DeliveryRunApproval approval = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(approval));
+        when(userRepository.getReferenceById(7L)).thenReturn(delegator);
+
+        service.decide("acme", 100L, 9L, true, true, reason, 7L);
+
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService).append(eq(run), eq("human.decision"), any(), data.capture());
+        assertThat(data.getValue()).doesNotContainKey("reason").containsEntry("decision", "ALLOWED").containsEntry("scope", "MISSION");
+    }
+
     @ParameterizedTest(name = "accord={0}, pour la mission={1} : portée {2}")
     @CsvSource({
         "true,  true,  MISSION", // R46 : le runner ne redemande plus ce que la même règle demande

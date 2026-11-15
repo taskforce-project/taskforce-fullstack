@@ -326,15 +326,31 @@ class DeliveryControllerWebMvcTest {
         var a = auth();
         String body = scope == null ? "{\"decision\":\"" + decision + "\"}"
             : "{\"decision\":\"" + decision + "\",\"scope\":\"" + scope + "\"}";
-        // La réponse dit ce que le service a enregistré, pas seulement ce que la personne a demandé.
-        when(activityService.decide("acme", 100L, 9L, allow, forMission, 7L)).thenReturn(stored);
+        // La réponse dit ce que le service a enregistré, pas seulement ce que la personne a demandé. Sans raison donnée,
+        // le service n'en reçoit pas.
+        when(activityService.decide("acme", 100L, 9L, allow, forMission, null, 7L)).thenReturn(stored);
 
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value(message));
 
-        verify(activityService).decide("acme", 100L, 9L, allow, forMission, 7L);
+        verify(activityService).decide("acme", 100L, 9L, allow, forMission, null, 7L);
+    }
+
+    @Test
+    @DisplayName("POST approval avec une raison : elle va au service telle qu'écrite, la décision ne change pas")
+    void decide_passes_the_reason() throws Exception {
+        var a = auth();
+        when(activityService.decide("acme", 100L, 9L, false, false, " Touches the billing module ", 7L)).thenReturn("ONCE");
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"DENY\",\"reason\":\" Touches the billing module \"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Action denied"));
+
+        verify(activityService).decide("acme", 100L, 9L, false, false, " Touches the billing module ", 7L);
     }
 
     @ParameterizedTest(name = "POST approval : {0} refusé (400)")
@@ -348,7 +364,27 @@ class DeliveryControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content(body))
             .andExpect(status().isBadRequest());
 
-        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), anyBoolean(), any());
+        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), anyBoolean(), any(), any());
+    }
+
+    @Test
+    @DisplayName("POST approval : une raison de plus de 500 caractères → 400, rien n'est décidé ; 500 passent")
+    void decide_rejects_a_reason_too_long() throws Exception {
+        var a = auth();
+        when(activityService.decide(anyString(), anyLong(), anyLong(), anyBoolean(), anyBoolean(), anyString(), anyLong()))
+            .thenReturn("ONCE");
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"ALLOW\",\"reason\":\"" + "r".repeat(501) + "\"}"))
+            .andExpect(status().isBadRequest());
+        verify(activityService, never()).decide(any(), any(), any(), anyBoolean(), anyBoolean(), any(), any());
+
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/approvals/9").with(a)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"ALLOW\",\"reason\":\"" + "r".repeat(500) + "\"}"))
+            .andExpect(status().isOk());
+        verify(activityService).decide("acme", 100L, 9L, true, false, "r".repeat(500), 7L);
     }
 
     // --------------------------------------------------------------------- carte de résultat (R78)

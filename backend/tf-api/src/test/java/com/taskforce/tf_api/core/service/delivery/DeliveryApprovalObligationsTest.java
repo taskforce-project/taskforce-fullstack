@@ -222,6 +222,23 @@ class DeliveryApprovalObligationsTest {
     }
 
     @Test
+    @DisplayName("une signature qui attend celles des autres garde aussi sa raison au dossier, sans les espaces autour")
+    void aSignatureKeepsItsReason() {
+        companyRule(Map.of("action", "file.write"), Map.of("signatures", 2, "separate", true));
+        service.openApproval(run, "Edit", "src/accounting/ledger.ts", false, editInAccounting());
+        DeliveryRunApproval approval = opened();
+
+        assertThat(service.decide("acme", 100L, 9L, true, false, "  Checked with the auditors  ", 5L)).isNull();
+
+        assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.PENDING);
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(evidenceService).append(eq(run), eq("human.decision"), any(), data.capture());
+        assertThat(data.getValue()).containsEntry("decision", "SIGNED").containsEntry("signatures", 1)
+            .containsEntry("reason", "Checked with the auditors");
+    }
+
+    @Test
     @DisplayName("une règle de l'entreprise lie : accordée « pour la mission », elle ne vaut qu'une fois, et l'écran le sait")
     void aCompanyRuleIsAllowedOnceOnly() {
         companyRule(Map.of("action", "file.write", "path", "**/accounting/**"), Map.of());
