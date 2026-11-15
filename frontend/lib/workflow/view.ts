@@ -68,8 +68,14 @@ export function columnRows(stage: StageModel, options: ColumnOptions): ColumnRow
     visible.push(flat && node.depth === 1 ? { ...node, depth: 0, parentKey: null } : node)
   }
 
-  const active = visible.filter((node) => !TERMINAL.has(node.state))
-  const finished = visible.filter((node) => TERMINAL.has(node.state))
+  // Un parent et ses sous-issues ne se séparent pas : dès que l'un d'eux est actif (une sous-issue repliée comprise), tout
+  // le groupe reste dans la partie active de la colonne, et la sous-issue ne part pas loin de son parent.
+  const groupOf = (node: WorkflowNode) => (!flat && node.depth === 1 && node.parentKey ? node.parentKey : node.key)
+  const activeGroups = new Set<string>()
+  for (const node of nodes) if (!TERMINAL.has(node.state)) activeGroups.add(groupOf(node))
+  const isActive = (node: WorkflowNode) => activeGroups.has(groupOf(node))
+  const active = visible.filter(isActive)
+  const finished = visible.filter((node) => !isActive(node))
   const selectedAt = (list: readonly WorkflowNode[]) => (selected ? list.findIndex((node) => node.key === selected) : -1)
   const showAll = options.showAll || selectedAt(active) >= MORE_AFTER
   const showDone = options.showDone || selectedAt(finished) >= DONE_SHOWN

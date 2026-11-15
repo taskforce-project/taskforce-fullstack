@@ -52,6 +52,15 @@ describe("les lignes d'une colonne", () => {
     expect(columnRows(stage, { ...options, selectedKey: hidden }).some((row) => row.key === hidden)).toBe(true)
   })
 
+  it("un parent et ses sous-issues restent ensemble : une sous-issue active garde son parent fini près d'elle", () => {
+    const parentRef = { id: 1, sequenceNumber: 1, identifier: "WEB-1", title: "Issue 1", status: DONE }
+    const issues = [issue(1, { status: DONE }), issue(2, { status: DONE, parent: parentRef }), issue(3, { status: DONE })]
+    const runs = [projectRun(deliveryRun(1, 2, { status: "FAILED", error: "Tests failed" }))]
+    const stage = buildWorkflow({ ...base, issues, runs }).stages[2]
+    expect(stage.nodes.map((node) => node.state)).toEqual(["done", "failed", "done"])
+    expect(keysOf(columnRows(stage, options))).toEqual(["issue-1", "issue-2", "issue-3"])
+  })
+
   it("en Summary, seules les exceptions gardent une carte : Needs you, Failed, Missing, Blocked, et ce qui a passé sa date", () => {
     const a = issue(1)
     const b = issue(2)
