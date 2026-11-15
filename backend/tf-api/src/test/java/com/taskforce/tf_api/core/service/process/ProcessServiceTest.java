@@ -371,6 +371,33 @@ class ProcessServiceTest {
         });
     }
 
+    /** Un processus de {@code levels} phases emboîtées, construit sans récursion. */
+    static ProcessModel nested(int levels) {
+        ProcessModel.Step inner = null;
+        for (int i = levels; i >= 1; i--) {
+            inner = new ProcessModel.Step("stage-" + i, ProcessModel.STAGE, "Stage " + i, null, null, null, null, null,
+                null, null, null, null, null, null, null, inner == null ? null : List.of(inner), null);
+        }
+        return new ProcessModel(ProcessModel.FORMAT, "deep", "Deep", null, null, List.of(inner), null);
+    }
+
+    @Test
+    @DisplayName("un processus trop profond se refuse en une phrase, sans être parcouru ni avoir d'empreinte")
+    void too_deep() {
+        ProcessModel deep = nested(5000);
+
+        ProcessResponse.Check check = service.check("acme", PROJECT, deep, MEMBER);
+        ProcessResponse.Publication publication = service.publish("acme", PROJECT, deep, LEAD);
+
+        assertThat(check.passed()).isFalse();
+        assertThat(check.digest()).isNull();
+        assertThat(check.problems()).singleElement().extracting(ProcessResponse.Problem::code).isEqualTo("tooDeep");
+        assertThat(publication.version()).isNull();
+        assertThat(publication.refused().problems()).extracting(ProcessResponse.Problem::code)
+            .containsExactly("tooDeep");
+        verify(versions, never()).saveAndFlush(any());
+    }
+
     @Test
     @DisplayName("vérifier n'écrit rien")
     void checking_writes_nothing() {

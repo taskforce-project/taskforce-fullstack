@@ -67,6 +67,11 @@ public final class ProcessValidator {
     /** Le plus grand processus qu'on vérifie : au-delà, il se découpe. */
     public static final int MAX_STEPS = 300;
     public static final int MAX_FLOWS = 600;
+    /**
+     * La plus grande profondeur d'étapes qu'on lit : un processus en a trois (ses phases, leurs étapes et leurs zones,
+     * les étapes d'une zone) ; au-delà de huit, rien ne se parcourt, ni pour vérifier ni pour calculer l'empreinte.
+     */
+    public static final int MAX_DEPTH = 8;
     static final int MAX_NAME = 200;
     static final int MAX_TEXT = 2000;
     static final int MAX_LINE = 300;
@@ -137,6 +142,22 @@ public final class ProcessValidator {
         return new Run(model, context == null ? Context.NONE : context).check(foreign == null ? List.of() : foreign);
     }
 
+    /**
+     * La profondeur des étapes d'un processus (1 pour les siennes, 2 pour celles d'une phase...), lue sans récursion et
+     * jamais au-delà de {@link #MAX_DEPTH} plus un : un modèle trop profond ne se parcourt pas.
+     */
+    public static int depth(ProcessModel model) {
+        int depth = 0;
+        List<Step> level = model.stepsOrEmpty();
+        while (!level.isEmpty() && depth <= MAX_DEPTH) {
+            depth++;
+            List<Step> next = new ArrayList<>();
+            level.forEach(s -> next.addAll(s.stepsOrEmpty()));
+            level = next;
+        }
+        return depth;
+    }
+
     // ------------------------------------------------------------------------------------------------- une vérification
 
     private static final class Run {
@@ -163,6 +184,11 @@ public final class ProcessValidator {
             }
             // Un fichier qui sort du sous-ensemble se reprend d'abord là : le reste de ses refus en découlerait.
             if (!foreign.isEmpty()) {
+                return problems;
+            }
+            if (depth(model) > MAX_DEPTH) {
+                add("tooDeep", null, null, "This process nests its steps more than " + MAX_DEPTH + " levels deep: a "
+                    + "process holds its stages, a stage its steps and agent zones, a zone its agent steps.");
                 return problems;
             }
             if (model.format() != null && !ProcessModel.FORMAT.equals(model.format())) {

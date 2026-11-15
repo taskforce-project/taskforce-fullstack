@@ -506,7 +506,7 @@ public class ProcessValidatorTest {
         Set<String> tested = new java.util.HashSet<>();
         refusals().forEach(a -> tested.add((String) a.get()[0]));
         // Les cas écrits à part, plus bas : ceux qui demandent un contexte, un fichier importé ou un grand processus.
-        tested.addAll(Set.of("tooLarge", "lockedStepMissing", "lockedStepUnlocked", "notInSubset", "badPerson",
+        tested.addAll(Set.of("tooLarge", "tooDeep", "lockedStepMissing", "lockedStepUnlocked", "notInSubset", "badPerson",
             "unknownRule"));
         String source = java.nio.file.Files.readString(java.nio.file.Path.of(
             "src/main/java/com/taskforce/tf_api/core/process/ProcessValidator.java"));
@@ -621,6 +621,25 @@ public class ProcessValidatorTest {
             assertThat(p.code()).isEqualTo("notInSubset");
             assertThat(p.stepId()).isEqualTo("pick");
             assertThat(p.message()).startsWith("“Pick the suppliers” takes several paths at once");
+        });
+    }
+
+    @Test
+    @DisplayName("un processus trop profond se refuse en une phrase, avant tout parcours")
+    void too_deep() {
+        ObjectNode process = e20();
+        ObjectNode inner = step(process, "frame");
+        // La phase est au niveau 1 ; huit niveaux de plus la mettent à neuf, un de trop.
+        for (int i = 0; i < 8; i++) {
+            ObjectNode next = JSON.createObjectNode().put("id", "deeper-" + i).put("type", "stage").put("name", "Deeper");
+            steps(inner).add(next);
+            inner = next;
+        }
+
+        assertThat(check(process)).singleElement().satisfies(p -> {
+            assertThat(p.code()).isEqualTo("tooDeep");
+            assertThat(p.message()).isEqualTo("This process nests its steps more than 8 levels deep: a process holds its "
+                + "stages, a stage its steps and agent zones, a zone its agent steps.");
         });
     }
 

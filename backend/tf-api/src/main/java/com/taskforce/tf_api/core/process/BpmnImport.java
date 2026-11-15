@@ -60,6 +60,15 @@ public final class BpmnImport {
     /** Le plus grand fichier qu'on lit : un processus de la taille permise y tient largement. */
     public static final int MAX_CHARS = 1_000_000;
 
+    /**
+     * La plus grande profondeur d'éléments qu'on lit : un processus en tient une dizaine (le fichier, le processus, une
+     * phase, une zone, une étape, ses extensions et leurs réglages). Au-delà, le lecteur s'arrête avant de descendre.
+     */
+    public static final int MAX_DEPTH = 64;
+
+    /** La propriété de JAXP qui borne la profondeur ; son nom revient dans l'erreur du lecteur, quelle que soit sa langue. */
+    private static final String MAX_ELEMENT_DEPTH = "http://www.oracle.com/xml/jaxp/properties/maxElementDepth";
+
     /** L'extension tf:, telle que le contrat l'écrit ; une copie est dans le serveur, un test vérifie qu'elle est la même. */
     private static final Schema TF_SCHEMA = tfSchema();
 
@@ -108,6 +117,7 @@ public final class BpmnImport {
             factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
             factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            factory.setAttribute(MAX_ELEMENT_DEPTH, MAX_DEPTH);
             factory.setXIncludeAware(false);
             factory.setExpandEntityReferences(false);
             DocumentBuilder builder = factory.newDocumentBuilder();
@@ -129,6 +139,10 @@ public final class BpmnImport {
             });
             return builder.parse(new InputSource(new StringReader(xml)));
         } catch (SAXParseException e) {
+            if (Objects.toString(e.getMessage(), "").contains("maxElementDepth")) {
+                throw new Unreadable("The file nests its parts more than " + MAX_DEPTH + " levels deep: a process is "
+                    + "never that deep.");
+            }
             throw new Unreadable("The file isn't well-formed XML (line " + e.getLineNumber() + ").");
         } catch (SAXException | IOException e) {
             throw new Unreadable("The file isn't well-formed XML.");

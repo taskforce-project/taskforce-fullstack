@@ -188,8 +188,9 @@ public class ProcessService {
         Optional<ProcessVersion> current = current(access, candidate.key());
         List<ProcessValidator.Problem> problems = new ArrayList<>(ProcessValidator.check(candidate,
             context(access, current.map(this::modelOf).orElse(null))));
-        String digest = ProcessFingerprint.of(candidate);
-        if (problems.isEmpty() && current.isPresent() && digest.equals(current.get().getDigest())) {
+        // L'empreinte d'un processus refusé ne se calcule pas ici : il peut être trop profond pour être parcouru.
+        String digest = problems.isEmpty() ? ProcessFingerprint.of(candidate) : null;
+        if (digest != null && current.isPresent() && digest.equals(current.get().getDigest())) {
             problems.add(new ProcessValidator.Problem("unchanged", null, null, "Nothing changed since version "
                 + current.get().getVersion() + ": there is nothing to publish."));
         }
@@ -339,8 +340,10 @@ public class ProcessService {
             nameOf(row.getCreatedBy()), row.getCreatedAt(), model.derivedFrom(), model);
     }
 
+    /** Le résultat d'une vérification ; l'empreinte, sauf pour un modèle sans clé ou trop profond pour être parcouru. */
     private static ProcessResponse.Check check(ProcessModel model, List<ProcessValidator.Problem> problems) {
-        String digest = model.key() == null ? null : ProcessFingerprint.of(model);
+        String digest = model.key() == null || ProcessValidator.depth(model) > ProcessValidator.MAX_DEPTH ? null
+            : ProcessFingerprint.of(model);
         return new ProcessResponse.Check(problems.isEmpty(), digest, problems.stream()
             .map(p -> new ProcessResponse.Problem(p.code(), p.stepId(), p.step(), p.message())).toList());
     }

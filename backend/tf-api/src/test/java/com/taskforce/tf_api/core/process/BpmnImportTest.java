@@ -170,6 +170,16 @@ class BpmnImportTest {
     }
 
     @Test
+    @DisplayName("un fichier trop profond s'arrête au lecteur, en une phrase : rien ne descend au-delà")
+    void too_deep() {
+        int levels = 20_000;
+        String xml = file("<bpmn:subProcess id=\"s\">".repeat(levels) + "</bpmn:subProcess>".repeat(levels));
+
+        assertThatThrownBy(() -> BpmnImport.read(xml)).isInstanceOf(BpmnImport.Unreadable.class)
+            .hasMessage("The file nests its parts more than 64 levels deep: a process is never that deep.");
+    }
+
+    @Test
     @DisplayName("ce qui n'est pas un processus BPMN 2.0 lisible le dit, en mots")
     void unreadable_files() {
         assertThatThrownBy(() -> BpmnImport.read("")).hasMessage("The file is empty.");
