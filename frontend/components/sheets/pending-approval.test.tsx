@@ -86,7 +86,7 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
 
     fireEvent.click(screen.getByRole("button", { name: "Allow for this mission" }));
 
-    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, true));
+    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, true, null));
     const { toast } = await import("sonner");
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Allowed for this mission"));
   });
@@ -97,7 +97,7 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
 
     fireEvent.click(screen.getByRole("button", { name: "Refuse" }));
 
-    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, false, false));
+    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, false, false, null));
     const { toast } = await import("sonner");
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Refused: the agent goes on without it"));
   });
@@ -110,7 +110,7 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
     expect(screen.queryByRole("button", { name: "Allow for this mission" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Allow" }));
 
-    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, false));
+    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, false, null));
   });
 
   it("une décision qui lie (une règle de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois", async () => {
@@ -121,7 +121,7 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
     expect(screen.getByText(/this approval counts for this request only/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Allow" }));
 
-    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, false));
+    await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, false, null));
   });
 
   it("une décision refusée par le serveur ne dit pas qu'elle a réussi", async () => {
@@ -159,7 +159,7 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
       expect(screen.getByText(/means no/)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: "Allow for this mission" }));
-      await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, true));
+      await waitFor(() => expect(svc.decideApproval).toHaveBeenCalledWith("acme", 100, 9, true, true, null));
     });
 
     it("un coéquipier y voit seulement qu'elle attend", () => {
