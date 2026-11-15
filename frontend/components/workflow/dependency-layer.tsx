@@ -1,6 +1,6 @@
 "use client"
 
-import { useLayoutEffect, useState, type RefObject } from "react"
+import { useEffect, useState, type RefObject } from "react"
 
 import type { DependencyEdge } from "@/lib/workflow/view"
 
@@ -45,7 +45,8 @@ export function DependencyLayer({ boardRef, edges, labels }: Readonly<{
 }>) {
   const [drawn, setDrawn] = useState<readonly DrawnEdge[]>([])
 
-  useLayoutEffect(() => {
+  // Un effet après le rendu : le plateau a son élément, même quand le calque est rendu dans lui.
+  useEffect(() => {
     const board = boardRef.current
     if (!board || edges.length === 0) {
       const clear = requestAnimationFrame(() => setDrawn((was) => (was.length === 0 ? was : [])))

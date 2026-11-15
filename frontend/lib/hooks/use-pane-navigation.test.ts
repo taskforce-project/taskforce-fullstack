@@ -75,3 +75,22 @@ describe("usePaneNavigation", () => {
     ])
   })
 })
+
+// Le workflow d'un projet (séance n°25) : sa route, avec la conversation, et le nœud choisi quand il est donné.
+describe("usePaneNavigation : le workflow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    globalThis.history.replaceState(null, "", "/acme/projects/3?c=9&issue=34")
+  })
+
+  it("opens a project's workflow with the conversation only, on a node when one is given", () => {
+    const { result } = renderHook(() => usePaneNavigation())
+
+    result.current.openWorkflow(5)
+    result.current.openWorkflow(5, "issue-41")
+    expect(nav.push.mock.calls).toEqual([
+      ["/acme/projects/5/workflow?c=9", { scroll: false }],
+      ["/acme/projects/5/workflow?c=9&node=issue-41", { scroll: false }],
+    ])
+  })
+})

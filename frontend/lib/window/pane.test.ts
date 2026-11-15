@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { PROGRESS, boardPath, homePath, issuePath, paneOf, paneTitle, progressPath } from "./pane"
+import { PROGRESS, boardPath, homePath, issuePath, paneOf, paneTitle, progressPath, workflowPath } from "./pane"
 
 const SCREENS = { dashboard: "Dashboard", inbox: "Waiting for you", "my-work": "My work", project: "Project" }
 const PROJECTS = [{ id: 3, name: "Website" }]
@@ -51,5 +51,14 @@ describe("les adresses de la fenêtre", () => {
     expect(progressPath("acme")).toBe("/acme/progress")
     expect(paneOf(progressPath("acme"))).toEqual({ section: PROGRESS, projectId: null })
     expect(paneTitle({ section: PROGRESS, projectId: null }, PROJECTS, { ...SCREENS, progress: "Progress" })).toBe("Progress")
+  })
+})
+
+// Le workflow d'un projet (séance n°25, W1) : sa route, à côté du tableau, le nœud choisi dans l'adresse.
+describe("workflowPath", () => {
+  it("is the project's workflow, on a node when one is given", () => {
+    expect(workflowPath("acme", 3)).toBe("/acme/projects/3/workflow")
+    expect(workflowPath("acme", 3, "issue-4")).toBe("/acme/projects/3/workflow?node=issue-4")
+    expect(paneOf(workflowPath("acme", 3))).toEqual({ section: "projects", projectId: 3 })
   })
 })

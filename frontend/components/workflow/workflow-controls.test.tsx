@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it, vi } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { useSyncExternalStore } from "react"
+
+const address = vi.hoisted(() => {
+  const listeners = new Set<() => void>()
+  return { listeners, notify: () => listeners.forEach((listener) => listener()) }
+})
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => {
+    const search = useSyncExternalStore(
+      (listener) => { address.listeners.add(listener); return () => address.listeners.delete(listener) },
+      () => globalThis.location.search,
+      () => "",
+    )
+    return new URLSearchParams(search)
+  },
+}))
+
+import { DensitySwitch, FilterMenu, LegendDialog, LiveIndicator } from "./workflow-controls"
+import { WorkflowTitleControls } from "./workflow-title-controls"
+import type { AuthUser } from "@/lib/auth"
+import { useUserStore } from "@/lib/store/user-store"
+import { useWorkflowViewStore } from "@/lib/store/workflow-view-store"
+
+/** Ce que la ligne du titre du workflow porte (séance n°25, §3, §10). */
+describe("the workflow's title line", () => {
+  beforeEach(() => {
+    const real = History.prototype.replaceState
+    globalThis.history.replaceState = function (...args: Parameters<History["replaceState"]>) {
+      real.apply(globalThis.history, args)
+      address.notify()
+    }
+    globalThis.history.replaceState(null, "", "/acme/projects/3/workflow")
+    useUserStore.setState({ user: { id: "7" } as AuthUser })
+    useWorkflowViewStore.setState({ densities: {}, inspectorWidths: {}, legendOpen: false, live: null })
+    Object.defineProperty(globalThis.window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: true, media: query, addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+      })),
+    })
+  })
+
+  it("says the live state in a dot and a word, and nothing before the first connection", () => {
+    const { rerender, container } = render(<LiveIndicator state="connecting" readAt={null} />)
+    expect(container).toBeEmptyDOMElement()
+    rerender(<LiveIndicator state="live" readAt={null} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Live")
+    rerender(<LiveIndicator state="reconnecting" readAt={null} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Reconnecting…")
+    rerender(<LiveIndicator state="offline" readAt={new Date(2026, 10, 13, 9, 5).getTime()} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Offline. Showing 09:05.")
+    rerender(<LiveIndicator state="offline" readAt={null} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Offline. Showing --:--.")
+  })
+
+  it("chooses the density in a segmented control", () => {
+    const onChange = vi.fn()
+    render(<DensitySwitch value="plan" onChange={onChange} />)
+    expect(screen.getByRole("radiogroup", { name: "How much to show" })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: "Plan" })).toHaveAttribute("aria-checked", "true")
+    fireEvent.click(screen.getByRole("radio", { name: "Summary" }))
+    expect(onChange).toHaveBeenCalledWith("summary")
+  })
+
+  it("filters on one state at a time, and shows everything again", async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<FilterMenu value={null} onChange={onChange} />)
+    await userEvent.click(screen.getByRole("button", { name: "Filter" }))
+    await userEvent.click(screen.getByRole("menuitem", { name: /Blocked/ }))
+    expect(onChange).toHaveBeenCalledWith("blocked")
+    rerender(<FilterMenu value="blocked" onChange={onChange} />)
+    await userEvent.click(screen.getByRole("button", { name: "Filter: Blocked" }))
+    await userEvent.click(screen.getByRole("menuitem", { name: "Show everything" }))
+    expect(onChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it("the legend shows the ten states, each with its mark, its word and its meaning", () => {
+    useWorkflowViewStore.setState({ legendOpen: true })
+    render(<LegendDialog />)
+    const dialog = screen.getByRole("dialog", { name: "Legend" })
+    expect(dialog.querySelectorAll("li")).toHaveLength(10)
+    expect(screen.getByText("Waits for you: a request to decide, or a result to review.")).toBeInTheDocument()
+    expect(screen.getAllByRole("img").map((mark) => mark.getAttribute("aria-label"))).toContain("Stopped")
+  })
+
+  it("in the title line: the live state of this project, the density remembered for the person, the filter in the address", () => {
+    useWorkflowViewStore.setState({ live: { projectId: 3, state: "live", readAt: 1 } })
+    render(<WorkflowTitleControls projectId={3} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Live")
+    fireEvent.click(screen.getByRole("radio", { name: "Detail" }))
+    expect(useWorkflowViewStore.getState().densities["7"]).toBe("detail")
+    expect(globalThis.location.search).toBe("?view=detail")
+    fireEvent.click(screen.getByRole("radio", { name: "Plan" }))
+    expect(globalThis.location.search).toBe("")
+  })
+
+  it("says nothing of another project's live state", () => {
+    useWorkflowViewStore.setState({ live: { projectId: 4, state: "live", readAt: 1 } })
+    render(<WorkflowTitleControls projectId={3} />)
+    expect(screen.queryByRole("status")).toBeNull()
+  })
+})
