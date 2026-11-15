@@ -197,6 +197,28 @@ class DeliveryRunApprovalRepositoryIntegrationTest extends AbstractIntegrationTe
         assertThat(pending).extracting(DeliveryRunApproval::getStatus).containsOnly(DeliveryApprovalStatus.PENDING);
     }
 
+    @Test
+    @DisplayName("expireIfPending : une demande qui attend se clôt une fois ; une demande tranchée ne change pas")
+    void a_request_is_expired_once_and_a_decided_one_never() {
+        DeliveryRun run = persistRun(persistIssue(web, "Fix the footer"), DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        DeliveryRunApproval waiting = approvalRepository.saveAndFlush(DeliveryRunApproval.builder()
+            .run(run).tool("Bash").summary("npm install").status(DeliveryApprovalStatus.PENDING)
+            .expiresAt(LocalDateTime.now().minusMinutes(1)).build());
+        DeliveryRunApproval allowed = approvalRepository.saveAndFlush(DeliveryRunApproval.builder()
+            .run(run).tool("Bash").summary("npm test").status(DeliveryApprovalStatus.ALLOWED)
+            .expiresAt(LocalDateTime.now().minusMinutes(1)).build());
+        LocalDateTime now = LocalDateTime.now();
+
+        int first = approvalRepository.expireIfPending(waiting.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        int second = approvalRepository.expireIfPending(waiting.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        int decided = approvalRepository.expireIfPending(allowed.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        em.clear();
+
+        assertThat(List.of(first, second, decided)).containsExactly(1, 0, 0);
+        assertThat(approvalRepository.findById(waiting.getId()).orElseThrow().getStatus()).isEqualTo(DeliveryApprovalStatus.EXPIRED);
+        assertThat(approvalRepository.findById(allowed.getId()).orElseThrow().getStatus()).isEqualTo(DeliveryApprovalStatus.ALLOWED);
+    }
+
     private Notification persistNotification(User recipient, String issueIdentifier, String type) {
         return notificationRepository.saveAndFlush(Notification.builder()
             .recipient(recipient).workspace(workspace).type(type).urgency("warning").title("A title")

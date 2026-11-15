@@ -97,6 +97,9 @@ class DeliveryActivityServiceTest {
             .startedBy(delegator).build();
         lenient().when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         lenient().when(approvalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // Par défaut, la lecture qui trouve une demande échue est la seule : c'est elle qui la clôt.
+        lenient().when(approvalRepository.expireIfPending(any(), any(), eq(DeliveryApprovalStatus.PENDING),
+            eq(DeliveryApprovalStatus.EXPIRED))).thenReturn(1);
     }
 
     // --------------------------------------------------------------------- chronologie
@@ -221,6 +224,68 @@ class DeliveryActivityServiceTest {
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
         verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
         assertThat(data.getValue()).containsEntry("effect", "deny").containsEntry("reason", "No answer in time.");
+    }
+
+    @Test
+    void a_due_request_is_closed_once_when_two_reads_cross() {
+        // Deux lectures, deux transactions : chacune a sa copie de la même demande échue ; la base n'en clôt qu'une.
+        DeliveryRunApproval first = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
+        DeliveryRunApproval second = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
+        when(approvalRepository.findByIdAndRunId(9L, 100L)).thenReturn(Optional.of(first), Optional.of(second));
+        when(approvalRepository.expireIfPending(eq(9L), any(), eq(DeliveryApprovalStatus.PENDING), eq(DeliveryApprovalStatus.EXPIRED)))
+            .thenReturn(1, 0);
+
+        assertThat(service.approvalStatus(run, 9L).status()).isEqualTo("EXPIRED");
+        service.approvalStatus(run, 9L);
+
+        verify(evidenceService, org.mockito.Mockito.times(1)).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), any());
+        verify(feed, org.mockito.Mockito.times(1)).approval(eq(run), any());
+        // La lecture qui n'a rien clos ne touche pas à sa copie : rien ne s'écrira par-dessus l'autre transaction.
+        assertThat(second.getStatus()).isEqualTo(DeliveryApprovalStatus.PENDING);
+        verify(approvalRepository, never()).save(any());
+    }
+
+    @Test
+    void a_request_closed_by_another_read_is_no_longer_open_on_the_page() {
+        DeliveryRunApproval late = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
+        when(approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(java.util.Set.of(100L), DeliveryApprovalStatus.PENDING))
+            .thenReturn(List.of(late));
+        when(approvalRepository.expireIfPending(eq(9L), any(), eq(DeliveryApprovalStatus.PENDING), eq(DeliveryApprovalStatus.EXPIRED)))
+            .thenReturn(0);
+
+        assertThat(service.pendingApprovals(List.of(run), 7L)).isEmpty();
+        verify(evidenceService, never()).append(any(), any(), any(), any());
+    }
+
+    @Test
+    void answering_a_request_another_read_just_closed_says_it_expired() {
+        DeliveryRunApproval late = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
+        when(approvalRepository.findByIdAndRunIdForUpdate(9L, 100L)).thenReturn(Optional.of(late));
+        when(approvalRepository.expireIfPending(eq(9L), any(), eq(DeliveryApprovalStatus.PENDING), eq(DeliveryApprovalStatus.EXPIRED)))
+            .thenReturn(0);
+
+        assertThatThrownBy(() -> service.decide("acme", 100L, 9L, true, 7L))
+            .isInstanceOf(BusinessException.class)
+            .hasMessageContaining("expired");
+        verify(evidenceService, never()).append(any(), any(), any(), any());
+    }
+
+    @Test
+    void closing_a_run_does_not_write_twice_a_request_a_read_already_closed() {
+        DeliveryRunApproval closedElsewhere = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().minusSeconds(1));
+        DeliveryRunApproval stillOpen = DeliveryRunApproval.builder().id(10L).run(run).tool("Bash").summary("npm test")
+            .status(DeliveryApprovalStatus.PENDING).expiresAt(LocalDateTime.now().plusMinutes(5)).build();
+        when(approvalRepository.findByRunIdOrderByCreatedAtAsc(100L)).thenReturn(List.of(closedElsewhere, stillOpen));
+        when(approvalRepository.expireIfPending(eq(9L), any(), eq(DeliveryApprovalStatus.PENDING), eq(DeliveryApprovalStatus.EXPIRED)))
+            .thenReturn(0);
+
+        service.closeApprovals(run);
+
+        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
+        verify(evidenceService, org.mockito.Mockito.times(1))
+            .append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
+        assertThat(data.getValue()).containsEntry("approval", 10L).containsEntry("reason", "The mission ended before an answer.");
+        assertThat(stillOpen.getStatus()).isEqualTo(DeliveryApprovalStatus.EXPIRED);
     }
 
     @Test

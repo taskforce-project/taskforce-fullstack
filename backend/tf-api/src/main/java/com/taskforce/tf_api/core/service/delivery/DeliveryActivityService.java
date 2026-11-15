@@ -318,15 +318,22 @@ public class DeliveryActivityService {
         return toRunnerResponse(approval);
     }
 
-    /** Run terminé : ses demandes encore ouvertes ne recevront plus de réponse utile, et le dossier le dit. */
+    /**
+     * Run terminé : ses demandes encore ouvertes ne recevront plus de réponse utile, et le dossier le dit, une fois chacune
+     * (une lecture qui close la même demande au même moment ne l'écrit pas une seconde fois).
+     */
     @Transactional
     public void closeApprovals(DeliveryRun run) {
+        LocalDateTime now = LocalDateTime.now();
         for (DeliveryRunApproval approval : approvalRepository.findByRunIdOrderByCreatedAtAsc(run.getId())) {
-            if (approval.getStatus() == DeliveryApprovalStatus.PENDING) {
+            if (approval.getStatus() == DeliveryApprovalStatus.PENDING && approvalRepository.expireIfPending(approval.getId(), now,
+                    DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED) == 1) {
+                approval.setStatus(DeliveryApprovalStatus.EXPIRED);
                 recordUnanswered(run, approval, "The mission ended before an answer.");
             }
         }
-        approvalRepository.expirePending(run.getId(), LocalDateTime.now(), DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        // Une demande ouverte pendant la clôture, que la liste n'avait pas encore : close aussi.
+        approvalRepository.expirePending(run.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
         notificationService.readAgentApprovals(run.getIssue(), run.getStartedBy());
     }
 
@@ -413,8 +420,7 @@ public class DeliveryActivityService {
                 DeliveryApprovalStatus.PENDING)) {
             DeliveryRun run = running.get(approval.getRun().getId());
             if (run == null) continue;
-            expireIfDue(approval, now);
-            if (approval.getStatus() != DeliveryApprovalStatus.PENDING) continue;
+            if (!expireIfDue(approval, now)) continue;
             pending.computeIfAbsent(run.getId(), id -> new ArrayList<>()).add(approvalView(run, approval, userId));
         }
         return pending;
@@ -475,11 +481,14 @@ public class DeliveryActivityService {
                 : "Your workspace's rules ask other people to approve this request.");
         }
         LocalDateTime now = LocalDateTime.now();
-        expireIfDue(approval, now);
-        if (approval.getStatus() == DeliveryApprovalStatus.EXPIRED || run.getStatus() != DeliveryRunStatus.RUNNING) {
+        boolean open = expireIfDue(approval, now);
+        // Échue : close ici, ou par une autre lecture au même moment (la demande attend encore ici, plus en base).
+        boolean expired = approval.getStatus() == DeliveryApprovalStatus.EXPIRED
+            || (!open && approval.getStatus() == DeliveryApprovalStatus.PENDING);
+        if (expired || run.getStatus() != DeliveryRunStatus.RUNNING) {
             throw new BusinessException("This request has expired: the agent already went on without it.");
         }
-        if (approval.getStatus() != DeliveryApprovalStatus.PENDING) {
+        if (!open) {
             throw new BusinessException("This request was already answered.");
         }
         User person = userRepository.getReferenceById(userId);
@@ -536,14 +545,22 @@ public class DeliveryActivityService {
 
     // ---------------------------------------------------------------------
 
-    private void expireIfDue(DeliveryRunApproval approval, LocalDateTime now) {
-        if (approval.getStatus() == DeliveryApprovalStatus.PENDING && !now.isBefore(approval.getExpiresAt())) {
+    /**
+     * Une demande restée sans réponse au-delà de son échéance passe EXPIRED, une seule fois : la ligne ne change que si elle
+     * attend encore, et seule la lecture qui l'a close l'écrit au dossier et l'annonce. Une lecture qui en croise une autre
+     * ne touche pas à la demande. Rend vrai si la demande attend encore une réponse.
+     */
+    private boolean expireIfDue(DeliveryRunApproval approval, LocalDateTime now) {
+        if (approval.getStatus() != DeliveryApprovalStatus.PENDING) return false;
+        if (now.isBefore(approval.getExpiresAt())) return true;
+        if (approvalRepository.expireIfPending(approval.getId(), now, DeliveryApprovalStatus.PENDING,
+                DeliveryApprovalStatus.EXPIRED) == 1) {
             approval.setStatus(DeliveryApprovalStatus.EXPIRED);
-            approvalRepository.save(approval);
             recordUnanswered(approval.getRun(), approval, "No answer in time.");
             readNotificationsIfSettled(approval.getRun());
             feed.approval(approval.getRun(), approval);
         }
+        return false;
     }
 
     /** La dernière demande ouverte du run vient de se clore : ses notifications d'accord ne restent pas non lues. */
