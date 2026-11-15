@@ -43,6 +43,11 @@ public class ProjectDeliveryService {
     /** La taille d'une page quand l'appel n'en demande pas, et la plus grande qu'il peut demander. */
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 50;
+    /**
+     * La plus haute page qu'un appel peut demander : son décalage tient dans l'entier que la requête attend, et aucun
+     * projet n'a autant de missions. Une page plus haute se lit comme celle-ci, vide, au lieu d'échouer.
+     */
+    public static final int MAX_PAGE = 1_000_000;
 
     private final DeliveryRunRepository runRepository;
     private final DeliveryRunEventRepository eventRepository;
@@ -60,7 +65,8 @@ public class ProjectDeliveryService {
     public PageResponse<ProjectRunResponse> listRuns(String slug, Long projectId, int page, int size, Long userId) {
         Project project = viewableProject(slug, projectId, userId);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        Page<DeliveryRun> runs = runRepository.findByProjectId(project.getId(), PageRequest.of(Math.max(page, 0), safeSize));
+        int safePage = Math.min(Math.max(page, 0), MAX_PAGE);
+        Page<DeliveryRun> runs = runRepository.findByProjectId(project.getId(), PageRequest.of(safePage, safeSize));
         Facts facts = facts(runs.getContent(), userId);
         return PageResponse.of(runs.map(run -> row(run, facts)));
     }

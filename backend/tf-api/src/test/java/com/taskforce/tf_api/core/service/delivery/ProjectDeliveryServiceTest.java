@@ -146,8 +146,11 @@ class ProjectDeliveryServiceTest {
         "2,   50,  2,  50",
         "-1,  500, 0,  50",
         "3,   0,   3,  1",
+        "1000000,    50, 1000000, 50",
+        "1000001,    20, 1000000, 20",
+        "2147483647, 50, 1000000, 50",
     })
-    @DisplayName("la page est bornée : 50 missions au plus, jamais une page négative")
+    @DisplayName("la page est bornée : 50 missions au plus, jamais une page négative, ni une page que la requête ne sait pas lire")
     void the_page_is_bounded(int page, int size, int expectedPage, int expectedSize) {
         when(runRepository.findByProjectId(eq(12L), any(Pageable.class))).thenAnswer(call -> new PageImpl<DeliveryRun>(List.of(), call.getArgument(1), 0));
 
@@ -157,6 +160,8 @@ class ProjectDeliveryServiceTest {
         verify(runRepository).findByProjectId(eq(12L), asked.capture());
         assertThat(asked.getValue().getPageNumber()).isEqualTo(expectedPage);
         assertThat(asked.getValue().getPageSize()).isEqualTo(expectedSize);
+        // Le décalage tient dans l'entier que la requête attend : une page énorme ne fait pas échouer la lecture.
+        assertThat(asked.getValue().getOffset()).isLessThanOrEqualTo(Integer.MAX_VALUE);
         assertThat(read.getContent()).isEmpty();
         // Une page vide ne lit ni étapes, ni reprises, ni demandes.
         verifyNoInteractions(eventRepository, activityService);
