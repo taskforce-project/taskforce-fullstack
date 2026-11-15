@@ -15608,6 +15608,12 @@
           "issue": {
             "type": "string"
           },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessStep"
+            }
+          },
           "flows": {
             "type": "array",
             "items": {

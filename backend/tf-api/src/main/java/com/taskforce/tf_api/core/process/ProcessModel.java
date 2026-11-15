@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
@@ -131,7 +132,8 @@ public record ProcessModel(
         List<RuleRef> rules,
         List<String> documents,
         String issue,
-        List<Step> steps,
+        // Une étape qui tient des étapes : la référence d'API ne décrit pas seule ce type qui se contient.
+        @ArraySchema(schema = @Schema(ref = "#/components/schemas/ProcessStep")) List<Step> steps,
         List<Flow> flows) {
 
         public Step {
