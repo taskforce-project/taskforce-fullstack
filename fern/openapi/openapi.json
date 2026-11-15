@@ -169,6 +169,10 @@
       "description": "The company's rules in layers above TaskForce's floor: read them, write one in words and check its cases, add or remove it, and see what the rules would decide for an action."
     },
     {
+      "name": "Processes",
+      "description": "Processes as versioned definitions in TaskForce's own model, a subset of BPMN 2.0: the default workflows, a project's processes and their immutable versions, checking a process, reading and writing BPMN 2.0 files, and publishing a version."
+    },
+    {
       "name": "Storage",
       "description": "Where TaskForce saves what it writes, for the workspace and for a project: TaskForce, a folder on the computer, Google Drive, OneDrive or SharePoint; the documents saved and their link; what Google's picker and the OneDrive folder browser need."
     },
@@ -1952,6 +1956,190 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseProjectResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/processes": {
+      "get": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "listProcesses",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "publishProcess",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishProcessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessPublication"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/processes/import": {
+      "post": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "importProcess",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportProcessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessImport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/processes/check": {
+      "post": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "checkProcess",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishProcessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessCheck"
                 }
               }
             }
@@ -9016,6 +9204,165 @@
         }
       }
     },
+    "/api/workspaces/{slug}/projects/{projectId}/processes/{key}": {
+      "get": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "getProcess",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/processes/{key}/versions/{version}": {
+      "get": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "getProcessVersion",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessVersion"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/projects/{projectId}/processes/{key}/versions/{version}/bpmn": {
+      "get": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "exportProcessVersion",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/projects/{projectId}/issues/{issueId}/cycles": {
       "get": {
         "tags": [
@@ -9480,6 +9827,74 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponseProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/processes/defaults": {
+      "get": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "listDefaultProcesses",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseListProcessDefault"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/processes/defaults/{key}/bpmn": {
+      "get": {
+        "tags": [
+          "Processes"
+        ],
+        "operationId": "exportDefaultProcess",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -14825,6 +15240,430 @@
           },
           "isFavorite": {
             "type": "boolean"
+          }
+        }
+      },
+      "ProcessAgentSettings": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timeout": {
+            "type": "string"
+          }
+        }
+      },
+      "ProcessCondition": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          }
+        }
+      },
+      "ProcessField": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ProcessFlow": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "otherwise": {
+            "type": "boolean"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/ProcessCondition"
+          }
+        }
+      },
+      "ProcessHumanTask": {
+        "type": "object",
+        "properties": {
+          "who": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "meaning": {
+            "type": "string"
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessField"
+            }
+          }
+        }
+      },
+      "ProcessLock": {
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string"
+          },
+          "ref": {
+            "type": "string"
+          }
+        }
+      },
+      "ProcessModel": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "derivedFrom": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessStep"
+            }
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessFlow"
+            }
+          }
+        }
+      },
+      "ProcessRuleRef": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ProcessStep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "answeredBy": {
+            "type": "string"
+          },
+          "lock": {
+            "$ref": "#/components/schemas/ProcessLock"
+          },
+          "terminate": {
+            "type": "boolean"
+          },
+          "attachedTo": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string"
+          },
+          "agent": {
+            "$ref": "#/components/schemas/ProcessAgentSettings"
+          },
+          "human": {
+            "$ref": "#/components/schemas/ProcessHumanTask"
+          },
+          "wait": {
+            "$ref": "#/components/schemas/ProcessWaitFor"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessRuleRef"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issue": {
+            "type": "string"
+          },
+          "flows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessFlow"
+            }
+          }
+        }
+      },
+      "ProcessWaitFor": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "duration": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishProcessRequest": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "$ref": "#/components/schemas/ProcessModel"
+          }
+        },
+        "required": [
+          "model"
+        ]
+      },
+      "ApiResponseProcessPublication": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProcessPublication"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProcessCheck": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessProblem"
+            }
+          }
+        }
+      },
+      "ProcessProblem": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "stepId": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ProcessPublication": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ProcessVersion"
+          },
+          "refused": {
+            "$ref": "#/components/schemas/ProcessCheck"
+          }
+        }
+      },
+      "ProcessVersion": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "derivedFrom": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ProcessModel"
+          }
+        }
+      },
+      "ImportProcessRequest": {
+        "type": "object",
+        "properties": {
+          "xml": {
+            "type": "string",
+            "maxLength": 1000000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "xml"
+        ]
+      },
+      "ApiResponseProcessImport": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProcessImport"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProcessImport": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "boolean"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ProcessModel"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessProblem"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ApiResponseProcessCheck": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProcessCheck"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -20731,6 +21570,145 @@
           }
         }
       },
+      "ApiResponseProcessOverview": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProcessOverview"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProcessOverview": {
+        "type": "object",
+        "properties": {
+          "processes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessSummary"
+            }
+          },
+          "canPublish": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProcessSummary": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "versions": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ApiResponseProcessDetail": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProcessDetail"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProcessDetail": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ProcessVersion"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessVersionSummary"
+            }
+          },
+          "canPublish": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProcessVersionSummary": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ApiResponseProcessVersion": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProcessVersion"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ApiResponseListWorklogResponse": {
         "type": "object",
         "properties": {
@@ -21339,6 +22317,47 @@
           "teammateCount": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ApiResponseListProcessDefault": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcessDefault"
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProcessDefault": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ProcessModel"
           }
         }
       },
