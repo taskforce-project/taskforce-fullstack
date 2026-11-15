@@ -1518,6 +1518,7 @@ public class IssueService {
             .relationType(r.getRelationType())
             .issue(toIssueSummary(self))
             .relatedIssue(toIssueSummary(related))
+            .fromTarget(!isSource)
             .createdBy(toUserSummary(r.getCreatedBy()))
             .createdAt(r.getCreatedAt())
             .build();
