@@ -155,18 +155,18 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         <p className="pointer-events-none relative z-10 truncate pl-6 font-mono text-xs text-subtle" title={detail}>{detail}</p>
       )}
       {showFoot && (
-        <div className="pointer-events-none relative z-10 flex min-h-4 items-center gap-2 pl-6 text-xs text-muted-foreground">
+        <div className="pointer-events-none relative z-10 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-muted-foreground">
           {governance.rules > 0 && (
-            <span className="flex items-center gap-1" title={governance.ruleReasons.join(" ")}>
+            <span className="flex items-center gap-1 whitespace-nowrap" title={governance.ruleReasons.join(" ")}>
               <Lock aria-hidden="true" className="size-3 shrink-0" />
               {countWords(governance.rules, t.gov.rulesOne, t.gov.rulesMany)}
             </span>
           )}
           {governance.signed && (
-            <span className="tabular-nums">{fillText(t.gov.signed, { signed: governance.signed.signed, needed: governance.signed.needed })}</span>
+            <span className="whitespace-nowrap tabular-nums">{fillText(t.gov.signed, { signed: governance.signed.signed, needed: governance.signed.needed })}</span>
           )}
           {governance.documents > 0 && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 whitespace-nowrap">
               <Paperclip aria-hidden="true" className="size-3 shrink-0" />
               {countWords(governance.documents, t.gov.documentsOne, t.gov.documentsMany)}
             </span>

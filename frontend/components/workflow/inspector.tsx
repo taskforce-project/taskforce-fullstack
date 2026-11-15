@@ -23,11 +23,15 @@ import { cn } from "@/lib/utils"
 import { isMine } from "@/lib/window/missions"
 import { issueKey, nextStage, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
 import { pendingOf } from "@/lib/workflow/node-state"
-import { countWords, momentWords } from "@/lib/workflow/sentence"
+import { countWords, momentWords, nodeSentence } from "@/lib/workflow/sentence"
+import type { WorkflowState } from "@/lib/workflow/states"
 import type { NodeAgent } from "@/components/workflow/workflow-node"
 import { MAX_EDGES } from "@/lib/workflow/view"
 
 export type InspectorTab = "details" | "activity" | "evidence"
+
+/** Les états où le nœud attend quelqu'un ou quelque chose : « Waiting for » dit quoi, et qui. */
+const WAITS: ReadonlySet<WorkflowState> = new Set<WorkflowState>(["needsYou", "waiting", "blocked", "missing"])
 
 /** Où vit l'inspecteur : à droite des colonnes, en feuille par-dessus (volet étroit), ou plein écran (fenêtre étroite). */
 export type InspectorMode = "side" | "sheet" | "full"
@@ -115,50 +119,52 @@ export function Inspector({
           className="absolute inset-y-0 -left-1 z-10 w-2 cursor-col-resize hover:bg-ring/20"
         />
       )}
-      <header className="flex shrink-0 items-start gap-1 border-b border-border px-3 py-2">
-        {mode !== "side" && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t.inspector.back}
-            title={t.inspector.back}
-            className="flex size-7 shrink-0 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-          </button>
-        )}
-        <div className="min-w-0 flex-1 px-1">
-          <h3 className="line-clamp-2 text-sm font-[550] text-foreground" title={node.issue.title}>{node.issue.title}</h3>
-          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-            <StateMark state={node.state} word={word} showWord />
-            <span className="font-mono text-subtle">{node.issue.identifier}</span>
-          </div>
+      {/* L'en-tête : le titre, le menu du nœud et la croix ; dessous, la marque et le mot de l'état, la clé, et « Ask about
+          this step ». Deux lignes : rien ne se coupe à 360 px. */}
+      <header className="flex shrink-0 flex-col gap-1 border-b border-border px-3 py-2">
+        <div className="flex items-start gap-1">
+          {mode !== "side" && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t.inspector.back}
+              title={t.inspector.back}
+              className="flex size-7 shrink-0 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+            </button>
+          )}
+          <h3 className="line-clamp-2 min-w-0 flex-1 px-1 pt-1 text-sm font-[550] text-foreground" title={node.issue.title}>{node.issue.title}</h3>
+          <NodeMenu
+            node={node}
+            stages={stages}
+            can={can}
+            agents={agents}
+            gestures={gestures}
+            onOpen={() => onOpen(node)}
+            open={menuOpen}
+            onOpenChange={onMenuOpen}
+          />
+          {mode === "side" && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t.inspector.close}
+              title={t.inspector.close}
+              className="flex size-7 shrink-0 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          )}
         </div>
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-xs" onClick={() => gestures.ask(node)}>
-          <Sparkles className="size-3.5" aria-hidden="true" />
-          {t.inspector.ask}
-        </Button>
-        <NodeMenu
-          node={node}
-          stages={stages}
-          can={can}
-          agents={agents}
-          gestures={gestures}
-          onOpen={() => onOpen(node)}
-          open={menuOpen}
-          onOpenChange={onMenuOpen}
-        />
-        {mode === "side" && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t.inspector.close}
-            title={t.inspector.close}
-            className="flex size-7 shrink-0 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </button>
-        )}
+        <div className="flex min-w-0 items-center gap-2 px-1 text-xs text-muted-foreground">
+          <StateMark state={node.state} word={word} showWord className="shrink-0" />
+          <span className="shrink-0 whitespace-nowrap font-mono text-subtle">{node.issue.identifier}</span>
+          <Button variant="ghost" size="sm" className="ml-auto h-7 shrink-0 gap-1.5 px-2 text-xs" onClick={() => gestures.ask(node)}>
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            {t.inspector.ask}
+          </Button>
+        </div>
       </header>
       <Tabs value={tab} onValueChange={(value) => onTab(value as InspectorTab)} className="flex min-h-0 flex-1 flex-col">
         <TabsList className="mx-3 mt-2 shrink-0 rounded-none">
@@ -168,7 +174,7 @@ export function Inspector({
         </TabsList>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
           <TabsContent value="details">
-            <Details slug={slug} projectId={projectId} node={node} model={model} agents={agents} agent={agent}
+            <Details slug={slug} projectId={projectId} node={node} model={model} agents={agents} agent={agent} me={me}
               onSelect={onSelect} onOpen={onOpen} gestures={gestures} can={can} now={now} />
           </TabsContent>
           <TabsContent value="activity">
@@ -214,13 +220,14 @@ function LinkList({ items, model, onSelect, more }: Readonly<{
   )
 }
 
-function Details({ slug, projectId, node, model, agents, agent, onSelect, onOpen, gestures, can, now }: Readonly<{
+function Details({ slug, projectId, node, model, agents, agent, me, onSelect, onOpen, gestures, can, now }: Readonly<{
   slug: string
   projectId: number
   node: WorkflowNode
   model: WorkflowModel
   agents: readonly DeliveryProvider[]
   agent: NodeAgent | null
+  me: string | number | null | undefined
   onSelect: (key: string) => void
   onOpen: (node: WorkflowNode) => void
   gestures: NodeGestures
@@ -239,9 +246,8 @@ function Details({ slug, projectId, node, model, agents, agent, onSelect, onOpen
     : parent ? fillText(i.whatSubIssue, { parent: parent.identifier, stage }) : fillText(i.whatIssue, { stage })
   const next = nextStage(model, node.stageId)
   const pending = pendingOf(node.run)
-  const waits = node.reason.kind === "waitingApproval" && run
-    ? pending.map((approval) => requestWant(approval, run, sequence)).join(", ")
-    : null
+  // Ce qui attend, et qui : la phrase du nœud quand il attend quelqu'un ou quelque chose.
+  const waits = WAITS.has(node.state) ? nodeSentence(node, { workflow: t, sequence }, { me, now }) : null
   // Les liens vers le haut d'abord, puis vers le bas : cinquante en tout au plus, le reste dit en nombre.
   const upstream = node.blockedBy.slice(0, MAX_EDGES)
   const downstream = node.blocks.slice(0, Math.max(0, MAX_EDGES - upstream.length))
@@ -276,7 +282,7 @@ function Details({ slug, projectId, node, model, agents, agent, onSelect, onOpen
       <dl className="flex flex-col gap-3">
         <Row label={i.answersFor}>{node.issue.assignee ? (node.issue.assignee.displayName ?? node.issue.assignee.email) : i.nobody}</Row>
         <Row label={i.doneBy}>{agent ? (agent.model ? `${agent.name} · ${agent.model}` : agent.name) : i.noAgent}</Row>
-        <Row label={i.waitsFor}>{waits ?? (node.reason.kind === "queued" ? t.now.queued : i.nothingWaits)}</Row>
+        <Row label={i.waitsFor}>{waits ?? i.nothingWaits}</Row>
         <Row label={i.next}>{next ? next.name : i.lastStage}</Row>
         {upstream.length > 0 && (
           <Row label={i.blockedBy}><LinkList items={upstream} model={model} onSelect={onSelect} more={0} /></Row>

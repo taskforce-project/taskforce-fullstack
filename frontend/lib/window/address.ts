@@ -63,13 +63,14 @@ export function hrefWith(
 /**
  * Change la requête de l'adresse sans recharger ni pousser d'entrée dans l'historique (le workflow, séance n°25 : choisir
  * un nœud, une densité ou un filtre remplace l'adresse ; ouvrir un objet en pousse une nouvelle). Next.js suit
- * `history.replaceState` : `useSearchParams()` se met à jour, sans aller-retour au serveur.
+ * `history.replaceState` : `useSearchParams()` se met à jour, sans aller-retour au serveur. L'état passé est nul : celui
+ * de Next.js porte la marque de ses propres appels, et il ignorerait alors l'adresse (il recopie lui-même son état).
  */
 export function replaceQuery(changes: Readonly<Record<string, string | null>>): void {
   if (globalThis.location === undefined) return
   const href = hrefWith(globalThis.location.pathname, globalThis.location.search, changes)
   if (href === `${globalThis.location.pathname}${globalThis.location.search}`) return
-  globalThis.history.replaceState(globalThis.history.state, "", href)
+  globalThis.history.replaceState(null, "", href)
 }
 
 /** Le projet dont le workflow est le volet (`/{slug}/projects/{id}/workflow`), sinon null. */
