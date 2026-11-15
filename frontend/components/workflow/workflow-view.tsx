@@ -315,8 +315,14 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const dependencies = useMemo(() => dependenciesOf(selected), [selected])
   const related = useMemo(() => (selected ? relatedKeys(selected) : null), [selected])
 
+  // La même racine pendant la lecture et après : sa largeur se mesure dès le premier rendu (sans elle, la mesure partait
+  // sur le squelette, sans élément, et ne revenait jamais : l'inspecteur ne devenait jamais une feuille).
   if (load === "loading" || !model) {
-    return load === "error" ? <LoadFailed t={t} retry={retry} /> : <BoardSkeleton density={density} />
+    return (
+      <div ref={rootRef} className="relative flex h-full min-h-0 flex-col border border-border">
+        {load === "error" ? <LoadFailed t={t} retry={retry} /> : <BoardSkeleton density={density} />}
+      </div>
+    )
   }
 
   const empty = model.byKey.size === 0

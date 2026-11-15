@@ -114,6 +114,7 @@ export function Inspector({
     <aside
       role="complementary"
       aria-label={t.inspector.region}
+      data-mode={mode}
       style={mode === "full" ? undefined : { width }}
       className={cn(
         "flex min-h-0 flex-col bg-background",

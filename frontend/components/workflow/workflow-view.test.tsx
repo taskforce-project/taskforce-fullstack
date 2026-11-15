@@ -284,6 +284,29 @@ describe("le workflow d'un projet", () => {
   })
 })
 
+/** La vue dans un volet de 592 px, la largeur par défaut de la fenêtre avec la conversation ouverte (R161, H2). */
+describe("la vue dans un volet étroit", () => {
+  const RealObserver = globalThis.ResizeObserver
+  afterEach(() => { globalThis.ResizeObserver = RealObserver })
+
+  it("mesure sa largeur dès le premier rendu, même pendant la lecture : l'inspecteur devient une feuille", async () => {
+    // Un ResizeObserver qui donne 592 px à tout ce qu'il observe, tout de suite.
+    globalThis.ResizeObserver = class {
+      constructor(private readonly callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback([{ target, contentRect: { width: 592 } } as unknown as ResizeObserverEntry], this as unknown as ResizeObserver)
+      }
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver
+    serve({ issues: [issue(1, { title: "Write the spec" })] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    fireEvent.click(card("Write the spec"))
+    await waitFor(() => expect(screen.getByRole("complementary")).toHaveAttribute("data-mode", "sheet"))
+  })
+})
+
 /**
  * Les grands projets (le premier client de la Présidence) : 2 000 issues, 300 missions, 3 000 liens. La vue lit tout par
  * pages, calcule en une passe et ne rend que ce qui se voit ; le premier rendu et le choix d'un nœud restent rapides.
