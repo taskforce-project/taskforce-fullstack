@@ -121,6 +121,9 @@ class ProjectBundleServiceIntegrationTest extends AbstractIntegrationTest {
             Map.of("p", projectId, "u", mate.getId()));
         id("INSERT INTO pages (project_id, title, content, created_by) VALUES (:p, 'Spec', '# Spec', :u)",
             Map.of("p", projectId, "u", owner.getId()));
+        jdbc.update("INSERT INTO project_objectives (project_id, goal, target_date, criteria, updated_by, updated_at) "
+            + "VALUES (:p, 'Ship the module', '2026-12-19', CAST(:c AS jsonb), :u, '2026-01-04T05:06:07')",
+            Map.of("p", projectId, "c", "[\"Docs read\", \"Tests green\"]", "u", owner.getId()));
 
         parentIssue = issue(1, "Parent", todo, bug, null, "2025-12-01T10:00:00", null);
         childIssue = issue(2, "Child", done, null, parentIssue, "2025-12-02T10:00:00", null);
@@ -232,6 +235,7 @@ class ProjectBundleServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(manifest.path("version").asInt()).isEqualTo(1);
         assertThat(manifest.path("tables").path("issues")).hasSize(3);
         assertThat(manifest.path("tables").path("issue_statuses")).hasSize(2);
+        assertThat(manifest.path("tables").path("project_objectives")).hasSize(1);
         assertThat(manifest.path("people").findValuesAsText("email"))
             .containsExactlyInAnyOrder("owner@bundle.dev", "mate@bundle.dev");
         long attachmentId = manifest.path("tables").path("attachments").get(0).path("id").asLong();
@@ -281,6 +285,11 @@ class ProjectBundleServiceIntegrationTest extends AbstractIntegrationTest {
                 imported)).as(table).isEqualTo(1);
         }
         assertThat(count("SELECT count(*) FROM pages WHERE project_id = :p", imported)).isEqualTo(1);
+        // L'objectif suit le projet : son but, sa date, ses critères dans l'ordre, et qui l'a posé.
+        Map<String, Object> objective = jdbc.queryForMap("SELECT goal, target_date::text AS target, criteria::text AS criteria, "
+            + "updated_by FROM project_objectives WHERE project_id = :p", Map.of("p", imported));
+        assertThat(objective).containsEntry("goal", "Ship the module").containsEntry("target", "2026-12-19")
+            .containsEntry("criteria", "[\"Docs read\", \"Tests green\"]").containsEntry("updated_by", owner.getId());
         // La pièce jointe est rangée sous le nouveau ticket, avec son contenu.
         String key = jdbc.queryForObject("SELECT stored_key FROM attachments WHERE issue_id IN "
             + "(SELECT id FROM issues WHERE project_id = :p)", Map.of("p", imported), String.class);
