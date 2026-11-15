@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
@@ -21,11 +22,13 @@ import javax.xml.validation.SchemaFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * Le contrat des processus (ADR-027, E23) sur le processus d'E20, « intégrer un module », premier workflow par défaut :
@@ -130,6 +133,59 @@ class ProcessContractTest {
         // Les cinq types d'étapes, et toute la structure.
         assertThat(integrateAModule().allSteps().stream().map(ProcessModel.Step::type).distinct())
             .containsExactlyInAnyOrderElementsOf(ProcessModel.TYPES);
+    }
+
+    /**
+     * Des processus qui passaient le vérificateur et perdaient quelque chose à l'aller et retour, ou s'exportaient en un
+     * fichier invalide (R159, M2) : un champ qui n'est pas du type de l'étape, un caractère qu'un fichier XML ne porte
+     * pas.
+     */
+    static Stream<Arguments> passing() {
+        String control = "Write" + (char) 1 + " the scope" + (char) 0x1F;
+        String nonCharacter = "Write the scope" + (char) 0xFFFF;
+        String loneSurrogate = "Approve " + (char) 0xD800 + "it";
+        return Stream.of(
+            Arguments.of("une attente d'une durée qui dit aussi ce qu'elle attend, et de qui", (Consumer<ObjectNode>) r ->
+                ((ObjectNode) ProcessValidatorTest.step(r, "watch").get("wait")).put("what", "A report")
+                    .put("from", "project-lead")),
+            Arguments.of("une attente d'un document qui a aussi une durée", (Consumer<ObjectNode>) r ->
+                ((ObjectNode) ProcessValidatorTest.step(r, "acceptance-report").get("wait")).put("duration", "P3D")),
+            Arguments.of("une tâche humaine avec une durée, une étape surveillée et une attente", (Consumer<ObjectNode>) r -> {
+                ObjectNode s = ProcessValidatorTest.step(r, "write-scope");
+                s.put("duration", "P1D").put("attachedTo", "frame-start");
+                s.putObject("wait").put("kind", "timer").put("duration", "P1D");
+            }),
+            Arguments.of("un début qui arrête tout", (Consumer<ObjectNode>) r ->
+                ProcessValidatorTest.step(r, "requested").put("terminate", true)),
+            Arguments.of("des réglages d'agent vides sur une tâche humaine", (Consumer<ObjectNode>) r ->
+                ProcessValidatorTest.step(r, "write-scope").putObject("agent")),
+            Arguments.of("une question de tâche humaine sur une étape d'agent", (Consumer<ObjectNode>) r ->
+                ProcessValidatorTest.step(r, "draft-spec").putObject("human").put("question", "Why?")),
+            Arguments.of("des caractères de contrôle dans un nom et une description", (Consumer<ObjectNode>) r -> {
+                ProcessValidatorTest.step(r, "write-scope").put("name", control);
+                r.put("description", control);
+            }),
+            Arguments.of("U+FFFF dans un nom, une moitié de paire seule dans une description", (Consumer<ObjectNode>) r -> {
+                ProcessValidatorTest.step(r, "write-scope").put("name", nonCharacter);
+                ProcessValidatorTest.step(r, "approve-scope").put("description", loneSurrogate);
+            }));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("passing")
+    @DisplayName("ce qui passe le vérificateur s'exporte en un fichier valide, et revient avec la même empreinte")
+    void what_passes_comes_back(String why, Consumer<ObjectNode> change) throws Exception {
+        ObjectNode root = ProcessValidatorTest.e20();
+        change.accept(root);
+        ProcessModel model = ProcessValidatorTest.model(root);
+        assertThat(ProcessValidator.check(model, ProcessValidator.Context.NONE)).as(why).isEmpty();
+
+        String xml = BpmnExport.toXml(model);
+
+        bpmnSchema().newValidator().validate(new StreamSource(new StringReader(xml)));
+        BpmnImport.Result back = BpmnImport.read(xml);
+        assertThat(back.foreign()).isEmpty();
+        assertThat(ProcessFingerprint.canonical(back.model())).isEqualTo(ProcessFingerprint.canonical(model));
     }
 
     static Stream<Path> rewritten() throws IOException {

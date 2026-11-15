@@ -209,6 +209,8 @@ public final class ProcessValidator {
                 } else if (!seen.add(step.id())) {
                     add("duplicateId", step.id(), step.name(), "Two parts of the process have the same identifier: "
                         + step.id() + ".");
+                } else if (step.id().equals(model.key())) {
+                    add("duplicateId", step.id(), step.name(), keyTaken("“" + step.label() + "”", step.id()));
                 }
                 if (step.type() == null || !ProcessModel.TYPES.contains(step.type())) {
                     add("unknownType", step.id(), step.name(), "“" + step.label() + "” is of a kind TaskForce's processes "
@@ -226,8 +228,16 @@ public final class ProcessValidator {
                 } else if (!seen.add(flow.id())) {
                     add("duplicateId", flow.id(), null, "Two parts of the process have the same identifier: " + flow.id()
                         + ".");
+                } else if (flow.id().equals(model.key())) {
+                    add("duplicateId", flow.id(), null, keyTaken("A path", flow.id()));
                 }
             }
+        }
+
+        /** Le fichier BPMN donne la clé du processus au processus lui-même : une étape ou un chemin ne la prend pas. */
+        private static String keyTaken(String what, String id) {
+            return what + " has the process's own key as its identifier, " + id + ": in the exported file, that "
+                + "identifier is the process's. Give it another one.";
         }
 
         private void index(Step parent, List<Step> steps) {
@@ -1409,9 +1419,16 @@ public final class ProcessValidator {
         return seen;
     }
 
+    /**
+     * La forme d'une durée de XML Schema, sans signe : des années, des mois, des jours, puis des heures, des minutes et
+     * des secondes. Ni semaines ({@code P1W}) ni minuscules : le fichier BPMN les refuserait, comme un moteur.
+     */
+    private static final Pattern DURATION = Pattern.compile(
+        "^P(?=\\d|T\\d)(\\d+Y)?(\\d+M)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+(\\.\\d+)?S)?)?$");
+
     /** Une durée ISO 8601, comme {@code P2D}, {@code PT4H} ou {@code P1DT12H}, plus longue que zéro. */
     static boolean isDuration(String value) {
-        if (value == null || !value.startsWith("P")) {
+        if (value == null || !DURATION.matcher(value).matches()) {
             return false;
         }
         try {

@@ -20,8 +20,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * {@link #DECISION}, {@link #WAIT}, {@link #ZONE}), pas de sixième ; le reste est de la structure.</p>
  *
  * <p>Chaque enregistrement se normalise à la construction : une chaîne vide devient nulle, une liste vide aussi, un
- * booléen faux aussi. Deux écritures du même processus (un JSON qui omet un champ, un autre qui le met à null, un
- * fichier qu'un modeleur a réécrit) donnent donc le même modèle et la même empreinte. Les méthodes d'aide ne
+ * booléen faux aussi ; un texte perd ce qu'un fichier XML ne peut pas porter, et une étape les champs qui ne sont pas de
+ * son type. Deux écritures du même processus (un JSON qui omet un champ, un autre qui le met à null, un fichier qu'un
+ * modeleur a réécrit) donnent donc le même modèle et la même empreinte. Les méthodes d'aide ne
  * commencent ni par {@code get} ni par {@code is} : Jackson les prendrait pour des champs du JSON. Les
  * annotations {@code @Schema} ne font que nommer ces types dans la référence d'API ({@code ProcessStep}...) : un
  * {@code Step} d'un autre domaine y cacherait celui-ci.</p>
@@ -147,6 +148,16 @@ public record ProcessModel(
             issue = clean(issue);
             steps = cleanList(steps);
             flows = cleanList(flows);
+            // Seuls les champs du type comptent : un autre champ ne voyage pas dans le fichier BPMN, et l'aller et retour
+            // changerait l'empreinte. Un type inconnu garde tout, pour que le vérificateur dise ce qui ne va pas.
+            if (type != null && TYPES.contains(type)) {
+                terminate = END.equals(type) ? terminate : null;
+                attachedTo = DEADLINE.equals(type) || FAILURE.equals(type) ? attachedTo : null;
+                duration = DEADLINE.equals(type) ? duration : null;
+                agent = AGENT.equals(type) ? agent : null;
+                human = HUMAN.equals(type) ? human : null;
+                waitFor = WAIT.equals(type) ? waitFor : null;
+            }
         }
 
         /** Vrai pour une étape d'un des cinq types. */
@@ -300,6 +311,13 @@ public record ProcessModel(
             duration = clean(duration);
             what = line(what);
             from = clean(from);
+            // Une durée n'a ni objet ni personne qui le fournit ; un message n'a pas de durée.
+            if (TIMER.equals(kind)) {
+                what = null;
+                from = null;
+            } else if (MESSAGE.equals(kind)) {
+                duration = null;
+            }
         }
     }
 
@@ -341,8 +359,40 @@ public record ProcessModel(
         if (value == null) {
             return null;
         }
-        String stripped = value.strip();
+        String stripped = xmlChars(value).strip();
         return stripped.isEmpty() ? null : stripped;
+    }
+
+    /**
+     * Le texte sans ce qu'un fichier XML 1.0 ne peut pas porter : les caractères de contrôle (sauf la tabulation et les
+     * fins de ligne), U+FFFE, U+FFFF et une moitié de paire de substitution seule. L'export les perdrait, ou écrirait un
+     * fichier que personne ne relit ; le modèle les retire d'avance.
+     */
+    static String xmlChars(String value) {
+        StringBuilder out = null;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            boolean kept;
+            if (Character.isHighSurrogate(c)) {
+                kept = i + 1 < value.length() && Character.isLowSurrogate(value.charAt(i + 1));
+                if (kept) {
+                    if (out != null) {
+                        out.append(c).append(value.charAt(i + 1));
+                    }
+                    i++;
+                    continue;
+                }
+            } else {
+                kept = !Character.isLowSurrogate(c) && c != 0xFFFE && c != 0xFFFF
+                    && (c >= 0x20 || c == '\t' || c == '\n' || c == '\r');
+            }
+            if (!kept && out == null) {
+                out = new StringBuilder(value.length()).append(value, 0, i);
+            } else if (kept && out != null) {
+                out.append(c);
+            }
+        }
+        return out == null ? value : out.toString();
     }
 
     static Boolean cleanFlag(Boolean value) {

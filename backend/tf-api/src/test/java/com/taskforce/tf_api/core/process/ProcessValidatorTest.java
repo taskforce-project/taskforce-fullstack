@@ -272,6 +272,13 @@ public class ProcessValidatorTest {
                 flow(r, "write-scope-approve-scope").put("from", "1 write");
             }),
             refusal("duplicateId", "deux fois le même identifiant", r -> step(r, "write-code").put("id", "write-tests")),
+            refusal("duplicateId", "une étape qui prend la clé du processus comme identifiant", r -> {
+                step(r, "write-scope").put("id", "integrate-a-module");
+                flow(r, "frame-start-write-scope").put("to", "integrate-a-module");
+                flow(r, "write-scope-approve-scope").put("from", "integrate-a-module");
+            }),
+            refusal("duplicateId", "un chemin qui prend la clé du processus comme identifiant",
+                r -> flow(r, "requested-frame").put("id", "integrate-a-module")),
             refusal("unknownType", "un type d'étape inconnu", r -> step(r, "write-scope").put("type", "inclusive")),
             refusal("notAContainer", "une tâche humaine qui tient des étapes",
                 r -> steps(step(r, "write-scope")).add(human("inside", "Inside"))),
@@ -420,6 +427,12 @@ public class ProcessValidatorTest {
                 r -> step(r, "build-failed").put("attachedTo", "unblock-build")),
             refusal("badDuration", "une durée qui n'en est pas une", r -> step(r, "build-late").put("duration", "two days")),
             refusal("badDuration", "une échéance sans durée", r -> step(r, "build-late").remove("duration")),
+            refusal("badDuration", "une échéance en semaines, que XML Schema n'écrit pas",
+                r -> step(r, "build-late").put("duration", "P1W")),
+            refusal("badDuration", "un délai d'agent en semaines",
+                r -> ((ObjectNode) step(r, "draft-spec").get("agent")).put("timeout", "P1W")),
+            refusal("badDuration", "une durée en minuscules", r -> ((ObjectNode) step(r, "watch").get("wait"))
+                .put("duration", "p7d")),
             refusal("unreachable", "une étape qu'on n'atteint jamais", r -> {
                 steps(step(r, "frame")).add(human("orphan", "Orphan task"));
                 flows(step(r, "frame")).add(newFlow("orphan-frame-end", "orphan", "frame-end"));
@@ -640,12 +653,17 @@ public class ProcessValidatorTest {
     }
 
     @Test
-    @DisplayName("une durée ISO 8601 : des jours, des heures, les deux ; jamais zéro ni négative")
+    @DisplayName("une durée ISO 8601 : des jours, des heures, les deux ; jamais zéro ni négative, ni en semaines")
     void durations() {
         assertThat(ProcessValidator.isDuration("P2D")).isTrue();
         assertThat(ProcessValidator.isDuration("PT4H")).isTrue();
         assertThat(ProcessValidator.isDuration("P1DT12H")).isTrue();
-        assertThat(ProcessValidator.isDuration("P1W")).isTrue();
+        assertThat(ProcessValidator.isDuration("P1Y2M")).isTrue();
+        assertThat(ProcessValidator.isDuration("PT1.5S")).isTrue();
+        assertThat(ProcessValidator.isDuration("P1W")).isFalse();
+        assertThat(ProcessValidator.isDuration("p2d")).isFalse();
+        assertThat(ProcessValidator.isDuration("P1DT")).isFalse();
+        assertThat(ProcessValidator.isDuration("P99999999999D")).isFalse();
         assertThat(ProcessValidator.isDuration("P0D")).isFalse();
         assertThat(ProcessValidator.isDuration("PT0S")).isFalse();
         assertThat(ProcessValidator.isDuration("P-1D")).isFalse();
