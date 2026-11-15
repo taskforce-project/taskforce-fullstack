@@ -82,8 +82,11 @@ public final class ProcessValidator {
 
     static final Pattern KEY = Pattern.compile("^[a-z][a-z0-9-]{0,79}$");
     static final Pattern ID = Pattern.compile("^[A-Za-z][A-Za-z0-9_-]{0,79}$");
-    /** Qui répond, qui fait, qui fournit : comme ceux qui accordent une règle (RuleValidator.APPROVER). */
-    static final Pattern PERSON = Pattern.compile("^(person:[0-9]{1,19}|role:(owner|admin)|project-lead)$");
+    /**
+     * Qui répond, qui fait, qui fournit : comme ceux qui accordent une règle (RuleValidator.APPROVER), avec un numéro de
+     * dix-huit chiffres au plus, qui tient toujours dans l'identifiant d'une personne.
+     */
+    static final Pattern PERSON = Pattern.compile("^(person:[0-9]{1,18}|role:(owner|admin)|project-lead)$");
     static final Pattern RULE = Pattern.compile("^[a-z0-9][a-z0-9-]{1,79}$");
     static final Pattern PROVIDER = Pattern.compile("^[a-z][a-z0-9-]{1,39}$");
     static final Pattern TOOL = Pattern.compile("^[a-z0-9][a-z0-9._-]{0,79}$");

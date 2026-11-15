@@ -29,7 +29,7 @@
     "person": {
       "description": "Who: a person of the workspace (person:<id>), its owner (role:owner), its admins (role:admin), or the project's lead (project-lead).",
       "type": "string",
-      "pattern": "^(person:[0-9]{1,19}|role:(owner|admin)|project-lead)$"
+      "pattern": "^(person:[0-9]{1,18}|role:(owner|admin)|project-lead)$"
     },
     "duration": { "description": "An ISO 8601 duration in days, hours or minutes, never in weeks, like P2D, P14D or PT4H.", "type": "string", "pattern": "^P[0-9YMDTHS.]+$" },
     "ruleRef": {

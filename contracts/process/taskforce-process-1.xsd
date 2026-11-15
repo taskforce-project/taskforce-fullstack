@@ -120,7 +120,7 @@
 
   <xsd:simpleType name="tPerson">
     <xsd:restriction base="xsd:string">
-      <xsd:pattern value="person:[0-9]{1,19}|role:(owner|admin)|project-lead"/>
+      <xsd:pattern value="person:[0-9]{1,18}|role:(owner|admin)|project-lead"/>
     </xsd:restriction>
   </xsd:simpleType>
 

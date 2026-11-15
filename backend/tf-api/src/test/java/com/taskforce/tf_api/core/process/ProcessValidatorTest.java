@@ -440,6 +440,8 @@ public class ProcessValidatorTest {
             // Les réglages.
             refusal("badPerson", "une personne que TaskForce ne connaît pas",
                 r -> step(r, "write-scope").put("answeredBy", "the boss")),
+            refusal("badPerson", "une personne d'un numéro qu'aucun identifiant ne tient",
+                r -> step(r, "write-scope").put("answeredBy", "person:9223372036854775808")),
             refusal("unknownRule", "une règle nommée par un identifiant illisible",
                 r -> ((ObjectNode) step(r, "spec-zone").get("rules").get(0)).put("ref", "Bad Rule")),
             refusal("unknownRule", "une version des règles qui n'existe pas",
@@ -609,6 +611,22 @@ public class ProcessValidatorTest {
                 + "workspace.");
         assertThat(problems).filteredOn(p -> p.code().equals("unknownRule")).extracting(Problem::message)
             .contains("“Draft the specification” follows a rule that doesn't exist in this workspace: search-files.");
+    }
+
+    @Test
+    @DisplayName("une personne d'un numéro trop long se refuse en phrase, même contre les personnes de l'espace")
+    void a_person_number_too_long() {
+        ObjectNode process = e20();
+        step(process, "write-scope").put("answeredBy", "person:9223372036854775808");
+
+        List<Problem> problems = ProcessValidator.check(model(process),
+            new Context(List.of(), Map.of(), null, Set.of(1L, 2L)));
+
+        assertRefused(problems, "badPerson");
+        assertThat(problems).filteredOn(p -> p.code().equals("badPerson")).singleElement()
+            .extracting(Problem::message).isEqualTo("“Write the module's scope” names someone TaskForce doesn't know: "
+                + "person:9223372036854775808. Name a person of the workspace, its owner, its admins, or the project's "
+                + "lead.");
     }
 
     @Test
