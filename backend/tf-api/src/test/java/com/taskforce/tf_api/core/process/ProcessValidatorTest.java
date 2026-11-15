@@ -662,6 +662,25 @@ public class ProcessValidatorTest {
     }
 
     @Test
+    @DisplayName("un fichier de mille fautes se dit par ses cinquante premières, puis leur nombre")
+    void many_problems_are_counted() {
+        List<ProcessValidator.Foreign> foreign = new java.util.ArrayList<>();
+        for (int i = 0; i < 120; i++) {
+            foreign.add(new ProcessValidator.Foreign("inclusiveGateway", "pick-" + i, "Pick " + i));
+        }
+
+        List<Problem> problems = ProcessValidator.check(model(e20()), Context.NONE, foreign);
+
+        assertThat(problems).hasSize(51);
+        assertThat(problems.subList(0, 50)).extracting(Problem::code).containsOnly("notInSubset");
+        assertThat(problems.get(50)).satisfies(p -> {
+            assertThat(p.code()).isEqualTo("moreProblems");
+            assertThat(p.stepId()).isNull();
+            assertThat(p.message()).isEqualTo("There are 70 more problems: fix these first, then check again.");
+        });
+    }
+
+    @Test
     @DisplayName("un processus trop grand se découpe")
     void too_large() {
         ObjectNode process = e20();

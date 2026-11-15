@@ -72,6 +72,8 @@ public final class ProcessValidator {
      * les étapes d'une zone) ; au-delà de huit, rien ne se parcourt, ni pour vérifier ni pour calculer l'empreinte.
      */
     public static final int MAX_DEPTH = 8;
+    /** Les refus qu'on dit un à un ; au-delà, leur nombre. */
+    public static final int MAX_PROBLEMS = 50;
     static final int MAX_NAME = 200;
     static final int MAX_TEXT = 2000;
     static final int MAX_LINE = 300;
@@ -142,7 +144,16 @@ public final class ProcessValidator {
     }
 
     public static List<Problem> check(ProcessModel model, Context context, List<Foreign> foreign) {
-        return new Run(model, context == null ? Context.NONE : context).check(foreign == null ? List.of() : foreign);
+        List<Problem> all = new Run(model, context == null ? Context.NONE : context)
+            .check(foreign == null ? List.of() : foreign);
+        if (all.size() <= MAX_PROBLEMS) {
+            return all;
+        }
+        // Un fichier de mille fautes se reprend par les premières : le reste se compte.
+        List<Problem> first = new ArrayList<>(all.subList(0, MAX_PROBLEMS));
+        first.add(new Problem("moreProblems", null, null, "There are " + (all.size() - MAX_PROBLEMS) + " more "
+            + "problems: fix these first, then check again."));
+        return first;
     }
 
     /**
