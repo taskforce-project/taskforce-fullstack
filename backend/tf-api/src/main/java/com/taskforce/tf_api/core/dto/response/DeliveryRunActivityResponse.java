@@ -22,6 +22,7 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
      * @param signatures le nombre de personnes distinctes qui accordent
      * @param separate   la personne qui a délégué ne signe pas
      * @param signedBy   qui a déjà accordé, quand l'accord en demande plusieurs
+     * @param signedAt   l'heure de chaque signature, dans l'ordre de {@code signedBy}
      */
     public record Approval(
         Long id,
@@ -43,8 +44,19 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
         boolean separate,
         List<String> signedBy,
         /** La décision lie (une couche de l'entreprise, des obligations, le socle) : un accord n'y vaut qu'une fois. */
-        boolean binding
+        boolean binding,
+        List<LocalDateTime> signedAt
     ) {
+
+        /** Sans l'heure des signatures (une demande ordinaire, un test). */
+        public Approval(Long id, String tool, String summary, String status, LocalDateTime createdAt,
+                        LocalDateTime expiresAt, LocalDateTime decidedAt, String decidedBy, boolean canDecide,
+                        String askedBy, String action, String rule, String reason, String scope,
+                        List<List<String>> waitingFor, int signatures, boolean separate, List<String> signedBy,
+                        boolean binding) {
+            this(id, tool, summary, status, createdAt, expiresAt, decidedAt, decidedBy, canDecide, askedBy, action, rule,
+                reason, scope, waitingFor, signatures, separate, signedBy, binding, List.of());
+        }
 
         /** Un accord sur une décision qui ne lie pas : il peut valoir pour le reste de la mission. */
         public Approval(Long id, String tool, String summary, String status, LocalDateTime createdAt,
@@ -52,7 +64,7 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
                         String askedBy, String action, String rule, String reason, String scope,
                         List<List<String>> waitingFor, int signatures, boolean separate, List<String> signedBy) {
             this(id, tool, summary, status, createdAt, expiresAt, decidedAt, decidedBy, canDecide, askedBy, action, rule,
-                reason, scope, waitingFor, signatures, separate, signedBy, false);
+                reason, scope, waitingFor, signatures, separate, signedBy, false, List.of());
         }
 
         /** Un accord ordinaire, que la personne qui a délégué donne seule. */
@@ -60,7 +72,7 @@ public record DeliveryRunActivityResponse(List<Event> events, List<Approval> app
                         LocalDateTime expiresAt, LocalDateTime decidedAt, String decidedBy, boolean canDecide,
                         String askedBy, String action, String rule, String reason, String scope) {
             this(id, tool, summary, status, createdAt, expiresAt, decidedAt, decidedBy, canDecide, askedBy, action, rule,
-                reason, scope, List.of(), 1, false, List.of(), false);
+                reason, scope, List.of(), 1, false, List.of(), false, List.of());
         }
     }
 }

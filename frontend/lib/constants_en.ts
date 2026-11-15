@@ -578,6 +578,7 @@ export const CONSTANTS_EN = {
       noEvidence: "No record yet: it starts with the mission.",
       noMission: "No mission yet: the record starts when an agent works on it.",
       signedBy: "{who}, {time}. Meaning: Approval.",
+      signedByUndated: "{who}. Meaning: Approval.",
     },
     decide: {
       title: "Approve {what}?",

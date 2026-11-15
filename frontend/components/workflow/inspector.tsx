@@ -459,11 +459,15 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
                 <li key={approval.id} className="flex flex-col gap-0.5">
                   <span>{words.title}</span>
                   {outcome && <span className="text-xs text-muted-foreground">{outcome}</span>}
-                  {(approval.signedBy ?? []).map((who) => (
-                    <span key={who} className="text-xs text-muted-foreground">
-                      {fillText(t.signedBy, { who, time: approval.decidedAt ? momentWords(approval.decidedAt, now) : "" })}
-                    </span>
-                  ))}
+                  {(approval.signedBy ?? []).map((who, index) => {
+                    // L'heure de cette signature-là : la décision finale n'a que l'heure de la dernière.
+                    const at = approval.signedAt?.[index] ?? null
+                    return (
+                      <span key={`${who}-${index}`} className="text-xs text-muted-foreground">
+                        {at ? fillText(t.signedBy, { who, time: momentWords(at, now) }) : fillText(t.signedByUndated, { who })}
+                      </span>
+                    )
+                  })}
                 </li>
               )
             })}

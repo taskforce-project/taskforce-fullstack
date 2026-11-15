@@ -435,14 +435,17 @@ public class DeliveryActivityService {
     private DeliveryRunActivityResponse.Approval approvalView(DeliveryRun run, DeliveryRunApproval a, Long userId) {
         Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
         RulesEngine.Obligations require = a.obligations();
-        List<String> signedBy = RuleApprovers.ordinary(require) ? List.of()
+        List<DeliveryRunApprovalSignature> allowed = RuleApprovers.ordinary(require) ? List.of()
             : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
-                .filter(DeliveryRunApprovalSignature::isAllow).map(s -> displayName(s.getUser())).toList();
+                .filter(DeliveryRunApprovalSignature::isAllow).toList();
+        // Qui a signé, et quand : chaque signature garde son heure, celle de la décision finale n'est que la dernière.
+        List<String> signedBy = allowed.stream().map(s -> displayName(s.getUser())).toList();
+        List<LocalDateTime> signedAt = allowed.stream().map(DeliveryRunApprovalSignature::getSignedAt).toList();
         return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
             a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
             canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
             approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
-            require != null && require.separate(), signedBy, a.isBinding());
+            require != null && require.separate(), signedBy, a.isBinding(), signedAt);
     }
 
     /** Le dossier de preuve du run, en JSON ou en Markdown, si le projet est visible ; vide pour un run de la v1. */

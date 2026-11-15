@@ -205,6 +205,11 @@ class DeliveryApprovalObligationsTest {
 
         service.decide("acme", 100L, 9L, true, 5L);
         assertThat(approval.getStatus()).isEqualTo(DeliveryApprovalStatus.PENDING);
+        // La première signature se lit avec son heure à elle (R159, L10).
+        assertThat(service.activity("acme", 100L, 0, 7L).approvals()).singleElement().satisfies(view -> {
+            assertThat(view.signedBy()).hasSize(1);
+            assertThat(view.signedAt()).hasSize(1).doesNotContainNull();
+        });
         assertThatThrownBy(() -> service.decide("acme", 100L, 9L, true, 5L))
             .isInstanceOf(BusinessException.class).hasMessageContaining("already answered");
 
