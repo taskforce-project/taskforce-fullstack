@@ -356,6 +356,65 @@ public class ProcessValidatorTest {
                     .put("outcome", "approved");
                 flows(step(r, "specify")).add(extra);
             }),
+            // Un processus finit toujours (R159, M4).
+            refusal("joinShape", "deux chemins d'une décision qui se retrouvent à une jonction en parallèle", r -> {
+                ObjectNode frame = step(r, "frame");
+                steps(frame).add(JSON.createObjectNode().put("id", "scope-ok").put("type", "decision")
+                    .put("name", "Is the scope fine?").put("answeredBy", "project-lead"));
+                steps(frame).add(JSON.createObjectNode().put("id", "frame-join").put("type", "parallel"));
+                flow(frame, "approve-scope-frame-end").put("to", "scope-ok");
+                ObjectNode yes = newFlow("scope-ok-yes", "scope-ok", "frame-join");
+                yes.putObject("condition").put("text", "The scope is approved").put("step", "approve-scope")
+                    .put("outcome", "approved");
+                flows(frame).add(yes);
+                flows(frame).add(newFlow("scope-ok-no", "scope-ok", "frame-join").put("otherwise", true));
+                flows(frame).add(newFlow("frame-join-end", "frame-join", "frame-end"));
+            }),
+            refusal("joinShape", "deux chemins en parallèle qui se croisent avant toute jonction", r -> {
+                ObjectNode deliver = step(r, "deliver");
+                steps(deliver).add(JSON.createObjectNode().put("id", "release-split").put("type", "parallel"));
+                steps(deliver).add(human("tell-support", "Tell the support team"));
+                steps(deliver).add(human("tell-users", "Tell the users"));
+                flow(deliver, "before-delivery-deliver-module").put("to", "release-split");
+                flows(deliver).add(newFlow("release-split-support", "release-split", "tell-support"));
+                flows(deliver).add(newFlow("release-split-users", "release-split", "tell-users"));
+                flows(deliver).add(newFlow("support-deliver-module", "tell-support", "deliver-module"));
+                flows(deliver).add(newFlow("users-deliver-module", "tell-users", "deliver-module"));
+            }),
+            refusal("joinShape", "un chemin en parallèle qui peut finir avant sa jonction", r -> {
+                ObjectNode accept = step(r, "accept");
+                steps(accept).add(JSON.createObjectNode().put("id", "report-ok").put("type", "decision")
+                    .put("name", "Is the report usable?").put("answeredBy", "project-lead"));
+                flow(accept, "acceptance-report-accept-join").put("to", "report-ok");
+                ObjectNode yes = newFlow("report-ok-join", "report-ok", "accept-join");
+                yes.putObject("condition").put("text", "The review was approved").put("step", "review-code")
+                    .put("outcome", "approved");
+                flows(accept).add(yes);
+                flows(accept).add(newFlow("report-ok-end", "report-ok", "accept-end").put("otherwise", true));
+            }),
+            refusal("splitInLoop", "un partage en parallèle dans une boucle", r -> {
+                ObjectNode accept = step(r, "accept");
+                steps(accept).add(human("prepare-acceptance", "Prepare the acceptance"));
+                flow(accept, "accept-start-accept-split").put("to", "prepare-acceptance");
+                flows(accept).add(newFlow("prepare-acceptance-accept-split", "prepare-acceptance", "accept-split"));
+                steps(accept).add(JSON.createObjectNode().put("id", "signed-off").put("type", "decision")
+                    .put("name", "Is it signed off?").put("answeredBy", "project-lead"));
+                flow(accept, "sign-acceptance-accept-end").put("to", "signed-off");
+                ObjectNode yes = newFlow("signed-off-end", "signed-off", "accept-end");
+                yes.putObject("condition").put("text", "The acceptance is signed").put("step", "sign-acceptance")
+                    .put("outcome", "approved");
+                flows(accept).add(yes);
+                flows(accept).add(newFlow("signed-off-again", "signed-off", "prepare-acceptance").put("otherwise", true));
+            }),
+            refusal("decisionLoop", "une décision dont un chemin revient à elle-même",
+                r -> flow(r, "spec-approved-spec-zone").put("to", "spec-approved")),
+            refusal("decisionLoop", "une décision qui revient à elle-même sans que l'étape qu'elle juge tourne de nouveau",
+                r -> {
+                    ObjectNode specify = step(r, "specify");
+                    steps(specify).add(human("explain", "Explain the refusal"));
+                    flow(specify, "spec-approved-spec-zone").put("to", "explain");
+                    flows(specify).add(newFlow("explain-spec-approved", "explain", "spec-approved"));
+                }),
             refusal("boundaryTarget", "une échéance sur un début", r -> step(r, "build-late").put("attachedTo", "build-start")),
             refusal("boundaryTarget", "un chemin d'échec sur une tâche humaine",
                 r -> step(r, "build-failed").put("attachedTo", "unblock-build")),

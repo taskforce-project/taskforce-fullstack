@@ -84,9 +84,13 @@ public final class ProcessValidator {
     static final Pattern TOOL = Pattern.compile("^[a-z0-9][a-z0-9._-]{0,79}$");
     static final Pattern ISSUE = Pattern.compile("^[A-Za-z][A-Za-z0-9]{0,19}-[0-9]{1,9}$");
 
-    /** Les refus qui rendent la forme du processus trop incertaine pour les vérifications de bout en bout. */
+    /**
+     * Les refus qui rendent la forme du processus trop incertaine pour les vérifications de bout en bout ; des chemins en
+     * parallèle qui ne se rejoignent pas comme il faut en font partie : le graphe de bout en bout ne voit pas le
+     * parallèle.
+     */
     private static final Set<String> STRUCTURAL = Set.of("tooLarge", "badId", "duplicateId", "unknownType", "flowUnknown",
-        "flowAcross", "startCount", "endMissing", "notInSubset");
+        "flowAcross", "startCount", "endMissing", "notInSubset", "joinShape", "splitInLoop");
 
     private ProcessValidator() {
     }
@@ -185,6 +189,7 @@ public final class ProcessValidator {
             if (sound) {
                 Graph graph = Graph.of(model);
                 conditions(graph);
+                decisionLoops(graph);
                 pausePoints(graph);
             }
             locked();
@@ -351,7 +356,9 @@ public final class ProcessValidator {
                 reach(local, out);
             }
             if (linked) {
-                new Blocks(local, out, in).pausePoints();
+                Blocks blocks = new Blocks(local, out, in);
+                blocks.judge();
+                blocks.pausePoints();
             }
         }
 
@@ -613,6 +620,130 @@ public final class ProcessValidator {
                     }
                 }
                 return new Branch(nodes, arrivals, ends, unclear);
+            }
+
+            /**
+             * Des chemins en parallèle qui finissent toujours : un partage n'est dans aucune boucle de son conteneur ; ses
+             * chemins se retrouvent tous à une même jonction, chacun par un seul chemin, ou finissent chacun de leur
+             * côté, sans se croiser ni rien recevoir d'ailleurs ; une jonction ne joint que les chemins d'un partage.
+             */
+            void judge() {
+                Set<String> joined = new HashSet<>();
+                for (Step split : local.values()) {
+                    if (!isSplit(split)) {
+                        continue;
+                    }
+                    Block block = block(split);
+                    if (block != null) {
+                        block.branches().forEach(b -> b.arrivals().forEach(f -> joined.add(f.to())));
+                    }
+                    if (inLoop(split)) {
+                        add("splitInLoop", split.id(), split.name(), "“" + split.label() + "” splits paths in parallel "
+                            + "inside a loop: each time round it would start them again, while the others may still "
+                            + "run. Loop around the whole stage instead.");
+                    } else if (block != null) {
+                        String fault = fault(block);
+                        if (fault != null) {
+                            add("joinShape", split.id(), split.name(), fault);
+                        }
+                    }
+                }
+                for (Step join : local.values()) {
+                    if (isJoin(join) && !joined.contains(join.id())) {
+                        add("joinShape", join.id(), join.name(), "“" + join.label() + "” joins paths that don't come "
+                            + "from one split: a parallel join waits for every path a split started, and these never "
+                            + "all come.");
+                    }
+                }
+            }
+
+            /** Vrai quand le partage se rejoint depuis ce qui le suit, dans son conteneur. */
+            private boolean inLoop(Step split) {
+                Set<String> seen = new HashSet<>();
+                Deque<String> todo = new ArrayDeque<>(next(split.id()));
+                while (!todo.isEmpty()) {
+                    String id = todo.pop();
+                    if (id.equals(split.id())) {
+                        return true;
+                    }
+                    if (seen.add(id)) {
+                        todo.addAll(next(id));
+                    }
+                }
+                return false;
+            }
+
+            private List<String> next(String id) {
+                List<String> out = new ArrayList<>();
+                outs(id).forEach(f -> out.add(f.to()));
+                watching.getOrDefault(id, List.of()).forEach(b -> out.add(b.id()));
+                return out;
+            }
+
+            /** Ce qui fait qu'un bloc ne finirait pas, en une phrase ; null quand il finit. */
+            private String fault(Block block) {
+                if (block.branches().stream().anyMatch(Branch::unclear)) {
+                    // Une boucle, ou un bloc plus loin qui ne finit pas : dit pour lui.
+                    return null;
+                }
+                String split = block.split().label();
+                Set<String> seen = new HashSet<>();
+                for (Branch branch : block.branches()) {
+                    for (String id : branch.nodes()) {
+                        if (!seen.add(id)) {
+                            return "Two paths that “" + split + "” runs in parallel meet at “" + label(id) + "” before "
+                                + "any join: “" + label(id) + "” would run twice. Join them with a parallel join first.";
+                        }
+                    }
+                }
+                Set<String> joins = new LinkedHashSet<>();
+                Set<Flow> arrivals = new HashSet<>();
+                block.branches().forEach(b -> b.arrivals().forEach(f -> {
+                    joins.add(f.to());
+                    arrivals.add(f);
+                }));
+                if (joins.size() > 1) {
+                    return "The paths that “" + split + "” runs in parallel meet again at different joins: make them "
+                        + "all go on to the same one.";
+                }
+                Step join = block.join();
+                for (Branch branch : block.branches()) {
+                    if (branch.arrivals().size() > 1) {
+                        return "A path that “" + split + "” starts comes into “" + join.label() + "” more than once: a "
+                            + "parallel join waits for one arrival of each path.";
+                    }
+                    if (!branch.arrivals().isEmpty() && branch.ends()) {
+                        return "One of the paths that “" + split + "” runs in parallel can end before “" + join.label()
+                            + "”: the join would wait for it forever. Let it go on to the join.";
+                    }
+                }
+                if (join != null && !new HashSet<>(ins(join.id())).equals(arrivals)) {
+                    return "“" + join.label() + "” waits for a path that “" + split + "” doesn't start: a parallel join "
+                        + "joins the paths of one split, and only those.";
+                }
+                for (Branch branch : block.branches()) {
+                    for (String id : branch.nodes()) {
+                        for (String from : before(id)) {
+                            if (!from.equals(block.split().id()) && !branch.nodes().contains(from)) {
+                                return "A path comes into what “" + split + "” runs in parallel from outside, at “"
+                                    + label(id) + "”: it would go on without the others. Let it come in before the "
+                                    + "split.";
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            /** D'où l'on arrive à une étape : ses chemins entrants, et l'étape qu'elle surveille. */
+            private List<String> before(String id) {
+                List<String> from = new ArrayList<>();
+                ins(id).forEach(f -> from.add(f.from()));
+                Step step = local.get(id);
+                if (step != null && step.boundary() && step.attachedTo() != null) {
+                    from.add(step.attachedTo());
+                }
+                return from;
             }
 
             /**
@@ -946,6 +1077,62 @@ public final class ProcessValidator {
             }
         }
 
+        /**
+         * Une décision qui revient à elle-même sans que l'étape qu'elle juge ait tourné de nouveau prendrait le même chemin
+         * pour toujours : l'issue qu'elle juge n'a pas changé. Le chemin de tous les autres cas revient par l'une des
+         * étapes qu'elle juge ; un chemin à condition, par celle de sa condition. Une étape d'agent tourne avec sa zone.
+         */
+        private void decisionLoops(Graph graph) {
+            for (Step decision : model.allSteps()) {
+                if (!DECISION.equals(decision.type()) || decision.id() == null) {
+                    continue;
+                }
+                List<Flow> paths = graph.flowsFrom(decision.id());
+                Set<String> judged = new LinkedHashSet<>();
+                for (Flow f : paths) {
+                    if (judges(f)) {
+                        judged.add(f.condition().step());
+                    }
+                }
+                for (Flow f : paths) {
+                    Set<String> again = new LinkedHashSet<>();
+                    if (f.otherwiseFlow()) {
+                        again.addAll(judged);
+                    } else if (judges(f)) {
+                        again.add(f.condition().step());
+                    }
+                    if (again.isEmpty() || f.to() == null) {
+                        continue;
+                    }
+                    Set<String> avoided = new LinkedHashSet<>(again);
+                    for (String id : again) {
+                        Step zone = parentOf.get(id);
+                        if (zone != null && ZONE.equals(zone.type())) {
+                            avoided.add(zone.id());
+                        }
+                    }
+                    if (!graph.reachableFrom(graph.entryOf(f.to()), avoided).contains(decision.id())) {
+                        continue;
+                    }
+                    if (f.to().equals(decision.id())) {
+                        add("decisionLoop", decision.id(), decision.name(), "The decision “" + decision.label() + "” has "
+                            + "a path back to itself: it would take it forever.");
+                    } else {
+                        String steps = String.join(" or ", again.stream().map(id -> "“" + label(id) + "”").toList());
+                        add("decisionLoop", decision.id(), decision.name(), "The decision “" + decision.label() + "” "
+                            + "comes back to itself by the path to “" + label(f.to()) + "” without " + steps + " running "
+                            + "again: it would take the same path forever. Put " + steps + " on the way back.");
+                    }
+                }
+            }
+        }
+
+        /** Vrai pour un chemin dont la condition juge une étape qui est là. */
+        private boolean judges(Flow f) {
+            return !f.otherwiseFlow() && f.condition() != null && !f.condition().wordsOnly()
+                && byId.containsKey(f.condition().step());
+        }
+
         private static Set<String> outcomes(Step step) {
             if (HUMAN.equals(step.type()) && step.human() != null && APPROVAL.equals(step.human().kind())) {
                 return new LinkedHashSet<>(List.of(APPROVED, REFUSED));
@@ -1103,6 +1290,8 @@ public final class ProcessValidator {
 
         private final Map<String, Set<String>> edges = new HashMap<>();
         private final Map<String, List<Flow>> flowsFrom = new HashMap<>();
+        /** Où l'on entre dans chaque étape : le début d'une étape de haut niveau, l'étape elle-même sinon. */
+        private final Map<String, String> entries = new HashMap<>();
         private String start;
 
         static Graph of(ProcessModel model) {
@@ -1116,6 +1305,7 @@ public final class ProcessValidator {
         private void container(List<Step> steps, List<Flow> flows) {
             Map<String, Step> local = new HashMap<>();
             steps.forEach(s -> local.put(s.id(), s));
+            steps.forEach(s -> entries.put(s.id(), entry(s)));
             for (Flow f : flows) {
                 flowsFrom.computeIfAbsent(f.from(), k -> new ArrayList<>()).add(f);
                 for (String from : exits(local.get(f.from()))) {
@@ -1170,6 +1360,10 @@ public final class ProcessValidator {
 
         List<Flow> flowsFrom(String id) {
             return flowsFrom.getOrDefault(id, List.of());
+        }
+
+        String entryOf(String id) {
+            return entries.getOrDefault(id, id);
         }
 
         /** Vrai quand un chemin d'au moins un pas mène de {@code from} à {@code to}. */
