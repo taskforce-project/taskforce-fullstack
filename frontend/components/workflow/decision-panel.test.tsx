@@ -65,7 +65,7 @@ describe("DecisionPanel", () => {
   it("past its deadline, a request is not offered: it says it expired, without a button", () => {
     const late = approval(9, { expiresAt: "2026-11-13T07:30:00" })
     render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={late} now={now} />)
-    expect(screen.getByText(/^This request expired .*. No answer in time: refused.$/)).toBeInTheDocument()
+    expect(screen.getByText(/^This request expired .*\. No answer in time: refused\.$/)).toBeInTheDocument()
     expect(screen.queryByRole("button")).toBeNull()
   })
 
