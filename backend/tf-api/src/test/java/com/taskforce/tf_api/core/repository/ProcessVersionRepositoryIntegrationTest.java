@@ -24,8 +24,9 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
 /**
  * Les versions des processus contre un vrai Postgres (V132) : changer une version publiée échoue en base, comme dans le
- * service ; une version ne s'efface pas seule, mais part avec son projet ; une clé ne change pas ; le modèle revient de
- * sa colonne JSON avec la même empreinte ; la liste des versions se lit sans les modèles.
+ * service ; une version ne s'efface pas seule, sa définition non plus, et personne ne vide les tables : elles partent
+ * avec leur projet ; l'auteur ne s'efface qu'avec son compte ; une clé ne change pas ; le modèle revient de sa colonne
+ * JSON avec la même empreinte ; la liste des versions se lit sans les modèles.
  *
  * <p>Chaque refus de la base se joue sous un point de sauvegarde : une erreur ne laisse pas la transaction du test
  * inutilisable pour la suite.</p>
@@ -91,18 +92,23 @@ class ProcessVersionRepositoryIntegrationTest extends AbstractIntegrationTest {
         ProcessVersion v = publish(1, "Integrate a module");
 
         for (String change : List.of("name = 'Renamed'", "digest = 'sha256:" + "0".repeat(64) + "'", "version = 5",
-            "model = '{}'::jsonb", "created_at = now() - interval '1 day'")) {
+            "model = '{}'::jsonb", "created_at = now() - interval '1 day'", "id = id + 1000", "created_by = NULL")) {
             refused("UPDATE process_versions SET " + change + " WHERE id = ?",
                 "A published version of a process never changes", v.getId());
         }
     }
 
     @Test
-    @DisplayName("une version ne s'efface pas seule ; elle part avec son projet, et sa définition aussi")
+    @DisplayName("une version ne s'efface pas seule, sa définition non plus, ni les tables d'un coup ; elles partent avec "
+        + "leur projet")
     void a_version_is_never_deleted_on_its_own() {
         ProcessVersion v = publish(1, "Integrate a module");
 
         refused("DELETE FROM process_versions WHERE id = ?", "is never deleted on its own", v.getId());
+        refused("DELETE FROM process_definitions WHERE id = ?", "A process is never deleted on its own",
+            definition.getId());
+        refused("TRUNCATE process_versions", "never emptied");
+        refused("TRUNCATE process_definitions CASCADE", "never emptied");
         jdbc.update("DELETE FROM projects WHERE id = ?", project.getId());
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM process_versions WHERE id = ?", Integer.class, v.getId()))
@@ -112,14 +118,22 @@ class ProcessVersionRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("l'auteur d'une version peut s'effacer : la version reste, sans lui")
-    void the_author_may_go() {
-        ProcessVersion v = publish(1, "Integrate a module");
+    @DisplayName("l'auteur d'une version ne s'efface qu'avec son compte : la version reste, sans lui")
+    void the_author_goes_with_the_account_only() {
+        User max = userRepository.save(User.builder().keycloakId("kc-max").email("max@it.dev").displayName("Max")
+            .isActive(true).build());
+        ProcessVersion v = versions.saveAndFlush(ProcessVersion.builder().definition(definition).version(1)
+            .name("Integrate a module").model(ProcessJson.toMap(model)).digest(ProcessFingerprint.of(model))
+            .createdBy(max).createdAt(LocalDateTime.now()).build());
 
-        jdbc.update("UPDATE process_versions SET created_by = NULL WHERE id = ?", v.getId());
+        refused("UPDATE process_versions SET created_by = NULL WHERE id = ?",
+            "A published version of a process never changes", v.getId());
+        jdbc.update("DELETE FROM users WHERE id = ?", max.getId());
 
         assertThat(jdbc.queryForObject("SELECT created_by FROM process_versions WHERE id = ?", Long.class, v.getId()))
             .isNull();
+        assertThat(jdbc.queryForObject("SELECT name FROM process_versions WHERE id = ?", String.class, v.getId()))
+            .isEqualTo("Integrate a module");
     }
 
     @Test
@@ -127,8 +141,10 @@ class ProcessVersionRepositoryIntegrationTest extends AbstractIntegrationTest {
     void the_key_stays_and_numbers_are_unique() {
         publish(1, "Integrate a module");
 
-        refused("UPDATE process_definitions SET process_key = 'other' WHERE id = ?",
-            "A process keeps its key and its project", definition.getId());
+        for (String change : List.of("process_key = 'other'", "id = id + 1000", "created_by = NULL")) {
+            refused("UPDATE process_definitions SET " + change + " WHERE id = ?",
+                "A process keeps its key and its project", definition.getId());
+        }
         refused("INSERT INTO process_versions (definition_id, version, name, model, digest) VALUES (?, 1, 'Again', "
             + "'{}'::jsonb, 'sha256:" + "0".repeat(64) + "')", "uq_process_versions_version", definition.getId());
         refused("INSERT INTO process_definitions (workspace_id, project_id, process_key) VALUES (?, ?, 'Not A Key')",
