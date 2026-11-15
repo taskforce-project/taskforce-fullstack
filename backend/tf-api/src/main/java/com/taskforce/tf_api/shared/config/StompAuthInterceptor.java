@@ -55,10 +55,12 @@ public class StompAuthInterceptor implements ChannelInterceptor {
     /** Les étapes des réponses de Cortex : même règle, {@code /topic/cortex.{userId}} n'est lu que par cette personne. */
     private static final Pattern CORTEX_TOPIC = Pattern.compile("/topic/cortex\\.([1-9]\\d*)");
     /**
-     * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board) et
-     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA).
+     * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board),
+     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA) et
+     * {@code /topic/projects.{projectId}.delivery} (ses missions et leurs demandes, la vue du workflow, R166).
      */
-    private static final Pattern PROJECT_TOPIC = Pattern.compile("/topic/projects\\.([1-9]\\d*)(?:\\.analysis)?");
+    private static final Pattern PROJECT_TOPIC =
+        Pattern.compile("/topic/projects\\.([1-9]\\d*)(?:\\.analysis|\\.delivery)?");
     /** Les caractères de motif n'appartiennent à aucune de ces formes. */
     private static final Pattern PATTERN_CHARACTERS = Pattern.compile("[*?{}#]");
     /** Ancien flux d'analyse IA par espace, {@code /topic/analysis.{workspaceId}} : retiré, tout abonnement est refusé. */
@@ -163,8 +165,9 @@ public class StompAuthInterceptor implements ChannelInterceptor {
      * souscription exige une session authentifiée ; en plus, les canaux porteurs de données sont vérifiés :
      * <ul>
      *   <li>{@code /topic/notifications.{userId}} — l'abonné doit être ce {@code userId} ;</li>
-     *   <li>{@code /topic/projects.{projectId}} et {@code /topic/projects.{projectId}.analysis} : l'abonné doit
-     *       <b>voir</b> le projet (public / membre / OWNER-ADMIN).</li>
+     *   <li>{@code /topic/projects.{projectId}}, {@code /topic/projects.{projectId}.analysis} et
+     *       {@code /topic/projects.{projectId}.delivery} : l'abonné doit <b>voir</b> le projet (membre de son espace,
+     *       puis public / membre / OWNER-ADMIN).</li>
      * </ul>
      * Avant, seul le topic notifications était contrôlé : {@code projects.*} / {@code analysis.*} n'exigeaient
      * qu'une session authentifiée → n'importe qui pouvait streamer l'activité d'un autre compte par simple

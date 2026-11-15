@@ -23,6 +23,9 @@ public interface DeliveryRunApprovalRepository extends JpaRepository<DeliveryRun
 
     List<DeliveryRunApproval> findByRunIdOrderByCreatedAtAsc(Long runId);
 
+    /** Les demandes de ces missions dans cet état, la plus ancienne d'abord (la vue du projet, R166). */
+    List<DeliveryRunApproval> findByRunIdInAndStatusOrderByCreatedAtAsc(Collection<Long> runIds, DeliveryApprovalStatus status);
+
     Optional<DeliveryRunApproval> findByIdAndRunId(Long id, Long runId);
 
     /**
@@ -90,6 +93,16 @@ public interface DeliveryRunApprovalRepository extends JpaRepository<DeliveryRun
                                                       @Param("now") LocalDateTime now,
                                                       @Param("running") DeliveryRunStatus running,
                                                       @Param("aliveSince") LocalDateTime aliveSince);
+
+    /**
+     * Clôt une demande, une seule fois : la ligne ne change que si elle attend encore. Deux lectures qui se croisent sur
+     * une demande échue, ou la fin de la mission et une lecture, ne la closent qu'une fois ; rend 1 pour celle qui l'a close.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE DeliveryRunApproval a SET a.status = :expired, a.updatedAt = :now "
+        + "WHERE a.id = :id AND a.status = :pending")
+    int expireIfPending(@Param("id") Long id, @Param("now") LocalDateTime now,
+                        @Param("pending") DeliveryApprovalStatus pending, @Param("expired") DeliveryApprovalStatus expired);
 
     /** Clôt les demandes encore ouvertes d'un run : expirées (run terminé, ou échéance passée). */
     @Modifying

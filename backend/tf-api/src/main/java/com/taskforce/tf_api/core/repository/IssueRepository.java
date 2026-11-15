@@ -112,6 +112,20 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """)
     List<Issue> findForKanban(@Param("projectId") Long projectId);
 
+    /**
+     * Les sous-issues d'un projet, chacune avec son parent et leur statut (la vue du workflow, R166) : le lien que la liste
+     * du kanban ne porte pas, elle qui ne prend que le premier niveau. Sans les issues archivées, d'un côté comme de l'autre.
+     */
+    @Query("""
+        SELECT i FROM Issue i
+        JOIN FETCH i.status
+        JOIN FETCH i.parent p JOIN FETCH p.status
+        WHERE i.project.id = :projectId AND p.project.id = :projectId
+          AND i.archivedAt IS NULL AND p.archivedAt IS NULL
+        ORDER BY p.sequenceNumber ASC, i.sequenceNumber ASC
+        """)
+    List<Issue> findSubIssues(@Param("projectId") Long projectId);
+
     /** Issues assignées à un utilisateur sur TOUT le workspace (vue My Work) — évite le N+1 côté front */
     @Query("""
         SELECT DISTINCT i FROM Issue i

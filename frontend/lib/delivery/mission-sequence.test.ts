@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+
 import { describe, expect, it } from "vitest"
 
 import type { DeliveryRun, DeliveryRunApproval, DeliveryRunEvent } from "@/lib/api/delivery-service"
@@ -665,5 +669,41 @@ describe("missionModel", () => {
     expect(missionModel({ model: "claude-haiku-4-5" }, [])).toBe("Haiku 4.5")
     expect(missionModel({ model: "claude-haiku-4-5" }, [ev("start", null, "Claude Code started")])).toBe("Haiku 4.5")
     expect(missionModel({ model: null }, [])).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Le contrat de l'étape : les cas que le serveur rejoue aussi (MissionStepsContractTest). La vue du workflow lit l'étape
+// du serveur, la vue du travail celle-ci : un cas qui ne rend pas la même étape des deux côtés fait échouer l'un des deux.
+// ---------------------------------------------------------------------------
+
+interface StepCase {
+  name: string
+  status: DeliveryRun["status"]
+  events: { kind: DeliveryRunEvent["kind"]; tool: string | null; text: string }[]
+  approvals: { tool: string; summary: string; status: DeliveryRunApproval["status"] }[]
+  step: MissionStepKey
+}
+
+const STEP_CASES = JSON.parse(
+  // Le chemin se construit sans `new URL` : sous happy-dom, `URL` n'est plus celle de Node.
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "../../../contracts/mission-steps/cases.json"), "utf8"),
+) as { format: string; cases: StepCase[] }
+
+describe("the step of a mission, on the contract shared with the server (contracts/mission-steps)", () => {
+  it("reads the contract it shares with the server, which covers the five steps", () => {
+    expect(STEP_CASES.format).toBe("taskforce-mission-steps/1")
+    expect(new Set(STEP_CASES.cases.map((c) => c.step))).toEqual(new Set(["understand", "plan", "do", "check", "handover"]))
+  })
+
+  it.each(STEP_CASES.cases.map((c) => [c.name, c] as const))("%s", (_name, c) => {
+    const events = c.events.map((e, i): DeliveryRunEvent => ({ seq: i + 1, kind: e.kind, tool: e.tool, text: e.text, at: null }))
+    const approvals = c.approvals.map((a, i) => approval({
+      id: i + 1, tool: a.tool, summary: a.summary, status: a.status, decidedAt: null, decidedBy: null, scope: null,
+    }))
+
+    const steps = missionSequence({ ...RUN, status: c.status }, { events, approvals }, t).steps
+
+    expect(steps.find((step) => step.current)?.key).toBe(c.step)
   })
 })

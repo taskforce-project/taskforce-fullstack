@@ -69,6 +69,7 @@ class MissionResultServiceTest {
     @Mock private DeliveryRunner deliveryRunner;
     @Mock private MissionChangesService missionChanges;
     @Mock private MissionEvidenceService evidenceService;
+    @Mock private ProjectDeliveryFeed feed;
 
     private MissionResultService service;
     private User delegator;
@@ -78,7 +79,7 @@ class MissionResultServiceTest {
     @BeforeEach
     void setUp() {
         service = new MissionResultService(runRepository, userRepository, linkRepository, visibilityGuard, pullRequests,
-            mergedPullRequests, issueService, deliveryService, deliveryRunner, missionChanges, evidenceService);
+            mergedPullRequests, issueService, deliveryService, deliveryRunner, missionChanges, evidenceService, feed);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(1L).slug("acme").build();
         Project project = Project.builder().id(12L).workspace(workspace).build();
@@ -285,6 +286,8 @@ class MissionResultServiceTest {
         }
 
         verify(issueService).logActivity(run.getIssue(), delegator, expected, null, null, null);
+        // Le geste change la mission : le topic des missions du projet le dit (R166).
+        verify(feed).run(run);
     }
 
     @ParameterizedTest(name = "branche [{0}], {1} commits : l'issue terminée, sans rien fusionner ni fermer")

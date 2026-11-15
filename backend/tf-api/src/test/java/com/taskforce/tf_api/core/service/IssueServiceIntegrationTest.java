@@ -15,9 +15,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
+import com.taskforce.tf_api.core.dto.request.CreateIssueRelationRequest;
 import com.taskforce.tf_api.core.dto.request.CreateIssueRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateIssueRequest;
 import com.taskforce.tf_api.core.dto.response.IssueResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectIssueRelationsResponse;
+import com.taskforce.tf_api.core.enums.IssueActivityType;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.enums.ProjectRole;
@@ -1285,6 +1288,123 @@ class IssueServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() -> issueService.updateStatus(
                     SLUG, project.getId(), foreign.getId(), upd, owner.getId()))
                 .isInstanceOf(ResourceNotFoundException.class);
+        }
+    }
+
+    // =========================================================================
+    @Nested
+    @DisplayName("les liens entre les issues d'un projet (la vue du workflow, R166)")
+    class ProjectRelations {
+
+        private IssueResponse issue(String title) {
+            return issueService.createIssue(SLUG, project.getId(), createRequest(title, null), owner.getId());
+        }
+
+        private Long relate(IssueResponse source, IssueResponse target, String type, Long projectId, User by) {
+            var req = new CreateIssueRelationRequest();
+            req.setTargetIssueId(target.getId());
+            req.setRelationType(type);
+            return issueService.addRelation(SLUG, projectId, source.getId(), req, by.getId()).getId();
+        }
+
+        private List<String> activity(IssueResponse issue, IssueActivityType action) {
+            return issueService.listActivity(SLUG, project.getId(), issue.getId(), owner.getId()).stream()
+                .filter(a -> a.getAction() == action)
+                .map(a -> action == IssueActivityType.RELATION_ADDED ? a.getNewValue() : a.getOldValue())
+                .toList();
+        }
+
+        @Test
+        @DisplayName("une lecture : chaque relation de la source vers la cible, chaque sous-issue avec son parent, sans les archivées")
+        void one_read_gives_every_relation_and_every_sub_issue() {
+            IssueResponse a = issue("Design the export");
+            IssueResponse b = issue("Build the export");
+            IssueResponse c = issue("Document the export");
+            IssueResponse child = issue("Export the CSV");
+            IssueResponse old = issue("Old export");
+            UpdateIssueRequest toParent = new UpdateIssueRequest();
+            toParent.setParentId(a.getId());
+            issueService.updateIssue(SLUG, project.getId(), child.getId(), toParent, owner.getId());
+            relate(a, b, "BLOCKS", project.getId(), owner);
+            relate(b, c, "RELATES_TO", project.getId(), owner);
+            relate(old, a, "DUPLICATE", project.getId(), owner);
+            issueService.setArchived(SLUG, project.getId(), old.getId(), true, owner.getId());
+            em.flush();
+            em.clear();
+
+            ProjectIssueRelationsResponse links = issueService.listProjectRelations(SLUG, project.getId(), owner.getId());
+
+            assertThat(links.relations())
+                .extracting(r -> r.source().getIdentifier() + " " + r.relationType() + " " + r.target().getIdentifier())
+                .containsExactly(a.getIdentifier() + " BLOCKS " + b.getIdentifier(), b.getIdentifier() + " RELATES_TO " + c.getIdentifier());
+            assertThat(links.relations().get(0).source().getTitle()).isEqualTo("Design the export");
+            assertThat(links.relations().get(0).source().getStatus().getName()).isEqualTo("Todo");
+            assertThat(links.relations().get(0).createdBy().getEmail()).isEqualTo("owner@it.dev");
+            assertThat(links.subIssues())
+                .extracting(s -> s.parent().getIdentifier() + " > " + s.issue().getIdentifier())
+                .containsExactly(a.getIdentifier() + " > " + child.getIdentifier());
+        }
+
+        @Test
+        @DisplayName("un lien posé puis retiré entre à l'activité des deux issues, chacune de son côté (V131)")
+        void a_link_enters_the_activity_of_both_issues() {
+            IssueResponse a = issue("Design the export");
+            IssueResponse b = issue("Build the export");
+            Long blocks = relate(a, b, "BLOCKS", project.getId(), owner);
+            relate(b, a, "DUPLICATE", project.getId(), owner);
+
+            assertThat(activity(a, IssueActivityType.RELATION_ADDED))
+                .containsExactlyInAnyOrder("BLOCKS " + b.getIdentifier(), "DUPLICATED_BY " + b.getIdentifier());
+            assertThat(activity(b, IssueActivityType.RELATION_ADDED))
+                .containsExactlyInAnyOrder("BLOCKED_BY " + a.getIdentifier(), "DUPLICATE_OF " + a.getIdentifier());
+
+            // Retiré depuis la cible : le lien vu de chaque côté, comme à l'ajout.
+            issueService.deleteRelation(SLUG, project.getId(), b.getId(), blocks, owner.getId());
+
+            assertThat(activity(a, IssueActivityType.RELATION_REMOVED)).containsExactly("BLOCKS " + b.getIdentifier());
+            assertThat(activity(b, IssueActivityType.RELATION_REMOVED)).containsExactly("BLOCKED_BY " + a.getIdentifier());
+            assertThat(issueService.listProjectRelations(SLUG, project.getId(), owner.getId()).relations()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("🔒 un lien ne se retire pas depuis le projet d'un autre espace (IDOR)")
+        void a_link_cannot_be_removed_from_another_workspace() {
+            IssueResponse a = issue("Design the export");
+            IssueResponse b = issue("Build the export");
+            Long blocks = relate(a, b, "BLOCKS", project.getId(), owner);
+            // Mallory est propriétaire de son propre espace et de son projet : elle y écrit, mais rien d'ici.
+            User mallory = userRepository.save(User.builder()
+                .keycloakId("kc-mallory").email("mallory@it.dev").displayName("Mallory").isActive(true).build());
+            Workspace hers = workspaceRepository.save(Workspace.builder().name("Mallory WS").slug("ws-mallory").owner(mallory).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder().workspace(hers).user(mallory).role(WorkspaceRole.OWNER).build());
+            Project herProject = projectRepository.save(Project.builder()
+                .workspace(hers).name("Hers").identifier("HER").createdBy(mallory).build());
+
+            assertThatThrownBy(() -> issueService.deleteRelation("ws-mallory", herProject.getId(), a.getId(), blocks, mallory.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+            assertThat(issueService.listProjectRelations(SLUG, project.getId(), owner.getId()).relations())
+                .extracting(ProjectIssueRelationsResponse.Relation::id).containsExactly(blocks);
+        }
+
+        @Test
+        @DisplayName("🔒 gardée comme la liste des issues : hors de l'espace refusé, projet privé caché à qui n'en est pas")
+        void read_like_the_issue_list() {
+            IssueResponse a = issue("Design the export");
+            IssueResponse b = issue("Build the export");
+            relate(a, b, "BLOCKS", project.getId(), owner);
+            User stranger = userRepository.save(User.builder()
+                .keycloakId("kc-stranger").email("stranger@it.dev").displayName("Stranger").isActive(true).build());
+            User member = userRepository.save(User.builder()
+                .keycloakId("kc-rel-member").email("rel-member@it.dev").displayName("Member").isActive(true).build());
+            workspaceMemberRepository.save(WorkspaceMember.builder().workspace(workspace).user(member).role(WorkspaceRole.MEMBER).build());
+
+            assertThatThrownBy(() -> issueService.listProjectRelations(SLUG, project.getId(), stranger.getId()))
+                .isInstanceOf(BusinessException.class).hasMessage("Access denied");
+            // Le projet est privé par défaut : un membre de l'espace qui n'y est pas invité ne le voit pas.
+            assertThatThrownBy(() -> issueService.listProjectRelations(SLUG, project.getId(), member.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+            projectMemberRepository.save(ProjectMember.builder().project(project).user(member).role(ProjectRole.VIEWER).build());
+            assertThat(issueService.listProjectRelations(SLUG, project.getId(), member.getId()).relations()).hasSize(1);
         }
     }
 
