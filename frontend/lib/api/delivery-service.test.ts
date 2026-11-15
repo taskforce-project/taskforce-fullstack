@@ -131,7 +131,7 @@ describe('delivery-service', () => {
   });
 
   it('listProjectRuns GET une page des missions du projet (page, taille), sans toast', async () => {
-    const page = { content: [{ run: { id: 9 }, step: null, links: {}, approvals: [] }], pageNumber: 1, last: true };
+    const page = { content: [{ run: { id: 9 }, step: { key: 'understand', seq: null, kind: null, tool: null, at: null }, links: {}, approvals: [] }], pageNumber: 1, last: true };
     vi.mocked(apiClient.get).mockResolvedValue(envelope(page));
 
     const result = await listProjectRuns(SLUG, 12, 1, 30);
@@ -150,7 +150,7 @@ describe('delivery-service', () => {
   });
 
   it('getProjectRun GET une mission du projet, sans toast', async () => {
-    const row = { run: { id: 9 }, step: { seq: 4, kind: 'tool', tool: 'Edit', at: null }, links: {}, approvals: [] };
+    const row = { run: { id: 9 }, step: { key: 'do', seq: 4, kind: 'tool', tool: 'Edit', at: null }, links: {}, approvals: [] };
     vi.mocked(apiClient.get).mockResolvedValue(envelope(row));
 
     const result = await getProjectRun(SLUG, 12, 9);

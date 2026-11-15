@@ -21,7 +21,6 @@ const delivery = vi.hoisted(() => ({
   fetchProjectRuns: vi.fn(),
   fetchProjectRun: vi.fn(),
   applyProjectRunStep: vi.fn(),
-  fetchActivity: vi.fn(),
 }))
 const issues = vi.hoisted(() => ({ fetchProjectRelations: vi.fn() }))
 const workflow = vi.hoisted(() => ({ applyJobUpdate: vi.fn(), fetchJobs: vi.fn() }))
@@ -36,9 +35,10 @@ vi.mock("@/lib/store/workflow-store", () => ({
   useWorkflowStore: (selector: (s: typeof workflow) => unknown) => selector(workflow),
 }))
 
-import { MAX_FOLLOWED_TIMELINES, PROJECT_LIVE_DELAY_MS, analysisTopic, deliveryTopic, useProjectLive } from "./use-project-live"
+import { PROJECT_LIVE_DELAY_MS, analysisTopic, deliveryTopic, useProjectLive } from "./use-project-live"
 
-const row = (id: number, status: string) => ({ run: { id, status }, step: null, links: {}, approvals: [] })
+const STARTED = { key: "understand", seq: null, kind: null, tool: null, at: null }
+const row = (id: number, status: string) => ({ run: { id, status }, step: STARTED, links: {}, approvals: [] })
 const deliveryEvent = (over: Record<string, unknown>) => JSON.stringify({
   type: "run", projectId: 30, runId: 9, issueId: 90, status: "RUNNING", outcome: null, approvalId: null, approvalStatus: null,
   step: null, ...over,
@@ -54,7 +54,6 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     stomp.closed = 0
     delivery.fetchProjectRuns.mockResolvedValue([row(9, "RUNNING"), row(8, "DONE"), row(7, "RUNNING")])
     delivery.fetchProjectRun.mockResolvedValue(null)
-    delivery.fetchActivity.mockResolvedValue(null)
     issues.fetchProjectRelations.mockResolvedValue(null)
     workflow.fetchJobs.mockResolvedValue(undefined)
   })
@@ -74,29 +73,14 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     expect(issues.fetchProjectRelations).not.toHaveBeenCalled()
   })
 
-  it("reads the project's links and first page of missions, with the timeline of those at work", async () => {
+  it("reads the project's links and first page of missions, each with its step: no timeline", async () => {
     renderHook(() => useProjectLive("acme", 30))
     await vi.advanceTimersByTimeAsync(0)
 
     expect(issues.fetchProjectRelations).toHaveBeenCalledWith("acme", 30)
     expect(delivery.fetchProjectRuns).toHaveBeenCalledWith("acme", 30)
-    expect(delivery.fetchActivity.mock.calls).toEqual([["acme", 9], ["acme", 7]])
-  })
-
-  it(`follows the timeline of ${MAX_FOLLOWED_TIMELINES} missions at work at most`, async () => {
-    delivery.fetchProjectRuns.mockResolvedValue(Array.from({ length: MAX_FOLLOWED_TIMELINES + 3 }, (_, i) => row(i + 1, "RUNNING")))
-    renderHook(() => useProjectLive("acme", 30))
-    await vi.advanceTimersByTimeAsync(0)
-
-    expect(delivery.fetchActivity).toHaveBeenCalledTimes(MAX_FOLLOWED_TIMELINES)
-  })
-
-  it("reads no timeline when the missions can't be read", async () => {
-    delivery.fetchProjectRuns.mockResolvedValue(null)
-    renderHook(() => useProjectLive("acme", 30))
-    await vi.advanceTimersByTimeAsync(0)
-
-    expect(delivery.fetchActivity).not.toHaveBeenCalled()
+    expect(delivery.fetchProjectRuns).toHaveBeenCalledTimes(1)
+    expect(delivery.fetchProjectRun).not.toHaveBeenCalled()
   })
 
   it("listens to the project's missions and analyses on one connection", () => {
@@ -107,33 +91,31 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     expect(analysisTopic(30)).toBe("/topic/projects.30.analysis")
   })
 
-  it.each(["run", "approval"])("reads a mission again, and its timeline, once a burst of %s events is over", async (type) => {
+  it.each(["run", "approval"])("puts the step of a %s event in place at once, and reads the mission again once a burst is over", async (type) => {
     renderHook(() => useProjectLive("acme", 30))
     await vi.advanceTimersByTimeAsync(0)
-    delivery.fetchActivity.mockClear()
+    const asked = { key: "handover", seq: 12, kind: "tool", tool: "Edit", at: "2026-11-13T10:00:00" }
+    const answered = { ...asked, key: "do" }
 
-    send(deliveryTopic(30), deliveryEvent({ type, approvalId: 4, approvalStatus: "PENDING" }))
-    send(deliveryTopic(30), deliveryEvent({ type, approvalId: 4, approvalStatus: "ALLOWED" }))
+    send(deliveryTopic(30), deliveryEvent({ type, approvalId: 4, approvalStatus: "PENDING", step: asked }))
+    send(deliveryTopic(30), deliveryEvent({ type, approvalId: 4, approvalStatus: "ALLOWED", step: answered }))
+    expect(delivery.applyProjectRunStep.mock.calls).toEqual([[30, 9, asked], [30, 9, answered]])
     expect(delivery.fetchProjectRun).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(PROJECT_LIVE_DELAY_MS)
 
     expect(delivery.fetchProjectRun).toHaveBeenCalledTimes(1)
     expect(delivery.fetchProjectRun).toHaveBeenCalledWith("acme", 30, 9)
-    expect(delivery.fetchActivity).toHaveBeenCalledTimes(1)
-    expect(delivery.fetchActivity).toHaveBeenCalledWith("acme", 9)
   })
 
-  it("puts a new step in place at once, then reads what follows in the timeline, without reading the mission again", async () => {
+  it("puts a new step in place at once, without reading the mission again", async () => {
     renderHook(() => useProjectLive("acme", 30))
     await vi.advanceTimersByTimeAsync(0)
-    delivery.fetchActivity.mockClear()
-    const step = { seq: 12, kind: "tool", tool: "Edit", at: "2026-11-13T10:00:00" }
+    const step = { key: "check", seq: 12, kind: "test", tool: "npm test", at: "2026-11-13T10:00:00" }
 
     send(deliveryTopic(30), deliveryEvent({ type: "step", step }))
 
     expect(delivery.applyProjectRunStep).toHaveBeenCalledWith(30, 9, step)
     await vi.advanceTimersByTimeAsync(PROJECT_LIVE_DELAY_MS)
-    expect(delivery.fetchActivity).toHaveBeenCalledWith("acme", 9)
     expect(delivery.fetchProjectRun).not.toHaveBeenCalled()
   })
 
@@ -150,7 +132,6 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
   it("ignores what is not this project's, or not a message at all", async () => {
     renderHook(() => useProjectLive("acme", 30))
     await vi.advanceTimersByTimeAsync(0)
-    delivery.fetchActivity.mockClear()
 
     send(deliveryTopic(30), deliveryEvent({ projectId: 31 }))
     send(deliveryTopic(30), deliveryEvent({ runId: "9" }))
@@ -161,7 +142,7 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     await vi.advanceTimersByTimeAsync(PROJECT_LIVE_DELAY_MS)
 
     expect(delivery.fetchProjectRun).not.toHaveBeenCalled()
-    expect(delivery.fetchActivity).not.toHaveBeenCalled()
+    expect(delivery.applyProjectRunStep).not.toHaveBeenCalled()
     expect(workflow.applyJobUpdate).not.toHaveBeenCalled()
   })
 

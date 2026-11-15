@@ -534,7 +534,7 @@ describe('delivery-store : les missions d’un projet (R166)', () => {
   function row(id: number, createdAt: string, over: Partial<ProjectRun> = {}): ProjectRun {
     return {
       run: makeRun({ id, issueId: id * 10, createdAt, status: 'RUNNING' }),
-      step: { seq: 3, kind: 'tool', tool: 'Edit', at: createdAt },
+      step: { key: 'do', seq: 3, kind: 'tool', tool: 'Edit', at: createdAt },
       links: { branch: null, pullRequestUrl: null, followUpOf: null, followedUpBy: null },
       approvals: [],
       ...over,
@@ -655,14 +655,23 @@ describe('delivery-store : les missions d’un projet (R166)', () => {
   });
 
   it('applyProjectRunStep pose une étape plus loin, jamais une étape d’avant, et rien pour une mission non lue', () => {
-    useDeliveryStore.setState({ projectRuns: { [PROJECT]: { rows: [row(9, '2026-11-13T10:00:00'), row(8, '2026-11-13T09:00:00', { step: null })], page: 0, last: true, total: 2 } } });
-    const next = { seq: 4, kind: 'test' as const, tool: null, at: '2026-11-13T10:05:00' };
+    const started = { key: 'understand' as const, seq: null, kind: null, tool: null, at: null };
+    useDeliveryStore.setState({ projectRuns: { [PROJECT]: { rows: [row(9, '2026-11-13T10:00:00'), row(8, '2026-11-13T09:00:00', { step: started })], page: 0, last: true, total: 2 } } });
+    const next = { key: 'check' as const, seq: 4, kind: 'test' as const, tool: null, at: '2026-11-13T10:05:00' };
+    const steps = () => useDeliveryStore.getState().projectRuns[PROJECT]?.rows.map((r) => r.step);
 
     expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 9, next)).toBe(true);
-    expect(useDeliveryStore.getState().projectRuns[PROJECT]?.rows[0].step).toEqual(next);
-    expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 9, { ...next, seq: 2 })).toBe(false);
-    expect(useDeliveryStore.getState().projectRuns[PROJECT]?.rows[0].step?.seq).toBe(4);
+    expect(steps()?.[0]).toEqual(next);
+    expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 9, { ...next, key: 'do', seq: 2 })).toBe(false);
+    expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 9, { ...started, key: 'plan' })).toBe(false);
+    expect(steps()?.[0]).toEqual(next);
 
+    // Au même événement, l'étape change : une demande de pousser la branche ouverte, puis tranchée.
+    const asked = { ...next, key: 'handover' as const };
+    expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 9, asked)).toBe(true);
+    expect(steps()?.[0]).toEqual(asked);
+
+    // Une mission sans chronologie prend toute étape.
     expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 8, next)).toBe(true);
     expect(useDeliveryStore.getState().applyProjectRunStep(PROJECT, 42, next)).toBe(false);
     expect(useDeliveryStore.getState().applyProjectRunStep(99, 9, next)).toBe(false);

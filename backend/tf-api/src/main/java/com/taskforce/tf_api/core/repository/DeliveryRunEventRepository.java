@@ -21,6 +21,12 @@ public interface DeliveryRunEventRepository extends JpaRepository<DeliveryRunEve
     /** Événements après {@code after}, dans l'ordre : le front lit la suite de ce qu'il a déjà. */
     List<DeliveryRunEvent> findByRunIdAndSeqGreaterThanOrderBySeqAsc(Long runId, Integer after, Pageable page);
 
+    /** La chronologie d'une mission, dans l'ordre : son étape en cours se lit de toute la chronologie (R166). */
+    List<DeliveryRunEvent> findByRunIdOrderBySeqAsc(Long runId);
+
+    /** Les chronologies de ces missions en une requête, mission par mission, chacune dans l'ordre (la vue du projet, R166). */
+    List<DeliveryRunEvent> findByRunIdInOrderByRunIdAscSeqAsc(Collection<Long> runIds);
+
     /** Le dernier événement de chacune de ces missions : leur étape en cours, pour la vue du projet (R166). */
     @Query("""
         SELECT e FROM DeliveryRunEvent e

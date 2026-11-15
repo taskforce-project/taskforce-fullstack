@@ -18,18 +18,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import com.taskforce.tf_api.core.dto.response.DeliveryRunActivityResponse;
 import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
-import com.taskforce.tf_api.core.model.DeliveryRunEvent;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
-import com.taskforce.tf_api.core.repository.DeliveryRunEventRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
@@ -60,12 +57,12 @@ import static org.mockito.Mockito.when;
 class ProjectDeliveryServiceTest {
 
     @Mock private DeliveryRunRepository runRepository;
-    @Mock private DeliveryRunEventRepository eventRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private ProjectVisibilityGuard visibilityGuard;
     @Mock private BrainAccessGuard access;
     @Mock private DeliveryService deliveryService;
     @Mock private DeliveryActivityService activityService;
+    @Mock private MissionStepReader stepReader;
 
     @InjectMocks private ProjectDeliveryService service;
 
@@ -87,12 +84,6 @@ class ProjectDeliveryServiceTest {
 
     private DeliveryRun run(long id, DeliveryRunStatus status) {
         return DeliveryRun.builder().id(id).issue(issue).providerKey("claude-code").status(status).build();
-    }
-
-    private static DeliveryRunEvent event(DeliveryRun run, int seq, String kind, String tool) {
-        DeliveryRunEvent event = DeliveryRunEvent.builder().run(run).seq(seq).kind(kind).tool(tool).text("...").build();
-        ReflectionTestUtils.setField(event, "createdAt", LocalDateTime.of(2026, 11, 13, 10, seq));
-        return event;
     }
 
     private static DeliveryRunRepository.FollowUpRow followUp(long parent, long run) {
@@ -119,21 +110,26 @@ class ProjectDeliveryServiceTest {
         commented.setResultUrl("https://taskforce.example/issues/55#comment-3");
         when(runRepository.findByProjectId(eq(12L), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(working, reviewed, commented), PageRequest.of(0, 20), 3));
-        when(eventRepository.findLastByRunIds(List.of(100L, 90L, 80L))).thenReturn(List.of(event(working, 12, "tool", "Edit")));
         when(runRepository.findFollowUps(List.of(100L, 90L, 80L))).thenReturn(List.of(followUp(90L, 95L), followUp(90L, 100L)));
-        when(activityService.pendingApprovals(List.of(working, reviewed, commented), 7L)).thenReturn(Map.of(100L, List.of(pending(9L, true))));
+        Map<Long, List<DeliveryRunActivityResponse.Approval>> open = Map.of(100L, List.of(pending(9L, true)));
+        when(activityService.pendingApprovals(List.of(working, reviewed, commented), 7L)).thenReturn(open);
+        ProjectRunResponse.Step doing = new ProjectRunResponse.Step("do", 12, "tool", "Edit", LocalDateTime.of(2026, 11, 13, 10, 12));
+        ProjectRunResponse.Step delivered = new ProjectRunResponse.Step("handover", null, null, null, null);
+        // L'étape se lit des demandes que la page montre : celles qui restent ouvertes une fois les échues closes.
+        when(stepReader.stepsOf(List.of(working, reviewed, commented), open))
+            .thenReturn(Map.of(100L, doing, 90L, delivered, 80L, delivered));
 
         PageResponse<ProjectRunResponse> page = service.listRuns("acme", 12L, 0, 20, 7L);
 
         assertThat(page.getTotalElements()).isEqualTo(3);
         assertThat(page.getContent()).extracting(row -> row.run().id()).containsExactly(100L, 90L, 80L);
         ProjectRunResponse first = page.getContent().get(0);
-        assertThat(first.step()).isEqualTo(new ProjectRunResponse.Step(12, "tool", "Edit", LocalDateTime.of(2026, 11, 13, 10, 12)));
+        assertThat(first.step()).isEqualTo(doing);
         assertThat(first.links()).isEqualTo(new ProjectRunResponse.Links(null, null, 90L, null));
         assertThat(first.approvals()).extracting(DeliveryRunActivityResponse.Approval::canDecide).containsExactly(true);
         // La mission reprise : sa branche, sa pull request, et la dernière mission qui la reprend.
         ProjectRunResponse second = page.getContent().get(1);
-        assertThat(second.step()).isNull();
+        assertThat(second.step()).isEqualTo(delivered);
         assertThat(second.links()).isEqualTo(new ProjectRunResponse.Links("tf/web-4", "https://github.com/acme/website/pull/212", null, 100L));
         assertThat(second.approvals()).isEmpty();
         // Un résultat qui n'est pas une pull request n'en devient pas une.
@@ -164,7 +160,7 @@ class ProjectDeliveryServiceTest {
         assertThat(asked.getValue().getOffset()).isLessThanOrEqualTo(Integer.MAX_VALUE);
         assertThat(read.getContent()).isEmpty();
         // Une page vide ne lit ni étapes, ni reprises, ni demandes.
-        verifyNoInteractions(eventRepository, activityService);
+        verifyNoInteractions(stepReader, activityService);
     }
 
     @Test
@@ -205,13 +201,16 @@ class ProjectDeliveryServiceTest {
     void one_mission_reads_like_a_row_of_the_page() {
         DeliveryRun working = run(100L, DeliveryRunStatus.RUNNING);
         when(runRepository.findInProject(100L, 12L)).thenReturn(Optional.of(working));
-        when(eventRepository.findLastByRunIds(List.of(100L))).thenReturn(List.of(event(working, 3, "test", null)));
         when(runRepository.findFollowUps(List.of(100L))).thenReturn(List.of());
-        when(activityService.pendingApprovals(List.of(working), 7L)).thenReturn(Map.of(100L, List.of(pending(9L, false))));
+        Map<Long, List<DeliveryRunActivityResponse.Approval>> open = Map.of(100L, List.of(pending(9L, false)));
+        when(activityService.pendingApprovals(List.of(working), 7L)).thenReturn(open);
+        when(stepReader.stepsOf(List.of(working), open))
+            .thenReturn(Map.of(100L, new ProjectRunResponse.Step("check", 3, "test", null, LocalDateTime.of(2026, 11, 13, 10, 3))));
 
         ProjectRunResponse row = service.run("acme", 12L, 100L, 7L);
 
         assertThat(row.run().id()).isEqualTo(100L);
+        assertThat(row.step().key()).isEqualTo("check");
         assertThat(row.step().kind()).isEqualTo("test");
         assertThat(row.approvals()).extracting(DeliveryRunActivityResponse.Approval::canDecide).containsExactly(false);
 

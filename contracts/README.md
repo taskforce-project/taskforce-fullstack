@@ -9,6 +9,7 @@ cases.
 | Rules bundle, `taskforce-rules/1` | `rules/taskforce-rules-1.schema.json`, `rules/default.rules.json` | the server publishes it and judges its own tools with it, the runner applies it to the agent's actions | `rules/cases.json`: the same actions must get the same decision on both sides |
 | Evidence file, `taskforce-evidence/1` | `evidence/taskforce-evidence-1.schema.json` | the server writes the chain, anyone can check an export | `evidence/chain-cases.json`: the same events must give the same hashes on both sides |
 | Agent adapter | `agent/adapter.md` | the runner, one adapter per agent | the adapter tests in `taskforce-runner` |
+| Mission step, `taskforce-mission-steps/1` | `mission-steps/cases.json` | the server gives the step of each mission to the workflow view (`MissionSteps`), the screen draws the steps of one mission (`frontend/lib/delivery/mission-sequence.ts`) | the same cases: the same status, timeline and requests must give the same step on both sides |
 
 ## One engine for both sides
 
@@ -56,3 +57,12 @@ compiles the module again from the Java sources and refuses a difference with th
    `JSON.stringify` does: `\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t` as two-character escapes, any other code unit below
    0x20 and any lone surrogate as `\u` with four lowercase hex digits, everything else as is.
 5. The file's `root` is the `hash` of its last event. Changing or removing any event changes `root`.
+
+## Mission steps: two codes, one set of cases
+
+A mission goes through five steps: `understand`, `plan`, `do`, `check`, `handover`. The screen draws them from a
+mission's timeline, and the server gives the current one with each mission of a project, so that the workflow view
+does not read every timeline. Here the rules are written twice, in TypeScript (`missionSequence`, the step marked
+`current`) and in Java (`MissionSteps.current`), and `mission-steps/cases.json` keeps them together: the frontend's
+`mission-sequence.test.ts` and the server's `MissionStepsContractTest` replay every case. A rule changed on one side
+only fails one of them; a new rule comes with its case.
