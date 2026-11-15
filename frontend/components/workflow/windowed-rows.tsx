@@ -66,8 +66,10 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
   const [measured, setMeasured] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [viewport, setViewport] = useState({ top: 0, height: 0 })
 
-  // Ce qui se voit : relu à chaque défilement (une fois par image) et à chaque changement de taille.
-  useLayoutEffect(() => {
+  // Ce qui se voit : relu à chaque défilement (une fois par image) et à chaque changement de taille. Un effet, pas un effet
+  // de mise en page : l'élément qui défile appartient au parent, et React ne pose sa référence qu'après les effets de mise
+  // en page de ses enfants. Lue trop tôt, elle était vide, et la colonne ne suivait jamais le défilement (R161, H1).
+  useEffect(() => {
     const element = scrollRef.current
     if (!element) return
     let frame = 0

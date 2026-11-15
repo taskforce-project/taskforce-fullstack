@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { render } from "@testing-library/react"
+import { act, fireEvent, render } from "@testing-library/react"
 import { useRef } from "react"
 
 import { FALLBACK_VIEWPORT, OVERSCAN_PX, WindowedRows, rowWindow } from "./windowed-rows"
@@ -42,6 +42,19 @@ describe("WindowedRows", () => {
     expect(rendered).toBeLessThanOrEqual(Math.ceil((FALLBACK_VIEWPORT + OVERSCAN_PX) / 100) + 1)
     const spacer = container.querySelector("[data-row-key]")?.parentElement?.parentElement as HTMLElement
     expect(Number.parseInt(spacer.style.paddingBottom, 10)).toBeGreaterThan(150_000)
+  })
+
+  it("follows the scroll of the element its parent owns: the rows under the eyes render, the first ones leave", async () => {
+    const { container } = render(<Column count={2000} />)
+    const scroller = container.firstElementChild as HTMLElement
+    await act(async () => {
+      scroller.scrollTop = 100 * 100
+      fireEvent.scroll(scroller)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+    const keys = [...container.querySelectorAll<HTMLElement>("[data-row-key]")].map((row) => row.dataset.rowKey)
+    expect(keys).toContain("row-100")
+    expect(keys).not.toContain("row-0")
   })
 
   it("renders nothing for an empty column", () => {
