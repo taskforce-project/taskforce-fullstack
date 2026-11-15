@@ -8,6 +8,23 @@ import {
 const base = { statuses: STATUSES, runs: [], relations: [], documents: {}, me: ME, today: "2026-11-13" }
 
 /** La carte du projet (séance n°25, W1) : les colonnes comme étapes, les issues comme nœuds, en une passe. */
+describe("une mission plus ancienne dans l'adresse", () => {
+  it("run-{id} d'une mission plus ancienne mène aussi au nœud de son issue", () => {
+    const model = buildWorkflow({
+      statuses: STATUSES, issues: [issue(1)], relations: [], documents: {}, me: ME, today: "2026-11-13",
+      runs: [
+        projectRun(deliveryRun(1, 1, { status: "FAILED", createdAt: "2026-11-10T09:00:00" })),
+        projectRun(deliveryRun(2, 1, { createdAt: "2026-11-12T09:00:00" }), [approval(7)]),
+      ],
+    })
+    expect(model.byKey.get("issue-1")?.run?.run.id).toBe(2)
+    expect(resolveNode(model, "run-1")?.key).toBe("issue-1")
+    expect(resolveNode(model, "run-2")?.key).toBe("issue-1")
+    expect(resolveNode(model, "approval-7")?.key).toBe("issue-1")
+    expect(resolveNode(model, "run-99")).toBeNull()
+  })
+})
+
 describe("la carte d'un projet", () => {
   it("une colonne par étape, dans l'ordre du tableau ; chaque issue dans la sienne", () => {
     const model = buildWorkflow({ ...base, statuses: [DONE, TODO, DOING], issues: [issue(1), issue(2, { status: DOING }), issue(3, { status: DONE })] })

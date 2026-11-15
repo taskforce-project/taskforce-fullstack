@@ -227,6 +227,15 @@ export function buildWorkflow(input: WorkflowInput): WorkflowModel {
     return { status, nodes, counts: stageCounts }
   })
 
+  // Chaque mission d'une issue de la carte, pas seulement la dernière : `run-{id}` dans l'adresse mène à son issue, et
+  // l'inspecteur montre cette mission-là.
+  for (const row of runs) {
+    const key = issueKey(row.run.issueId)
+    if (!byKey.has(key)) continue
+    if (!runKeys.has(row.run.id)) runKeys.set(row.run.id, key)
+    for (const approval of row.approvals) if (!approvalKeys.has(approval.id)) approvalKeys.set(approval.id, key)
+  }
+
   return { stages, byKey, runKeys, approvalKeys, counts, done, total }
 }
 

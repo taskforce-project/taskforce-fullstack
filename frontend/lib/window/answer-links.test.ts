@@ -20,9 +20,9 @@ describe("splitLinks", () => {
   it("links the issues the window knows by their id, the others of a project by their key", () => {
     expect(splitLinks("Moved WEB-28 to Done; WEB-31 waits.", index)).toEqual([
       "Moved ",
-      { kind: "issue", text: "WEB-28", projectId: 3, issueId: 28, key: "WEB-28" },
+      { kind: "issue", text: "WEB-28", projectId: 3, issueId: 28, key: "WEB-28", runId: null },
       " to Done; ",
-      { kind: "issue", text: "WEB-31", projectId: 3, issueId: null, key: "WEB-31" },
+      { kind: "issue", text: "WEB-31", projectId: 3, issueId: null, key: "WEB-31", runId: null },
       " waits.",
     ])
   })

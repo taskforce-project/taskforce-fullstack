@@ -143,6 +143,24 @@ describe("Inspector", () => {
     await waitFor(() => expect(useDeliveryStore.getState().downloadEvidence).toHaveBeenCalledWith("acme", 1, "json"))
   })
 
+  it("a mission named in the address shows itself, even an earlier one, and says so", () => {
+    const older = projectRun(deliveryRun(1, 1, { status: "FAILED", error: "Tests failed", createdAt: "2026-11-10T09:00:00" }))
+    const model = buildWorkflow({
+      statuses: STATUSES, issues: [issue(1, { status: DOING })], relations: [], documents: {}, me: ME, today: "2026-11-13",
+      runs: [older, projectRun(deliveryRun(2, 1, { createdAt: "2026-11-12T09:00:00" }))],
+    })
+    const node = model.byKey.get("issue-1")
+    if (!node) throw new Error("no node")
+    render(
+      <Inspector slug="acme" projectId={3} node={node} model={model} stages={STATUSES} agents={[]} agent={null} me={ME} tab="evidence"
+        mode="side" width={360} gestures={{ move: vi.fn(), stop: vi.fn(), retry: vi.fn(), handTo: vi.fn(), ask: vi.fn() }} menuOpen={false}
+        now={now} onTab={vi.fn()} onResize={vi.fn()} onClose={vi.fn()} onSelect={vi.fn()} onOpen={vi.fn()} onOpenMission={vi.fn()} onMenuOpen={vi.fn()}
+        focusRun={older} />,
+    )
+    expect(screen.getByText(/^An earlier mission of this issue, started /)).toBeInTheDocument()
+    expect(useDeliveryStore.getState().fetchEvidence).toHaveBeenCalledWith("acme", 1)
+  })
+
   it("Evidence of an issue without a mission says the record starts with one", () => {
     const model = buildWorkflow({ statuses: STATUSES, issues: [issue(1)], relations: [], documents: {}, me: ME, today: "2026-11-13", runs: [] })
     const node = model.byKey.get("issue-1")

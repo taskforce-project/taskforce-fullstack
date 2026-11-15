@@ -10,7 +10,7 @@ import { NodeMenu, nodeCan, type NodeGestures } from "@/components/workflow/node
 import { StateMark } from "@/components/workflow/state-mark"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { DeliveryProvider } from "@/lib/api/delivery-service"
+import type { DeliveryProvider, ProjectRun } from "@/lib/api/delivery-service"
 import type { IssueStatus } from "@/lib/api/issue-service"
 import { approvalOutcome, approvalWords } from "@/lib/delivery/approval-words"
 import { missionSequence, requestWant } from "@/lib/delivery/mission-sequence"
@@ -56,7 +56,7 @@ function Row({ label, children }: Readonly<{ label: string; children: ReactNode 
  */
 export function Inspector({
   slug, projectId, node, model, stages, agents, agent, me, tab, onTab, mode, width, onResize, onClose, onSelect, onOpen,
-  onOpenMission, gestures, menuOpen, onMenuOpen, now,
+  onOpenMission, gestures, menuOpen, onMenuOpen, now, focusRun = null,
 }: Readonly<{
   slug: string
   projectId: number
@@ -79,8 +79,19 @@ export function Inspector({
   menuOpen: boolean
   onMenuOpen: (open: boolean) => void
   now: Date
+  /** Une mission que l'adresse nomme (`run-{id}`) : Activity et Evidence montrent celle-là, même plus ancienne. */
+  focusRun?: ProjectRun | null
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
+  const earlier = focusRun !== null && focusRun.run.id !== node.run?.run.id ? focusRun : null
+  const shown: WorkflowNode = earlier ? { ...node, run: earlier } : node
+  const earlierLine = earlier
+    ? (
+      <p className="mb-3 text-xs text-muted-foreground">
+        {earlier.run.createdAt ? fillText(t.inspector.earlierAt, { time: momentWords(earlier.run.createdAt, now) }) : t.inspector.earlier}
+      </p>
+    )
+    : null
   const word = t.state[node.state]
   const can = nodeCan(node, me, agents)
 
@@ -178,10 +189,12 @@ export function Inspector({
               onSelect={onSelect} onOpen={onOpen} gestures={gestures} can={can} now={now} />
           </TabsContent>
           <TabsContent value="activity">
-            <Activity slug={slug} projectId={projectId} node={node} me={me} />
+            {earlierLine}
+            <Activity slug={slug} projectId={projectId} node={shown} me={me} />
           </TabsContent>
           <TabsContent value="evidence">
-            <Evidence slug={slug} node={node} onOpenMission={onOpenMission} now={now} />
+            {earlierLine}
+            <Evidence slug={slug} node={shown} onOpenMission={onOpenMission} now={now} />
           </TabsContent>
         </div>
       </Tabs>

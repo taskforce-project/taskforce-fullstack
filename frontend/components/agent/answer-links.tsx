@@ -27,6 +27,20 @@ function AnswerLinkView({ slug, link }: Readonly<{ slug: string; link: AnswerLin
   const t = usePreferencesStore((s) => s.t.window)
   const pathname = usePathname()
   const { openIssue, openBoard, openWorkflow } = usePaneNavigation()
+  // Une mission que la réponse a lancée ou touchée (séance n°25, §9) : son application est le workflow, sur son nœud.
+  if (link.kind === "issue" && link.runId !== null && link.issueId !== null) {
+    const mission = `run-${link.runId}`
+    return (
+      <PaneLink
+        href={workflowPath(slug, link.projectId, mission)}
+        open={() => openWorkflow(link.projectId, mission)}
+        title={fillText(t.missionOnWorkflow, { key: link.key })}
+        className={LINK}
+      >
+        {link.text}
+      </PaneLink>
+    )
+  }
   const onItsWorkflow = workflowProjectOf(pathname) === link.projectId
   if (onItsWorkflow && (link.kind === "project" || link.issueId !== null)) {
     const node = link.kind === "issue" && link.issueId !== null ? `issue-${link.issueId}` : null

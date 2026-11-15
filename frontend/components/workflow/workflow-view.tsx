@@ -139,6 +139,11 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   }, [statuses, issues, runs, relations, documents, me, now])
 
   const selected = model ? resolveNode(model, nodeParam) : null
+  // Une mission nommée dans l'adresse (`run-{id}`) : l'inspecteur montre celle-là, même si l'issue en a une plus récente.
+  const focusRun = useMemo(() => {
+    const id = /^run-(\d+)$/.exec(nodeParam ?? "")?.[1]
+    return id && runs ? (runs.find((row) => row.run.id === Number(id)) ?? null) : null
+  }, [nodeParam, runs])
   const selectedKey = selected?.key ?? null
 
   // Ce que chaque carte montre, calculé une fois par nœud et gardé tant que le nœud ne change pas.
@@ -406,6 +411,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             menuOpen={menuOpen}
             onMenuOpen={setMenuOpen}
             now={now}
+            focusRun={focusRun}
           />
         )}
       </div>

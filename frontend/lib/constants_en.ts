@@ -526,6 +526,8 @@ export const CONSTANTS_EN = {
     },
     inspector: {
       region: "About the chosen node",
+      earlier: "An earlier mission of this issue.",
+      earlierAt: "An earlier mission of this issue, started {time}.",
       details: "Details",
       activity: "Activity",
       evidence: "Evidence",
@@ -1827,6 +1829,7 @@ export const CONSTANTS_EN = {
     boardOf: "Open the board of {project}",
     workflow: "Workflow",
     workflowOf: "Open the workflow of {project}",
+    missionOnWorkflow: "Show the mission of {key} on its workflow",
     toggleRightPanel: "Show or hide what surrounds the conversation",
     workView: "Work view",
     workViewOf: "Follow the work on {mission}",

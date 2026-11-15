@@ -81,6 +81,20 @@ describe("les liens des réponses", () => {
     nav.pathname = "/acme"
   })
 
+  // Une mission que la réponse a lancée (séance n°25, §9) : son lien ouvre son nœud du workflow, cette mission-là.
+  it("a mission the answer started opens its node on the workflow, that very mission", () => {
+    const delegated: AssistantToolCall = {
+      name: "delegate_issue", status: "success", input: null, output: null, record: "rec",
+      target: { issueId: 28, projectId: 3, key: "WEB-28", title: "Fix the form", runId: 12 },
+    }
+    render(<AnswerText text="I handed WEB-28 to Claude Code." toolCalls={[delegated]} />)
+    const link = screen.getByRole("link", { name: "WEB-28" })
+    expect(link).toHaveAttribute("href", "/acme/projects/3/workflow?node=run-12")
+    expect(link).toHaveAttribute("title", "Show the mission of WEB-28 on its workflow")
+    fireEvent.click(link)
+    expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/3/workflow?c=9&node=run-12", { scroll: false })
+  })
+
   it("leaves the rest as text: code, other keys, a workspace without projects", () => {
     render(<AnswerText text={"Run `WEB-28` in UTF-8."} />)
     expect(screen.queryByRole("link")).toBeNull()
