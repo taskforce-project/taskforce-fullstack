@@ -132,6 +132,14 @@ public class ProcessValidatorTest {
         flows(container).add(newFlow(via.path("id").asText() + "-next", via.path("id").asText(), to));
     }
 
+    /** Une échéance d'un jour sur l'étape {@code on} de la phase {@code stage}, qui mène à {@code to}. */
+    static void deadline(ObjectNode root, String stage, String on, String to) {
+        ObjectNode container = step(root, stage);
+        steps(container).add(JSON.createObjectNode().put("id", on + "-late").put("type", "deadline")
+            .put("name", "A day without an answer").put("attachedTo", on).put("duration", "P1D"));
+        flows(container).add(newFlow(on + "-late-" + to, on + "-late", to));
+    }
+
     static void assertRefused(List<Problem> problems, String code) {
         assertThat(problems).extracting(Problem::code).contains(code);
         for (Problem p : problems) {
@@ -211,6 +219,47 @@ public class ProcessValidatorTest {
                 }),
             refusal("pausePointShape", "un point de pause qui n'est pas une liste de contrôle",
                 r -> ((ObjectNode) step(r, "before-mission").get("human")).put("kind", "approval")),
+            // Un point de pause ne se contourne pas (R159, H1).
+            refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant les agents, qui mène à leur zone",
+                r -> deadline(r, "specify", "before-mission", "spec-zone")),
+            refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant d'appliquer, qui mène plus loin",
+                r -> deadline(r, "review", "before-apply", "review-end")),
+            refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant de livrer, qui mène à la livraison",
+                r -> deadline(r, "deliver", "before-delivery", "deliver-module")),
+            refusal("pausePointMisplaced", "une décision devant le point d'avant de livrer, dont un chemin va droit à la "
+                + "livraison", r -> {
+                    ObjectNode deliver = step(r, "deliver");
+                    steps(deliver).add(JSON.createObjectNode().put("id", "signed").put("type", "decision")
+                        .put("name", "Is the acceptance signed?").put("answeredBy", "project-lead"));
+                    flow(deliver, "deliver-start-before-delivery").put("to", "signed");
+                    ObjectNode straight = newFlow("signed-deliver-module", "signed", "deliver-module");
+                    straight.putObject("condition").put("text", "The acceptance is signed")
+                        .put("step", "sign-acceptance").put("outcome", "approved");
+                    flows(deliver).add(straight);
+                    flows(deliver).add(newFlow("signed-before-delivery", "signed", "before-delivery").put("otherwise", true));
+                }),
+            refusal("pausePointMisplaced", "une échéance de la livraison qui mène droit à la fin", r -> {
+                steps(r).add(JSON.createObjectNode().put("id", "deliver-late").put("type", "deadline")
+                    .put("name", "A week without delivery").put("attachedTo", "deliver").put("duration", "P7D"));
+                flows(r).add(newFlow("deliver-late-delivered", "deliver-late", "delivered"));
+            }),
+            refusal("pausePointMisplaced", "un chemin d'échec de la revue qui mène à la recette sans le point d'avant "
+                + "d'appliquer", r -> {
+                    steps(r).add(JSON.createObjectNode().put("id", "review-failed").put("type", "failure")
+                        .put("name", "The review fails").put("attachedTo", "review"));
+                    flows(r).add(newFlow("review-failed-accept", "review-failed", "accept"));
+                }),
+            refusal("pausePointInParallel", "le point d'avant de livrer et la livraison côte à côte, en parallèle", r -> {
+                ObjectNode deliver = step(r, "deliver");
+                steps(deliver).add(JSON.createObjectNode().put("id", "deliver-split").put("type", "parallel"));
+                steps(deliver).add(JSON.createObjectNode().put("id", "deliver-join").put("type", "parallel"));
+                flow(deliver, "deliver-start-before-delivery").put("to", "deliver-split");
+                flows(deliver).add(newFlow("deliver-split-before-delivery", "deliver-split", "before-delivery"));
+                flows(deliver).add(newFlow("deliver-split-deliver-module", "deliver-split", "deliver-module"));
+                flow(deliver, "before-delivery-deliver-module").put("to", "deliver-join");
+                flow(deliver, "deliver-module-watch").put("from", "deliver-module").put("to", "deliver-join");
+                flows(deliver).add(newFlow("deliver-join-watch", "deliver-join", "watch"));
+            }),
             // Le processus.
             refusal("format", "un format inconnu", r -> r.put("format", "taskforce-process/9")),
             refusal("badKey", "une clé qui n'en est pas une", r -> r.put("key", "Integrate A Module")),

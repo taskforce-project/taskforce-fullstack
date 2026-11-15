@@ -137,6 +137,8 @@ public final class ProcessValidator {
         private final Map<String, Step> byId = new LinkedHashMap<>();
         /** Le conteneur de chaque étape : son étape de haut niveau ou sa zone, ou null au niveau du processus. */
         private final Map<String, Step> parentOf = new HashMap<>();
+        /** Les points de pause déjà refusés sur un chemin en parallèle : un refus chacun. */
+        private final Set<String> parallelPausePoints = new HashSet<>();
 
         Run(ProcessModel model, Context context) {
             this.model = model;
@@ -348,6 +350,9 @@ public final class ProcessValidator {
             if (linked && local.values().stream().filter(s -> START.equals(s.type())).count() == 1) {
                 reach(local, out);
             }
+            if (linked) {
+                new Blocks(local, out, in).pausePoints();
+            }
         }
 
         private void shape(Step step, List<Flow> ins, List<Flow> outs) {
@@ -443,6 +448,12 @@ public final class ProcessValidator {
             }
             if (DEADLINE.equals(step.type())) {
                 duration(step, step.duration(), true);
+                // Une échéance mènerait plus loin sans que personne ait passé la liste : un point de pause attend.
+                if (host != null && host.pausePoint() != null) {
+                    add("pausePointDeadline", step.id(), step.name(), "The pause point “" + host.label() + "” has a "
+                        + "deadline, “" + step.label() + "”: the process would go on without anyone checking its list. "
+                        + "A pause point waits for its person: remove the deadline.");
+                }
             }
         }
 
@@ -481,6 +492,179 @@ public final class ProcessValidator {
                         + "one.");
                 }
             }
+        }
+
+        // --------------------------------------------------------------------------------------------- en parallèle
+
+        /**
+         * Les chemins en parallèle d'un conteneur. Un partage lance des chemins ; chacun va de son premier pas jusqu'à
+         * une jonction ou à une fin, et passe d'un seul bond ce qu'un partage plus loin lance et rejoint (son bloc). Ce
+         * que tient un de ces chemins tourne en même temps que les autres.
+         */
+        private final class Blocks {
+
+            private final Map<String, Step> local;
+            private final Map<String, List<Flow>> out;
+            private final Map<String, List<Flow>> in;
+            /** Les échéances et les chemins d'échec de chaque étape : ils continuent son chemin. */
+            private final Map<String, List<Step>> watching = new HashMap<>();
+            private final Map<String, Block> blocks = new HashMap<>();
+            private final Set<String> open = new HashSet<>();
+
+            Blocks(Map<String, Step> local, Map<String, List<Flow>> out, Map<String, List<Flow>> in) {
+                this.local = local;
+                this.out = out;
+                this.in = in;
+                for (Step s : local.values()) {
+                    if (s.boundary() && s.attachedTo() != null && local.containsKey(s.attachedTo())) {
+                        watching.computeIfAbsent(s.attachedTo(), k -> new ArrayList<>()).add(s);
+                    }
+                }
+            }
+
+            private List<Flow> outs(String id) {
+                return out.getOrDefault(id, List.of());
+            }
+
+            private List<Flow> ins(String id) {
+                return in.getOrDefault(id, List.of());
+            }
+
+            boolean isSplit(Step s) {
+                return PARALLEL.equals(s.type()) && ins(s.id()).size() <= 1 && outs(s.id()).size() >= 2;
+            }
+
+            boolean isJoin(Step s) {
+                return PARALLEL.equals(s.type()) && ins(s.id()).size() >= 2 && outs(s.id()).size() <= 1;
+            }
+
+            /** Le bloc d'un partage ; null quand le partage se retrouve dans son propre bloc (une boucle). */
+            Block block(Step split) {
+                Block known = blocks.get(split.id());
+                if (known != null || !open.add(split.id())) {
+                    return known;
+                }
+                List<Branch> branches = new ArrayList<>();
+                for (Flow first : outs(split.id())) {
+                    branches.add(branch(split, first));
+                }
+                Set<String> joins = new LinkedHashSet<>();
+                branches.forEach(b -> b.arrivals().forEach(f -> joins.add(f.to())));
+                Block block = new Block(split, branches, joins.size() == 1 ? local.get(joins.iterator().next()) : null);
+                open.remove(split.id());
+                blocks.put(split.id(), block);
+                return block;
+            }
+
+            private Branch branch(Step split, Flow first) {
+                Set<String> nodes = new LinkedHashSet<>();
+                List<Flow> arrivals = new ArrayList<>();
+                boolean ends = false;
+                boolean unclear = false;
+                Deque<Hop> todo = new ArrayDeque<>();
+                todo.push(new Hop(first.to(), first));
+                while (!todo.isEmpty()) {
+                    Hop hop = todo.pop();
+                    Step step = local.get(hop.to());
+                    if (step == null) {
+                        continue;
+                    }
+                    if (step.id().equals(split.id())) {
+                        // Le chemin revient à son propre partage : une boucle.
+                        unclear = true;
+                        continue;
+                    }
+                    if (isJoin(step)) {
+                        if (hop.via() != null && !arrivals.contains(hop.via())) {
+                            arrivals.add(hop.via());
+                        }
+                        continue;
+                    }
+                    if (!nodes.add(step.id())) {
+                        continue;
+                    }
+                    if (END.equals(step.type())) {
+                        ends = true;
+                        continue;
+                    }
+                    List<Flow> next = outs(step.id());
+                    if (isSplit(step)) {
+                        Block inner = block(step);
+                        if (inner == null) {
+                            unclear = true;
+                            continue;
+                        }
+                        inner.branches().forEach(b -> nodes.addAll(b.nodes()));
+                        unclear |= inner.branches().stream().anyMatch(Branch::unclear);
+                        if (inner.join() == null) {
+                            boolean joined = inner.branches().stream().anyMatch(b -> !b.arrivals().isEmpty());
+                            unclear |= joined;
+                            ends |= !joined;
+                            continue;
+                        }
+                        nodes.add(inner.join().id());
+                        next = outs(inner.join().id());
+                    }
+                    for (Flow f : next) {
+                        todo.push(new Hop(f.to(), f));
+                    }
+                    for (Step b : watching.getOrDefault(step.id(), List.of())) {
+                        todo.push(new Hop(b.id(), null));
+                    }
+                }
+                return new Branch(nodes, arrivals, ends, unclear);
+            }
+
+            /**
+             * Un point de pause n'est sur aucun des chemins d'un partage : les autres chemins iraient sans attendre que
+             * sa liste soit passée. Pour une étape de haut niveau sur un de ces chemins, ce sont les siens.
+             */
+            void pausePoints() {
+                for (Step split : local.values()) {
+                    if (!isSplit(split)) {
+                        continue;
+                    }
+                    Block block = block(split);
+                    if (block == null) {
+                        continue;
+                    }
+                    for (Branch branch : block.branches()) {
+                        for (String id : branch.nodes()) {
+                            List<Step> inside = new ArrayList<>();
+                            within(local.get(id), inside);
+                            for (Step s : inside) {
+                                if (s.pausePoint() != null && s.id() != null && parallelPausePoints.add(s.id())) {
+                                    add("pausePointInParallel", s.id(), s.name(), "The pause point “" + s.label() + "” is "
+                                        + "on one of the paths that “" + split.label() + "” runs in parallel: the others "
+                                        + "would go on without waiting for its list. Put it before the split, or after "
+                                        + "the join.");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Une étape et tout ce qu'elle tient, à tous les niveaux. */
+        private static void within(Step step, List<Step> out) {
+            out.add(step);
+            step.stepsOrEmpty().forEach(s -> within(s, out));
+        }
+
+        /** Un pas d'un chemin : l'étape où il mène, et le chemin qui y mène (nul pour une échéance ou un échec). */
+        private record Hop(String to, Flow via) {
+        }
+
+        /**
+         * Un chemin lancé par un partage : les étapes qu'il tient, les chemins par lesquels il entre dans une jonction,
+         * s'il peut finir avant, et s'il est trop embrouillé pour en juger (il revient à son partage).
+         */
+        private record Branch(Set<String> nodes, List<Flow> arrivals, boolean ends, boolean unclear) {
+        }
+
+        /** Le bloc d'un partage : ses chemins, et la jonction où ils se retrouvent (nulle quand il n'y en a pas une seule). */
+        private record Block(Step split, List<Branch> branches, Step join) {
         }
 
         // --------------------------------------------------------------------------------------------- réglages
@@ -773,9 +957,11 @@ public final class ProcessValidator {
         }
 
         /**
-         * Les trois points de pause de TF-J2-10, dès que des agents travaillent : avant une mission (aucune zone d'agent
-         * ne commence sans l'avoir passé), avant d'appliquer (après le travail d'un agent), avant de livrer (après le
-         * point d'avant d'appliquer).
+         * Les trois points de pause de TF-J2-10, dès que des agents travaillent, et aucun ne se contourne : aucune zone
+         * d'agent ne commence sans être passée par celui d'avant une mission ; celui d'avant d'appliquer vient après le
+         * travail d'un agent, et on ne rejoint celui d'avant de livrer qu'en passant par lui ; aucun travail d'agent ne
+         * mène à une fin du processus sans passer par celui d'avant de livrer. Une échéance ne passe jamais un point de
+         * pause, et aucun n'est sur un chemin en parallèle : ces deux refus se disent avec les chemins de leur conteneur.
          */
         private void pausePoints(Graph graph) {
             List<Step> zones = model.allSteps().stream().filter(s -> ZONE.equals(s.type())).toList();
@@ -819,12 +1005,32 @@ public final class ProcessValidator {
                     "The pause point before the changes are applied comes before any agent works: put it after their "
                         + "work.");
             }
-            boolean deliveryAfterApply = points.get(BEFORE_DELIVERY).stream()
-                .anyMatch(d -> points.get(BEFORE_APPLY).stream().anyMatch(a -> graph.reaches(a.id(), d.id())));
-            if (!deliveryAfterApply) {
-                add("pausePointMisplaced", points.get(BEFORE_DELIVERY).get(0).id(),
-                    points.get(BEFORE_DELIVERY).get(0).name(), "The pause point before the work is delivered comes "
-                        + "before the one before the changes are applied: put it after.");
+            // Comme celui d'avant une mission : chaque chemin vers le point d'avant de livrer passe par celui d'avant
+            // d'appliquer, et chaque chemin du travail d'un agent à une fin du processus passe par celui d'avant de
+            // livrer. Une fin qui arrête tout ne livre rien : elle abandonne.
+            Set<String> apply = new HashSet<>();
+            points.get(BEFORE_APPLY).forEach(s -> apply.add(s.id()));
+            Set<String> beforeApply = graph.reachableAvoiding(apply);
+            for (Step delivery : points.get(BEFORE_DELIVERY)) {
+                if (beforeApply.contains(delivery.id())) {
+                    add("pausePointMisplaced", delivery.id(), delivery.name(), "The pause point “" + delivery.label()
+                        + "” can be reached before anyone has checked the list before the changes are applied: every "
+                        + "path to it goes through that pause point first.");
+                }
+            }
+            Set<String> delivery = new HashSet<>();
+            points.get(BEFORE_DELIVERY).forEach(s -> delivery.add(s.id()));
+            Set<String> ends = new LinkedHashSet<>();
+            model.stepsOrEmpty().stream().filter(s -> END.equals(s.type()) && !Boolean.TRUE.equals(s.terminate()))
+                .forEach(s -> ends.add(s.id()));
+            for (Step zone : zones) {
+                Set<String> after = graph.reachableFrom(zone.id(), delivery);
+                String end = ends.stream().filter(after::contains).findFirst().orElse(null);
+                if (end != null) {
+                    add("pausePointMisplaced", zone.id(), zone.name(), "The work of “" + zone.label() + "” can reach “"
+                        + label(end) + "” without the pause point before the work is delivered: every path from an "
+                        + "agent's work to the end goes through it.");
+                }
             }
         }
 
@@ -974,7 +1180,12 @@ public final class ProcessValidator {
 
         /** Ce qu'on rejoint depuis le début sans passer par {@code avoided}. */
         Set<String> reachableAvoiding(Set<String> avoided) {
-            if (start == null) {
+            return start == null ? Set.of() : reachableFrom(start, avoided);
+        }
+
+        /** Ce qu'on rejoint depuis {@code from} (compris) sans passer par {@code avoided}. */
+        Set<String> reachableFrom(String from, Set<String> avoided) {
+            if (from == null || avoided.contains(from)) {
                 return Set.of();
             }
             Map<String, Set<String>> cut = new HashMap<>();
@@ -983,7 +1194,7 @@ public final class ProcessValidator {
                     cut.put(k, v);
                 }
             });
-            Set<String> seen = walk(Set.of(start), cut);
+            Set<String> seen = walk(Set.of(from), cut);
             seen.removeAll(avoided);
             return seen;
         }
