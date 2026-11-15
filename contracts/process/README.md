@@ -13,7 +13,7 @@ The code: `backend/tf-api/src/main/java/com/taskforce/tf_api/core/process` (`Pro
 | File | What it is | Proved by |
 | --- | --- | --- |
 | `integrate-a-module.bpmn` | The first default workflow, of software delivery ("integrate a module", E20), as TaskForce exports it. Open it in any BPMN modeler. | `ProcessContractTest`: it is the export of the model, valid for the BPMN 2.0 XSD and for `taskforce-process-1.xsd` |
-| `round-trip/*.bpmn` | The same file as a modeler rewrites it: today bpmn-moddle, the model library of bpmn.io under Camunda's Desktop Modeler | written by `frontend/lib/process/bpmn-moddle.test.ts`; `ProcessContractTest` imports each one and finds the same fingerprint |
+| `round-trip/*.bpmn` | The same file as a modeler rewrites it: bpmn-moddle, the model library of bpmn.io under Camunda's modelers, and Camunda's Web Modeler (8.10) itself | `integrate-a-module.bpmn-moddle.bpmn` is written by `frontend/lib/process/bpmn-moddle.test.ts`; `integrate-a-module.camunda-web-modeler.bpmn` was opened in Camunda's Web Modeler and downloaded unchanged on 15/11/2026; `ProcessContractTest` imports each one and finds the same fingerprint |
 | `taskforce-process-1.xsd` | The XML Schema of the `tf:` extension | the same contract test validates the export against it |
 
 The default workflow itself lives with the backend, as a model:
