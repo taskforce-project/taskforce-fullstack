@@ -15,6 +15,12 @@ export const PROJECT_LIVE_DELAY_MS = 300
 /** Sans connexion après ce délai (la première, ou après une coupure), l'écran se dit hors ligne. */
 export const OFFLINE_AFTER_MS = 10_000
 
+/**
+ * La première lecture attend la connexion, qui la fait (elle couvre ce qui est publié avant l'abonnement) : une seule
+ * lecture au départ. Sans connexion après ce délai, elle part quand même : les missions se lisent sans le direct.
+ */
+export const FIRST_READ_FALLBACK_MS = 2_000
+
 /** Le topic des missions d'un projet et celui de ses analyses IA. */
 export const deliveryTopic = (projectId: number): string => `/topic/projects.${projectId}.delivery`
 export const analysisTopic = (projectId: number): string => `/topic/projects.${projectId}.analysis`
@@ -106,14 +112,18 @@ export function useProjectLive(slug: string | null | undefined, projectId: numbe
       if (job && typeof job.id === "number" && job.projectId === projectId) applyJobUpdate(job)
     }
 
-    void load()
+    let connected = false
+    later("first-read", () => { if (!connected && !disposed) void load() }, FIRST_READ_FALLBACK_MS)
     goOffline()
     const unsubscribe = subscribeTopics(
       { [deliveryTopic(projectId)]: onDelivery, [analysisTopic(projectId)]: onAnalysis },
       () => {
-        const pending = timers.get("offline")
-        if (pending) clearTimeout(pending)
-        timers.delete("offline")
+        connected = true
+        for (const name of ["offline", "first-read"]) {
+          const pending = timers.get(name)
+          if (pending) clearTimeout(pending)
+          timers.delete(name)
+        }
         if (!disposed) setLive((was) => ({ ...was, state: "live" }))
         // À chaque connexion, la première comprise : ce qui a été publié avant l'abonnement, ou pendant une coupure,
         // n'arrive jamais par le topic.

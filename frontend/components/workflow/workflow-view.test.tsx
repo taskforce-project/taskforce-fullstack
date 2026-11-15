@@ -28,7 +28,11 @@ vi.mock("next/navigation", () => ({
   },
 }))
 vi.mock("@/lib/hooks/use-project-realtime", () => ({ useProjectRealtime: vi.fn() }))
-vi.mock("@/lib/hooks/use-stomp", () => ({ subscribeTopics: vi.fn(() => () => {}), subscribeTopic: vi.fn(() => () => {}) }))
+// Le direct se connecte tout de suite : sa première connexion lit les missions (une lecture au départ).
+vi.mock("@/lib/hooks/use-stomp", () => ({
+  subscribeTopics: vi.fn((_handlers: unknown, onConnect?: () => void) => { onConnect?.(); return () => {} }),
+  subscribeTopic: vi.fn(() => () => {}),
+}))
 vi.mock("@/lib/api/issue-service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/issue-service")>()),
   listStatuses: vi.fn(),

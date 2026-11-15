@@ -596,6 +596,27 @@ describe('delivery-store : les missions d’un projet (R166)', () => {
     expect(useDeliveryStore.getState().projectRuns[PROJECT]).toMatchObject({ page: 2, last: true, total: 120 });
   });
 
+  it('fetchAllProjectRuns garde une ligne relue pendant sa lecture, plus récente, et une mission créée entre-temps', async () => {
+    useDeliveryStore.setState({ projectRuns: { [PROJECT]: { rows: [row(9, '2026-11-13T10:00:00')], page: 0, last: true, total: 1 } } });
+    let release: (value: ProjectRunsPage) => void = () => {};
+    vi.mocked(svc.listProjectRuns).mockImplementation(() => new Promise<ProjectRunsPage>((resolve) => { release = resolve; }));
+    let rows: ProjectRun[] | null = null;
+    await act(async () => {
+      const reading = useDeliveryStore.getState().fetchAllProjectRuns('acme', PROJECT);
+      // Pendant la lecture des pages, un événement fait relire la mission 9 (elle a fini) et en fait connaître une nouvelle.
+      vi.mocked(svc.getProjectRun).mockResolvedValueOnce(row(9, '2026-11-13T10:00:00', { run: makeRun({ id: 9, issueId: 90, createdAt: '2026-11-13T10:00:00', status: 'DONE' }) }));
+      await useDeliveryStore.getState().fetchProjectRun('acme', PROJECT, 9);
+      vi.mocked(svc.getProjectRun).mockResolvedValueOnce(row(12, '2026-11-13T12:00:00'));
+      await useDeliveryStore.getState().fetchProjectRun('acme', PROJECT, 12);
+      // La page arrive ensuite, avec la mission 9 encore au travail, et sans la nouvelle.
+      release(page([row(9, '2026-11-13T10:00:00'), row(8, '2026-11-13T09:00:00')]));
+      rows = await reading;
+    });
+    expect(ids()).toEqual([12, 9, 8]);
+    expect(useDeliveryStore.getState().projectRuns[PROJECT]?.rows.find((r) => r.run.id === 9)?.run.status).toBe('DONE');
+    expect(rows).toHaveLength(3);
+  });
+
   it('fetchAllProjectRuns borne les pages lues, garde une mission une fois, et rend null en cas d’échec', async () => {
     const twice = row(5, '2026-11-05T10:00:00');
     vi.mocked(svc.listProjectRuns).mockImplementation(async (_slug, _project, pageNumber = 0) => page(

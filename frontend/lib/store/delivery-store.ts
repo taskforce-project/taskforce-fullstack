@@ -174,6 +174,14 @@ export const PROJECT_RUN_PAGES_MAX = 40;
 const PROJECT_RUN_CONCURRENCY = 3;
 
 /** Les lignes d'une page ajoutées à celles déjà lues, une fois chacune (une mission a pu glisser d'une page à l'autre). */
+/**
+ * Une horloge qui ne fait qu'avancer : quand chaque mission a été relue seule (un événement l'a demandé), et quand chaque
+ * lecture de toutes les pages a commencé. Une ligne relue après le début de la lecture des pages est au moins aussi
+ * récente que l'événement qui l'a fait relire : quand les pages arrivent, elle reste, au lieu de la ligne de la page.
+ */
+let readClock = 0;
+const rowReadAt = new Map<number, number>();
+
 function appendRows(rows: ProjectRun[], next: ProjectRun[]): ProjectRun[] {
   const fresh = new Map(next.map((row) => [row.run.id, row]));
   return [...rows.filter((row) => !fresh.has(row.run.id)), ...next];
@@ -398,6 +406,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   },
 
   fetchAllProjectRuns: async (slug, projectId) => {
+    const started = ++readClock;
     try {
       const first = await listProjectRuns(slug, projectId, 0, PROJECT_RUN_PAGE_SIZE);
       const pages = Math.min(first.totalPages, PROJECT_RUN_PAGES_MAX);
@@ -408,14 +417,23 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
         read.push(...await Promise.all(batch.map((page) => listProjectRuns(slug, projectId, page, PROJECT_RUN_PAGE_SIZE))));
       }
       // Une mission créée pendant la lecture fait glisser les pages : une fois chacune, dans l'ordre du serveur.
-      const rows = read.reduce<ProjectRun[]>((all, page) => appendRows(all, page.content), []).sort(newerFirst);
+      const paged = read.reduce<ProjectRun[]>((all, page) => appendRows(all, page.content), []);
       const last = read.at(-1) ?? first;
-      set((state) => ({
-        projectRuns: {
-          ...state.projectRuns,
-          [projectId]: { rows, page: last.pageNumber, last: pages >= first.totalPages, total: first.totalElements },
-        },
-      }));
+      let rows: ProjectRun[] = paged;
+      set((state) => {
+        // Les lignes relues seules pendant la lecture des pages gardent leur version, plus récente ; une mission créée
+        // pendant la lecture, que les pages n'ont pas encore, reste aussi.
+        const fresher = (state.projectRuns[projectId]?.rows ?? []).filter((row) => (rowReadAt.get(row.run.id) ?? 0) > started);
+        const byId = new Map(fresher.map((row) => [row.run.id, row] as const));
+        rows = [...paged.map((row) => byId.get(row.run.id) ?? row), ...fresher.filter((row) => !paged.some((p) => p.run.id === row.run.id))]
+          .sort(newerFirst);
+        return {
+          projectRuns: {
+            ...state.projectRuns,
+            [projectId]: { rows, page: last.pageNumber, last: pages >= first.totalPages, total: first.totalElements },
+          },
+        };
+      });
       return rows;
     } catch {
       return null;
@@ -425,6 +443,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   fetchProjectRun: async (slug, projectId, runId) => {
     try {
       const row = await getProjectRun(slug, projectId, runId);
+      rowReadAt.set(runId, ++readClock);
       set((state) => {
         // Les missions d'un projet pas encore lu ne commencent pas par une ligne seule : la liste se lit d'abord.
         const current = state.projectRuns[projectId];

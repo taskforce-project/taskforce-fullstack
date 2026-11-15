@@ -37,7 +37,7 @@ vi.mock("@/lib/store/workflow-store", () => ({
   useWorkflowStore: (selector: (s: typeof workflow) => unknown) => selector(workflow),
 }))
 
-import { OFFLINE_AFTER_MS, PROJECT_LIVE_DELAY_MS, analysisTopic, deliveryTopic, useProjectLive } from "./use-project-live"
+import { FIRST_READ_FALLBACK_MS, OFFLINE_AFTER_MS, PROJECT_LIVE_DELAY_MS, analysisTopic, deliveryTopic, useProjectLive } from "./use-project-live"
 
 const STARTED = { key: "understand", seq: null, kind: null, tool: null, at: null }
 const row = (id: number, status: string) => ({ run: { id, status }, step: STARTED, links: {}, approvals: [] })
@@ -77,6 +77,7 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
 
   it("reads the project's links and all its missions, page by page, each with its step: no timeline", async () => {
     renderHook(() => useProjectLive("acme", 30))
+    stomp.onConnect?.()
     await vi.advanceTimersByTimeAsync(0)
 
     expect(issues.fetchProjectRelations).toHaveBeenCalledWith("acme", 30)
@@ -157,13 +158,13 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     expect(workflow.applyJobUpdate).toHaveBeenCalledWith(job)
   })
 
-  it("reads everything again at each connection, the first included", async () => {
+  it("reads once at the start, at the first connection, and everything again at each connection after", async () => {
     renderHook(() => useProjectLive("acme", 30))
     await vi.advanceTimersByTimeAsync(0)
-    vi.clearAllMocks()
+    // Rien avant la connexion : elle lit, et sa lecture couvre ce qui est publié avant l'abonnement (une lecture, pas deux).
+    expect(delivery.fetchAllProjectRuns).not.toHaveBeenCalled()
     delivery.fetchAllProjectRuns.mockResolvedValue([])
 
-    // Ce qui est publié entre la lecture du montage et l'abonnement n'arrive pas par le topic : la première connexion relit.
     stomp.onConnect?.()
     await vi.advanceTimersByTimeAsync(0)
     expect(delivery.fetchAllProjectRuns).toHaveBeenCalledWith("acme", 30)
@@ -176,6 +177,17 @@ describe("useProjectLive : le direct d'un projet ouvert (R166)", () => {
     expect(delivery.fetchAllProjectRuns).toHaveBeenCalledTimes(2)
     expect(issues.fetchProjectRelations).toHaveBeenCalledTimes(2)
     expect(workflow.fetchJobs).toHaveBeenCalledTimes(2)
+    // Le délai de secours ne relit pas une troisième fois.
+    await vi.advanceTimersByTimeAsync(FIRST_READ_FALLBACK_MS)
+    expect(delivery.fetchAllProjectRuns).toHaveBeenCalledTimes(2)
+  })
+
+  it("without a connection, reads once after a while: the missions are read without the live", async () => {
+    renderHook(() => useProjectLive("acme", 30))
+    await vi.advanceTimersByTimeAsync(FIRST_READ_FALLBACK_MS - 1)
+    expect(delivery.fetchAllProjectRuns).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(delivery.fetchAllProjectRuns).toHaveBeenCalledTimes(1)
   })
 
   it("closes the connection when the project is left, and reads nothing after", async () => {
@@ -209,12 +221,11 @@ describe("useProjectLive : l'état du direct", () => {
   it("connecting, then live; reconnecting after a cut; offline when nothing comes back; live again on return", async () => {
     const { result } = renderHook(() => useProjectLive("acme", 30))
     expect(result.current.state).toBe("connecting")
+    act(() => stomp.onConnect?.())
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(result.current.state).toBe("live")
     expect(result.current.readAt).not.toBeNull()
     expect(result.current.failed).toBe(false)
-
-    act(() => stomp.onConnect?.())
-    expect(result.current.state).toBe("live")
     act(() => stomp.onDrop?.())
     expect(result.current.state).toBe("reconnecting")
     await act(async () => { await vi.advanceTimersByTimeAsync(OFFLINE_AFTER_MS) })
