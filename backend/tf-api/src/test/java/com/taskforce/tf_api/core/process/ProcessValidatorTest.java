@@ -135,7 +135,8 @@ public class ProcessValidatorTest {
     static void assertRefused(List<Problem> problems, String code) {
         assertThat(problems).extracting(Problem::code).contains(code);
         for (Problem p : problems) {
-            assertThat(p.message()).as(p.code()).isNotBlank().endsWith(".").doesNotContain("—");
+            // Aucun tiret cadratin dans une phrase montrée : le caractère s'écrit ici en échappement.
+            assertThat(p.message()).as(p.code()).isNotBlank().endsWith(".").doesNotContain("\u2014");
             if (!p.code().equals(p.code().toLowerCase(java.util.Locale.ROOT))) {
                 // Un code en plusieurs mots (noOwner) ne s'écrit jamais dans la phrase qu'on montre.
                 assertThat(p.message()).as(p.code()).doesNotContain(p.code());
