@@ -242,7 +242,8 @@ describe("le workflow d'un projet", () => {
   })
 
   it("décider depuis le nœud : la règle sur la décision, puis la route qui existe, avec la raison (critère 3)", async () => {
-    const asks = approval(9, { reason: "Builds can touch the release", expiresAt: "2026-11-13T10:30:00" })
+    // Une échéance devant : la vue lit l'heure réelle, et une demande échue ne s'offre plus (R159, L2).
+    const asks = approval(9, { reason: "Builds can touch the release", expiresAt: "2099-11-13T10:30:00" })
     const row = projectRun(deliveryRun(1, 2), [asks])
     serve({ issues: [issue(2, { title: "Release", status: DOING })], runs: [row] })
     vi.mocked(getProjectRun).mockResolvedValue(projectRun(deliveryRun(1, 2)))
