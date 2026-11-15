@@ -582,7 +582,7 @@ public final class BpmnImport {
                         tfChildren(f, "choice").stream().map(c -> attr(c, "value")).toList()))
                     .toList();
                 human = new HumanTask(attr(h, "who"), attr(h, "question"), attr(h, "kind"), attr(h, "meaning"),
-                    checklist, fields);
+                    checklist, fields, attr(h, "prefill"));
             }
             List<RuleRef> rules = tfChildren(tf, "rule").stream()
                 .map(r -> new RuleRef(attr(r, "ref"), integer(attr(r, "version")))).toList();

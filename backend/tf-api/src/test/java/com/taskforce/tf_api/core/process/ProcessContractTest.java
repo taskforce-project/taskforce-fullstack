@@ -179,7 +179,9 @@ class ProcessContractTest {
             Arguments.of("U+FFFF dans un nom, une moitié de paire seule dans une description", (Consumer<ObjectNode>) r -> {
                 ProcessValidatorTest.step(r, "write-scope").put("name", nonCharacter);
                 ProcessValidatorTest.step(r, "approve-scope").put("description", loneSurrogate);
-            }));
+            }),
+            Arguments.of("un point de pause qui s'ouvre sur sa dernière réponse dans l'instance", (Consumer<ObjectNode>) r ->
+                ((ObjectNode) ProcessValidatorTest.step(r, "before-delivery").get("human")).put("prefill", "last-answer")));
     }
 
     @ParameterizedTest(name = "{0}")

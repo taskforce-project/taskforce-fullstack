@@ -62,6 +62,8 @@ export interface HumanTask {
   meaning?: SignatureMeaning
   checklist?: string[]
   fields?: ProcessField[]
+  /** Une liste de contrôle seulement : elle s'ouvre sur sa dernière réponse dans la même instance. */
+  prefill?: "last-answer"
 }
 
 /** Ce qu'attend une attente : une durée, ou ce qu'une personne fournit. */

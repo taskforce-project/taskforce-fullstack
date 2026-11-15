@@ -213,7 +213,7 @@ public final class BpmnExport {
                 return;
             }
             String[] attrs = {"who", human.who(), "kind", human.kind(), "meaning", human.meaning(), "question",
-                human.question()};
+                human.question(), "prefill", human.prefill()};
             if (human.checklist() == null && human.fields() == null) {
                 empty("tf:human", attrs);
                 return;

@@ -979,6 +979,13 @@ public final class ProcessValidator {
                     human.checklist().forEach(l -> length(step, l, MAX_LINE, "A line of “" + step.label() + "”"));
                 }
             }
+            if (human.prefill() != null && !ProcessModel.PREFILLS.contains(human.prefill())) {
+                add("humanShape", step.id(), step.name(), "“" + step.label() + "” opens in a way TaskForce doesn't know: "
+                    + human.prefill() + ". A checklist may open with its last answer in the run (last-answer).");
+            } else if (human.prefill() != null && !CHECKLIST.equals(human.kind())) {
+                add("humanShape", step.id(), step.name(), "“" + step.label() + "” opens with its last answer, which only "
+                    + "a checklist does.");
+            }
             if (INPUT.equals(human.kind())) {
                 if (human.fields() == null) {
                     add("humanShape", step.id(), step.name(), "“" + step.label() + "” asks for nothing: add what the "

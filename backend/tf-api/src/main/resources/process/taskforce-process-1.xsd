@@ -90,6 +90,8 @@
     <xsd:attribute name="kind" type="tHumanKind" use="required"/>
     <xsd:attribute name="meaning" type="tMeaning"/>
     <xsd:attribute name="question" type="xsd:string"/>
+    <!-- A checklist that opens with its last answer in the same run: of the same pause point, or of the same step. -->
+    <xsd:attribute name="prefill" type="tPrefill"/>
   </xsd:complexType>
 
   <!-- What a wait expects is its BPMN message; who provides it is here. -->
@@ -164,6 +166,12 @@
       <xsd:enumeration value="choice"/>
       <xsd:enumeration value="person"/>
       <xsd:enumeration value="document"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tPrefill">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="last-answer"/>
     </xsd:restriction>
   </xsd:simpleType>
 

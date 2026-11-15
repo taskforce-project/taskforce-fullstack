@@ -512,6 +512,10 @@ public class ProcessValidatorTest {
                 r -> ((ObjectNode) step(r, "before-mission").get("human")).remove("checklist")),
             refusal("humanShape", "une saisie qui ne demande rien",
                 r -> ((ObjectNode) step(r, "write-scope").get("human")).remove("fields")),
+            refusal("humanShape", "un accord qui s'ouvre sur sa dernière réponse, ce que seule une liste fait",
+                r -> ((ObjectNode) step(r, "approve-scope").get("human")).put("prefill", "last-answer")),
+            refusal("humanShape", "une liste qui s'ouvre d'une façon que TaskForce ne connaît pas",
+                r -> ((ObjectNode) step(r, "before-delivery").get("human")).put("prefill", "yesterday")),
             refusal("checklistTooLong", "une liste de contrôle de dix lignes", r -> {
                 ArrayNode lines = ((ObjectNode) step(r, "before-mission").get("human")).putArray("checklist");
                 for (int i = 1; i <= 10; i++) {

@@ -81,6 +81,14 @@ public record ProcessModel(
     public static final String BEFORE_DELIVERY = "before-delivery";
     public static final List<String> PAUSE_POINTS = List.of(BEFORE_MISSION, BEFORE_APPLY, BEFORE_DELIVERY);
 
+    /**
+     * Une liste de contrôle qui s'ouvre sur sa dernière réponse dans la même instance (TF-J2-10, décision de la Présidence
+     * du 15/11/2026) : celle du même point de pause, ou de la même étape pour une autre liste ; ligne à ligne, par leurs
+     * mots. La personne confirme ou change ; la confirmer d'un geste est l'écran de W5.
+     */
+    public static final String PREFILL_LAST_ANSWER = "last-answer";
+    public static final List<String> PREFILLS = List.of(PREFILL_LAST_ANSWER);
+
     // Ce qu'attend une attente : une durée, ou un message (un document fourni, une réponse).
     public static final String TIMER = "timer";
     public static final String MESSAGE = "message";
@@ -267,13 +275,13 @@ public record ProcessModel(
 
     /**
      * Une tâche humaine : qui la fait (une personne ou un rôle), la question, sa sorte (un accord, une saisie typée, une
-     * liste de contrôle de moins de dix lignes) et ce que signifie la signature (revue, approbation, responsabilité,
-     * rédaction).
+     * liste de contrôle de moins de dix lignes), ce que signifie la signature (revue, approbation, responsabilité,
+     * rédaction) et, pour une liste, si elle s'ouvre sur sa dernière réponse ({@link #PREFILL_LAST_ANSWER}).
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @Schema(name = "ProcessHumanTask")
     public record HumanTask(String who, String question, String kind, String meaning, List<String> checklist,
-                            List<Field> fields) {
+                            List<Field> fields, String prefill) {
 
         public HumanTask {
             who = clean(who);
@@ -282,6 +290,7 @@ public record ProcessModel(
             meaning = clean(meaning);
             checklist = cleanLines(checklist);
             fields = cleanList(fields);
+            prefill = clean(prefill);
         }
     }
 
