@@ -24,7 +24,8 @@ export function todayMark(start: string | null | undefined, target: string | nul
 }
 
 const COUNTERS: readonly { filter: WorkflowFilter; key: keyof WorkflowCounts; ink: string; dot?: boolean }[] = [
-  { filter: "needs-you", key: "needsYou", ink: "text-primary", dot: true },
+  // L'encre bleue lisible (AA sur le fond de l'en-tête, en clair comme en sombre) ; le point garde --primary.
+  { filter: "needs-you", key: "needsYou", ink: "text-ink-blue", dot: true },
   { filter: "blocked", key: "blocked", ink: "text-ink-yellow" },
   { filter: "missing", key: "missing", ink: "text-ink-yellow" },
   { filter: "failed", key: "failed", ink: "text-destructive" },
@@ -88,7 +89,7 @@ export function ObjectiveHeader({ slug, projectId, objective, projectStart, coun
           <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm text-foreground">
             <span>{o.none}</span>
             {canEdit && (
-              <button type="button" onClick={() => setEditing(true)} className="text-primary underline-offset-2 hover:underline">
+              <button type="button" onClick={() => setEditing(true)} className="text-ink-blue underline-offset-2 hover:underline">
                 {o.add}
               </button>
             )}
