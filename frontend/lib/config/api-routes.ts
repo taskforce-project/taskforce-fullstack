@@ -242,6 +242,8 @@ export const PROJECT_ROUTES = {
   REPO:    (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo`,
   /** Commande de test du projet (PUT), lancée par le runner après l'agent (S1). */
   REPO_TEST_COMMAND: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo/test-command`,
+  /** L'objectif du projet (GET, PUT pour le poser ou le remplacer, DELETE pour le retirer) : le workflow, séance n°25, W1. */
+  OBJECTIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/objective`,
   MEMBERS: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/members`,
   MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
   LABELS:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/labels`,
@@ -603,6 +605,8 @@ export const ATTACHMENT_ROUTES = {
   LIST:   (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
   UPLOAD: (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
   DELETE: (slug: string, projectId: number, issueId: number, attachmentId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`,
+  /** Le nombre de pièces jointes de chaque issue du projet, en une lecture (le workflow, séance n°25, W1). */
+  COUNTS: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/attachments/counts`,
 } as const;
 
 /**

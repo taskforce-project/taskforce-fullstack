@@ -198,6 +198,21 @@ describe('subscribeTopics', () => {
     expect(onConnect).toHaveBeenCalledTimes(2);
   });
 
+  // Le workflow dit « Reconnecting… » quand une connexion établie se coupe (séance n°25) ; pas avant la première.
+  it('says when an established connection drops, never before the first one', async () => {
+    const onDrop = vi.fn();
+    const unsubscribe = subscribeTopics({ '/topic/projects.30.delivery': () => {} }, undefined, onDrop);
+    await settle();
+
+    clients[0]?.config.onConnect();
+    clients[0]?.config.onWebSocketClose();
+    expect(onDrop).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    clients[0]?.config.onWebSocketClose();
+    expect(onDrop).toHaveBeenCalledTimes(1);
+  });
+
   it('closes its one connection when unsubscribed', async () => {
     const unsubscribe = subscribeTopics({ '/topic/projects.30.delivery': () => {}, '/topic/projects.30.analysis': () => {} });
     await settle();

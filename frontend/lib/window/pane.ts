@@ -27,6 +27,13 @@ export const homePath = (slug: string): string => `/${slug}`
 /** Le tableau d'un projet. */
 export const boardPath = (slug: string, projectId: number): string => `/${slug}/projects/${projectId}`
 
+/**
+ * Le workflow d'un projet (séance n°25, W1) : la vue du projet au rang du tableau, pilotée sur ses nœuds. Le nœud choisi
+ * est dans l'adresse (`?node=issue-{id}`).
+ */
+export const workflowPath = (slug: string, projectId: number, node?: string | null): string =>
+  `${boardPath(slug, projectId)}/workflow${node ? `?node=${encodeURIComponent(node)}` : ""}`
+
 /** Une issue, dans le volet, par-dessus le tableau de son projet : sa carte de résultat comprise quand une mission a fini. */
 export const issuePath = (slug: string, projectId: number, issueId: number): string =>
   `${boardPath(slug, projectId)}?issue=${issueId}`

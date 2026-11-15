@@ -16,6 +16,9 @@ vi.mock('../api/project-service', () => ({
   setProjectTestCommand: vi.fn(),
   unsetProjectRepo: vi.fn(),
   importProjectBundle: vi.fn(),
+  getProjectObjective: vi.fn(),
+  setProjectObjective: vi.fn(),
+  clearProjectObjective: vi.fn(),
 }));
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -395,5 +398,55 @@ describe('project-store', () => {
     } as ReturnType<typeof useProjectStore.getState>;
 
     expect(selectArchivedProjects(state).map((p) => p.id)).toEqual([3]);
+  });
+});
+
+// L objectif du projet (le workflow, séance n°25, W1) : lu, posé, retiré ; le serveur dit qui le peut.
+describe('project-store : l’objectif d’un projet', () => {
+  const objective = { goal: 'Ship the export', targetDate: '2026-12-19', criteria: ['CSV opens in Excel'], updatedBy: 'Pierre', updatedAt: '2026-11-13T10:00:00', canEdit: true };
+  const refused = Object.assign(new Error('403'), { isAxiosError: true, response: { status: 403, data: { message: 'Only the project lead can change its objective.' } } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useProjectStore.setState({ objectives: {}, objectiveError: null });
+  });
+
+  it('lit l’objectif, et garde celui d’avant en cas d’échec', async () => {
+    vi.mocked(svc.getProjectObjective).mockResolvedValue(objective);
+    await act(async () => { await useProjectStore.getState().fetchObjective('acme', 3); });
+    expect(useProjectStore.getState().objectives[3]).toEqual(objective);
+    vi.mocked(svc.getProjectObjective).mockRejectedValue(new Error('down'));
+    let read: unknown = {};
+    await act(async () => { read = await useProjectStore.getState().fetchObjective('acme', 3); });
+    expect(read).toBeNull();
+    expect(useProjectStore.getState().objectives[3]).toEqual(objective);
+  });
+
+  it('pose l’objectif ; un refus du serveur garde sa raison', async () => {
+    vi.mocked(svc.setProjectObjective).mockResolvedValue(objective);
+    const payload = { goal: 'Ship the export', targetDate: '2026-12-19', criteria: ['CSV opens in Excel'] };
+    let saved: unknown = null;
+    await act(async () => { saved = await useProjectStore.getState().saveObjective('acme', 3, payload); });
+    expect(saved).toEqual(objective);
+    expect(svc.setProjectObjective).toHaveBeenCalledWith('acme', 3, payload);
+
+    vi.mocked(svc.setProjectObjective).mockRejectedValue(refused);
+    await act(async () => { saved = await useProjectStore.getState().saveObjective('acme', 3, payload); });
+    expect(saved).toBeNull();
+    expect(useProjectStore.getState().objectiveError).toBe('Only the project lead can change its objective.');
+    vi.mocked(svc.setProjectObjective).mockRejectedValue(new Error('network'));
+    await act(async () => { await useProjectStore.getState().saveObjective('acme', 3, payload); });
+    expect(useProjectStore.getState().objectiveError).toBeNull();
+  });
+
+  it('retire l’objectif', async () => {
+    vi.mocked(svc.clearProjectObjective).mockResolvedValue({ ...objective, goal: null, targetDate: null, criteria: [] });
+    let ok = false;
+    await act(async () => { ok = await useProjectStore.getState().clearObjective('acme', 3); });
+    expect(ok).toBe(true);
+    expect(useProjectStore.getState().objectives[3]?.goal).toBeNull();
+    vi.mocked(svc.clearProjectObjective).mockRejectedValue(new Error('down'));
+    await act(async () => { ok = await useProjectStore.getState().clearObjective('acme', 3); });
+    expect(ok).toBe(false);
   });
 });

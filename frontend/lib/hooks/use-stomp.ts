@@ -38,11 +38,14 @@ export function subscribeTopic(topic: string, onMessage: (body: string) => void)
 /**
  * Abonne plusieurs topics sur une seule connexion (le projet ouvert : ses missions et ses analyses), chacun avec son
  * traitement. `onConnect` est appelé à chaque connexion, la première et celles qui suivent une coupure : les messages
- * publiés pendant la coupure sont perdus, l'appelant relit ce qu'il montre. Rend de quoi fermer la connexion.
+ * publiés pendant la coupure sont perdus, l'appelant relit ce qu'il montre. `onDrop` est appelé quand une connexion
+ * établie se coupe (le workflow dit alors « Reconnecting… ») ; le client se reconnecte seul. Rend de quoi fermer la
+ * connexion.
  */
 export function subscribeTopics(
   handlers: Readonly<Record<string, (body: string) => void>>,
   onConnect?: () => void,
+  onDrop?: () => void,
 ): () => void {
   if (globalThis.window === undefined) return () => {}
 
@@ -74,6 +77,8 @@ export function subscribeTopics(
         if (!connectedOnce && !useSockJs && !fallbackTriggered && !disposed) {
           fallbackTriggered = true
           void client.deactivate().finally(() => void activate(true))
+        } else if (connectedOnce && !disposed) {
+          onDrop?.()
         }
       },
     })
