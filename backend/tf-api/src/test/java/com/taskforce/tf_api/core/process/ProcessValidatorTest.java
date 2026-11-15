@@ -544,6 +544,23 @@ public class ProcessValidatorTest {
     }
 
     @Test
+    @DisplayName("un chemin qui contourne le point d'avant de livrer se dit une fois, pas une fois par zone d'agent")
+    void a_way_around_the_delivery_point_is_said_once() {
+        ObjectNode process = e20();
+        steps(process).add(JSON.createObjectNode().put("id", "deliver-late").put("type", "deadline")
+            .put("name", "A week without delivery").put("attachedTo", "deliver").put("duration", "P7D"));
+        flows(process).add(newFlow("deliver-late-delivered", "deliver-late", "delivered"));
+
+        assertThat(check(process)).singleElement().satisfies(p -> {
+            assertThat(p.code()).isEqualTo("pausePointMisplaced");
+            assertThat(p.stepId()).isEqualTo("spec-zone");
+            assertThat(p.message()).isEqualTo("The work of “Draft the specification” can reach “Module delivered” "
+                + "without the pause point before the work is delivered: every path from an agent's work to the end "
+                + "goes through it.");
+        });
+    }
+
+    @Test
     @DisplayName("une étape verrouillée ne se cache pas sous une étape d'agent : la zone est le dernier niveau")
     void a_locked_step_does_not_hide_under_an_agent_step() {
         ObjectNode base = e20();

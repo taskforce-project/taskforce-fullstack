@@ -1214,9 +1214,11 @@ public final class ProcessValidator {
                 Set<String> after = graph.reachableFrom(zone.id(), delivery);
                 String end = ends.stream().filter(after::contains).findFirst().orElse(null);
                 if (end != null) {
+                    // Le chemin qui contourne le point se dit une fois, depuis le premier travail d'agent qui y mène.
                     add("pausePointMisplaced", zone.id(), zone.name(), "The work of “" + zone.label() + "” can reach “"
                         + label(end) + "” without the pause point before the work is delivered: every path from an "
                         + "agent's work to the end goes through it.");
+                    break;
                 }
             }
         }
