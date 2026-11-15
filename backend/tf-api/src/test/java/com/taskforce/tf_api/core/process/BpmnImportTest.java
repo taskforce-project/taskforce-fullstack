@@ -90,7 +90,56 @@ class BpmnImportTest {
                 + "<bpmn:messageEventDefinition/></bpmn:boundaryEvent>"), "only a deadline or a failure path"),
             Arguments.of("severalProcesses", file("<bpmn:process id=\"other\"/>", ""), "several processes"),
             Arguments.of("choreographyTask", file("<bpmn:choreographyTask id=\"x\" name=\"Dance\"/>"),
-                "a BPMN element TaskForce's processes don't have (choreographyTask)"));
+                "a BPMN element TaskForce's processes don't have (choreographyTask)"),
+            // Ce qu'un élément du sous-ensemble porte en plus : refusé, jamais laissé de côté en silence (R159, M1).
+            Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\" color=\"red\"/>"
+                + "</bpmn:extensionElements></bpmn:userTask>"), "TaskForce settings this version doesn't read (tf:step)"),
+            Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\"><tf:script>rm</tf:script></tf:step>"
+                + "</bpmn:extensionElements></bpmn:userTask>"), "TaskForce settings this version doesn't read (tf:step)"),
+            Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
+                + "<tf:run xmlns:tf=\"" + Bpmn.TF + "\"/></bpmn:extensionElements></bpmn:userTask>"),
+                "(tf:run, which doesn't go there)"),
+            Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\"/>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"role:owner\"/></bpmn:extensionElements>"
+                + "</bpmn:userTask>"), "(tf:step, twice)"),
+            Arguments.of("completionCondition", file("<bpmn:adHocSubProcess id=\"x\" name=\"Zone\">"
+                + "<bpmn:completionCondition>done</bpmn:completionCondition></bpmn:adHocSubProcess>"),
+                "ends on a condition of its own"),
+            Arguments.of("rendering", file("<bpmn:userTask id=\"x\" name=\"Fill\"><bpmn:rendering id=\"r\"/>"
+                + "</bpmn:userTask>"), "a form drawn for another tool"),
+            Arguments.of("dataObject", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\"><bpmn:dataOutput id=\"o\"/>"
+                + "<bpmn:timerEventDefinition><bpmn:timeDuration>P1D</bpmn:timeDuration></bpmn:timerEventDefinition>"
+                + "</bpmn:intermediateCatchEvent>"), "is data drawn in the process"),
+            Arguments.of("dataObject", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\">"
+                + "<bpmn:dataOutputAssociation id=\"o\"/><bpmn:timerEventDefinition><bpmn:timeDuration>P1D"
+                + "</bpmn:timeDuration></bpmn:timerEventDefinition></bpmn:intermediateCatchEvent>"),
+                "is data drawn in the process"),
+            Arguments.of("foo", file("<bpmn:exclusiveGateway id=\"x\" name=\"Pick\"><bpmn:foo/></bpmn:exclusiveGateway>"),
+                "a BPMN element TaskForce's processes don't have (foo)"),
+            Arguments.of("setting", file("<bpmn:userTask id=\"x\" name=\"Twice\" completionQuantity=\"2\"/>"),
+                "has a setting TaskForce's processes don't have: completionQuantity=\"2\""),
+            Arguments.of("setting", file("<bpmn:adHocSubProcess id=\"x\" name=\"Zone\" ordering=\"Sequential\"/>"),
+                "ordering=\"Sequential\""),
+            Arguments.of("setting", file("<bpmn:serviceTask id=\"x\" name=\"Call\" operationRef=\"op\"/>"),
+                "operationRef=\"op\""),
+            Arguments.of("setting", file("<bpmn:boundaryEvent id=\"x\" name=\"Fails\" attachedToRef=\"y\">"
+                + "<bpmn:errorEventDefinition errorRef=\"e\"/></bpmn:boundaryEvent>"), "errorRef=\"e\""),
+            Arguments.of("setting", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\"><bpmn:timerEventDefinition>"
+                + "<bpmn:timeDuration language=\"feel\">=days(2)</bpmn:timeDuration></bpmn:timerEventDefinition>"
+                + "</bpmn:intermediateCatchEvent>"), "language=\"feel\""),
+            Arguments.of("service", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\"><bpmn:messageEventDefinition>"
+                + "<bpmn:operationRef>op</bpmn:operationRef></bpmn:messageEventDefinition></bpmn:intermediateCatchEvent>"),
+                "calls a service of another system"),
+            Arguments.of("conditionLanguage", file("<bpmn:sequenceFlow id=\"f\" sourceRef=\"a\" targetRef=\"b\">"
+                + "<bpmn:conditionExpression language=\"javascript\">x &gt; 1</bpmn:conditionExpression>"
+                + "</bpmn:sequenceFlow>"), "is written for another engine (javascript)"),
+            Arguments.of("conditionLanguage", file("<bpmn:sequenceFlow id=\"f\" sourceRef=\"a\" targetRef=\"b\">"
+                + "<bpmn:conditionExpression>x &gt; 1</bpmn:conditionExpression></bpmn:sequenceFlow>")
+                .replace("id=\"d\"", "id=\"d\" expressionLanguage=\"http://www.w3.org/1999/XPath\""),
+                "is written for another engine (http://www.w3.org/1999/XPath)"));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -156,6 +205,21 @@ class BpmnImportTest {
         assertThat(read.notes()).containsExactly(
             "Notes drawn on the diagram were left out: TaskForce keeps the process, not its drawing.",
             "Settings for another tool were left out (http://camunda.org/schema/zeebe/1.0): TaskForce doesn't run them.");
+    }
+
+    @Test
+    @DisplayName("les réglages d'un autre moteur en attributs, comme camunda:class, sont dits comme ceux de ses extensions")
+    void settings_of_another_engine_in_attributes() {
+        String xml = BpmnExport.toXml(ProcessFixtures.integrateAModule())
+            .replace("<bpmn:serviceTask id=\"draft-spec\"", "<bpmn:serviceTask xmlns:camunda="
+                + "\"http://camunda.org/schema/1.0/bpmn\" camunda:class=\"com.example.DraftDelegate\" id=\"draft-spec\"");
+
+        BpmnImport.Result read = BpmnImport.read(xml);
+
+        assertThat(read.foreign()).isEmpty();
+        assertThat(read.notes()).containsExactly("Settings for another tool were left out "
+            + "(http://camunda.org/schema/1.0/bpmn): TaskForce doesn't run them.");
+        assertThat(ProcessFingerprint.of(read.model())).isEqualTo(ProcessFingerprint.of(ProcessFixtures.integrateAModule()));
     }
 
     @Test

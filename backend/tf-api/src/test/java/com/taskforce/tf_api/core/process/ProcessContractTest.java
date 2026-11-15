@@ -106,6 +106,17 @@ class ProcessContractTest {
     }
 
     @Test
+    @DisplayName("le schéma de tf: que le serveur suit à l'import est celui du contrat")
+    void the_server_reads_the_contract_schema() throws IOException {
+        try (var in = getClass().getResourceAsStream("/process/taskforce-process-1.xsd")) {
+            assertThat(in).isNotNull();
+            assertThat(new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n"))
+                .isEqualTo(Files.readString(contracts().resolve("process/taskforce-process-1.xsd"), StandardCharsets.UTF_8)
+                    .replace("\r\n", "\n"));
+        }
+    }
+
+    @Test
     @DisplayName("l'aller et retour garde tout : la même empreinte, le même modèle")
     void the_round_trip_keeps_everything() {
         ProcessModel model = integrateAModule();

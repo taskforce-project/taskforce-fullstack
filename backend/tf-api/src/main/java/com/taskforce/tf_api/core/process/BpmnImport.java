@@ -1,21 +1,30 @@
 package com.taskforce.tf_api.core.process;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamSource;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
+import javax.xml.validation.Validator;
 
+import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.InputSource;
@@ -36,8 +45,11 @@ import com.taskforce.tf_api.core.process.ProcessValidator.Foreign;
 /**
  * L'import d'un fichier BPMN 2.0 dans notre modèle (ADR-027). Il lit le sous-ensemble ({@link ProcessSubset}) et
  * l'extension {@code tf:} ; ce qui est hors du sous-ensemble ne devient pas une étape, il revient dans la liste
- * {@link Result#foreign()}, que le vérificateur dit en phrases. Le dessin (BPMN DI) est ignoré : il n'est pas le
- * processus. Ce qui n'est ni du processus ni de TaskForce (les réglages d'un autre moteur, des notes dessinées) est
+ * {@link Result#foreign()}, que le vérificateur dit en phrases. Chaque élément lu n'a que les attributs et les enfants
+ * que le sous-ensemble lui connaît, avec les valeurs qui gardent son sens ; le reste est refusé, jamais laissé de côté
+ * en silence. Les éléments {@code tf:} suivent leur schéma ({@code contracts/process/taskforce-process-1.xsd}), et une
+ * condition est en mots, jamais dans la langue d'un autre moteur. Le dessin (BPMN DI) est ignoré : il n'est pas le
+ * processus. Ce qui n'est ni du processus ni de TaskForce (les réglages d'un autre outil, des notes dessinées) est
  * laissé de côté, et {@link Result#notes()} le dit.
  *
  * <p>Le fichier vient de dehors : le lecteur refuse les DTD et les entités externes (XXE), ne suit aucune adresse et
@@ -47,6 +59,19 @@ public final class BpmnImport {
 
     /** Le plus grand fichier qu'on lit : un processus de la taille permise y tient largement. */
     public static final int MAX_CHARS = 1_000_000;
+
+    /** L'extension tf:, telle que le contrat l'écrit ; une copie est dans le serveur, un test vérifie qu'elle est la même. */
+    private static final Schema TF_SCHEMA = tfSchema();
+
+    /**
+     * Les erreurs du schéma de tf: qui ne portent que sur une valeur (un motif, une liste, une borne, un type) : la
+     * valeur entre dans le modèle, où le vérificateur la juge en phrases. Les autres disent un élément ou un attribut
+     * que l'extension n'a pas, ou mal placé.
+     */
+    private static final List<String> VALUE_ERRORS = List.of("cvc-pattern-valid", "cvc-enumeration-valid",
+        "cvc-datatype-valid", "cvc-minInclusive-valid", "cvc-maxInclusive-valid", "cvc-minExclusive-valid",
+        "cvc-maxExclusive-valid", "cvc-minLength-valid", "cvc-maxLength-valid", "cvc-length-valid",
+        "cvc-totalDigits-valid", "cvc-fractionDigits-valid", "cvc-attribute.3", "cvc-type.3.1.3");
 
     private BpmnImport() {
     }
@@ -112,6 +137,97 @@ public final class BpmnImport {
         }
     }
 
+    private static Schema tfSchema() {
+        try (InputStream in = BpmnImport.class.getResourceAsStream("/process/taskforce-process-1.xsd")) {
+            if (in == null) {
+                throw new IllegalStateException("The schema of the tf: extension is missing from the server.");
+            }
+            SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            factory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            return factory.newSchema(new StreamSource(in));
+        } catch (IOException | SAXException e) {
+            throw new IllegalStateException("The schema of the tf: extension can't be read.", e);
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------- ce qu'on lit
+
+    /**
+     * Ce qu'un élément du sous-ensemble porte : ses attributs, avec les valeurs qui gardent son sens (aucune liste :
+     * toute valeur), ses enfants (null : son lecteur les lit lui-même), s'il porte des définitions d'événement (que son
+     * lecteur juge), et l'élément tf: qu'il porte dans ses extensions (null : aucun).
+     */
+    private record Shape(Map<String, Set<String>> attributes, Set<String> children, boolean events, String tf) {
+    }
+
+    private static final Set<String> ANY = Set.of();
+    private static final Set<String> ONE = Set.of("1");
+    private static final Set<String> NO = Set.of("false");
+    private static final Set<String> IMPLEMENTATION = Set.of("##unspecified", "##WebService");
+    private static final Set<String> NODE = Set.of("documentation", "extensionElements", "incoming", "outgoing");
+    /**
+     * Ce que lit le lecteur d'une tâche, pour le refuser avec sa raison ou le dire : les données, les boucles, les
+     * personnes qu'un fichier nomme.
+     */
+    private static final Set<String> TASK = Set.of("documentation", "extensionElements", "incoming", "outgoing",
+        "ioSpecification", "property", "dataInputAssociation", "dataOutputAssociation", "resourceRole", "performer",
+        "humanPerformer", "potentialOwner", "multiInstanceLoopCharacteristics", "standardLoopCharacteristics");
+    private static final Set<String> BASE = Set.of("documentation", "extensionElements");
+
+    private static final Map<String, Shape> SHAPES = new HashMap<>();
+
+    static {
+        Map<String, Set<String>> activity = Map.of("id", ANY, "name", ANY, "isForCompensation", ANY, "startQuantity", ONE,
+            "completionQuantity", ONE);
+        SHAPES.put("process", new Shape(Map.of("id", ANY, "name", ANY, "isExecutable", ANY, "processType", ANY,
+            "isClosed", ANY), null, false, "process"));
+        SHAPES.put("subProcess", new Shape(with(activity, "triggeredByEvent", ANY), null, false, "step"));
+        SHAPES.put("adHocSubProcess", new Shape(with(with(activity, "ordering", Set.of("Parallel")),
+            "cancelRemainingInstances", ANY), null, false, "step"));
+        SHAPES.put("userTask", new Shape(with(activity, "implementation", IMPLEMENTATION), TASK, false, "step"));
+        SHAPES.put("serviceTask", new Shape(with(activity, "implementation", IMPLEMENTATION), TASK, false, "step"));
+        SHAPES.put("startEvent", new Shape(Map.of("id", ANY, "name", ANY, "isInterrupting", Set.of("true"),
+            "parallelMultiple", NO), NODE, true, "step"));
+        SHAPES.put("endEvent", new Shape(Map.of("id", ANY, "name", ANY), NODE, true, "step"));
+        SHAPES.put("intermediateCatchEvent", new Shape(Map.of("id", ANY, "name", ANY, "parallelMultiple", NO), NODE,
+            true, "step"));
+        SHAPES.put("boundaryEvent", new Shape(Map.of("id", ANY, "name", ANY, "attachedToRef", ANY, "cancelActivity",
+            ANY, "parallelMultiple", NO), NODE, true, "step"));
+        SHAPES.put("exclusiveGateway", new Shape(Map.of("id", ANY, "name", ANY, "default", ANY, "gatewayDirection",
+            ANY), NODE, false, "step"));
+        SHAPES.put("parallelGateway", new Shape(Map.of("id", ANY, "name", ANY, "gatewayDirection", ANY), NODE, false,
+            "step"));
+        SHAPES.put("sequenceFlow", new Shape(Map.of("id", ANY, "name", ANY, "sourceRef", ANY, "targetRef", ANY),
+            Set.of("documentation", "extensionElements", "conditionExpression"), false, "condition"));
+        SHAPES.put("conditionExpression", new Shape(Map.of("id", ANY, "language", ANY, "evaluatesToTypeRef", ANY),
+            Set.of(), false, null));
+        SHAPES.put("timerEventDefinition", new Shape(Map.of("id", ANY), Set.of("documentation", "extensionElements",
+            "timeDuration", "timeDate", "timeCycle"), false, null));
+        SHAPES.put("timeDuration", new Shape(Map.of("id", ANY, "evaluatesToTypeRef", ANY), Set.of(), false, null));
+        SHAPES.put("messageEventDefinition", new Shape(Map.of("id", ANY, "messageRef", ANY), BASE, false, null));
+        SHAPES.put("errorEventDefinition", new Shape(Map.of("id", ANY), BASE, false, null));
+        SHAPES.put("terminateEventDefinition", new Shape(Map.of("id", ANY), BASE, false, null));
+    }
+
+    private static Map<String, Set<String>> with(Map<String, Set<String>> attributes, String name, Set<String> values) {
+        Map<String, Set<String>> out = new HashMap<>(attributes);
+        out.put(name, values);
+        return Map.copyOf(out);
+    }
+
+    /** Les enfants refusés qui ont leur raison dans {@link ProcessSubset} : les autres se disent par leur nom. */
+    private static final Map<String, String> REFUSED_CHILDREN = Map.ofEntries(
+        Map.entry("dataInput", "dataObject"), Map.entry("dataOutput", "dataObject"),
+        Map.entry("dataInputAssociation", "dataObject"), Map.entry("dataOutputAssociation", "dataObject"),
+        Map.entry("inputSet", "dataObject"), Map.entry("outputSet", "dataObject"), Map.entry("property", "dataObject"),
+        Map.entry("ioSpecification", "dataObject"), Map.entry("rendering", "rendering"),
+        Map.entry("completionCondition", "completionCondition"), Map.entry("operationRef", "service"),
+        Map.entry("ioBinding", "service"), Map.entry("supportedInterfaceRef", "service"),
+        Map.entry("standardLoopCharacteristics", "loop"),
+        Map.entry("multiInstanceLoopCharacteristics", "multiInstance"));
+
     // ------------------------------------------------------------------------------------------------- lire
 
     private static final class Reader {
@@ -120,9 +236,19 @@ public final class BpmnImport {
         private final List<Foreign> foreign = new ArrayList<>();
         private final Set<String> notes = new LinkedHashSet<>();
         private final Map<String, String> messages = new HashMap<>();
+        private final Validator tfValidator;
+        /** La langue des expressions que le fichier déclare pour lui tout entier, ou null. */
+        private String expressionLanguage;
 
         Reader(Document doc) {
             this.doc = doc;
+            this.tfValidator = TF_SCHEMA.newValidator();
+            try {
+                tfValidator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+                tfValidator.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            } catch (SAXException e) {
+                throw new IllegalStateException(e);
+            }
         }
 
         Result read() {
@@ -130,6 +256,7 @@ public final class BpmnImport {
             if (!Bpmn.MODEL.equals(root.getNamespaceURI()) || !"definitions".equals(root.getLocalName())) {
                 throw new Unreadable("This file isn't a BPMN 2.0 file: it has no definitions.");
             }
+            expressionLanguage = attr(root, "expressionLanguage");
             List<Element> processes = new ArrayList<>();
             for (Element child : children(root)) {
                 if (Bpmn.BPMNDI.equals(child.getNamespaceURI())) {
@@ -159,6 +286,7 @@ public final class BpmnImport {
                 foreign.add(new Foreign("severalProcesses", null, null));
             }
             Element process = processes.get(0);
+            inspect(process, "process", attr(process, "id"), attr(process, "name"));
             Element tf = tf(process, "process");
             List<Step> steps = new ArrayList<>();
             List<Flow> flows = new ArrayList<>();
@@ -173,18 +301,25 @@ public final class BpmnImport {
         private void container(Element owner, List<Step> steps, List<Flow> flows) {
             Map<String, String> defaults = new HashMap<>();
             for (Element e : children(owner)) {
+                if (Bpmn.TF.equals(e.getNamespaceURI())) {
+                    foreign.add(new Foreign("tfSettings", attr(owner, "id"), attr(owner, "name"), "tf:"
+                        + e.getLocalName() + ", outside its extensions"));
+                    continue;
+                }
                 if (!Bpmn.MODEL.equals(e.getNamespaceURI())) {
                     notes.add("Something other than the process was left out (" + e.getTagName() + ").");
                     continue;
                 }
                 String local = e.getLocalName();
                 switch (local) {
-                    case "documentation", "extensionElements", "incoming", "outgoing", "auditing", "monitoring",
-                         "categoryValueRef", "ioBinding", "supportedInterfaceRef", "completionCondition" -> { }
+                    case "documentation", "extensionElements", "incoming", "outgoing" -> { }
+                    case "auditing", "monitoring" -> notes.add(settings(local));
+                    case "categoryValueRef" -> notes.add(DRAWING);
+                    case "completionCondition", "ioBinding", "supportedInterfaceRef" ->
+                        foreign.add(new Foreign(REFUSED_CHILDREN.get(local), attr(owner, "id"), attr(owner, "name")));
                     case "laneSet" -> foreign.add(new Foreign("lanes", attr(e, "id"), null));
                     case "sequenceFlow" -> flows.add(flow(e));
-                    case "textAnnotation", "association", "group" -> notes.add("Notes drawn on the diagram were left "
-                        + "out: TaskForce keeps the process, not its drawing.");
+                    case "textAnnotation", "association", "group" -> notes.add(DRAWING);
                     case "dataObject", "dataObjectReference", "dataStoreReference", "property", "ioSpecification",
                          "dataInputAssociation", "dataOutputAssociation" ->
                         foreign.add(new Foreign("dataObject", attr(e, "id"), attr(e, "name")));
@@ -242,6 +377,7 @@ public final class BpmnImport {
             }
             if (defs.size() == 1 && "terminateEventDefinition".equals(defs.get(0).getLocalName())) {
                 Step plain = node(e, ProcessModel.END);
+                inspect(defs.get(0), "terminateEventDefinition", attr(e, "id"), attr(e, "name"));
                 return copy(plain, Boolean.TRUE, null, null, null);
             }
             if (defs.stream().anyMatch(d -> "cancelEventDefinition".equals(d.getLocalName()))) {
@@ -268,9 +404,10 @@ public final class BpmnImport {
                     if (kind != null) {
                         return refuse(kind, e);
                     }
-                    return withWait(plain, new WaitFor(ProcessModel.TIMER, text(child(def, "timeDuration")), null, from));
+                    return withWait(plain, new WaitFor(ProcessModel.TIMER, duration(e, def), null, from));
                 }
                 case "messageEventDefinition" -> {
+                    inspect(def, "messageEventDefinition", attr(e, "id"), attr(e, "name"));
                     String ref = local(attr(def, "messageRef"));
                     return withWait(plain, new WaitFor(ProcessModel.MESSAGE, null, ref == null ? null : messages.get(ref),
                         from));
@@ -306,9 +443,14 @@ public final class BpmnImport {
                     if (kind != null) {
                         return refuse(kind, e);
                     }
-                    return copy(node(e, ProcessModel.DEADLINE), null, host, text(child(def, "timeDuration")), null);
+                    return copy(node(e, ProcessModel.DEADLINE), null, host, duration(e, def), null);
                 }
                 case "errorEventDefinition" -> {
+                    if ("false".equals(attr(e, "cancelActivity"))) {
+                        // Un échec arrête toujours son étape : une bordure d'erreur qui la laisse aller n'existe pas.
+                        foreign.add(new Foreign("setting", attr(e, "id"), attr(e, "name"), "cancelActivity=\"false\""));
+                    }
+                    inspect(def, "errorEventDefinition", attr(e, "id"), attr(e, "name"));
                     return copy(node(e, ProcessModel.FAILURE), null, host, null, null);
                 }
                 case "compensateEventDefinition" -> {
@@ -327,6 +469,17 @@ public final class BpmnImport {
                     return refuse("boundaryTrigger", e);
                 }
             }
+        }
+
+        /** La durée d'une minuterie : sa définition et son {@code timeDuration} n'ont que ce que le sous-ensemble connaît. */
+        private String duration(Element owner, Element timer) {
+            inspect(timer, "timerEventDefinition", attr(owner, "id"), attr(owner, "name"));
+            Element value = child(timer, "timeDuration");
+            if (value == null) {
+                return null;
+            }
+            inspect(value, "timeDuration", attr(owner, "id"), attr(owner, "name"));
+            return text(value);
         }
 
         private String throwKind(Element e) {
@@ -389,10 +542,10 @@ public final class BpmnImport {
                 plain.rules(), plain.documents(), plain.issue(), steps, flows);
         }
 
-        /** Une étape et ce que {@code tf:step} dit d'elle. */
+        /** Une étape et ce que {@code tf:step} dit d'elle ; l'élément n'a que ce que le sous-ensemble lui connaît. */
         private Step node(Element e, String type) {
+            inspect(e, e.getLocalName(), attr(e, "id"), attr(e, "name"));
             Element tf = tf(e, "step");
-            vendors(e);
             if (tf == null) {
                 return new Step(attr(e, "id"), type, attr(e, "name"), documentation(e), null, null, null, null, null,
                     null, null, null, null, null, null, null, null);
@@ -439,27 +592,140 @@ public final class BpmnImport {
         }
 
         private Flow flow(Element e) {
+            String id = attr(e, "id");
+            String label = attr(e, "name") != null ? attr(e, "name") : id;
+            inspect(e, "sequenceFlow", id, label);
             Element expression = child(e, "conditionExpression");
+            if (expression != null) {
+                inspect(expression, "conditionExpression", id, label);
+                // Une condition est en mots (ADR-027, point 11) : la langue d'un autre moteur n'est pas la nôtre.
+                String language = attr(expression, "language") != null ? attr(expression, "language")
+                    : expressionLanguage;
+                if (language != null && !Bpmn.CONDITION_LANGUAGE.equals(language.strip())) {
+                    foreign.add(new Foreign("conditionLanguage", id, label, language.strip()));
+                }
+            }
             Element tf = tf(e, "condition");
             Condition condition = expression == null && tf == null ? null
                 : new Condition(expression == null ? null : text(expression), tf == null ? null : attr(tf, "step"),
                     tf == null ? null : attr(tf, "outcome"));
-            vendors(e);
-            return new Flow(attr(e, "id"), attr(e, "sourceRef"), attr(e, "targetRef"), attr(e, "name"), null, condition);
+            return new Flow(id, attr(e, "sourceRef"), attr(e, "targetRef"), attr(e, "name"), null, condition);
         }
 
-        /** Les réglages d'un autre outil, dans les extensions : laissés de côté, et dit une fois par outil. */
-        private void vendors(Element e) {
-            Element ext = child(e, "extensionElements");
+        // --------------------------------------------------------------------------------------------- ce qu'il porte
+
+        /**
+         * Un élément n'a que les attributs et les enfants que le sous-ensemble lui connaît, avec les valeurs qui gardent
+         * son sens ; le reste est refusé. Un attribut d'un autre outil est un de ses réglages : laissé de côté, et dit.
+         */
+        private void inspect(Element e, String kind, String id, String name) {
+            Shape shape = SHAPES.get(kind);
+            if (shape == null) {
+                return;
+            }
+            NamedNodeMap attributes = e.getAttributes();
+            for (int i = 0; i < attributes.getLength(); i++) {
+                Attr a = (Attr) attributes.item(i);
+                String ns = a.getNamespaceURI();
+                if (XMLConstants.XMLNS_ATTRIBUTE_NS_URI.equals(ns) || Bpmn.XSI.equals(ns)) {
+                    continue;
+                }
+                if (ns != null && !ns.isEmpty()) {
+                    notes.add(settings(ns));
+                    continue;
+                }
+                String local = a.getLocalName() != null ? a.getLocalName() : a.getName();
+                Set<String> values = shape.attributes().get(local);
+                if (values == null || (!values.isEmpty() && !values.contains(a.getValue().strip()))) {
+                    foreign.add(new Foreign("setting", id, name, local + "=\"" + a.getValue() + "\""));
+                }
+            }
+            if (shape.children() != null) {
+                for (Element c : children(e)) {
+                    String local = c.getLocalName();
+                    if (Bpmn.MODEL.equals(c.getNamespaceURI())) {
+                        boolean read = shape.children().contains(local) || (shape.events()
+                            && (local.endsWith("EventDefinition") || "eventDefinitionRef".equals(local)));
+                        if ("auditing".equals(local) || "monitoring".equals(local)) {
+                            notes.add(settings(local));
+                        } else if ("categoryValueRef".equals(local)) {
+                            notes.add(DRAWING);
+                        } else if (!read) {
+                            foreign.add(new Foreign(REFUSED_CHILDREN.getOrDefault(local, local), id, name));
+                        }
+                    } else if (Bpmn.TF.equals(c.getNamespaceURI())) {
+                        foreign.add(new Foreign("tfSettings", id, name, "tf:" + local + ", outside its extensions"));
+                    } else {
+                        notes.add("Something other than the process was left out (" + c.getTagName() + ").");
+                    }
+                }
+            }
+            extensions(e, shape.tf(), id, name);
+        }
+
+        /**
+         * Les extensions d'un élément : l'élément tf: qui a sa place là (tf:process sur le processus, tf:step sur une
+         * étape, tf:condition sur un chemin), une fois, selon le schéma de tf: ; les réglages d'un autre outil, laissés
+         * de côté et dits une fois par outil.
+         */
+        private void extensions(Element owner, String expected, String id, String name) {
+            Element ext = child(owner, "extensionElements");
             if (ext == null) {
                 return;
             }
+            boolean seen = false;
             for (Element c : children(ext)) {
                 if (!Bpmn.TF.equals(c.getNamespaceURI())) {
-                    notes.add("Settings for another tool were left out (" + c.getNamespaceURI() + "): TaskForce doesn't "
-                        + "run them.");
+                    notes.add(settings(Objects.toString(c.getNamespaceURI(), c.getTagName())));
+                    continue;
                 }
+                String tag = "tf:" + c.getLocalName();
+                if (!c.getLocalName().equals(expected)) {
+                    foreign.add(new Foreign("tfSettings", id, name, tag + ", which doesn't go there"));
+                } else if (seen) {
+                    foreign.add(new Foreign("tfSettings", id, name, tag + ", twice"));
+                } else if (!followsSchema(c)) {
+                    foreign.add(new Foreign("tfSettings", id, name, tag));
+                }
+                seen |= c.getLocalName().equals(expected);
             }
+        }
+
+        /**
+         * Vrai quand l'élément tf: suit le schéma de l'extension, ses valeurs mises à part : une valeur entre dans le
+         * modèle, où le vérificateur la dit en phrase.
+         */
+        private boolean followsSchema(Element tf) {
+            List<String> errors = new ArrayList<>();
+            tfValidator.setErrorHandler(new ErrorHandler() {
+                @Override
+                public void warning(SAXParseException e) {
+                    // Rien du processus.
+                }
+
+                @Override
+                public void error(SAXParseException e) {
+                    errors.add(Objects.toString(e.getMessage(), ""));
+                }
+
+                @Override
+                public void fatalError(SAXParseException e) throws SAXException {
+                    throw e;
+                }
+            });
+            try {
+                tfValidator.validate(new DOMSource(tf));
+            } catch (SAXException | IOException e) {
+                return false;
+            }
+            return errors.stream().allMatch(m -> VALUE_ERRORS.stream().anyMatch(m::startsWith));
+        }
+
+        private static final String DRAWING = "Notes drawn on the diagram were left out: TaskForce keeps the process, "
+            + "not its drawing.";
+
+        private static String settings(String tool) {
+            return "Settings for another tool were left out (" + tool + "): TaskForce doesn't run them.";
         }
 
         // --------------------------------------------------------------------------------------------- outils

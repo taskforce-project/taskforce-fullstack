@@ -99,8 +99,15 @@ public final class ProcessValidator {
     public record Problem(String code, String stepId, String step, String message) {
     }
 
-    /** Ce qu'un fichier importé contenait hors du sous-ensemble : l'élément, l'étape où il était, son nom. */
-    public record Foreign(String element, String stepId, String name) {
+    /**
+     * Ce qu'un fichier importé contenait hors du sous-ensemble : l'élément, l'étape où il était, son nom, et ce qui le
+     * précise quand la raison le cite (un réglage et sa valeur, la langue d'une condition), ou null.
+     */
+    public record Foreign(String element, String stepId, String name, String detail) {
+
+        public Foreign(String element, String stepId, String name) {
+            this(element, stepId, name, null);
+        }
     }
 
     /**
@@ -152,7 +159,7 @@ public final class ProcessValidator {
         List<Problem> check(List<Foreign> foreign) {
             for (Foreign f : foreign) {
                 add("notInSubset", f.stepId(), f.name(), ProcessSubset.reason(f.element(), f.name() != null ? f.name()
-                    : f.stepId()));
+                    : f.stepId(), f.detail()));
             }
             // Un fichier qui sort du sous-ensemble se reprend d'abord là : le reste de ses refus en découlerait.
             if (!foreign.isEmpty()) {

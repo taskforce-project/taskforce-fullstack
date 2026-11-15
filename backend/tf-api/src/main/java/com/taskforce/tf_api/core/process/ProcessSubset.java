@@ -102,6 +102,17 @@ public final class ProcessSubset {
         REASONS.put("boundaryTrigger", "“{name}” watches its step for an event TaskForce's processes don't have: only a "
             + "deadline or a failure path can be attached to a step.");
         REASONS.put("severalProcesses", "This file holds several processes: TaskForce imports one at a time.");
+        REASONS.put("completionCondition", "The agent zone “{name}” ends on a condition of its own: in TaskForce's "
+            + "processes, a zone ends when its agent has done its work.");
+        REASONS.put("rendering", "“{name}” comes with a form drawn for another tool: in TaskForce's processes, a human "
+            + "task asks what its settings say.");
+        REASONS.put("service", "“{name}” calls a service of another system: TaskForce's steps are done by a person, or "
+            + "by an agent under rules.");
+        REASONS.put("setting", "“{name}” has a setting TaskForce's processes don't have: {detail}.");
+        REASONS.put("conditionLanguage", "The condition of the path “{name}” is written for another engine ({detail}): "
+            + "TaskForce's conditions are words, with the step and the result code judges. Write it that way.");
+        REASONS.put("tfSettings", "“{name}” carries TaskForce settings this version doesn't read ({detail}): they come "
+            + "from another version of TaskForce, or were changed by hand.");
     }
 
     private ProcessSubset() {
@@ -117,10 +128,16 @@ public final class ProcessSubset {
      * d'un élément de BPMN que la liste ne connaît pas.
      */
     public static String reason(String element, String name) {
+        return reason(element, name, null);
+    }
+
+    /** La même phrase, avec ce qui précise l'élément quand elle le cite (un réglage et sa valeur, une langue). */
+    public static String reason(String element, String name, String detail) {
         String sentence = REASONS.get(element);
         if (sentence == null) {
             sentence = "“{name}” is a BPMN element TaskForce's processes don't have (" + element + ").";
         }
-        return sentence.replace("{name}", name == null || name.isBlank() ? element : name);
+        return sentence.replace("{name}", name == null || name.isBlank() ? element : name)
+            .replace("{detail}", detail == null ? element : detail);
     }
 }
