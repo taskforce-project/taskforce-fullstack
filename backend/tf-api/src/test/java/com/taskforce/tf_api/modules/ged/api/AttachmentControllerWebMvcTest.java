@@ -18,13 +18,18 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.modules.ged.dto.response.AttachmentResponse;
+import com.taskforce.tf_api.modules.ged.dto.response.IssueAttachmentCount;
 import com.taskforce.tf_api.modules.ged.service.AttachmentService;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -122,5 +127,45 @@ class AttachmentControllerWebMvcTest {
     void list_unauthenticated_401() throws Exception {
         mockMvc.perform(get(BASE))
             .andExpect(status().isUnauthorized());
+    }
+
+    // ---- le compte par issue d'un projet (la vue du workflow, lot W1) -------------------------------------------------
+
+    private static final String COUNTS = "/api/workspaces/acme/projects/1/attachments/counts";
+
+    @Test
+    @DisplayName("GET /projects/{id}/attachments/counts → 200 + une ligne {issueId, count} par issue qui a des pièces jointes")
+    void counts_200() throws Exception {
+        stubUser();
+        when(attachmentService.countByIssue("acme", 1L, 7L))
+            .thenReturn(List.of(new IssueAttachmentCount(2L, 3), new IssueAttachmentCount(5L, 1)));
+
+        mockMvc.perform(get(COUNTS).with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.length()").value(2))
+            .andExpect(jsonPath("$.data[0].issueId").value(2))
+            .andExpect(jsonPath("$.data[0].count").value(3))
+            .andExpect(jsonPath("$.data[1].issueId").value(5))
+            .andExpect(jsonPath("$.data[1].count").value(1));
+        verify(attachmentService).countByIssue("acme", 1L, 7L);
+    }
+
+    @Test
+    @DisplayName("GET counts : un projet que l'appelant ne voit pas → 404 ; un non-membre de l'espace → 403")
+    void counts_refusals() throws Exception {
+        stubUser();
+        doThrow(new ResourceNotFoundException("Project not found")).when(attachmentService).countByIssue("acme", 1L, 7L);
+        mockMvc.perform(get(COUNTS).with(auth())).andExpect(status().isNotFound());
+
+        doThrow(new ForbiddenException("Access denied: you're not a member of this workspace"))
+            .when(attachmentService).countByIssue("acme", 1L, 7L);
+        mockMvc.perform(get(COUNTS).with(auth())).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("GET counts sans JWT → 401")
+    void counts_unauthenticated_401() throws Exception {
+        mockMvc.perform(get(COUNTS)).andExpect(status().isUnauthorized());
     }
 }

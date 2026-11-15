@@ -1,5 +1,8 @@
 package com.taskforce.tf_api.modules.ged.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,7 +30,11 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.modules.ged.domain.Attachment;
+import com.taskforce.tf_api.modules.ged.dto.response.IssueAttachmentCount;
+import com.taskforce.tf_api.modules.ged.repository.AttachmentRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
@@ -60,6 +67,7 @@ class AttachmentServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private ProjectMemberRepository projectMemberRepository;
     @Autowired private IssueStatusRepository issueStatusRepository;
     @Autowired private IssueRepository issueRepository;
+    @Autowired private AttachmentRepository attachmentRepository;
 
     @MockitoBean private ObjectStorage objectStorage;
 
@@ -194,6 +202,109 @@ class AttachmentServiceIntegrationTest extends AbstractIntegrationTest {
             assertThatThrownBy(() ->
                 attachmentService.upload(SLUG, project.getId(), issueId, file(), viewer.getId()))
                 .isInstanceOf(BusinessException.class);
+        }
+    }
+
+    /**
+     * Le nombre de pièces jointes de chaque issue du projet (la vue du workflow, lot W1) : une requête groupée par issue,
+     * contre le vrai schéma, et gardée comme la liste d'une issue.
+     */
+    @Nested
+    @DisplayName("Compte par issue d'un projet")
+    class Counts {
+
+        private Issue issue(int number, String title, boolean archived) {
+            IssueStatus status = issueStatusRepository.findAll().stream()
+                .filter(s -> s.getProject().getId().equals(project.getId())).findFirst().orElseThrow();
+            return issueRepository.save(Issue.builder().project(project).status(status).reporter(owner)
+                .sequenceNumber(number).title(title).archivedAt(archived ? LocalDateTime.now() : null).build());
+        }
+
+        private void attach(Long issue, String name) {
+            attachmentRepository.save(Attachment.builder().issue(issueRepository.getReferenceById(issue)).uploadedBy(owner)
+                .originalName(name).storedKey("issues/" + issue + "/" + name).contentType("text/plain").fileSize(4L).build());
+        }
+
+        @Test
+        @DisplayName("une ligne par issue qui a des pièces jointes, dans l'ordre des issues ; ni les issues sans pièce jointe, ni les archivées")
+        void groups_by_issue_without_the_archived_ones() {
+            Long second = issue(2, "Second", false).getId();
+            Long empty = issue(3, "Without files", false).getId();
+            Long archived = issue(4, "Archived", true).getId();
+            attach(issueId, "a.txt");
+            attach(issueId, "b.txt");
+            attach(second, "c.txt");
+            attach(archived, "d.txt");
+
+            List<IssueAttachmentCount> counts = attachmentService.countByIssue(SLUG, project.getId(), owner.getId());
+
+            assertThat(counts).containsExactly(new IssueAttachmentCount(issueId, 2), new IssueAttachmentCount(second, 1));
+            assertThat(counts).extracting(IssueAttachmentCount::issueId).doesNotContain(empty, archived);
+        }
+
+        @Test
+        @DisplayName("les pièces jointes d'un autre projet ne comptent pas")
+        void counts_only_the_project() {
+            Project other = projectRepository.save(Project.builder()
+                .workspace(project.getWorkspace()).name("Other").identifier("OTH").createdBy(owner).build());
+            IssueStatus status = issueStatusRepository.save(IssueStatus.builder()
+                .project(other).name("Backlog").category(IssueStatusCategory.BACKLOG).build());
+            Issue elsewhere = issueRepository.save(Issue.builder()
+                .project(other).status(status).reporter(owner).sequenceNumber(1).title("Elsewhere").build());
+            attach(elsewhere.getId(), "x.txt");
+            attach(issueId, "a.txt");
+
+            assertThat(attachmentService.countByIssue(SLUG, project.getId(), owner.getId()))
+                .containsExactly(new IssueAttachmentCount(issueId, 1));
+            assertThat(attachmentService.countByIssue(SLUG, other.getId(), owner.getId()))
+                .containsExactly(new IssueAttachmentCount(elsewhere.getId(), 1));
+        }
+
+        @Test
+        @DisplayName("un projet sans pièce jointe rend une liste vide")
+        void empty_without_attachments() {
+            assertThat(attachmentService.countByIssue(SLUG, project.getId(), owner.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("quelqu'un qui n'est pas membre de l'espace est refusé (403), avant toute lecture")
+        void a_non_member_of_the_workspace_is_refused() {
+            User stranger = userRepository.save(User.builder()
+                .keycloakId("kc-att-cnt-out").email("count-outsider@it.dev").displayName("Outsider").isActive(true).build());
+
+            assertThatThrownBy(() -> attachmentService.countByIssue(SLUG, project.getId(), stranger.getId()))
+                .isInstanceOf(ForbiddenException.class);
+        }
+
+        @Test
+        @DisplayName("un membre de l'espace qui ne voit pas le projet privé reçoit 404 ; un membre du projet lit le compte")
+        void a_private_project_stays_hidden() {
+            User colleague = newUser("kc-att-cnt-mem", "count-member@it.dev", "Colleague");
+            workspaceMemberRepository.save(WorkspaceMember.builder()
+                .workspace(project.getWorkspace()).user(colleague).role(WorkspaceRole.MEMBER).build());
+            attach(issueId, "a.txt");
+
+            assertThatThrownBy(() -> attachmentService.countByIssue(SLUG, project.getId(), colleague.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+            projectMemberRepository.save(ProjectMember.builder()
+                .project(project).user(colleague).role(ProjectRole.VIEWER).build());
+            assertThat(attachmentService.countByIssue(SLUG, project.getId(), colleague.getId()))
+                .containsExactly(new IssueAttachmentCount(issueId, 1));
+        }
+
+        @Test
+        @DisplayName("le projet d'un autre espace, appelé par le chemin de cet espace, répond 404")
+        void a_project_of_another_workspace_is_not_found() {
+            User stranger = newUser("kc-att-cnt-oth", "count-other@it.dev", "Other owner");
+            Workspace otherWs = newWorkspace("Other WS", "ws-att-cnt-other", stranger);
+            Project foreign = projectRepository.save(Project.builder()
+                .workspace(otherWs).name("Foreign").identifier("FOR").createdBy(stranger).isPublic(true).build());
+
+            assertThatThrownBy(() -> attachmentService.countByIssue(SLUG, foreign.getId(), owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> attachmentService.countByIssue("no-such-workspace", project.getId(), owner.getId()))
+                .isInstanceOf(ResourceNotFoundException.class);
         }
     }
 }

@@ -8,12 +8,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueRepository;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.modules.ged.domain.Attachment;
 import com.taskforce.tf_api.modules.ged.dto.response.AttachmentResponse;
+import com.taskforce.tf_api.modules.ged.dto.response.IssueAttachmentCount;
 import com.taskforce.tf_api.modules.ged.repository.AttachmentRepository;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -53,6 +59,9 @@ public class AttachmentService {
     private final UserRepository userRepository;
     private final ObjectStorage objectStorage;
     private final ProjectVisibilityGuard visibilityGuard;
+    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final ProjectRepository projectRepository;
 
     @Transactional
     public AttachmentResponse upload(String slug, Long projectId, Long issueId, MultipartFile file, Long userId) {
@@ -100,6 +109,27 @@ public class AttachmentService {
         return attachmentRepository.findByIssueIdOrderByCreatedAtDesc(issueId)
                 .stream()
                 .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Le nombre de pièces jointes de chaque issue du projet, en une requête (la vue du workflow, lot W1, jusqu'à 2 000
+     * issues) : seules les issues qui en ont, sans les archivées. Gardé comme {@link #listByIssue} : un membre de l'espace
+     * du chemin (403 sinon, comme {@code WorkspaceAccessInterceptor}), un projet de cet espace (404 sinon), qu'il voit
+     * (404 sinon : un projet privé ne se révèle pas).
+     */
+    @Transactional(readOnly = true)
+    public List<IssueAttachmentCount> countByIssue(String slug, Long projectId, Long userId) {
+        Workspace workspace = workspaceRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        if (!workspaceMemberRepository.existsByWorkspaceIdAndUserId(workspace.getId(), userId)) {
+            throw new ForbiddenException("Access denied: you're not a member of this workspace");
+        }
+        Project project = projectRepository.findByIdAndWorkspaceId(projectId, workspace.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found"));
+        visibilityGuard.assertCanView(project, userId);
+        return attachmentRepository.countByIssueOfProject(project.getId()).stream()
+                .map(row -> new IssueAttachmentCount(((Number) row[0]).longValue(), ((Number) row[1]).longValue()))
                 .toList();
     }
 
