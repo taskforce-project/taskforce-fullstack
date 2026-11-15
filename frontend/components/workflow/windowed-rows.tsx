@@ -119,6 +119,8 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
     })
   }, [])
   const observer = useRef<ResizeObserver | null>(null)
+  // Les lignes rendues, que l'observateur reprend à sa création : celles du premier rendu existent avant lui.
+  const rendered = useRef(new Set<HTMLDivElement>())
   useEffect(() => {
     if (typeof ResizeObserver === "undefined") return
     const watch = new ResizeObserver((entries) => {
@@ -128,6 +130,7 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
       ] as const).filter(([key]) => key !== ""))
     })
     observer.current = watch
+    rendered.current.forEach((element) => watch.observe(element))
     return () => {
       watch.disconnect()
       observer.current = null
@@ -137,7 +140,12 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
     if (!element) return
     const key = element.dataset.rowKey
     if (key && element.offsetHeight > 0) remember([[key, element.offsetHeight]])
+    rendered.current.add(element)
     observer.current?.observe(element)
+    return () => {
+      rendered.current.delete(element)
+      observer.current?.unobserve(element)
+    }
   }, [remember])
 
   const heights = rows.map((row) => measured.get(row.key) ?? estimate(row))

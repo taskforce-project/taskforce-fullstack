@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 import { act, fireEvent, render } from "@testing-library/react"
 import { useRef } from "react"
 
@@ -34,6 +34,19 @@ function Column({ count }: Readonly<{ count: number }>) {
   )
 }
 
+/** Un ResizeObserver qui rend tout de suite, pour chaque élément observé, la hauteur donnée (une ligne mesurée). */
+function measuringObserver(height: number): typeof ResizeObserver {
+  return class {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      this.callback([{ target, borderBoxSize: [{ blockSize: height, inlineSize: 240 }], contentRect: { height } } as unknown as ResizeObserverEntry],
+        this as unknown as ResizeObserver)
+    }
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
+
 describe("WindowedRows", () => {
   it("renders only the first screen of 2,000 rows, with the height of the rest kept below", () => {
     const { container } = render(<Column count={2000} />)
@@ -55,6 +68,20 @@ describe("WindowedRows", () => {
     const keys = [...container.querySelectorAll<HTMLElement>("[data-row-key]")].map((row) => row.dataset.rowKey)
     expect(keys).toContain("row-100")
     expect(keys).not.toContain("row-0")
+  })
+
+  it("takes the measured height of each rendered row in place of its estimate", () => {
+    const real = globalThis.ResizeObserver
+    globalThis.ResizeObserver = measuringObserver(40)
+    try {
+      const { container, unmount } = render(<Column count={2000} />)
+      // Des lignes de 40 px au lieu de 92 : plus de lignes tiennent dans ce qui se voit.
+      const rendered = container.querySelectorAll("[data-row-key]").length
+      expect(rendered).toBeGreaterThan(Math.ceil((FALLBACK_VIEWPORT + OVERSCAN_PX) / 100) + 1)
+      unmount()
+    } finally {
+      globalThis.ResizeObserver = real
+    }
   })
 
   it("renders nothing for an empty column", () => {
