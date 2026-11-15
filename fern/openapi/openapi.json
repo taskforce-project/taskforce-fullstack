@@ -23147,6 +23147,16 @@
       "ProjectRunStep": {
         "type": "object",
         "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "understand",
+              "plan",
+              "do",
+              "check",
+              "handover"
+            ]
+          },
           "seq": {
             "type": "integer",
             "format": "int32"

@@ -10,9 +10,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * liens et ses demandes encore ouvertes, en une lecture.
  *
  * @param run       la mission, comme la liste des missions de l'espace la rend : son état, son résultat, ses tests
- * @param step      son étape en cours : le dernier événement de sa chronologie ; nulle tant qu'elle n'en a pas. Les cinq
- *                  étapes de la mission (comprendre, prévoir, faire, vérifier, rendre) se lisent de toute la chronologie,
- *                  comme sur la vue du travail
+ * @param step      son étape en cours, l'une des cinq (comprendre, prévoir, faire, vérifier, rendre), que le serveur
+ *                  calcule avec les règles de la vue du travail, et le dernier événement de sa chronologie
  * @param links     sa branche, sa pull request, et les missions qui la reprennent ou qu'elle reprend
  * @param approvals ses demandes encore ouvertes, avec les champs de la chronologie ; {@code canDecide} dit si la personne
  *                  qui lit peut y répondre, comme les règles de l'espace en décident
@@ -24,9 +23,20 @@ public record ProjectRunResponse(
     List<DeliveryRunActivityResponse.Approval> approvals
 ) {
 
-    /** Un événement de la chronologie : son numéro d'ordre, sa sorte ({@code tool}, {@code test}...), l'outil, l'heure. */
+    /**
+     * L'étape en cours d'une mission ({@code MissionSteps}) : {@code key}, l'une des cinq étapes, calculée avec les règles
+     * de l'écran (le contrat {@code contracts/mission-steps}, que les deux côtés rejouent). Avec elle, le dernier
+     * événement de la chronologie, nuls tant qu'elle n'en a pas : son numéro d'ordre, sa sorte ({@code tool},
+     * {@code test}...), l'outil, l'heure.
+     */
     @Schema(name = "ProjectRunStep")
-    public record Step(int seq, String kind, String tool, LocalDateTime at) {}
+    public record Step(
+        @Schema(allowableValues = {"understand", "plan", "do", "check", "handover"}) String key,
+        Integer seq,
+        String kind,
+        String tool,
+        LocalDateTime at
+    ) {}
 
     /**
      * @param branch         la branche de l'agent ; absente sans changement de code

@@ -106,7 +106,10 @@ interface DeliveryState {
    * dans l'ordre du serveur. `null` en cas d'échec ; une mission que la personne ne voit plus quitte la liste.
    */
   fetchProjectRun: (slug: string, projectId: number, runId: number) => Promise<ProjectRun | null>;
-  /** Pose la nouvelle étape en cours d'une mission lue (le topic l'a annoncée) ; `false` si elle n'est pas lue ou déjà plus loin. */
+  /**
+   * Pose l'étape en cours d'une mission lue, telle que le topic l'annonce ; `false` si la mission n'est pas lue, ou si
+   * l'étape vient d'un événement plus ancien que celle qu'elle a.
+   */
   applyProjectRunStep: (projectId: number, runId: number, step: ProjectRunStep) => boolean;
   /** Relit ce qui attend la personne ; `null` en cas d'échec, où la liste d'avant reste. */
   fetchOpenApprovals: (slug: string) => Promise<OpenApproval[] | null>;
@@ -448,7 +451,11 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   applyProjectRunStep: (projectId, runId, step) => {
     const current = get().projectRuns[projectId];
     const row = current?.rows.find((r) => r.run.id === runId);
-    if (!current || !row || (row.step && row.step.seq >= step.seq)) return false;
+    // Une étape d'un événement plus ancien ne remplace jamais la sienne. Au même événement, l'étape peut changer : une
+    // demande ouverte ou tranchée, la mission finie.
+    const known = row?.step?.seq;
+    const older = known != null && (step.seq == null || step.seq < known);
+    if (!current || !row || older) return false;
     set((state) => ({
       projectRuns: {
         ...state.projectRuns,

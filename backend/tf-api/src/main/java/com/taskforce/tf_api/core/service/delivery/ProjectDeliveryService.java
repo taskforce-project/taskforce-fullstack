@@ -15,10 +15,8 @@ import com.taskforce.tf_api.core.dto.response.DeliveryRunResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
-import com.taskforce.tf_api.core.model.DeliveryRunEvent;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
-import com.taskforce.tf_api.core.repository.DeliveryRunEventRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
@@ -43,14 +41,19 @@ public class ProjectDeliveryService {
     /** La taille d'une page quand l'appel n'en demande pas, et la plus grande qu'il peut demander. */
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 50;
+    /**
+     * La plus haute page qu'un appel peut demander : son décalage tient dans l'entier que la requête attend, et aucun
+     * projet n'a autant de missions. Une page plus haute se lit comme celle-ci, vide, au lieu d'échouer.
+     */
+    public static final int MAX_PAGE = 1_000_000;
 
     private final DeliveryRunRepository runRepository;
-    private final DeliveryRunEventRepository eventRepository;
     private final ProjectRepository projectRepository;
     private final ProjectVisibilityGuard visibilityGuard;
     private final BrainAccessGuard access;
     private final DeliveryService deliveryService;
     private final DeliveryActivityService activityService;
+    private final MissionStepReader stepReader;
 
     /**
      * Une page des missions du projet, les plus récentes d'abord. Une demande échue passe EXPIRED à la lecture, comme sur
@@ -60,7 +63,8 @@ public class ProjectDeliveryService {
     public PageResponse<ProjectRunResponse> listRuns(String slug, Long projectId, int page, int size, Long userId) {
         Project project = viewableProject(slug, projectId, userId);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        Page<DeliveryRun> runs = runRepository.findByProjectId(project.getId(), PageRequest.of(Math.max(page, 0), safeSize));
+        int safePage = Math.min(Math.max(page, 0), MAX_PAGE);
+        Page<DeliveryRun> runs = runRepository.findByProjectId(project.getId(), PageRequest.of(safePage, safeSize));
         Facts facts = facts(runs.getContent(), userId);
         return PageResponse.of(runs.map(run -> row(run, facts)));
     }
@@ -98,20 +102,19 @@ public class ProjectDeliveryService {
     private record Facts(Map<Long, ProjectRunResponse.Step> steps, Map<Long, Long> followedUpBy,
                          Map<Long, List<DeliveryRunActivityResponse.Approval>> approvals) {}
 
-    /** Les faits de ces missions, lus en trois requêtes pour toute la page. */
+    /** Les faits de ces missions, lus pour toute la page à la fois. */
     private Facts facts(List<DeliveryRun> runs, Long userId) {
         List<Long> ids = runs.stream().map(DeliveryRun::getId).toList();
         if (ids.isEmpty()) return new Facts(Map.of(), Map.of(), Map.of());
-        Map<Long, ProjectRunResponse.Step> steps = new HashMap<>();
-        for (DeliveryRunEvent event : eventRepository.findLastByRunIds(ids)) {
-            steps.put(event.getRun().getId(), ProjectDeliveryFeed.stepOf(event));
-        }
+        // Les demandes d'abord : une demande échue y passe EXPIRED, et l'étape se lit de celles qui restent ouvertes.
+        Map<Long, List<DeliveryRunActivityResponse.Approval>> approvals = activityService.pendingApprovals(runs, userId);
+        Map<Long, ProjectRunResponse.Step> steps = stepReader.stepsOf(runs, approvals);
         // De la plus ancienne à la plus récente : la dernière reprise l'emporte.
         Map<Long, Long> followedUpBy = new HashMap<>();
         for (DeliveryRunRepository.FollowUpRow row : runRepository.findFollowUps(ids)) {
             followedUpBy.put(row.getParentId(), row.getRunId());
         }
-        return new Facts(steps, followedUpBy, activityService.pendingApprovals(runs, userId));
+        return new Facts(steps, followedUpBy, approvals);
     }
 
     private ProjectRunResponse row(DeliveryRun run, Facts facts) {

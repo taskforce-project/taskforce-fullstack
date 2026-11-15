@@ -77,12 +77,11 @@ interface IssueState {
   /** Projet dont les issues sont en cache (évite le refetch au changement d'onglet - PROD-2.7). */
   loadedProjectId: number | null;
   /**
-   * Les liens entre les issues d'un projet (R166) : ses relations, et ses sous-issues avec leur parent, que `issues` ne
-   * porte pas (le premier niveau seul). `null` tant qu'ils ne sont pas lus ; le temps réel du projet les tient à jour.
+   * Les liens entre les issues de chaque projet lu, par projet (R166) : ses relations, et ses sous-issues avec leur parent,
+   * que `issues` ne porte pas (le premier niveau seul). Un projet absent n'est pas encore lu ; le temps réel du projet
+   * tient les siens à jour. Une réponse en retard d'un projet quitté ne range que les liens de ce projet-là.
    */
-  projectRelations: ProjectIssueRelations | null;
-  /** Le projet dont `projectRelations` sont les liens. */
-  relationsProjectId: number | null;
+  projectRelations: Record<number, ProjectIssueRelations>;
   /**
    * Toutes les issues du projet ouvert dans le workflow (séance n°25, W1), sous-issues comprises, sans les archivées : lues
    * page par page, jamais en un seul appel, puis tenues à jour comme `issues` (le temps réel et les gestes). `null` tant
@@ -237,15 +236,14 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   isLoading: false,
   error: null,
   loadedProjectId: null,
-  projectRelations: null,
-  relationsProjectId: null,
+  projectRelations: {},
   workflowIssues: null,
   documentCounts: null,
   issueActivity: {},
 
   clearIssues: () => set({
     issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null,
-    projectRelations: null, relationsProjectId: null, workflowIssues: null, documentCounts: null, issueActivity: {},
+    projectRelations: {}, workflowIssues: null, documentCounts: null, issueActivity: {},
   }),
 
   fetchWorkflowIssues: async (slug, projectId) => {
@@ -470,58 +468,61 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   upsertIssueLocal: (issue) =>
     set((state) => {
       const exists = state.issues.some((i) => i.id === issue.id);
-      const linked = state.projectRelations !== null && state.relationsProjectId === issue.projectId;
+      const links = state.projectRelations[issue.projectId];
       return {
         issues: exists
           ? state.issues.map((i) => (i.id === issue.id ? issue : i))
           : [issue, ...state.issues],
         activeIssue: state.activeIssue?.id === issue.id ? issue : state.activeIssue,
-        ...(linked && state.projectRelations ? { projectRelations: linksWithIssue(state.projectRelations, issue) } : {}),
+        ...(links ? { projectRelations: { ...state.projectRelations, [issue.projectId]: linksWithIssue(links, issue) } } : {}),
         workflowIssues: workflowWith(state.workflowIssues, issue),
       };
     }),
 
   removeIssueLocal: (issueId) =>
-    set((state) => ({
-      issues: state.issues.filter((i) => i.id !== issueId),
-      activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
-      workflowIssues: workflowWithout(state.workflowIssues, issueId),
-      ...(state.projectRelations ? { projectRelations: linksWithout(state.projectRelations, issueId) } : {}),
-    })),
+    set((state) => {
+      // L'événement ne dit pas le projet de l'issue : ses liens partent de chaque projet lu qui en a.
+      const touched = Object.entries(state.projectRelations).filter(([, links]) =>
+        links.relations.some((r) => r.source.id === issueId || r.target.id === issueId)
+          || links.subIssues.some((link) => link.issue.id === issueId || link.parent.id === issueId));
+      const projectRelations = { ...state.projectRelations };
+      for (const [projectId, links] of touched) projectRelations[Number(projectId)] = linksWithout(links, issueId);
+      return {
+        issues: state.issues.filter((i) => i.id !== issueId),
+        activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
+        workflowIssues: workflowWithout(state.workflowIssues, issueId),
+        ...(touched.length > 0 ? { projectRelations } : {}),
+      };
+    }),
 
   fetchProjectRelations: async (slug, projectId) => {
     try {
-      const projectRelations = await listProjectRelations(slug, projectId);
-      set({ projectRelations, relationsProjectId: projectId });
-      return projectRelations;
+      const links = await listProjectRelations(slug, projectId);
+      set((state) => ({ projectRelations: { ...state.projectRelations, [projectId]: links } }));
+      return links;
     } catch {
-      // Une lecture de fond : l'écran garde les liens d'avant, l'appelant branche sur `null`.
+      // Une lecture de fond : l'écran garde les liens d'avant de ce projet, l'appelant branche sur `null`.
       return null;
     }
   },
 
   upsertRelationLocal: (projectId, relation) =>
     set((state) => {
-      if (state.relationsProjectId !== projectId || !state.projectRelations) return {};
-      const { relations, subIssues } = state.projectRelations;
-      const known = relations.some((r) => r.id === relation.id);
-      return {
-        projectRelations: {
-          relations: known ? relations.map((r) => (r.id === relation.id ? relation : r)) : [...relations, relation],
-          subIssues,
-        },
-      };
+      const links = state.projectRelations[projectId];
+      if (!links) return {};
+      const known = links.relations.some((r) => r.id === relation.id);
+      const relations = known
+        ? links.relations.map((r) => (r.id === relation.id ? relation : r))
+        : [...links.relations, relation];
+      return { projectRelations: { ...state.projectRelations, [projectId]: { relations, subIssues: links.subIssues } } };
     }),
 
   removeRelationLocal: (projectId, relationId) =>
     set((state) => {
-      if (state.relationsProjectId !== projectId || !state.projectRelations) return {};
-      return {
-        projectRelations: {
-          relations: state.projectRelations.relations.filter((r) => r.id !== relationId),
-          subIssues: state.projectRelations.subIssues,
-        },
-      };
+      const links = state.projectRelations[projectId];
+      if (!links) return {};
+      const relations = links.relations.filter((r) => r.id !== relationId);
+      return { projectRelations: { ...state.projectRelations, [projectId]: { relations, subIssues: links.subIssues } } };
     }),
 
   fetchStatuses: async (slug, projectId) => {

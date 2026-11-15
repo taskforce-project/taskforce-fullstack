@@ -6,7 +6,7 @@ package com.taskforce.tf_api.core.dto.response;
  * mission pour cela ({@code GET .../delivery/projects/{projectId}/runs/{runId}}).
  *
  * @param type           {@code run} : son état, son résultat ou ses liens ; {@code approval} : une demande ouverte, signée,
- *                       tranchée ou échue ; {@code step} : sa chronologie a avancé, {@code step} est sa nouvelle étape
+ *                       tranchée ou échue ; {@code step} : sa chronologie a avancé
  * @param projectId      le projet
  * @param runId          la mission
  * @param issueId        son issue
@@ -14,7 +14,8 @@ package com.taskforce.tf_api.core.dto.response;
  * @param outcome        le geste de la personne sur son résultat, quand il y en a un
  * @param approvalId     la demande, pour {@code approval}
  * @param approvalStatus son état ({@code PENDING}, {@code ALLOWED}, {@code DENIED}, {@code EXPIRED}), pour {@code approval}
- * @param step           la nouvelle étape en cours, pour {@code step}
+ * @param step           l'étape en cours de la mission après ce changement, que chaque événement porte ; nulle si elle
+ *                       n'a pu se lire, l'écran relit alors la mission
  */
 public record ProjectDeliveryEvent(
     String type,

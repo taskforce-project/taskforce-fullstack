@@ -24,14 +24,10 @@ export interface SentenceTexts {
   readonly sequence: SequenceTexts
 }
 
-/** Ce que la phrase lit autour du nœud : la personne qui regarde, l'heure, le nom des agents, l'étape d'un échec. */
+/** Ce que la phrase lit autour du nœud : la personne qui regarde, et l'heure. */
 export interface SentenceContext {
   readonly me: string | number | null | undefined
   readonly now: Date
-  /** Le nom d'un agent par sa clé (« Claude Code ») ; la clé elle-même à défaut. */
-  readonly agentName: (providerKey: string) => string
-  /** L'étape où la mission a échoué, quand sa chronologie est lue (« Do ») ; null sinon. */
-  readonly failedStep?: string | null
 }
 
 const pad = (n: number) => String(n).padStart(2, "0")
@@ -109,13 +105,14 @@ export function nodeSentence(node: SentenceNode, t: SentenceTexts, context: Sent
     case "failed": {
       if (!reason.cause) return w.now.failedNoCause
       const cause = reason.cause.replace(/[.!?]+$/, "")
-      return context.failedStep
-        ? fillText(w.now.failed, { step: context.failedStep, cause })
-        : fillText(w.now.failedMission, { cause })
+      // L'étape où la mission s'est arrêtée, que le serveur calcule avec les règles de la vue du travail.
+      const step = node.run ? t.sequence.steps[node.run.step.key] : null
+      return step ? fillText(w.now.failed, { step, cause }) : fillText(w.now.failedMission, { cause })
     }
     case "mission": {
       if (reason.retried && run?.createdAt) return fillText(w.now.retried, { time: momentWords(run.createdAt, context.now) })
-      return fillText(w.now.agentWorking, { agent: run ? context.agentName(run.providerKey) : "" })
+      // Ce que l'agent fait en ce moment, en mots : « Doing the work », « Checking the work ».
+      return node.run ? t.sequence.status.working[node.run.step.key] : null
     }
     case "person": {
       const who = firstName(node.issue.assignee)

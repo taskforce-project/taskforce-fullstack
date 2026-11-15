@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.util.function.Supplier;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -18,9 +20,11 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Le flux temps réel des missions d'un projet, {@code /topic/projects.{projectId}.delivery} (la vue du workflow, R166) :
- * l'état d'une mission qui change, une demande ouverte ou tranchée, une étape de plus à sa chronologie. Publié après le
- * commit, pour que la relecture de la mission trouve ce qui vient d'être écrit ; hors transaction, tout de suite.
- * Best-effort : une panne du temps réel ne fait jamais échouer la mission, l'écran se relit à sa reconnexion.
+ * l'état d'une mission qui change, une demande ouverte ou tranchée, une étape de plus à sa chronologie. Chaque événement
+ * porte l'étape en cours de la mission après ce changement ({@link MissionStepReader}), lue dans la transaction qui
+ * l'écrit ; il est publié après le commit, pour que la relecture de la mission trouve ce qui vient d'être écrit ; hors
+ * transaction, tout de suite. Best-effort : une panne du temps réel ne fait jamais échouer la mission, l'écran se relit
+ * à sa reconnexion.
  *
  * <p>L'abonnement est réservé à qui voit le projet ({@code StompAuthInterceptor}), comme le board et ses analyses.
  * L'événement ne dit que ce que tous ceux-là peuvent lire ; ce qui dépend de la personne ({@code canDecide}) se relit.</p>
@@ -35,6 +39,7 @@ public class ProjectDeliveryFeed {
     static final String STEP = "step";
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final MissionStepReader steps;
 
     /** Le topic des missions d'un projet. */
     public static String topic(Long projectId) {
@@ -46,7 +51,7 @@ public class ProjectDeliveryFeed {
         Long projectId = projectOf(run);
         if (projectId == null) return;
         publish(new ProjectDeliveryEvent(RUN, projectId, run.getId(), run.getIssue().getId(), statusOf(run),
-            run.getOutcome() == null ? null : run.getOutcome().name(), null, null, null));
+            run.getOutcome() == null ? null : run.getOutcome().name(), null, null, stepOf(run.getId(), () -> steps.stepOf(run))));
     }
 
     /**
@@ -56,7 +61,7 @@ public class ProjectDeliveryFeed {
     public void run(Long projectId, Long runId, Long issueId, DeliveryRunStatus status) {
         if (projectId == null || runId == null) return;
         publish(new ProjectDeliveryEvent(RUN, projectId, runId, issueId, status == null ? null : status.name(),
-            null, null, null, null));
+            null, null, null, stepOf(runId, () -> steps.stepOfClaimed(runId, status))));
     }
 
     /** Une demande de la mission a été ouverte, signée, tranchée ou est échue. */
@@ -64,23 +69,29 @@ public class ProjectDeliveryFeed {
         Long projectId = projectOf(run);
         if (projectId == null || approval == null) return;
         publish(new ProjectDeliveryEvent(APPROVAL, projectId, run.getId(), run.getIssue().getId(), statusOf(run), null,
-            approval.getId(), approval.getStatus() == null ? null : approval.getStatus().name(), null));
+            approval.getId(), approval.getStatus() == null ? null : approval.getStatus().name(),
+            stepOf(run.getId(), () -> steps.stepOf(run))));
     }
 
-    /** La chronologie de la mission a avancé : {@code last} est sa nouvelle étape en cours. */
+    /** La chronologie de la mission a avancé jusqu'à {@code last}. */
     public void step(DeliveryRun run, DeliveryRunEvent last) {
         Long projectId = projectOf(run);
         if (projectId == null || last == null) return;
         publish(new ProjectDeliveryEvent(STEP, projectId, run.getId(), run.getIssue().getId(), statusOf(run), null,
-            null, null, stepOf(last)));
-    }
-
-    /** Un événement de la chronologie, tel que la vue du projet le montre comme étape en cours. */
-    public static ProjectRunResponse.Step stepOf(DeliveryRunEvent event) {
-        return new ProjectRunResponse.Step(event.getSeq(), event.getKind(), event.getTool(), event.getCreatedAt());
+            null, null, stepOf(run.getId(), () -> steps.stepOf(run))));
     }
 
     // ---------------------------------------------------------------------
+
+    /** L'étape en cours ; nulle si elle ne se lit pas : l'événement part quand même, et l'écran relit la mission. */
+    private static ProjectRunResponse.Step stepOf(Long runId, Supplier<ProjectRunResponse.Step> read) {
+        try {
+            return read.get();
+        } catch (RuntimeException ex) {
+            log.warn("Étape de la mission {} illisible pour le temps réel : {}", runId, ex.getMessage());
+            return null;
+        }
+    }
 
     private void publish(ProjectDeliveryEvent event) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {

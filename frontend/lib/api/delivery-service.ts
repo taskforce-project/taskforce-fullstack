@@ -315,14 +315,18 @@ export interface DeliveryRunActivity {
   approvals: DeliveryRunApproval[];
 }
 
+/** Les cinq étapes d'une mission, dans l'ordre : comprendre, prévoir, faire, vérifier, rendre. */
+export type ProjectRunStepKey = "understand" | "plan" | "do" | "check" | "handover";
+
 /**
- * L'étape en cours d'une mission, telle que le serveur la connaît : le dernier événement de sa chronologie. Les cinq
- * étapes (comprendre, prévoir, faire, vérifier, rendre) se lisent de toute la chronologie (`missionSequence`), comme sur
- * la vue du travail : `seq` dit si la chronologie lue est à jour.
+ * L'étape en cours d'une mission, que le serveur calcule avec les règles de l'écran (`missionSequence`, l'étape marquée
+ * `current`) : les deux rejouent les mêmes cas, `contracts/mission-steps/cases.json`. Avec elle, le dernier événement de
+ * la chronologie, nul tant qu'elle n'en a pas : `seq` dit si une étape reçue est plus récente que celle déjà lue.
  */
 export interface ProjectRunStep {
-  seq: number;
-  kind: DeliveryRunEvent["kind"];
+  key: ProjectRunStepKey;
+  seq: number | null;
+  kind: DeliveryRunEvent["kind"] | null;
   tool: string | null;
   at: string | null;
 }
@@ -338,8 +342,7 @@ export interface ProjectRunLinks {
 /** Une mission d'un projet telle que la vue du workflow la lit (R166) : elle, son étape en cours, ses liens, ses demandes. */
 export interface ProjectRun {
   run: DeliveryRun;
-  /** Nulle tant que la mission n'a rien fait. */
-  step: ProjectRunStep | null;
+  step: ProjectRunStep;
   links: ProjectRunLinks;
   /** Ses demandes encore ouvertes ; `canDecide` : la personne connectée peut y répondre, comme les règles en décident. */
   approvals: DeliveryRunApproval[];
@@ -371,7 +374,7 @@ export interface ProjectDeliveryEvent {
   outcome: DeliveryRunOutcome | null;
   approvalId: number | null;
   approvalStatus: DeliveryApprovalStatus | null;
-  /** La nouvelle étape en cours, pour `step`. */
+  /** L'étape en cours de la mission après ce changement : chaque événement la porte. */
   step: ProjectRunStep | null;
 }
 

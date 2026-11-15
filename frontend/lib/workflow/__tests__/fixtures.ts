@@ -1,6 +1,6 @@
 // Des données de test du workflow : des issues, des colonnes et des missions telles que l'API les rend. Jamais chargées
 // par l'application (le dossier `__tests__` est hors du code livré).
-import type { DeliveryRun, DeliveryRunApproval, ProjectRun } from "@/lib/api/delivery-service"
+import type { DeliveryRun, DeliveryRunApproval, ProjectRun, ProjectRunStepKey } from "@/lib/api/delivery-service"
 import type { Issue, IssueStatus, IssueStatusCategory, ProjectIssueRelation } from "@/lib/api/issue-service"
 
 export const ME = "7"
@@ -89,10 +89,10 @@ export function approval(id: number, patch: Partial<DeliveryRunApproval> = {}): 
   }
 }
 
-export function projectRun(run: DeliveryRun, approvals: DeliveryRunApproval[] = []): ProjectRun {
+export function projectRun(run: DeliveryRun, approvals: DeliveryRunApproval[] = [], key: ProjectRunStepKey = "do"): ProjectRun {
   return {
     run,
-    step: null,
+    step: { key, seq: 3, kind: "tool", tool: "Edit", at: "2026-11-13T10:00:00" },
     links: { branch: run.branch ?? null, pullRequestUrl: null, followUpOf: run.followUpOf ?? null, followedUpBy: null },
     approvals,
   }

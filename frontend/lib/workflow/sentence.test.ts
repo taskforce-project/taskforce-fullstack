@@ -11,7 +11,7 @@ import {
 
 const texts = { workflow: CONSTANTS_EN.workflow, sequence: CONSTANTS_EN.missionSequence }
 const now = new Date(2026, 10, 13, 15, 0)
-const context = { me: ME, now, agentName: (key: string) => (key === "claude-code" ? "Claude Code" : key) }
+const context = { me: ME, now }
 
 function nodeOf(...args: Parameters<typeof buildWorkflow>): WorkflowNode {
   const model = buildWorkflow(...args)
@@ -62,19 +62,20 @@ describe("la phrase d'un nœud", () => {
     expect(nodeSentence(many, texts, context)).toBe("Blocked by 2 issues.")
   })
 
-  it("un échec : l'étape quand on la connaît, sa cause, et « See why » pour qui l'a déléguée", () => {
-    const failed = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED", error: "The tests failed." }))] })
-    expect(nodeSentence(failed, texts, context)).toBe("The mission failed: The tests failed.")
-    expect(nodeSentence(failed, texts, { ...context, failedStep: "Check" })).toBe("Check failed: The tests failed.")
+  it("un échec : l'étape où la mission s'est arrêtée, sa cause, et « See why » pour qui l'a déléguée", () => {
+    const failed = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED", error: "The tests failed." }), [], "check")] })
+    expect(nodeSentence(failed, texts, context)).toBe("Check failed: The tests failed.")
     expect(nodeAction(failed, ME)).toBe("seeWhy")
     expect(nodeAction(failed, "8")).toBeNull()
     const silent = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED" }))] })
     expect(nodeSentence(silent, texts, context)).toBe(CONSTANTS_EN.workflow.now.failedNoCause)
   })
 
-  it("au travail : l'agent, ou le nouvel essai et son heure, ou la personne", () => {
+  it("au travail : ce que l'agent fait à son étape, ou le nouvel essai et son heure, ou la personne", () => {
     const agent = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1))] })
-    expect(nodeSentence(agent, texts, context)).toBe("Claude Code is working on it.")
+    expect(nodeSentence(agent, texts, context)).toBe("Doing the work")
+    const checking = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1), [], "check")] })
+    expect(nodeSentence(checking, texts, context)).toBe("Checking the work")
     const retried = nodeOf({
       ...base, issues: [issue(1, { status: DOING })],
       runs: [

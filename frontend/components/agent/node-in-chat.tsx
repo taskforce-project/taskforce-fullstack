@@ -6,7 +6,9 @@ import { toast } from "sonner"
 import { StateMark } from "@/components/workflow/state-mark"
 import { useNow } from "@/hooks/use-now"
 import type { AssistantTarget } from "@/lib/api/assistant-service"
-import type { DeliveryRun, ProjectRun } from "@/lib/api/delivery-service"
+import type { DeliveryRun, DeliveryRunActivity, ProjectRun } from "@/lib/api/delivery-service"
+import type { CONSTANTS_EN } from "@/lib/constants_en"
+import { missionSequence } from "@/lib/delivery/mission-sequence"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useIssueStore } from "@/lib/store/issue-store"
@@ -20,13 +22,20 @@ import { nodeSentence, type SentenceNode } from "@/lib/workflow/sentence"
 
 const NO_ISSUE = { assignee: null, completedAt: null, dueDate: null } as const
 
-/** La ligne d'une mission telle que le workflow la lit, refaite de ce que la conversation connaît d'elle. */
-function rowOf(run: DeliveryRun, approvals: ProjectRun["approvals"]): ProjectRun {
+type SequenceTexts = (typeof CONSTANTS_EN)["missionSequence"]
+
+/**
+ * La ligne d'une mission telle que le workflow la lit, refaite de ce que la conversation connaît d'elle : son étape en cours
+ * est celle que le déroulé tire de sa chronologie lue, avec les mêmes règles que le serveur (`contracts/mission-steps`).
+ */
+function rowOf(run: DeliveryRun, activity: DeliveryRunActivity | undefined, texts: SequenceTexts, you: boolean): ProjectRun {
+  const key = missionSequence(run, activity, texts, you).steps.find((step) => step.current)?.key ?? "understand"
+  const last = activity?.events.at(-1)
   return {
     run,
-    step: null,
+    step: { key, seq: last?.seq ?? null, kind: last?.kind ?? null, tool: last?.tool ?? null, at: last?.at ?? null },
     links: { branch: run.branch ?? null, pullRequestUrl: null, followUpOf: run.followUpOf ?? null, followedUpBy: null },
-    approvals: approvals.filter((approval) => approval.status === "PENDING"),
+    approvals: (activity?.approvals ?? []).filter((approval) => approval.status === "PENDING"),
   }
 }
 
@@ -50,21 +59,19 @@ export function NodeInChat({ slug, target, withSentence = true }: Readonly<{
   const retryRun = useDeliveryStore((s) => s.retryRun)
   const projectRow = useDeliveryStore((s) => s.projectRuns[target.projectId]?.rows.find((row) => row.run.issueId === target.issueId))
   const run = useDeliveryStore((s) => s.runs[target.issueId] ?? null)
-  const approvals = useDeliveryStore((s) => (run ? s.activity[run.id]?.approvals : undefined))
+  const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
   const issue = useIssueStore((s) => s.workflowIssues?.issues.find((i) => i.id === target.issueId)
     ?? s.issues.find((i) => i.id === target.issueId) ?? null)
 
   const node = useMemo(() => {
     // La ligne du projet porte ce que la personne peut décider ; sinon, la mission de l'issue et sa chronologie lue.
-    const row = projectRow && (!run || projectRow.run.id >= run.id) ? projectRow : run ? rowOf(run, approvals ?? []) : null
+    const row = projectRow && (!run || projectRow.run.id >= run.id) ? projectRow : run ? rowOf(run, activity, sequence, isMine(run, me)) : null
     const { state, reason } = nodeStateOf({ category: issue?.status.category ?? "UNSTARTED", run: row, blockers: [], me })
     const sentenceNode: SentenceNode = { reason, run: row, overdue: false, issue: issue ?? NO_ISSUE }
     return { state, reason, row, sentenceNode }
-  }, [projectRow, run, approvals, issue, me])
+  }, [projectRow, run, activity, sequence, issue, me])
 
-  const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence }, {
-    me, now: new Date(now), agentName: (key) => key, failedStep: null,
-  })
+  const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence }, { me, now: new Date(now) })
   const word = t.state[node.state]
   const nodeId = issueKey(target.issueId)
   const mission = node.row?.run ?? null

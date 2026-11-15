@@ -121,8 +121,7 @@ describe('issue-store', () => {
         isLoading: false,
         error: null,
         loadedProjectId: null,
-        projectRelations: null,
-        relationsProjectId: null,
+        projectRelations: {},
       });
     });
   });
@@ -682,14 +681,15 @@ describe('issue-store : les liens entre les issues du projet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     act(() => {
-      useIssueStore.setState({ issues: [], activeIssue: null, projectRelations: null, relationsProjectId: null });
+      useIssueStore.setState({ issues: [], activeIssue: null, projectRelations: {} });
     });
   });
 
   const loaded = (projectId = 10, value: ProjectIssueRelations = links()) =>
-    act(() => useIssueStore.setState({ projectRelations: value, relationsProjectId: projectId }));
+    act(() => useIssueStore.setState((state) => ({ projectRelations: { ...state.projectRelations, [projectId]: value } })));
+  const linksOf = (projectId = 10): ProjectIssueRelations | undefined => useIssueStore.getState().projectRelations[projectId];
 
-  it('fetchProjectRelations lit les liens du projet et les garde avec leur projet', async () => {
+  it('fetchProjectRelations lit les liens du projet et les range sous ce projet', async () => {
     const value = links();
     vi.mocked(svc.listProjectRelations).mockResolvedValue(value);
 
@@ -700,11 +700,10 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     expect(svc.listProjectRelations).toHaveBeenCalledWith('ws', 10);
     expect(result).toEqual(value);
-    expect(useIssueStore.getState().projectRelations).toEqual(value);
-    expect(useIssueStore.getState().relationsProjectId).toBe(10);
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: value });
   });
 
-  it('fetchProjectRelations rend null en cas d’échec, et les liens d’avant restent', async () => {
+  it('fetchProjectRelations rend null en cas d’échec, et les liens d’avant du projet restent', async () => {
     loaded();
     vi.mocked(svc.listProjectRelations).mockRejectedValue(new Error('down'));
 
@@ -714,18 +713,52 @@ describe('issue-store : les liens entre les issues du projet', () => {
     });
 
     expect(result).toBeNull();
-    expect(useIssueStore.getState().projectRelations).toEqual(links());
+    expect(linksOf(10)).toEqual(links());
+  });
+
+  it('un projet dont la lecture échoue reste sans liens : jamais ceux du projet d’avant', async () => {
+    loaded(10);
+    vi.mocked(svc.listProjectRelations).mockRejectedValue(new Error('down'));
+
+    await act(async () => {
+      await useIssueStore.getState().fetchProjectRelations('ws', 11);
+    });
+
+    expect(linksOf(11)).toBeUndefined();
+    expect(linksOf(10)).toEqual(links());
+  });
+
+  it('une réponse en retard du projet quitté ne range que ses liens à lui', async () => {
+    const before = links({ relations: [relation(7, 300, 301)] });
+    const now = links({ relations: [relation(8, 400, 401)] });
+    let answerBefore: (value: ProjectIssueRelations) => void = () => {};
+    vi.mocked(svc.listProjectRelations)
+      .mockImplementationOnce(() => new Promise((resolve) => { answerBefore = resolve; }))
+      .mockResolvedValueOnce(now);
+
+    let late: Promise<ProjectIssueRelations | null> = Promise.resolve(null);
+    await act(async () => {
+      late = useIssueStore.getState().fetchProjectRelations('ws', 10);
+      await useIssueStore.getState().fetchProjectRelations('ws', 11);
+    });
+    await act(async () => {
+      answerBefore(before);
+      await late;
+    });
+
+    expect(linksOf(11)).toEqual(now);
+    expect(linksOf(10)).toEqual(before);
   });
 
   it('upsertRelationLocal ajoute un lien posé, et remplace un lien déjà là', () => {
     loaded();
 
     act(() => useIssueStore.getState().upsertRelationLocal(10, relation(2, 101, 100)));
-    expect(useIssueStore.getState().projectRelations?.relations.map((r) => r.id)).toEqual([1, 2]);
+    expect(linksOf()?.relations.map((r) => r.id)).toEqual([1, 2]);
 
     const changed = { ...relation(2, 101, 100), relationType: 'RELATES_TO' as const };
     act(() => useIssueStore.getState().upsertRelationLocal(10, changed));
-    expect(useIssueStore.getState().projectRelations?.relations).toEqual([relation(1, 100, 101), changed]);
+    expect(linksOf()?.relations).toEqual([relation(1, 100, 101), changed]);
   });
 
   it('removeRelationLocal retire un lien', () => {
@@ -733,19 +766,19 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     act(() => useIssueStore.getState().removeRelationLocal(10, 1));
 
-    expect(useIssueStore.getState().projectRelations?.relations).toEqual([]);
-    expect(useIssueStore.getState().projectRelations?.subIssues).toHaveLength(1);
+    expect(linksOf()?.relations).toEqual([]);
+    expect(linksOf()?.subIssues).toHaveLength(1);
   });
 
   it('un lien d’un autre projet, ou avant la lecture des liens, ne change rien', () => {
     act(() => useIssueStore.getState().upsertRelationLocal(10, relation(2, 101, 100)));
     act(() => useIssueStore.getState().removeRelationLocal(10, 2));
-    expect(useIssueStore.getState().projectRelations).toBeNull();
+    expect(useIssueStore.getState().projectRelations).toEqual({});
 
     loaded(10);
     act(() => useIssueStore.getState().upsertRelationLocal(11, relation(3, 201, 200)));
     act(() => useIssueStore.getState().removeRelationLocal(11, 1));
-    expect(useIssueStore.getState().projectRelations).toEqual(links());
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: links() });
   });
 
   it('une issue qui change garde ses liens à jour : son nom et son statut', () => {
@@ -753,7 +786,7 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 101, identifier: 'TF-101', sequenceNumber: 101, title: 'Renamed', status: done })));
 
-    const target = useIssueStore.getState().projectRelations?.relations[0].target;
+    const target = linksOf()?.relations[0].target;
     expect(target).toEqual({ id: 101, sequenceNumber: 101, identifier: 'TF-101', title: 'Renamed', status: done });
   });
 
@@ -761,12 +794,12 @@ describe('issue-store : les liens entre les issues du projet', () => {
     loaded();
 
     act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 102, identifier: 'TF-102', sequenceNumber: 102, title: 'Child', parent: summary(101) })));
-    expect(useIssueStore.getState().projectRelations?.subIssues).toEqual([
+    expect(linksOf()?.subIssues).toEqual([
       { parent: summary(101), issue: { id: 102, sequenceNumber: 102, identifier: 'TF-102', title: 'Child', status } },
     ]);
 
     act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 102, parent: null })));
-    expect(useIssueStore.getState().projectRelations?.subIssues).toEqual([]);
+    expect(linksOf()?.subIssues).toEqual([]);
   });
 
   it('le parent qui change de nom le dit sur ses sous-issues', () => {
@@ -774,7 +807,7 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 100, identifier: 'TF-100', sequenceNumber: 100, title: 'Parent renamed' })));
 
-    expect(useIssueStore.getState().projectRelations?.subIssues[0].parent.title).toBe('Parent renamed');
+    expect(linksOf()?.subIssues[0].parent.title).toBe('Parent renamed');
   });
 
   it('une issue archivée quitte les liens, comme la lecture du serveur la laisse de côté', () => {
@@ -782,7 +815,7 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 100, archived: true })));
 
-    expect(useIssueStore.getState().projectRelations).toEqual({ relations: [], subIssues: [] });
+    expect(linksOf()).toEqual({ relations: [], subIssues: [] });
   });
 
   it('une issue d’un autre projet ne touche pas aux liens lus', () => {
@@ -790,15 +823,18 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 101, projectId: 11, title: 'Elsewhere' })));
 
-    expect(useIssueStore.getState().projectRelations).toEqual(links());
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: links() });
   });
 
-  it('une issue supprimée emporte ses liens et laisse ses sous-issues sans parent', () => {
+  it('une issue supprimée emporte ses liens et laisse ses sous-issues sans parent ; les autres projets ne changent pas', () => {
+    const elsewhere = links({ relations: [relation(5, 200, 201)], subIssues: [] });
     loaded(10, links({ relations: [relation(1, 100, 101), relation(2, 103, 104)] }));
+    loaded(11, elsewhere);
 
     act(() => useIssueStore.getState().removeIssueLocal(100));
 
-    expect(useIssueStore.getState().projectRelations).toEqual({ relations: [relation(2, 103, 104)], subIssues: [] });
+    expect(linksOf(10)).toEqual({ relations: [relation(2, 103, 104)], subIssues: [] });
+    expect(linksOf(11)).toBe(elsewhere);
   });
 
   it('clearIssues oublie aussi les liens', () => {
@@ -806,8 +842,7 @@ describe('issue-store : les liens entre les issues du projet', () => {
 
     act(() => useIssueStore.getState().clearIssues());
 
-    expect(useIssueStore.getState().projectRelations).toBeNull();
-    expect(useIssueStore.getState().relationsProjectId).toBeNull();
+    expect(useIssueStore.getState().projectRelations).toEqual({});
   });
 });
 

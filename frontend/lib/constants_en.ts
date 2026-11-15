@@ -496,7 +496,6 @@ export const CONSTANTS_EN = {
       failedMission: "The mission failed: {cause}.",
       failedNoCause: "The mission stopped before the end. Read why, then try again.",
       retried: "Tried again {time}. Waiting for the result.",
-      agentWorking: "{agent} is working on it.",
       inProgress: "In progress with {who}.",
       inProgressNobody: "In progress, with nobody on it.",
       notStarted: "Not started: {reason}",

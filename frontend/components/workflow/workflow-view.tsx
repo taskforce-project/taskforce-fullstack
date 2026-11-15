@@ -16,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useElementWidth } from "@/hooks/use-element-width"
 import { useMinWidth } from "@/hooks/use-min-width"
 import type { DeliveryProvider } from "@/lib/api/delivery-service"
-import { missionSequence } from "@/lib/delivery/mission-sequence"
 import { fillText } from "@/lib/delivery/result-card"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useWorkflowData, type WorkflowLoad } from "@/lib/hooks/use-workflow-data"
@@ -28,7 +27,6 @@ import { useScreenStore } from "@/lib/store/screen-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { INSPECTOR_DEFAULT, useWorkflowViewStore } from "@/lib/store/workflow-view-store"
 import { replaceQuery } from "@/lib/window/address"
-import { isMine } from "@/lib/window/missions"
 import { buildWorkflow, issueKey, resolveNode, todayKey, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
 import {
   governanceOf, nodeAction, nodeSentence, whoActs, type NodeAction, type SentenceTexts, type WorkflowTexts,
@@ -98,11 +96,10 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
 
   const statuses = useIssueStore((s) => s.statuses)
   const issues = useIssueStore((s) => (s.workflowIssues?.projectId === projectId ? s.workflowIssues.issues : null))
-  const relations = useIssueStore((s) => (s.relationsProjectId === projectId ? s.projectRelations?.relations ?? null : null))
+  const relations = useIssueStore((s) => s.projectRelations[projectId]?.relations ?? null)
   const documents = useIssueStore((s) => (s.documentCounts?.projectId === projectId ? s.documentCounts.counts : NO_DOCUMENTS))
   const runs = useDeliveryStore((s) => s.projectRuns[projectId]?.rows)
   const providers = useDeliveryStore((s) => s.projectProviders[projectId] ?? NO_PROVIDERS)
-  const activity = useDeliveryStore((s) => s.activity)
   const objective = useProjectStore((s) => s.objectives[projectId])
   const projectStart = useProjectStore((s) => s.projects.find((p) => p.id === projectId)?.createdAt ?? null)
   const densities = useWorkflowViewStore((s) => s.densities)
@@ -151,10 +148,10 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     if (!model) return out
     const assigneeOf = (issueId: number) => model.byKey.get(issueKey(issueId))?.issue.assignee ?? null
     for (const node of model.byKey.values()) {
-      out.set(node.key, nodeViewOf(node, texts, me, now, agentOf, activity, assigneeOf))
+      out.set(node.key, nodeViewOf(node, texts, me, now, agentOf, assigneeOf))
     }
     return out
-  }, [model, texts, me, now, agentOf, activity])
+  }, [model, texts, me, now, agentOf])
 
   // Ce qui est déplié, colonne par colonne, et les parents ouverts.
   const [expanded, setExpanded] = useState<Readonly<Record<number, { done?: boolean; all?: boolean }>>>({})
@@ -441,18 +438,11 @@ function nodeViewOf(
   me: string | number | null,
   now: Date,
   agentOf: (key: string) => DeliveryProvider | undefined,
-  activity: ReturnType<typeof useDeliveryStore.getState>["activity"],
   assigneeOf: Parameters<typeof whoActs>[3],
 ): NodeView {
   const run = node.run?.run ?? null
-  // L'étape d'un échec, quand la chronologie de la mission est lue : « Do failed: … ».
-  const failedStep = run && node.state === "failed" && activity[run.id]
-    ? missionSequence(run, activity[run.id], texts.sequence, isMine(run, me)).steps.find((step) => step.state === "failed")?.name ?? null
-    : null
   const agent = agentView(node, agentOf)
-  const sentence = nodeSentence(node, texts, {
-    me, now, agentName: (key) => agentOf(key)?.displayName ?? key, failedStep,
-  })
+  const sentence = nodeSentence(node, texts, { me, now })
   const detail = run ? [
     agent ? (run.model ? `${agent.name} · ${run.model}` : agent.name) : null,
     node.run?.links.branch ?? null,
