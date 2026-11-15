@@ -291,6 +291,12 @@ public final class ProcessValidator {
                     add("zoneContent", inner.id(), inner.name(), "The agent zone “" + zone.label() + "” holds agent steps "
                         + "only: move “" + inner.label() + "” out of it.");
                 }
+                // Ce qu'une étape de la zone tiendrait échapperait au reste de la vérification, une étape verrouillée
+                // comprise : la zone est le dernier niveau.
+                if (!inner.stepsOrEmpty().isEmpty() || !inner.flowsOrEmpty().isEmpty()) {
+                    add("notAContainer", inner.id(), inner.name(), "“" + inner.label() + "” holds other steps, which only "
+                        + "a stage or an agent zone does.");
+                }
             }
             if (!zone.flowsOrEmpty().isEmpty()) {
                 add("zoneFlows", zone.id(), zone.name(), "The agent zone “" + zone.label() + "” has paths inside: the "

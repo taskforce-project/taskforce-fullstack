@@ -226,6 +226,8 @@ public class ProcessValidatorTest {
             refusal("unknownType", "un type d'étape inconnu", r -> step(r, "write-scope").put("type", "inclusive")),
             refusal("notAContainer", "une tâche humaine qui tient des étapes",
                 r -> steps(step(r, "write-scope")).add(human("inside", "Inside"))),
+            refusal("notAContainer", "une étape d'agent, dans sa zone, qui tient des étapes",
+                r -> steps(step(r, "split-into-issues")).add(human("inside", "Inside"))),
             // La structure.
             refusal("startCount", "deux débuts dans une phase",
                 r -> steps(step(r, "frame")).add(JSON.createObjectNode().put("id", "frame-start-2").put("type", "start"))),
@@ -431,6 +433,27 @@ public class ProcessValidatorTest {
             new Context(List.of(ProcessFixtures.integrateAModule()), Map.of(), null, null));
 
         assertRefused(problems, "lockedStepUnlocked");
+    }
+
+    @Test
+    @DisplayName("une étape verrouillée ne se cache pas sous une étape d'agent : la zone est le dernier niveau")
+    void a_locked_step_does_not_hide_under_an_agent_step() {
+        ObjectNode base = e20();
+        step(base, "approve-breakdown").putObject("lock").put("by", "author");
+        ObjectNode next = base.deepCopy();
+        ObjectNode breakDown = step(next, "break-down");
+        ObjectNode approve = step(next, "approve-breakdown").deepCopy();
+        remove(steps(breakDown), "approve-breakdown");
+        remove(flows(breakDown), "approve-breakdown-break-down-end");
+        flow(breakDown, "breakdown-zone-approve-breakdown").put("to", "break-down-end");
+        steps(step(next, "split-into-issues")).add(approve);
+
+        List<Problem> problems = ProcessValidator.check(model(next),
+            new Context(List.of(model(base)), Map.of(), null, null));
+
+        assertRefused(problems, "notAContainer");
+        assertThat(problems).filteredOn(p -> p.code().equals("notAContainer")).singleElement()
+            .extracting(Problem::stepId).isEqualTo("split-into-issues");
     }
 
     @Test
