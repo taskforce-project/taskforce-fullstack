@@ -14,6 +14,7 @@ import { obligationWords } from "@/lib/rules/rule-words"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { momentWords } from "@/lib/workflow/sentence"
 
 /** La raison d'une décision, au plus, comme le serveur la borne. */
@@ -24,7 +25,8 @@ export const REASON_MAX = 500
  * signatures qu'elle demande, l'échéance et ce qui suit, la signification de la signature, une raison facultative, puis
  * « Refuse » et « Approve » en bas à droite ; « This can't be undone. » quand l'accord engage. Jamais un « Approve » nu. La
  * décision passe par la route qui existe, déjà jugée par les règles et entrée au dossier ; la raison y entre avec elle. Un
- * accord donné ici vaut une fois. Pour qui ne peut pas décider : qui l'on attend, sans bouton.
+ * accord donné ici vaut une fois. Pour qui ne peut pas décider : qui l'on attend, sans bouton. Une demande échue ne se
+ * décide plus : elle le dit, sans bouton, en attendant que la mission relue la montre close.
  */
 export function DecisionPanel({ slug, projectId, run, approval, now }: Readonly<{
   slug: string
@@ -47,6 +49,11 @@ export function DecisionPanel({ slug, projectId, run, approval, now }: Readonly<
   const obligations = obligationWords(approval, rulesText)
   const fieldId = `decide-why-${approval.id}`
   const title = fillText(t.title, { what })
+  const expired = approval.expiresAt !== null && parseServerDate(approval.expiresAt).getTime() <= now.getTime()
+
+  if (expired && approval.expiresAt) {
+    return <p className="text-sm text-muted-foreground">{fillText(t.expired, { time: momentWords(approval.expiresAt, now) })}</p>
+  }
 
   if (!approval.canDecide) {
     const who = obligations.length > 0 ? obligations.join(" ").replace(/\.$/, "") : (run.startedByName?.trim() || t.someone)
@@ -60,11 +67,12 @@ export function DecisionPanel({ slug, projectId, run, approval, now }: Readonly<
     if (ok) {
       const multi = allow && (approval.signatures ?? 1) > 1
       toast.success(allow ? (multi ? t.signed : t.approved) : t.refused)
-      // La ligne de la mission se relit tout de suite : le nœud quitte « Needs you » sans attendre le topic.
-      void fetchProjectRun(slug, projectId, run.id)
     } else {
       toast.error(t.failed)
     }
+    // La ligne de la mission se relit tout de suite, décision prise ou refusée (échue, tranchée ailleurs) : le nœud dit
+    // où elle en est sans attendre le topic.
+    void fetchProjectRun(slug, projectId, run.id)
   }
 
   return (

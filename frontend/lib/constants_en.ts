@@ -581,6 +581,7 @@ export const CONSTANTS_EN = {
       noRule: "No rule of your workspace covers this: the agent asks before it acts.",
       expires: "Expires {time}. Then: {then}",
       then: "No answer in time: refused.",
+      expired: "This request expired {time}. No answer in time: refused.",
       signingAs: "Signing as {name}. Meaning: {meaning}.",
       meaning: {
         approval: "Approval",

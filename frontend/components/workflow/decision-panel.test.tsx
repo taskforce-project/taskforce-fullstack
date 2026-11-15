@@ -58,6 +58,15 @@ describe("DecisionPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refuse" }))
     await waitFor(() => expect(decideApproval).toHaveBeenCalledWith("acme", 1, 9, false, false, ""))
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^Couldn't record your decision/))
+    // Refusée par le serveur (échue, tranchée ailleurs) : la mission se relit aussi, et le nœud dit où elle en est.
+    expect(fetchProjectRun).toHaveBeenCalledWith("acme", 3, 1)
+  })
+
+  it("past its deadline, a request is not offered: it says it expired, without a button", () => {
+    const late = approval(9, { expiresAt: "2026-11-13T07:30:00" })
+    render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={late} now={now} />)
+    expect(screen.getByText(/^This request expired .*. No answer in time: refused.$/)).toBeInTheDocument()
+    expect(screen.queryByRole("button")).toBeNull()
   })
 
   it("a signature that waits for others says so", async () => {
