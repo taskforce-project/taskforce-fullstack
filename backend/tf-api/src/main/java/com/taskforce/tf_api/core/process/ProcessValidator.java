@@ -1240,7 +1240,8 @@ public final class ProcessValidator {
 
         /**
          * Les trois points de pause de TF-J2-10, dès que des agents travaillent, et aucun ne se contourne : aucune zone
-         * d'agent ne commence sans être passée par celui d'avant une mission ; celui d'avant d'appliquer vient après le
+         * d'agent ne commence sans être passée par un point d'avant une mission, au début comme après le travail d'un
+         * agent (avant chaque mission, décision de la Présidence) ; celui d'avant d'appliquer vient après le
          * travail d'un agent, et on ne rejoint celui d'avant de livrer qu'en passant par lui ; aucun travail d'agent ne
          * mène à une fin du processus sans passer par celui d'avant de livrer. Une échéance ne passe jamais un point de
          * pause, et aucun n'est sur un chemin en parallèle : ces deux refus se disent avec les chemins de leur conteneur.
@@ -1278,6 +1279,22 @@ public final class ProcessValidator {
                 if (unguarded.contains(zone.id())) {
                     add("pausePointMisplaced", zone.id(), zone.name(), "“" + zone.label() + "” can start before anyone "
                         + "has checked the list before the agents start: put that pause point before it.");
+                }
+            }
+            // Avant chaque mission, pas seulement la première (décision de la Présidence du 15/11/2026, TF-J2-10) : après
+            // le travail d'un agent, le sien compris quand il recommence, aucune zone ne commence sans repasser par un
+            // point d'avant une mission.
+            Set<String> told = new HashSet<>(unguarded);
+            for (Step zone : zones) {
+                Set<String> after = graph.reachableAfter(zone.id(), mission);
+                for (Step next : zones) {
+                    if (after.contains(next.id()) && told.add(next.id())) {
+                        String when = next == zone ? "again after its own work" : "after the work of “" + zone.label()
+                            + "”";
+                        add("missionWithoutPausePoint", next.id(), next.name(), "“" + next.label() + "” can start " + when
+                            + " without anyone checking the list before the agents start: it is checked before every agent "
+                            + "mission, opened with its last answer. Put that pause point before “" + next.label() + "”.");
+                    }
                 }
             }
             boolean applyAfterWork = points.get(BEFORE_APPLY).stream()
@@ -1472,6 +1489,15 @@ public final class ProcessValidator {
         /** Ce qu'on rejoint depuis le début sans passer par {@code avoided}. */
         Set<String> reachableAvoiding(Set<String> avoided) {
             return start == null ? Set.of() : reachableFrom(start, avoided);
+        }
+
+        /** Ce qu'on rejoint après {@code from}, en un pas au moins (lui-même s'il y revient), sans passer par {@code avoided}. */
+        Set<String> reachableAfter(String from, Set<String> avoided) {
+            Set<String> out = new LinkedHashSet<>();
+            for (String next : edges.getOrDefault(from, Set.of())) {
+                out.addAll(reachableFrom(next, avoided));
+            }
+            return out;
         }
 
         /** Ce qu'on rejoint depuis {@code from} (compris) sans passer par {@code avoided}. */

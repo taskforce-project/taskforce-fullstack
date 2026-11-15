@@ -219,6 +219,16 @@ public class ProcessValidatorTest {
                 }),
             refusal("pausePointShape", "un point de pause qui n'est pas une liste de contrôle",
                 r -> ((ObjectNode) step(r, "before-mission").get("human")).put("kind", "approval")),
+            // Le point d'avant une mission vient avant chaque mission, pas seulement la première (la Présidence, L8).
+            refusal("missionWithoutPausePoint", "une zone de construction sans son point d'avant une mission, après le "
+                + "découpage comme au retour de la recette",
+                r -> flow(r, "build-start-before-mission-build").put("to", "build-zone")),
+            refusal("missionWithoutPausePoint", "une zone qui recommence après son échec sans repasser le point",
+                r -> flow(r, "unblock-build-before-mission-build").put("to", "build-zone")),
+            refusal("missionWithoutPausePoint", "une correction qui commence après l'échec des tests sans le point",
+                r -> flow(r, "tests-failed-before-mission-fix").put("to", "fix-zone")),
+            refusal("missionWithoutPausePoint", "une spécification refusée que l'agent reprend sans le point",
+                r -> flow(r, "spec-approved-before-mission").put("to", "spec-zone")),
             // Un point de pause ne se contourne pas (R159, H1).
             refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant les agents, qui mène à leur zone",
                 r -> deadline(r, "specify", "before-mission", "spec-zone")),
@@ -374,18 +384,18 @@ public class ProcessValidatorTest {
                 remove(steps(accept), "notes-zone");
             }),
             refusal("gatewayShape", "une décision d'un seul chemin",
-                r -> remove(flows(step(r, "specify")), "spec-approved-spec-zone")),
+                r -> remove(flows(step(r, "specify")), "spec-approved-before-mission")),
             refusal("severalPaths", "une tâche à deux sorties",
                 r -> flows(step(r, "frame")).add(newFlow("second-way", "write-scope", "frame-end"))),
             refusal("decisionWithoutDefault", "une décision sans chemin pour tous les autres cas",
-                r -> flow(r, "spec-approved-spec-zone").remove("otherwise")),
+                r -> flow(r, "spec-approved-before-mission").remove("otherwise")),
             refusal("severalDefaults", "une décision à deux chemins pour tous les autres cas", r -> {
                 ObjectNode f = flow(r, "spec-approved-specify-end");
                 f.remove("condition");
                 f.put("otherwise", true);
             }),
             refusal("otherwiseWithCondition", "le chemin de tous les autres cas avec sa condition", r -> {
-                ObjectNode f = flow(r, "spec-approved-spec-zone");
+                ObjectNode f = flow(r, "spec-approved-before-mission");
                 f.putObject("condition").put("text", "Refused").put("step", "review-spec").put("outcome", "refused");
             }),
             refusal("conditionWords", "une condition compilée sans ses mots",
@@ -443,7 +453,7 @@ public class ProcessValidatorTest {
             refusal("splitInLoop", "un partage en parallèle dans une boucle", r -> {
                 ObjectNode accept = step(r, "accept");
                 steps(accept).add(human("prepare-acceptance", "Prepare the acceptance"));
-                flow(accept, "accept-start-accept-split").put("to", "prepare-acceptance");
+                flow(accept, "before-mission-notes-accept-split").put("to", "prepare-acceptance");
                 flows(accept).add(newFlow("prepare-acceptance-accept-split", "prepare-acceptance", "accept-split"));
                 steps(accept).add(JSON.createObjectNode().put("id", "signed-off").put("type", "decision")
                     .put("name", "Is it signed off?").put("answeredBy", "project-lead"));
@@ -455,12 +465,12 @@ public class ProcessValidatorTest {
                 flows(accept).add(newFlow("signed-off-again", "signed-off", "prepare-acceptance").put("otherwise", true));
             }),
             refusal("decisionLoop", "une décision dont un chemin revient à elle-même",
-                r -> flow(r, "spec-approved-spec-zone").put("to", "spec-approved")),
+                r -> flow(r, "spec-approved-before-mission").put("to", "spec-approved")),
             refusal("decisionLoop", "une décision qui revient à elle-même sans que l'étape qu'elle juge tourne de nouveau",
                 r -> {
                     ObjectNode specify = step(r, "specify");
                     steps(specify).add(human("explain", "Explain the refusal"));
-                    flow(specify, "spec-approved-spec-zone").put("to", "explain");
+                    flow(specify, "spec-approved-before-mission").put("to", "explain");
                     flows(specify).add(newFlow("explain-spec-approved", "explain", "spec-approved"));
                 }),
             refusal("boundaryTarget", "une échéance sur un début", r -> step(r, "build-late").put("attachedTo", "build-start")),

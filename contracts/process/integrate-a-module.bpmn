@@ -2,7 +2,7 @@
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tf="https://taskforce-project.fr/schema/process/1" id="integrate-a-module.definitions" targetNamespace="https://taskforce-project.fr/processes" exporter="TaskForce" exporterVersion="taskforce-process/1">
   <bpmn:message id="acceptance-report.message" name="The acceptance report from the client's tester"/>
   <bpmn:process id="integrate-a-module" name="Integrate a module" isExecutable="true">
-    <bpmn:documentation>The default workflow of software delivery: integrate a new module into the company's base tool, from its scope to its delivery, with who answers for each step, who decides, and three pause points: before the agents start, before their changes are applied, and before the work is delivered.</bpmn:documentation>
+    <bpmn:documentation>The default workflow of software delivery: integrate a new module into the company's base tool, from its scope to its delivery, with who answers for each step, who decides, and three pause points: before every agent mission (the checklist opens with its last answer), before the agents' changes are applied, and before the work is delivered.</bpmn:documentation>
     <bpmn:extensionElements>
       <tf:process format="taskforce-process/1"/>
     </bpmn:extensionElements>
@@ -65,7 +65,7 @@
       <bpmn:userTask id="before-mission" name="Before the agents start">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
-            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
               <tf:item text="The base tool's documentation is imported, with its version."/>
               <tf:item text="The environment sheet is validated: install, build, test and run."/>
               <tf:item text="The approved scope is written in the project."/>
@@ -75,6 +75,7 @@
           </tf:step>
         </bpmn:extensionElements>
         <bpmn:incoming>specify-start-before-mission</bpmn:incoming>
+        <bpmn:incoming>spec-approved-before-mission</bpmn:incoming>
         <bpmn:outgoing>before-mission-spec-zone</bpmn:outgoing>
       </bpmn:userTask>
       <bpmn:adHocSubProcess id="spec-zone" name="Draft the specification">
@@ -87,7 +88,6 @@
           </tf:step>
         </bpmn:extensionElements>
         <bpmn:incoming>before-mission-spec-zone</bpmn:incoming>
-        <bpmn:incoming>spec-approved-spec-zone</bpmn:incoming>
         <bpmn:outgoing>spec-zone-review-spec</bpmn:outgoing>
         <bpmn:serviceTask id="draft-spec" name="Draft the specification from the base tool's documentation">
           <bpmn:extensionElements>
@@ -107,13 +107,13 @@
         <bpmn:incoming>spec-zone-review-spec</bpmn:incoming>
         <bpmn:outgoing>review-spec-spec-approved</bpmn:outgoing>
       </bpmn:userTask>
-      <bpmn:exclusiveGateway id="spec-approved" name="Is the specification approved?" default="spec-approved-spec-zone">
+      <bpmn:exclusiveGateway id="spec-approved" name="Is the specification approved?" default="spec-approved-before-mission">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead"/>
         </bpmn:extensionElements>
         <bpmn:incoming>review-spec-spec-approved</bpmn:incoming>
         <bpmn:outgoing>spec-approved-specify-end</bpmn:outgoing>
-        <bpmn:outgoing>spec-approved-spec-zone</bpmn:outgoing>
+        <bpmn:outgoing>spec-approved-before-mission</bpmn:outgoing>
       </bpmn:exclusiveGateway>
       <bpmn:endEvent id="specify-end" name="Specification approved">
         <bpmn:incoming>spec-approved-specify-end</bpmn:incoming>
@@ -128,14 +128,29 @@
         </bpmn:extensionElements>
         <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="https://taskforce-project.fr/schema/process/1#condition">The specification is approved</bpmn:conditionExpression>
       </bpmn:sequenceFlow>
-      <bpmn:sequenceFlow id="spec-approved-spec-zone" name="Otherwise" sourceRef="spec-approved" targetRef="spec-zone"/>
+      <bpmn:sequenceFlow id="spec-approved-before-mission" name="Otherwise" sourceRef="spec-approved" targetRef="before-mission"/>
     </bpmn:subProcess>
     <bpmn:subProcess id="break-down" name="Break down">
       <bpmn:incoming>specify-break-down</bpmn:incoming>
       <bpmn:outgoing>break-down-build</bpmn:outgoing>
       <bpmn:startEvent id="break-down-start" name="Breakdown starts">
-        <bpmn:outgoing>break-down-start-breakdown-zone</bpmn:outgoing>
+        <bpmn:outgoing>break-down-start-before-mission-breakdown</bpmn:outgoing>
       </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-breakdown" name="Before the agents break the work down">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>break-down-start-before-mission-breakdown</bpmn:incoming>
+        <bpmn:outgoing>before-mission-breakdown-breakdown-zone</bpmn:outgoing>
+      </bpmn:userTask>
       <bpmn:adHocSubProcess id="breakdown-zone" name="Break the work down">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead">
@@ -144,7 +159,7 @@
             <tf:rule ref="update-issue"/>
           </tf:step>
         </bpmn:extensionElements>
-        <bpmn:incoming>break-down-start-breakdown-zone</bpmn:incoming>
+        <bpmn:incoming>before-mission-breakdown-breakdown-zone</bpmn:incoming>
         <bpmn:outgoing>breakdown-zone-approve-breakdown</bpmn:outgoing>
         <bpmn:serviceTask id="split-into-issues" name="Split the specification into issues, each with its acceptance criteria">
           <bpmn:extensionElements>
@@ -166,7 +181,8 @@
       <bpmn:endEvent id="break-down-end" name="Work broken down">
         <bpmn:incoming>approve-breakdown-break-down-end</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="break-down-start-breakdown-zone" sourceRef="break-down-start" targetRef="breakdown-zone"/>
+      <bpmn:sequenceFlow id="break-down-start-before-mission-breakdown" sourceRef="break-down-start" targetRef="before-mission-breakdown"/>
+      <bpmn:sequenceFlow id="before-mission-breakdown-breakdown-zone" sourceRef="before-mission-breakdown" targetRef="breakdown-zone"/>
       <bpmn:sequenceFlow id="breakdown-zone-approve-breakdown" sourceRef="breakdown-zone" targetRef="approve-breakdown"/>
       <bpmn:sequenceFlow id="approve-breakdown-break-down-end" sourceRef="approve-breakdown" targetRef="break-down-end"/>
     </bpmn:subProcess>
@@ -175,8 +191,24 @@
       <bpmn:incoming>accepted-build</bpmn:incoming>
       <bpmn:outgoing>build-test</bpmn:outgoing>
       <bpmn:startEvent id="build-start" name="Build starts">
-        <bpmn:outgoing>build-start-build-zone</bpmn:outgoing>
+        <bpmn:outgoing>build-start-before-mission-build</bpmn:outgoing>
       </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-build" name="Before the agents build">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>build-start-before-mission-build</bpmn:incoming>
+        <bpmn:incoming>unblock-build-before-mission-build</bpmn:incoming>
+        <bpmn:outgoing>before-mission-build-build-zone</bpmn:outgoing>
+      </bpmn:userTask>
       <bpmn:adHocSubProcess id="build-zone" name="Build the module">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead">
@@ -188,8 +220,7 @@
             <tf:rule ref="floor-irreversible"/>
           </tf:step>
         </bpmn:extensionElements>
-        <bpmn:incoming>build-start-build-zone</bpmn:incoming>
-        <bpmn:incoming>unblock-build-build-zone</bpmn:incoming>
+        <bpmn:incoming>before-mission-build-build-zone</bpmn:incoming>
         <bpmn:outgoing>build-zone-build-end</bpmn:outgoing>
         <bpmn:serviceTask id="write-code" name="Write the module's code">
           <bpmn:extensionElements>
@@ -233,23 +264,40 @@
         </bpmn:extensionElements>
         <bpmn:incoming>build-failed-unblock-build</bpmn:incoming>
         <bpmn:incoming>build-late-unblock-build</bpmn:incoming>
-        <bpmn:outgoing>unblock-build-build-zone</bpmn:outgoing>
+        <bpmn:outgoing>unblock-build-before-mission-build</bpmn:outgoing>
       </bpmn:userTask>
       <bpmn:endEvent id="build-end" name="Module built">
         <bpmn:incoming>build-zone-build-end</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="build-start-build-zone" sourceRef="build-start" targetRef="build-zone"/>
+      <bpmn:sequenceFlow id="build-start-before-mission-build" sourceRef="build-start" targetRef="before-mission-build"/>
+      <bpmn:sequenceFlow id="before-mission-build-build-zone" sourceRef="before-mission-build" targetRef="build-zone"/>
       <bpmn:sequenceFlow id="build-zone-build-end" sourceRef="build-zone" targetRef="build-end"/>
       <bpmn:sequenceFlow id="build-failed-unblock-build" sourceRef="build-failed" targetRef="unblock-build"/>
       <bpmn:sequenceFlow id="build-late-unblock-build" sourceRef="build-late" targetRef="unblock-build"/>
-      <bpmn:sequenceFlow id="unblock-build-build-zone" sourceRef="unblock-build" targetRef="build-zone"/>
+      <bpmn:sequenceFlow id="unblock-build-before-mission-build" sourceRef="unblock-build" targetRef="before-mission-build"/>
     </bpmn:subProcess>
     <bpmn:subProcess id="test" name="Test">
       <bpmn:incoming>build-test</bpmn:incoming>
       <bpmn:outgoing>test-review</bpmn:outgoing>
       <bpmn:startEvent id="test-start" name="Tests start">
-        <bpmn:outgoing>test-start-test-zone</bpmn:outgoing>
+        <bpmn:outgoing>test-start-before-mission-test</bpmn:outgoing>
       </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-test" name="Before the agents test">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>test-start-before-mission-test</bpmn:incoming>
+        <bpmn:incoming>fix-zone-before-mission-test</bpmn:incoming>
+        <bpmn:outgoing>before-mission-test-test-zone</bpmn:outgoing>
+      </bpmn:userTask>
       <bpmn:adHocSubProcess id="test-zone" name="Test the module">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead">
@@ -258,8 +306,7 @@
             <tf:rule ref="push-agent-branch-private"/>
           </tf:step>
         </bpmn:extensionElements>
-        <bpmn:incoming>test-start-test-zone</bpmn:incoming>
-        <bpmn:incoming>fix-zone-test-zone</bpmn:incoming>
+        <bpmn:incoming>before-mission-test-test-zone</bpmn:incoming>
         <bpmn:outgoing>test-zone-test-end</bpmn:outgoing>
         <bpmn:serviceTask id="test-criteria" name="Test the module against each acceptance criterion">
           <bpmn:extensionElements>
@@ -270,9 +317,24 @@
         </bpmn:serviceTask>
       </bpmn:adHocSubProcess>
       <bpmn:boundaryEvent id="tests-failed" name="The tests fail" attachedToRef="test-zone">
-        <bpmn:outgoing>tests-failed-fix-zone</bpmn:outgoing>
+        <bpmn:outgoing>tests-failed-before-mission-fix</bpmn:outgoing>
         <bpmn:errorEventDefinition id="tests-failed.event"/>
       </bpmn:boundaryEvent>
+      <bpmn:userTask id="before-mission-fix" name="Before the agents fix what the tests found">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>tests-failed-before-mission-fix</bpmn:incoming>
+        <bpmn:outgoing>before-mission-fix-fix-zone</bpmn:outgoing>
+      </bpmn:userTask>
       <bpmn:adHocSubProcess id="fix-zone" name="Fix what the tests found">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead">
@@ -282,8 +344,8 @@
             <tf:rule ref="floor-irreversible"/>
           </tf:step>
         </bpmn:extensionElements>
-        <bpmn:incoming>tests-failed-fix-zone</bpmn:incoming>
-        <bpmn:outgoing>fix-zone-test-zone</bpmn:outgoing>
+        <bpmn:incoming>before-mission-fix-fix-zone</bpmn:incoming>
+        <bpmn:outgoing>fix-zone-before-mission-test</bpmn:outgoing>
         <bpmn:serviceTask id="fix-tests" name="Fix what the tests found">
           <bpmn:extensionElements>
             <tf:step answeredBy="project-lead">
@@ -295,10 +357,12 @@
       <bpmn:endEvent id="test-end" name="Module tested">
         <bpmn:incoming>test-zone-test-end</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="test-start-test-zone" sourceRef="test-start" targetRef="test-zone"/>
+      <bpmn:sequenceFlow id="test-start-before-mission-test" sourceRef="test-start" targetRef="before-mission-test"/>
+      <bpmn:sequenceFlow id="before-mission-test-test-zone" sourceRef="before-mission-test" targetRef="test-zone"/>
       <bpmn:sequenceFlow id="test-zone-test-end" sourceRef="test-zone" targetRef="test-end"/>
-      <bpmn:sequenceFlow id="tests-failed-fix-zone" sourceRef="tests-failed" targetRef="fix-zone"/>
-      <bpmn:sequenceFlow id="fix-zone-test-zone" sourceRef="fix-zone" targetRef="test-zone"/>
+      <bpmn:sequenceFlow id="tests-failed-before-mission-fix" sourceRef="tests-failed" targetRef="before-mission-fix"/>
+      <bpmn:sequenceFlow id="before-mission-fix-fix-zone" sourceRef="before-mission-fix" targetRef="fix-zone"/>
+      <bpmn:sequenceFlow id="fix-zone-before-mission-test" sourceRef="fix-zone" targetRef="before-mission-test"/>
     </bpmn:subProcess>
     <bpmn:subProcess id="review" name="Review">
       <bpmn:incoming>test-review</bpmn:incoming>
@@ -316,14 +380,29 @@
         <bpmn:incoming>remarks-zone-review-code</bpmn:incoming>
         <bpmn:outgoing>review-code-review-approved</bpmn:outgoing>
       </bpmn:userTask>
-      <bpmn:exclusiveGateway id="review-approved" name="Is the review approved?" default="review-approved-remarks-zone">
+      <bpmn:exclusiveGateway id="review-approved" name="Is the review approved?" default="review-approved-before-mission-remarks">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead"/>
         </bpmn:extensionElements>
         <bpmn:incoming>review-code-review-approved</bpmn:incoming>
         <bpmn:outgoing>review-approved-before-apply</bpmn:outgoing>
-        <bpmn:outgoing>review-approved-remarks-zone</bpmn:outgoing>
+        <bpmn:outgoing>review-approved-before-mission-remarks</bpmn:outgoing>
       </bpmn:exclusiveGateway>
+      <bpmn:userTask id="before-mission-remarks" name="Before the agents apply the review's remarks">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>review-approved-before-mission-remarks</bpmn:incoming>
+        <bpmn:outgoing>before-mission-remarks-remarks-zone</bpmn:outgoing>
+      </bpmn:userTask>
       <bpmn:adHocSubProcess id="remarks-zone" name="Apply the review's remarks">
         <bpmn:extensionElements>
           <tf:step answeredBy="project-lead">
@@ -333,7 +412,7 @@
             <tf:rule ref="floor-irreversible"/>
           </tf:step>
         </bpmn:extensionElements>
-        <bpmn:incoming>review-approved-remarks-zone</bpmn:incoming>
+        <bpmn:incoming>before-mission-remarks-remarks-zone</bpmn:incoming>
         <bpmn:outgoing>remarks-zone-review-code</bpmn:outgoing>
         <bpmn:serviceTask id="apply-remarks" name="Apply the review's remarks">
           <bpmn:extensionElements>
@@ -369,7 +448,8 @@
         </bpmn:extensionElements>
         <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="https://taskforce-project.fr/schema/process/1#condition">The review is approved</bpmn:conditionExpression>
       </bpmn:sequenceFlow>
-      <bpmn:sequenceFlow id="review-approved-remarks-zone" name="Otherwise" sourceRef="review-approved" targetRef="remarks-zone"/>
+      <bpmn:sequenceFlow id="review-approved-before-mission-remarks" name="Otherwise" sourceRef="review-approved" targetRef="before-mission-remarks"/>
+      <bpmn:sequenceFlow id="before-mission-remarks-remarks-zone" sourceRef="before-mission-remarks" targetRef="remarks-zone"/>
       <bpmn:sequenceFlow id="remarks-zone-review-code" sourceRef="remarks-zone" targetRef="review-code"/>
       <bpmn:sequenceFlow id="before-apply-review-end" sourceRef="before-apply" targetRef="review-end"/>
     </bpmn:subProcess>
@@ -377,10 +457,25 @@
       <bpmn:incoming>review-accept</bpmn:incoming>
       <bpmn:outgoing>accept-accepted</bpmn:outgoing>
       <bpmn:startEvent id="accept-start" name="Acceptance starts">
-        <bpmn:outgoing>accept-start-accept-split</bpmn:outgoing>
+        <bpmn:outgoing>accept-start-before-mission-notes</bpmn:outgoing>
       </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-notes" name="Before the agents write the release notes">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>accept-start-before-mission-notes</bpmn:incoming>
+        <bpmn:outgoing>before-mission-notes-accept-split</bpmn:outgoing>
+      </bpmn:userTask>
       <bpmn:parallelGateway id="accept-split">
-        <bpmn:incoming>accept-start-accept-split</bpmn:incoming>
+        <bpmn:incoming>before-mission-notes-accept-split</bpmn:incoming>
         <bpmn:outgoing>accept-split-acceptance-report</bpmn:outgoing>
         <bpmn:outgoing>accept-split-notes-zone</bpmn:outgoing>
       </bpmn:parallelGateway>
@@ -431,7 +526,8 @@
       <bpmn:endEvent id="accept-end" name="Acceptance decided">
         <bpmn:incoming>sign-acceptance-accept-end</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="accept-start-accept-split" sourceRef="accept-start" targetRef="accept-split"/>
+      <bpmn:sequenceFlow id="accept-start-before-mission-notes" sourceRef="accept-start" targetRef="before-mission-notes"/>
+      <bpmn:sequenceFlow id="before-mission-notes-accept-split" sourceRef="before-mission-notes" targetRef="accept-split"/>
       <bpmn:sequenceFlow id="accept-split-acceptance-report" sourceRef="accept-split" targetRef="acceptance-report"/>
       <bpmn:sequenceFlow id="accept-split-notes-zone" sourceRef="accept-split" targetRef="notes-zone"/>
       <bpmn:sequenceFlow id="acceptance-report-accept-join" sourceRef="acceptance-report" targetRef="accept-join"/>
@@ -617,315 +713,361 @@
         <di:waypoint x="1634" y="298"/>
         <di:waypoint x="1694" y="298"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="spec-approved-spec-zone.di" bpmnElement="spec-approved-spec-zone">
+      <bpmndi:BPMNEdge id="spec-approved-before-mission.di" bpmnElement="spec-approved-before-mission">
         <di:waypoint x="1609" y="323"/>
         <di:waypoint x="1609" y="398"/>
-        <di:waypoint x="1209" y="398"/>
-        <di:waypoint x="1209" y="298"/>
-        <di:waypoint x="1224" y="298"/>
+        <di:waypoint x="1049" y="398"/>
+        <di:waypoint x="1049" y="298"/>
+        <di:waypoint x="1064" y="298"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="break-down.di" bpmnElement="break-down" isExpanded="true">
-        <dc:Bounds x="1820" y="248" width="552" height="210"/>
+        <dc:Bounds x="1820" y="248" width="712" height="210"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="break-down-start.di" bpmnElement="break-down-start">
         <dc:Bounds x="1850" y="340" width="36" height="36"/>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-breakdown.di" bpmnElement="before-mission-breakdown">
+        <dc:Bounds x="1946" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="breakdown-zone.di" bpmnElement="breakdown-zone" isExpanded="true">
-        <dc:Bounds x="1946" y="288" width="140" height="140"/>
+        <dc:Bounds x="2106" y="288" width="140" height="140"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="split-into-issues.di" bpmnElement="split-into-issues">
-        <dc:Bounds x="1966" y="328" width="100" height="80"/>
+        <dc:Bounds x="2126" y="328" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="approve-breakdown.di" bpmnElement="approve-breakdown">
-        <dc:Bounds x="2146" y="318" width="100" height="80"/>
+        <dc:Bounds x="2306" y="318" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="break-down-end.di" bpmnElement="break-down-end">
-        <dc:Bounds x="2306" y="340" width="36" height="36"/>
+        <dc:Bounds x="2466" y="340" width="36" height="36"/>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="break-down-start-breakdown-zone.di" bpmnElement="break-down-start-breakdown-zone">
+      <bpmndi:BPMNEdge id="break-down-start-before-mission-breakdown.di" bpmnElement="break-down-start-before-mission-breakdown">
         <di:waypoint x="1886" y="358"/>
         <di:waypoint x="1946" y="358"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="breakdown-zone-approve-breakdown.di" bpmnElement="breakdown-zone-approve-breakdown">
-        <di:waypoint x="2086" y="358"/>
-        <di:waypoint x="2146" y="358"/>
+      <bpmndi:BPMNEdge id="before-mission-breakdown-breakdown-zone.di" bpmnElement="before-mission-breakdown-breakdown-zone">
+        <di:waypoint x="2046" y="358"/>
+        <di:waypoint x="2106" y="358"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="approve-breakdown-break-down-end.di" bpmnElement="approve-breakdown-break-down-end">
+      <bpmndi:BPMNEdge id="breakdown-zone-approve-breakdown.di" bpmnElement="breakdown-zone-approve-breakdown">
         <di:waypoint x="2246" y="358"/>
         <di:waypoint x="2306" y="358"/>
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="approve-breakdown-break-down-end.di" bpmnElement="approve-breakdown-break-down-end">
+        <di:waypoint x="2406" y="358"/>
+        <di:waypoint x="2466" y="358"/>
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="build.di" bpmnElement="build" isExpanded="true">
-        <dc:Bounds x="2432" y="100" width="509" height="507"/>
+        <dc:Bounds x="2592" y="100" width="669" height="507"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="build-start.di" bpmnElement="build-start">
-        <dc:Bounds x="2462" y="292" width="36" height="36"/>
+        <dc:Bounds x="2622" y="292" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-build.di" bpmnElement="before-mission-build">
+        <dc:Bounds x="2718" y="270" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="build-zone.di" bpmnElement="build-zone" isExpanded="true">
-        <dc:Bounds x="2558" y="140" width="193" height="340"/>
+        <dc:Bounds x="2878" y="140" width="193" height="340"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="write-code.di" bpmnElement="write-code">
-        <dc:Bounds x="2604" y="180" width="100" height="80"/>
+        <dc:Bounds x="2924" y="180" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="write-tests.di" bpmnElement="write-tests">
-        <dc:Bounds x="2604" y="280" width="100" height="80"/>
+        <dc:Bounds x="2924" y="280" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="update-docs.di" bpmnElement="update-docs">
-        <dc:Bounds x="2604" y="380" width="100" height="80"/>
+        <dc:Bounds x="2924" y="380" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="build-failed.di" bpmnElement="build-failed">
-        <dc:Bounds x="2688" y="462" width="36" height="36"/>
+        <dc:Bounds x="3008" y="462" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="build-late.di" bpmnElement="build-late">
-        <dc:Bounds x="2578" y="462" width="36" height="36"/>
+        <dc:Bounds x="2898" y="462" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="unblock-build.di" bpmnElement="unblock-build">
-        <dc:Bounds x="2811" y="308" width="100" height="80"/>
+        <dc:Bounds x="3131" y="308" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="build-end.di" bpmnElement="build-end">
-        <dc:Bounds x="2843" y="232" width="36" height="36"/>
+        <dc:Bounds x="3163" y="232" width="36" height="36"/>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="build-start-build-zone.di" bpmnElement="build-start-build-zone">
-        <di:waypoint x="2498" y="310"/>
-        <di:waypoint x="2558" y="310"/>
+      <bpmndi:BPMNEdge id="build-start-before-mission-build.di" bpmnElement="build-start-before-mission-build">
+        <di:waypoint x="2658" y="310"/>
+        <di:waypoint x="2718" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-build-build-zone.di" bpmnElement="before-mission-build-build-zone">
+        <di:waypoint x="2818" y="310"/>
+        <di:waypoint x="2878" y="310"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="build-zone-build-end.di" bpmnElement="build-zone-build-end">
-        <di:waypoint x="2751" y="310"/>
-        <di:waypoint x="2781" y="310"/>
-        <di:waypoint x="2781" y="250"/>
-        <di:waypoint x="2843" y="250"/>
+        <di:waypoint x="3071" y="310"/>
+        <di:waypoint x="3101" y="310"/>
+        <di:waypoint x="3101" y="250"/>
+        <di:waypoint x="3163" y="250"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="build-failed-unblock-build.di" bpmnElement="build-failed-unblock-build">
-        <di:waypoint x="2706" y="498"/>
-        <di:waypoint x="2706" y="532"/>
-        <di:waypoint x="2861" y="532"/>
-        <di:waypoint x="2861" y="388"/>
+        <di:waypoint x="3026" y="498"/>
+        <di:waypoint x="3026" y="532"/>
+        <di:waypoint x="3181" y="532"/>
+        <di:waypoint x="3181" y="388"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="build-late-unblock-build.di" bpmnElement="build-late-unblock-build">
-        <di:waypoint x="2596" y="498"/>
-        <di:waypoint x="2596" y="547"/>
-        <di:waypoint x="2861" y="547"/>
-        <di:waypoint x="2861" y="388"/>
+        <di:waypoint x="2916" y="498"/>
+        <di:waypoint x="2916" y="547"/>
+        <di:waypoint x="3181" y="547"/>
+        <di:waypoint x="3181" y="388"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="unblock-build-build-zone.di" bpmnElement="unblock-build-build-zone">
-        <di:waypoint x="2861" y="388"/>
-        <di:waypoint x="2861" y="562"/>
-        <di:waypoint x="2543" y="562"/>
-        <di:waypoint x="2543" y="310"/>
-        <di:waypoint x="2558" y="310"/>
+      <bpmndi:BPMNEdge id="unblock-build-before-mission-build.di" bpmnElement="unblock-build-before-mission-build">
+        <di:waypoint x="3181" y="388"/>
+        <di:waypoint x="3181" y="562"/>
+        <di:waypoint x="2703" y="562"/>
+        <di:waypoint x="2703" y="310"/>
+        <di:waypoint x="2718" y="310"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="test.di" bpmnElement="test" isExpanded="true">
-        <dc:Bounds x="3001" y="162" width="496" height="383"/>
+        <dc:Bounds x="3321" y="192" width="816" height="323"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="test-start.di" bpmnElement="test-start">
-        <dc:Bounds x="3031" y="292" width="36" height="36"/>
+        <dc:Bounds x="3351" y="292" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-test.di" bpmnElement="before-mission-test">
+        <dc:Bounds x="3447" y="270" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="test-zone.di" bpmnElement="test-zone" isExpanded="true">
-        <dc:Bounds x="3127" y="240" width="140" height="140"/>
+        <dc:Bounds x="3607" y="240" width="140" height="140"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="test-criteria.di" bpmnElement="test-criteria">
-        <dc:Bounds x="3147" y="280" width="100" height="80"/>
+        <dc:Bounds x="3627" y="280" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="tests-failed.di" bpmnElement="tests-failed">
-        <dc:Bounds x="3204" y="362" width="36" height="36"/>
+        <dc:Bounds x="3684" y="362" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-fix.di" bpmnElement="before-mission-fix">
+        <dc:Bounds x="3807" y="308" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="fix-zone.di" bpmnElement="fix-zone" isExpanded="true">
-        <dc:Bounds x="3327" y="278" width="140" height="140"/>
+        <dc:Bounds x="3967" y="240" width="140" height="140"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="fix-tests.di" bpmnElement="fix-tests">
-        <dc:Bounds x="3347" y="318" width="100" height="80"/>
+        <dc:Bounds x="3987" y="280" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="test-end.di" bpmnElement="test-end">
-        <dc:Bounds x="3379" y="202" width="36" height="36"/>
+        <dc:Bounds x="3839" y="232" width="36" height="36"/>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="test-start-test-zone.di" bpmnElement="test-start-test-zone">
-        <di:waypoint x="3067" y="310"/>
-        <di:waypoint x="3127" y="310"/>
+      <bpmndi:BPMNEdge id="test-start-before-mission-test.di" bpmnElement="test-start-before-mission-test">
+        <di:waypoint x="3387" y="310"/>
+        <di:waypoint x="3447" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-test-test-zone.di" bpmnElement="before-mission-test-test-zone">
+        <di:waypoint x="3547" y="310"/>
+        <di:waypoint x="3607" y="310"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="test-zone-test-end.di" bpmnElement="test-zone-test-end">
-        <di:waypoint x="3267" y="310"/>
-        <di:waypoint x="3297" y="310"/>
-        <di:waypoint x="3297" y="220"/>
-        <di:waypoint x="3379" y="220"/>
+        <di:waypoint x="3747" y="310"/>
+        <di:waypoint x="3777" y="310"/>
+        <di:waypoint x="3777" y="250"/>
+        <di:waypoint x="3839" y="250"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="tests-failed-fix-zone.di" bpmnElement="tests-failed-fix-zone">
-        <di:waypoint x="3222" y="398"/>
-        <di:waypoint x="3222" y="432"/>
-        <di:waypoint x="3397" y="432"/>
-        <di:waypoint x="3397" y="418"/>
+      <bpmndi:BPMNEdge id="tests-failed-before-mission-fix.di" bpmnElement="tests-failed-before-mission-fix">
+        <di:waypoint x="3702" y="398"/>
+        <di:waypoint x="3702" y="432"/>
+        <di:waypoint x="3857" y="432"/>
+        <di:waypoint x="3857" y="388"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="fix-zone-test-zone.di" bpmnElement="fix-zone-test-zone">
-        <di:waypoint x="3397" y="418"/>
-        <di:waypoint x="3397" y="500"/>
-        <di:waypoint x="3112" y="500"/>
-        <di:waypoint x="3112" y="310"/>
-        <di:waypoint x="3127" y="310"/>
+      <bpmndi:BPMNEdge id="before-mission-fix-fix-zone.di" bpmnElement="before-mission-fix-fix-zone">
+        <di:waypoint x="3907" y="348"/>
+        <di:waypoint x="3937" y="348"/>
+        <di:waypoint x="3937" y="310"/>
+        <di:waypoint x="3967" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="fix-zone-before-mission-test.di" bpmnElement="fix-zone-before-mission-test">
+        <di:waypoint x="4037" y="380"/>
+        <di:waypoint x="4037" y="470"/>
+        <di:waypoint x="3432" y="470"/>
+        <di:waypoint x="3432" y="310"/>
+        <di:waypoint x="3447" y="310"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="review.di" bpmnElement="review" isExpanded="true">
-        <dc:Bounds x="3557" y="166" width="662" height="375"/>
+        <dc:Bounds x="4197" y="188" width="726" height="331"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="review-start.di" bpmnElement="review-start">
-        <dc:Bounds x="3587" y="318" width="36" height="36"/>
+        <dc:Bounds x="4227" y="318" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="review-code.di" bpmnElement="review-code">
-        <dc:Bounds x="3683" y="296" width="100" height="80"/>
+        <dc:Bounds x="4323" y="296" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="review-approved.di" bpmnElement="review-approved" isMarkerVisible="true">
-        <dc:Bounds x="3843" y="311" width="50" height="50"/>
+        <dc:Bounds x="4483" y="311" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-remarks.di" bpmnElement="before-mission-remarks">
+        <dc:Bounds x="4593" y="356" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="remarks-zone.di" bpmnElement="remarks-zone" isExpanded="true">
-        <dc:Bounds x="3953" y="326" width="140" height="140"/>
+        <dc:Bounds x="4753" y="304" width="140" height="140"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="apply-remarks.di" bpmnElement="apply-remarks">
-        <dc:Bounds x="3973" y="366" width="100" height="80"/>
+        <dc:Bounds x="4773" y="344" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="before-apply.di" bpmnElement="before-apply">
-        <dc:Bounds x="3973" y="206" width="100" height="80"/>
+        <dc:Bounds x="4593" y="236" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="review-end.di" bpmnElement="review-end">
-        <dc:Bounds x="4153" y="318" width="36" height="36"/>
+        <dc:Bounds x="4805" y="228" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="review-start-review-code.di" bpmnElement="review-start-review-code">
-        <di:waypoint x="3623" y="336"/>
-        <di:waypoint x="3683" y="336"/>
+        <di:waypoint x="4263" y="336"/>
+        <di:waypoint x="4323" y="336"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="review-code-review-approved.di" bpmnElement="review-code-review-approved">
-        <di:waypoint x="3783" y="336"/>
-        <di:waypoint x="3843" y="336"/>
+        <di:waypoint x="4423" y="336"/>
+        <di:waypoint x="4483" y="336"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="review-approved-before-apply.di" bpmnElement="review-approved-before-apply">
-        <di:waypoint x="3893" y="336"/>
-        <di:waypoint x="3923" y="336"/>
-        <di:waypoint x="3923" y="246"/>
-        <di:waypoint x="3973" y="246"/>
+        <di:waypoint x="4533" y="336"/>
+        <di:waypoint x="4563" y="336"/>
+        <di:waypoint x="4563" y="276"/>
+        <di:waypoint x="4593" y="276"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="review-approved-remarks-zone.di" bpmnElement="review-approved-remarks-zone">
-        <di:waypoint x="3893" y="336"/>
-        <di:waypoint x="3923" y="336"/>
-        <di:waypoint x="3923" y="396"/>
-        <di:waypoint x="3953" y="396"/>
+      <bpmndi:BPMNEdge id="review-approved-before-mission-remarks.di" bpmnElement="review-approved-before-mission-remarks">
+        <di:waypoint x="4533" y="336"/>
+        <di:waypoint x="4563" y="336"/>
+        <di:waypoint x="4563" y="396"/>
+        <di:waypoint x="4593" y="396"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-remarks-remarks-zone.di" bpmnElement="before-mission-remarks-remarks-zone">
+        <di:waypoint x="4693" y="396"/>
+        <di:waypoint x="4723" y="396"/>
+        <di:waypoint x="4723" y="374"/>
+        <di:waypoint x="4753" y="374"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="remarks-zone-review-code.di" bpmnElement="remarks-zone-review-code">
-        <di:waypoint x="4023" y="466"/>
-        <di:waypoint x="4023" y="496"/>
-        <di:waypoint x="3668" y="496"/>
-        <di:waypoint x="3668" y="336"/>
-        <di:waypoint x="3683" y="336"/>
+        <di:waypoint x="4823" y="444"/>
+        <di:waypoint x="4823" y="474"/>
+        <di:waypoint x="4308" y="474"/>
+        <di:waypoint x="4308" y="336"/>
+        <di:waypoint x="4323" y="336"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="before-apply-review-end.di" bpmnElement="before-apply-review-end">
-        <di:waypoint x="4073" y="246"/>
-        <di:waypoint x="4123" y="246"/>
-        <di:waypoint x="4123" y="336"/>
-        <di:waypoint x="4153" y="336"/>
+        <di:waypoint x="4693" y="276"/>
+        <di:waypoint x="4723" y="276"/>
+        <di:waypoint x="4723" y="246"/>
+        <di:waypoint x="4805" y="246"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="accept.di" bpmnElement="accept" isExpanded="true">
-        <dc:Bounds x="4279" y="210" width="772" height="286"/>
+        <dc:Bounds x="4983" y="210" width="932" height="286"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="accept-start.di" bpmnElement="accept-start">
-        <dc:Bounds x="4309" y="340" width="36" height="36"/>
+        <dc:Bounds x="5013" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-notes.di" bpmnElement="before-mission-notes">
+        <dc:Bounds x="5109" y="318" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="accept-split.di" bpmnElement="accept-split">
-        <dc:Bounds x="4405" y="333" width="50" height="50"/>
+        <dc:Bounds x="5269" y="333" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="acceptance-report.di" bpmnElement="acceptance-report">
-        <dc:Bounds x="4567" y="250" width="36" height="36"/>
+        <dc:Bounds x="5431" y="250" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="notes-zone.di" bpmnElement="notes-zone" isExpanded="true">
-        <dc:Bounds x="4515" y="326" width="140" height="140"/>
+        <dc:Bounds x="5379" y="326" width="140" height="140"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="write-notes.di" bpmnElement="write-notes">
-        <dc:Bounds x="4535" y="366" width="100" height="80"/>
+        <dc:Bounds x="5399" y="366" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="accept-join.di" bpmnElement="accept-join">
-        <dc:Bounds x="4715" y="333" width="50" height="50"/>
+        <dc:Bounds x="5579" y="333" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="sign-acceptance.di" bpmnElement="sign-acceptance">
-        <dc:Bounds x="4825" y="318" width="100" height="80"/>
+        <dc:Bounds x="5689" y="318" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="accept-end.di" bpmnElement="accept-end">
-        <dc:Bounds x="4985" y="340" width="36" height="36"/>
+        <dc:Bounds x="5849" y="340" width="36" height="36"/>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNEdge id="accept-start-accept-split.di" bpmnElement="accept-start-accept-split">
-        <di:waypoint x="4345" y="358"/>
-        <di:waypoint x="4405" y="358"/>
+      <bpmndi:BPMNEdge id="accept-start-before-mission-notes.di" bpmnElement="accept-start-before-mission-notes">
+        <di:waypoint x="5049" y="358"/>
+        <di:waypoint x="5109" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-notes-accept-split.di" bpmnElement="before-mission-notes-accept-split">
+        <di:waypoint x="5209" y="358"/>
+        <di:waypoint x="5269" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="accept-split-acceptance-report.di" bpmnElement="accept-split-acceptance-report">
-        <di:waypoint x="4455" y="358"/>
-        <di:waypoint x="4485" y="358"/>
-        <di:waypoint x="4485" y="268"/>
-        <di:waypoint x="4567" y="268"/>
+        <di:waypoint x="5319" y="358"/>
+        <di:waypoint x="5349" y="358"/>
+        <di:waypoint x="5349" y="268"/>
+        <di:waypoint x="5431" y="268"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="accept-split-notes-zone.di" bpmnElement="accept-split-notes-zone">
-        <di:waypoint x="4455" y="358"/>
-        <di:waypoint x="4485" y="358"/>
-        <di:waypoint x="4485" y="396"/>
-        <di:waypoint x="4515" y="396"/>
+        <di:waypoint x="5319" y="358"/>
+        <di:waypoint x="5349" y="358"/>
+        <di:waypoint x="5349" y="396"/>
+        <di:waypoint x="5379" y="396"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="acceptance-report-accept-join.di" bpmnElement="acceptance-report-accept-join">
-        <di:waypoint x="4603" y="268"/>
-        <di:waypoint x="4685" y="268"/>
-        <di:waypoint x="4685" y="358"/>
-        <di:waypoint x="4715" y="358"/>
+        <di:waypoint x="5467" y="268"/>
+        <di:waypoint x="5549" y="268"/>
+        <di:waypoint x="5549" y="358"/>
+        <di:waypoint x="5579" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="notes-zone-accept-join.di" bpmnElement="notes-zone-accept-join">
-        <di:waypoint x="4655" y="396"/>
-        <di:waypoint x="4685" y="396"/>
-        <di:waypoint x="4685" y="358"/>
-        <di:waypoint x="4715" y="358"/>
+        <di:waypoint x="5519" y="396"/>
+        <di:waypoint x="5549" y="396"/>
+        <di:waypoint x="5549" y="358"/>
+        <di:waypoint x="5579" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="accept-join-sign-acceptance.di" bpmnElement="accept-join-sign-acceptance">
-        <di:waypoint x="4765" y="358"/>
-        <di:waypoint x="4825" y="358"/>
+        <di:waypoint x="5629" y="358"/>
+        <di:waypoint x="5689" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="sign-acceptance-accept-end.di" bpmnElement="sign-acceptance-accept-end">
-        <di:waypoint x="4925" y="358"/>
-        <di:waypoint x="4985" y="358"/>
+        <di:waypoint x="5789" y="358"/>
+        <di:waypoint x="5849" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="accepted.di" bpmnElement="accepted" isMarkerVisible="true">
-        <dc:Bounds x="5111" y="328" width="50" height="50"/>
+        <dc:Bounds x="5975" y="328" width="50" height="50"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="deliver.di" bpmnElement="deliver" isExpanded="true">
-        <dc:Bounds x="5221" y="278" width="768" height="150"/>
+        <dc:Bounds x="6085" y="278" width="768" height="150"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="deliver-start.di" bpmnElement="deliver-start">
-        <dc:Bounds x="5251" y="340" width="36" height="36"/>
+        <dc:Bounds x="6115" y="340" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="before-delivery.di" bpmnElement="before-delivery">
-        <dc:Bounds x="5347" y="318" width="100" height="80"/>
+        <dc:Bounds x="6211" y="318" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="deliver-module.di" bpmnElement="deliver-module">
-        <dc:Bounds x="5507" y="318" width="100" height="80"/>
+        <dc:Bounds x="6371" y="318" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="watch.di" bpmnElement="watch">
-        <dc:Bounds x="5667" y="340" width="36" height="36"/>
+        <dc:Bounds x="6531" y="340" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="close-integration.di" bpmnElement="close-integration">
-        <dc:Bounds x="5763" y="318" width="100" height="80"/>
+        <dc:Bounds x="6627" y="318" width="100" height="80"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="deliver-end.di" bpmnElement="deliver-end">
-        <dc:Bounds x="5923" y="340" width="36" height="36"/>
+        <dc:Bounds x="6787" y="340" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="deliver-start-before-delivery.di" bpmnElement="deliver-start-before-delivery">
-        <di:waypoint x="5287" y="358"/>
-        <di:waypoint x="5347" y="358"/>
+        <di:waypoint x="6151" y="358"/>
+        <di:waypoint x="6211" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="before-delivery-deliver-module.di" bpmnElement="before-delivery-deliver-module">
-        <di:waypoint x="5447" y="358"/>
-        <di:waypoint x="5507" y="358"/>
+        <di:waypoint x="6311" y="358"/>
+        <di:waypoint x="6371" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="deliver-module-watch.di" bpmnElement="deliver-module-watch">
-        <di:waypoint x="5607" y="358"/>
-        <di:waypoint x="5667" y="358"/>
+        <di:waypoint x="6471" y="358"/>
+        <di:waypoint x="6531" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="watch-close-integration.di" bpmnElement="watch-close-integration">
-        <di:waypoint x="5703" y="358"/>
-        <di:waypoint x="5763" y="358"/>
+        <di:waypoint x="6567" y="358"/>
+        <di:waypoint x="6627" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="close-integration-deliver-end.di" bpmnElement="close-integration-deliver-end">
-        <di:waypoint x="5863" y="358"/>
-        <di:waypoint x="5923" y="358"/>
+        <di:waypoint x="6727" y="358"/>
+        <di:waypoint x="6787" y="358"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="delivered.di" bpmnElement="delivered">
-        <dc:Bounds x="6049" y="335" width="36" height="36"/>
+        <dc:Bounds x="6913" y="335" width="36" height="36"/>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="requested-frame.di" bpmnElement="requested-frame">
         <di:waypoint x="196" y="353"/>
@@ -954,39 +1096,39 @@
         <di:waypoint x="1820" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="break-down-build.di" bpmnElement="break-down-build">
-        <di:waypoint x="2372" y="353"/>
-        <di:waypoint x="2432" y="353"/>
+        <di:waypoint x="2532" y="353"/>
+        <di:waypoint x="2592" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="build-test.di" bpmnElement="build-test">
-        <di:waypoint x="2941" y="353"/>
-        <di:waypoint x="3001" y="353"/>
+        <di:waypoint x="3261" y="353"/>
+        <di:waypoint x="3321" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="test-review.di" bpmnElement="test-review">
-        <di:waypoint x="3497" y="353"/>
-        <di:waypoint x="3557" y="353"/>
+        <di:waypoint x="4137" y="353"/>
+        <di:waypoint x="4197" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="review-accept.di" bpmnElement="review-accept">
-        <di:waypoint x="4219" y="353"/>
-        <di:waypoint x="4279" y="353"/>
+        <di:waypoint x="4923" y="353"/>
+        <di:waypoint x="4983" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="accept-accepted.di" bpmnElement="accept-accepted">
-        <di:waypoint x="5051" y="353"/>
-        <di:waypoint x="5111" y="353"/>
+        <di:waypoint x="5915" y="353"/>
+        <di:waypoint x="5975" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="accepted-deliver.di" bpmnElement="accepted-deliver">
-        <di:waypoint x="5161" y="353"/>
-        <di:waypoint x="5221" y="353"/>
+        <di:waypoint x="6025" y="353"/>
+        <di:waypoint x="6085" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="accepted-build.di" bpmnElement="accepted-build">
-        <di:waypoint x="5136" y="378"/>
-        <di:waypoint x="5136" y="637"/>
-        <di:waypoint x="2417" y="637"/>
-        <di:waypoint x="2417" y="353"/>
-        <di:waypoint x="2432" y="353"/>
+        <di:waypoint x="6000" y="378"/>
+        <di:waypoint x="6000" y="637"/>
+        <di:waypoint x="2577" y="637"/>
+        <di:waypoint x="2577" y="353"/>
+        <di:waypoint x="2592" y="353"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="deliver-delivered.di" bpmnElement="deliver-delivered">
-        <di:waypoint x="5989" y="353"/>
-        <di:waypoint x="6049" y="353"/>
+        <di:waypoint x="6853" y="353"/>
+        <di:waypoint x="6913" y="353"/>
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

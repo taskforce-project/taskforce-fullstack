@@ -78,8 +78,13 @@ class ProcessContractTest {
             new ProcessValidator.Context(List.of(), java.util.Map.of(), taskforceRules(), null));
 
         assertThat(problems).isEmpty();
-        assertThat(model.allSteps().stream().filter(s -> s.pausePoint() != null).map(ProcessModel.Step::pausePoint))
-            .containsExactlyInAnyOrderElementsOf(ProcessModel.PAUSE_POINTS);
+        assertThat(model.allSteps().stream().filter(s -> s.pausePoint() != null).map(ProcessModel.Step::pausePoint)
+            .distinct()).containsExactlyInAnyOrderElementsOf(ProcessModel.PAUSE_POINTS);
+        // Le point d'avant une mission devant chacune de ses sept zones d'agent, qui s'ouvre sur sa dernière réponse.
+        assertThat(model.allSteps().stream().filter(s -> ProcessModel.ZONE.equals(s.type()))).hasSize(7);
+        assertThat(model.allSteps().stream().filter(s -> ProcessModel.BEFORE_MISSION.equals(s.pausePoint())))
+            .hasSize(7)
+            .allSatisfy(s -> assertThat(s.human().prefill()).isEqualTo(ProcessModel.PREFILL_LAST_ANSWER));
     }
 
     @Test
@@ -210,14 +215,18 @@ class ProcessContractTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("rewritten")
-    @DisplayName("un fichier réécrit par un modeleur revient à l'identique, tf: gardée")
+    @DisplayName("un fichier réécrit par un modeleur revient à l'identique de ce qu'il a lu, tf: gardée")
     void a_rewritten_file_comes_back(Path file) throws Exception {
         String xml = Files.readString(file, StandardCharsets.UTF_8);
+        // Ce que l'outil a lu : l'export de ce jour-là quand il est gardé dans sources/, l'export d'aujourd'hui sinon.
+        Path source = file.resolveSibling("sources").resolve(file.getFileName());
+        ProcessModel read = Files.exists(source) ? BpmnImport.read(Files.readString(source, StandardCharsets.UTF_8))
+            .model() : integrateAModule();
 
         BpmnImport.Result back = BpmnImport.read(xml);
 
         assertThat(back.foreign()).isEmpty();
-        assertThat(ProcessFingerprint.of(back.model())).isEqualTo(ProcessFingerprint.of(integrateAModule()));
+        assertThat(ProcessFingerprint.of(back.model())).isEqualTo(ProcessFingerprint.of(read));
         bpmnSchema().newValidator().validate(new StreamSource(new StringReader(xml)));
     }
 }
