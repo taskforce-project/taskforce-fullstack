@@ -7,6 +7,9 @@ import type {
   IssueType,
   IssueComment,
   IssueActivity,
+  IssueSummary,
+  ProjectIssueRelation,
+  ProjectIssueRelations,
 } from '../api/issue-service';
 import * as svc from '../api/issue-service';
 
@@ -28,6 +31,7 @@ vi.mock('../api/issue-service', () => ({
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
   listActivity: vi.fn(),
+  listProjectRelations: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -113,6 +117,7 @@ describe('issue-store', () => {
         isLoading: false,
         error: null,
         loadedProjectId: null,
+        projectRelations: {},
       });
     });
   });
@@ -646,5 +651,193 @@ describe('issue-store', () => {
     expect(s.activity).toEqual([]);
     expect(s.error).toBeNull();
     expect(s.loadedProjectId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Les liens entre les issues d'un projet (R166)
+// ---------------------------------------------------------------------------
+
+const ada = { id: 1, email: 'a@b.c', displayName: 'A', avatarUrl: null };
+const done: IssueStatus = { ...status, id: 2, name: 'Done', category: 'COMPLETED' };
+
+function summary(id: number, title = `Issue ${id}`): IssueSummary {
+  return { id, sequenceNumber: id, identifier: `TF-${id}`, title, status };
+}
+
+function relation(id: number, source: number, target: number): ProjectIssueRelation {
+  return { id, relationType: 'BLOCKS', source: summary(source), target: summary(target), createdBy: ada, createdAt: '2026-11-13T10:00:00' };
+}
+
+function links(over: Partial<ProjectIssueRelations> = {}): ProjectIssueRelations {
+  return { relations: [relation(1, 100, 101)], subIssues: [{ parent: summary(100), issue: summary(102) }], ...over };
+}
+
+describe('issue-store : les liens entre les issues du projet', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    act(() => {
+      useIssueStore.setState({ issues: [], activeIssue: null, projectRelations: {} });
+    });
+  });
+
+  const loaded = (projectId = 10, value: ProjectIssueRelations = links()) =>
+    act(() => useIssueStore.setState((state) => ({ projectRelations: { ...state.projectRelations, [projectId]: value } })));
+  const linksOf = (projectId = 10): ProjectIssueRelations | undefined => useIssueStore.getState().projectRelations[projectId];
+
+  it('fetchProjectRelations lit les liens du projet et les range sous ce projet', async () => {
+    const value = links();
+    vi.mocked(svc.listProjectRelations).mockResolvedValue(value);
+
+    let result: ProjectIssueRelations | null = null;
+    await act(async () => {
+      result = await useIssueStore.getState().fetchProjectRelations('ws', 10);
+    });
+
+    expect(svc.listProjectRelations).toHaveBeenCalledWith('ws', 10);
+    expect(result).toEqual(value);
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: value });
+  });
+
+  it('fetchProjectRelations rend null en cas d’échec, et les liens d’avant du projet restent', async () => {
+    loaded();
+    vi.mocked(svc.listProjectRelations).mockRejectedValue(new Error('down'));
+
+    let result: ProjectIssueRelations | null = links();
+    await act(async () => {
+      result = await useIssueStore.getState().fetchProjectRelations('ws', 10);
+    });
+
+    expect(result).toBeNull();
+    expect(linksOf(10)).toEqual(links());
+  });
+
+  it('un projet dont la lecture échoue reste sans liens : jamais ceux du projet d’avant', async () => {
+    loaded(10);
+    vi.mocked(svc.listProjectRelations).mockRejectedValue(new Error('down'));
+
+    await act(async () => {
+      await useIssueStore.getState().fetchProjectRelations('ws', 11);
+    });
+
+    expect(linksOf(11)).toBeUndefined();
+    expect(linksOf(10)).toEqual(links());
+  });
+
+  it('une réponse en retard du projet quitté ne range que ses liens à lui', async () => {
+    const before = links({ relations: [relation(7, 300, 301)] });
+    const now = links({ relations: [relation(8, 400, 401)] });
+    let answerBefore: (value: ProjectIssueRelations) => void = () => {};
+    vi.mocked(svc.listProjectRelations)
+      .mockImplementationOnce(() => new Promise((resolve) => { answerBefore = resolve; }))
+      .mockResolvedValueOnce(now);
+
+    let late: Promise<ProjectIssueRelations | null> = Promise.resolve(null);
+    await act(async () => {
+      late = useIssueStore.getState().fetchProjectRelations('ws', 10);
+      await useIssueStore.getState().fetchProjectRelations('ws', 11);
+    });
+    await act(async () => {
+      answerBefore(before);
+      await late;
+    });
+
+    expect(linksOf(11)).toEqual(now);
+    expect(linksOf(10)).toEqual(before);
+  });
+
+  it('upsertRelationLocal ajoute un lien posé, et remplace un lien déjà là', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertRelationLocal(10, relation(2, 101, 100)));
+    expect(linksOf()?.relations.map((r) => r.id)).toEqual([1, 2]);
+
+    const changed = { ...relation(2, 101, 100), relationType: 'RELATES_TO' as const };
+    act(() => useIssueStore.getState().upsertRelationLocal(10, changed));
+    expect(linksOf()?.relations).toEqual([relation(1, 100, 101), changed]);
+  });
+
+  it('removeRelationLocal retire un lien', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().removeRelationLocal(10, 1));
+
+    expect(linksOf()?.relations).toEqual([]);
+    expect(linksOf()?.subIssues).toHaveLength(1);
+  });
+
+  it('un lien d’un autre projet, ou avant la lecture des liens, ne change rien', () => {
+    act(() => useIssueStore.getState().upsertRelationLocal(10, relation(2, 101, 100)));
+    act(() => useIssueStore.getState().removeRelationLocal(10, 2));
+    expect(useIssueStore.getState().projectRelations).toEqual({});
+
+    loaded(10);
+    act(() => useIssueStore.getState().upsertRelationLocal(11, relation(3, 201, 200)));
+    act(() => useIssueStore.getState().removeRelationLocal(11, 1));
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: links() });
+  });
+
+  it('une issue qui change garde ses liens à jour : son nom et son statut', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 101, identifier: 'TF-101', sequenceNumber: 101, title: 'Renamed', status: done })));
+
+    const target = linksOf()?.relations[0].target;
+    expect(target).toEqual({ id: 101, sequenceNumber: 101, identifier: 'TF-101', title: 'Renamed', status: done });
+  });
+
+  it('une sous-issue qui change de parent change de lien ; celle qui n’en a plus le quitte', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 102, identifier: 'TF-102', sequenceNumber: 102, title: 'Child', parent: summary(101) })));
+    expect(linksOf()?.subIssues).toEqual([
+      { parent: summary(101), issue: { id: 102, sequenceNumber: 102, identifier: 'TF-102', title: 'Child', status } },
+    ]);
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 102, parent: null })));
+    expect(linksOf()?.subIssues).toEqual([]);
+  });
+
+  it('le parent qui change de nom le dit sur ses sous-issues', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 100, identifier: 'TF-100', sequenceNumber: 100, title: 'Parent renamed' })));
+
+    expect(linksOf()?.subIssues[0].parent.title).toBe('Parent renamed');
+  });
+
+  it('une issue archivée quitte les liens, comme la lecture du serveur la laisse de côté', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 100, archived: true })));
+
+    expect(linksOf()).toEqual({ relations: [], subIssues: [] });
+  });
+
+  it('une issue d’un autre projet ne touche pas aux liens lus', () => {
+    loaded(10);
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 101, projectId: 11, title: 'Elsewhere' })));
+
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: links() });
+  });
+
+  it('une issue supprimée emporte ses liens et laisse ses sous-issues sans parent ; les autres projets ne changent pas', () => {
+    const elsewhere = links({ relations: [relation(5, 200, 201)], subIssues: [] });
+    loaded(10, links({ relations: [relation(1, 100, 101), relation(2, 103, 104)] }));
+    loaded(11, elsewhere);
+
+    act(() => useIssueStore.getState().removeIssueLocal(100));
+
+    expect(linksOf(10)).toEqual({ relations: [relation(2, 103, 104)], subIssues: [] });
+    expect(linksOf(11)).toBe(elsewhere);
+  });
+
+  it('clearIssues oublie aussi les liens', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().clearIssues());
+
+    expect(useIssueStore.getState().projectRelations).toEqual({});
   });
 });

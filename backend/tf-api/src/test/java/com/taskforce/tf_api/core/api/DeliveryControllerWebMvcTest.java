@@ -30,6 +30,7 @@ import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
 import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
 import com.taskforce.tf_api.core.service.delivery.MissionResultService;
+import com.taskforce.tf_api.core.service.delivery.ProjectDeliveryService;
 import com.taskforce.tf_api.shared.security.SecurityConfig;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -65,6 +66,7 @@ class DeliveryControllerWebMvcTest {
     @MockitoBean private DeliveryActivityService activityService;
     @MockitoBean private MissionResultService missionResults;
     @MockitoBean private MissionChangesService missionChanges;
+    @MockitoBean private ProjectDeliveryService projectDelivery;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -142,6 +144,80 @@ class DeliveryControllerWebMvcTest {
             .andExpect(jsonPath("$.data.status").value(status));
 
         verify(deliveryRunner, times(refreshed ? 1 : 0)).refresh(9L);
+    }
+
+    private static com.taskforce.tf_api.core.dto.response.ProjectRunResponse projectRun(long id, String status) {
+        return new com.taskforce.tf_api.core.dto.response.ProjectRunResponse(run(id, status), null,
+            new com.taskforce.tf_api.core.dto.response.ProjectRunResponse.Links(null, null, null, null), List.of());
+    }
+
+    private static com.taskforce.tf_api.shared.dto.PageResponse<com.taskforce.tf_api.core.dto.response.ProjectRunResponse> page(
+            com.taskforce.tf_api.core.dto.response.ProjectRunResponse... rows) {
+        return com.taskforce.tf_api.shared.dto.PageResponse.<com.taskforce.tf_api.core.dto.response.ProjectRunResponse>builder()
+            .content(List.of(rows)).pageNumber(0).pageSize(20).totalElements(rows.length).totalPages(1).first(true).last(true)
+            .empty(rows.length == 0).build();
+    }
+
+    @Test
+    @DisplayName("GET /delivery/projects/{id}/runs : une page du projet ; les missions en attente ou en cours avancent, puis la page se relit")
+    void projectRuns_advance_missions_in_flight_then_read_again() throws Exception {
+        var a = auth();
+        when(projectDelivery.listRuns("acme", 12L, 1, 30, 7L))
+            .thenReturn(page(projectRun(1L, "QUEUED"), projectRun(2L, "RUNNING"), projectRun(3L, "DONE")))
+            .thenReturn(page(projectRun(1L, "FAILED"), projectRun(2L, "RUNNING"), projectRun(3L, "DONE")));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/projects/12/runs").param("page", "1").param("size", "30").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.content[0].run.status").value("FAILED"))
+            .andExpect(jsonPath("$.data.content[0].links").exists())
+            .andExpect(jsonPath("$.data.totalElements").value(3));
+
+        verify(deliveryRunner).refresh(1L);
+        verify(deliveryRunner).refresh(2L);
+        verify(deliveryRunner, never()).refresh(3L);
+        verify(projectDelivery, times(2)).listRuns("acme", 12L, 1, 30, 7L);
+    }
+
+    @Test
+    @DisplayName("GET /delivery/projects/{id}/runs : par défaut la première page de 20 ; sans mission en vol, une seule lecture")
+    void projectRuns_default_page_reads_once_without_missions_in_flight() throws Exception {
+        var a = auth();
+        when(projectDelivery.listRuns("acme", 12L, 0, 20, 7L)).thenReturn(page(projectRun(3L, "DONE")));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/projects/12/runs").with(a)).andExpect(status().isOk());
+
+        verify(deliveryRunner, never()).refresh(anyLong());
+        verify(projectDelivery, times(1)).listRuns("acme", 12L, 0, 20, 7L);
+    }
+
+    @Test
+    @DisplayName("GET /delivery/projects/{id}/runs : au plus 10 missions avancent par lecture")
+    void projectRuns_advance_ten_missions_at_most() throws Exception {
+        var a = auth();
+        var rows = java.util.stream.LongStream.rangeClosed(1, 12).mapToObj(id -> projectRun(id, "RUNNING"))
+            .toArray(com.taskforce.tf_api.core.dto.response.ProjectRunResponse[]::new);
+        when(projectDelivery.listRuns(anyString(), anyLong(), org.mockito.ArgumentMatchers.anyInt(),
+            org.mockito.ArgumentMatchers.anyInt(), anyLong())).thenReturn(page(rows));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/projects/12/runs").with(a)).andExpect(status().isOk());
+
+        verify(deliveryRunner, times(DeliveryController.MAX_ADVANCED_RUNS)).refresh(anyLong());
+    }
+
+    @ParameterizedTest(name = "mission {0} : avance et se relit = {1}")
+    @CsvSource({ "RUNNING, true", "QUEUED, true", "DONE, false" })
+    @DisplayName("GET /delivery/projects/{id}/runs/{runId} : une mission du projet, relue après avoir avancé si elle est en vol")
+    void projectRun_reads_one_mission(String status, boolean advanced) throws Exception {
+        var a = auth();
+        when(projectDelivery.run("acme", 12L, 9L, 7L)).thenReturn(projectRun(9L, status));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/projects/12/runs/9").with(a))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.run.id").value(9))
+            .andExpect(jsonPath("$.data.approvals").isArray());
+
+        verify(deliveryRunner, times(advanced ? 1 : 0)).refresh(9L);
+        verify(projectDelivery, times(advanced ? 2 : 1)).run("acme", 12L, 9L, 7L);
     }
 
     @Test

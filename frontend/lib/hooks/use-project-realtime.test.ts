@@ -33,9 +33,16 @@ vi.mock("@/lib/hooks/use-stomp", () => ({
 
 const mockUpsert = vi.fn()
 const mockRemove = vi.fn()
+const mockUpsertRelation = vi.fn()
+const mockRemoveRelation = vi.fn()
 vi.mock("@/lib/store/issue-store", () => ({
   useIssueStore: (selector: (s: unknown) => unknown) =>
-    selector({ upsertIssueLocal: mockUpsert, removeIssueLocal: mockRemove }),
+    selector({
+      upsertIssueLocal: mockUpsert,
+      removeIssueLocal: mockRemove,
+      upsertRelationLocal: mockUpsertRelation,
+      removeRelationLocal: mockRemoveRelation,
+    }),
 }))
 
 import { useProjectRealtime } from "./use-project-realtime"
@@ -70,6 +77,30 @@ describe("useProjectRealtime", () => {
     renderHook(() => useProjectRealtime(30))
     messageHandler?.({ body: JSON.stringify({ action: "deleted", projectId: 30, issueId: 7, issue: null }) })
     expect(mockRemove).toHaveBeenCalledWith(7)
+    expect(mockUpsert).not.toHaveBeenCalled()
+  })
+
+  it("un lien posé entre deux issues du projet entre dans ses liens (R166)", () => {
+    renderHook(() => useProjectRealtime(30))
+    const relation = { id: 5, relationType: "BLOCKS", source: { id: 7 }, target: { id: 8 } }
+    messageHandler?.({ body: JSON.stringify({ action: "relation.added", projectId: 30, issueId: 7, issue: null, relation }) })
+    expect(mockUpsertRelation).toHaveBeenCalledWith(30, relation)
+    expect(mockUpsert).not.toHaveBeenCalled()
+  })
+
+  it("un lien retiré quitte les liens du projet", () => {
+    renderHook(() => useProjectRealtime(30))
+    const relation = { id: 5, relationType: "BLOCKS", source: { id: 7 }, target: { id: 8 } }
+    messageHandler?.({ body: JSON.stringify({ action: "relation.removed", projectId: 30, issueId: 7, issue: null, relation }) })
+    expect(mockRemoveRelation).toHaveBeenCalledWith(30, 5)
+    expect(mockRemove).not.toHaveBeenCalled()
+  })
+
+  it("un événement de lien sans lien, ou l'activité d'une issue, ne touche à rien", () => {
+    renderHook(() => useProjectRealtime(30))
+    messageHandler?.({ body: JSON.stringify({ action: "relation.added", projectId: 30, issueId: 7, issue: null }) })
+    messageHandler?.({ body: JSON.stringify({ action: "activity", projectId: 30, issueId: 7, issue: null }) })
+    expect(mockUpsertRelation).not.toHaveBeenCalled()
     expect(mockUpsert).not.toHaveBeenCalled()
   })
 

@@ -58,6 +58,11 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
+  /** Les missions d'un projet et leurs demandes ouvertes, page par page (GET, `?page=&size=`, R166). */
+  PROJECT_RUNS: (slug: string, projectId: number) => `/api/workspaces/${slug}/delivery/projects/${projectId}/runs`,
+  /** Une mission d'un projet, comme une ligne de la liste (GET) : relue quand le topic du projet l'annonce. */
+  PROJECT_RUN: (slug: string, projectId: number, runId: number) =>
+    `/api/workspaces/${slug}/delivery/projects/${projectId}/runs/${runId}`,
   /** Ce qui attend la personne connectée (GET, R128) : ses demandes encore ouvertes, une ligne par mission. */
   OPEN_APPROVALS: (slug: string) => `/api/workspaces/${slug}/delivery/approvals/open`,
   /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
@@ -283,6 +288,8 @@ export const ISSUE_ROUTES = {
   CHILDREN:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/children`,
   CHECKLIST:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist`,
   CHECKLIST_ITEM:   (slug: string, projectId: number, issueId: number, itemId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist/${itemId}`,
+  /** Les liens entre les issues du projet, en une lecture (GET, R166) : ses relations et ses sous-issues avec leur parent. */
+  PROJECT_RELATIONS: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/relations`,
   RELATIONS:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations`,
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
   WORKLOGS:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs`,

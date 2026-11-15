@@ -8,8 +8,9 @@ import { API_URL } from "@/lib/config/urls"
 /**
  * Utilitaire temps réel : construit les URLs WebSocket/SockJS du broker STOMP à partir de l'URL API.
  * Consommé par `use-notifications-realtime` et `use-project-realtime`, qui portent chacun leur propre
- * client STOMP et leur repli SockJS, et par `use-issue-realtime` (fiche d'une issue ouverte) au travers de
- * `subscribeTopic`. Le dock « Workflows IA » n'est PAS abonné : il poll (`IA-DEC-004`).
+ * client STOMP et leur repli SockJS, par `use-issue-realtime` (fiche d'une issue ouverte) au travers de
+ * `subscribeTopic`, et par `use-project-live` (les missions et les analyses d'un projet, R166) au travers de
+ * `subscribeTopics`. Le dock « Workflows IA » reste à son polling (`IA-DEC-004`).
  */
 export type RealtimeConnectionState = "idle" | "connecting" | "connected" | "disconnected" | "error"
 export type RealtimeTransport = "none" | "websocket" | "sockjs"
@@ -31,6 +32,18 @@ export function buildRealtimeUrls(apiUrl: string): { wsUrl: string; sockJsUrl: s
  * connexion. Hors du navigateur, rien.
  */
 export function subscribeTopic(topic: string, onMessage: (body: string) => void): () => void {
+  return subscribeTopics({ [topic]: onMessage })
+}
+
+/**
+ * Abonne plusieurs topics sur une seule connexion (le projet ouvert : ses missions et ses analyses), chacun avec son
+ * traitement. `onConnect` est appelé à chaque connexion, la première et celles qui suivent une coupure : les messages
+ * publiés pendant la coupure sont perdus, l'appelant relit ce qu'il montre. Rend de quoi fermer la connexion.
+ */
+export function subscribeTopics(
+  handlers: Readonly<Record<string, (body: string) => void>>,
+  onConnect?: () => void,
+): () => void {
   if (globalThis.window === undefined) return () => {}
 
   let disposed = false
@@ -52,7 +65,10 @@ export function subscribeTopic(topic: string, onMessage: (body: string) => void)
       reconnectDelay: 5000,
       onConnect: () => {
         connectedOnce = true
-        client.subscribe(topic, (msg: IMessage) => onMessage(msg.body))
+        for (const [topic, onMessage] of Object.entries(handlers)) {
+          client.subscribe(topic, (msg: IMessage) => onMessage(msg.body))
+        }
+        onConnect?.()
       },
       onWebSocketClose: () => {
         if (!connectedOnce && !useSockJs && !fallbackTriggered && !disposed) {

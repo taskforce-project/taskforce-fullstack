@@ -62,6 +62,7 @@ public class MissionResultService {
     private final DeliveryRunner deliveryRunner;
     private final MissionChangesService missionChanges;
     private final MissionEvidenceService evidenceService;
+    private final ProjectDeliveryFeed feed;
 
     private record PullRequest(String repo, int number) {}
 
@@ -277,6 +278,7 @@ public class MissionResultService {
         run.setOutcomeAt(LocalDateTime.now());
         runRepository.save(run);
         issueService.logActivity(run.getIssue(), person, ACTIVITY.get(outcome), null, null, null);
+        feed.run(run);
     }
 
     /** Ce que l'activité de l'issue garde de chaque geste. */

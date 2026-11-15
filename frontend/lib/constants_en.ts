@@ -2138,6 +2138,25 @@ export const CONSTANTS_EN = {
     markedDone: "marked the issue done: no change was needed",
     askedForChanges: "asked the agent for changes",
     forWhom: "for {who}",
+    // A link between two issues, said from the side of the issue being read (R166).
+    linkAdded: "added a link: this issue {link} {issue}",
+    linkRemoved: "removed a link: this issue {link} {issue}",
+    linkAddedPlain: "added a link to another issue",
+    linkRemovedPlain: "removed a link to another issue",
+    links: {
+      BLOCKS: "blocks",
+      BLOCKED_BY: "is blocked by",
+      DUPLICATE_OF: "is a duplicate of",
+      DUPLICATED_BY: "is duplicated by",
+      RELATES_TO: "relates to",
+    },
+    unlinks: {
+      BLOCKS: "no longer blocks",
+      BLOCKED_BY: "is no longer blocked by",
+      DUPLICATE_OF: "is no longer a duplicate of",
+      DUPLICATED_BY: "is no longer duplicated by",
+      RELATES_TO: "no longer relates to",
+    },
   },
 
   // Cortex in the conversation.

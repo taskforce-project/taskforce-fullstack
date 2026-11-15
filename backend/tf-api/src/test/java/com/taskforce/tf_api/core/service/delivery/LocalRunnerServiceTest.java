@@ -68,6 +68,7 @@ class LocalRunnerServiceTest {
     @Mock private HarnessRulesService rulesService;
     @Mock private MissionEvidenceService evidenceService;
     @Mock private DeliveryAgentProviderRegistry providers;
+    @Mock private ProjectDeliveryFeed feed;
 
     private static final RulesBundle RULES = new RulesBundle(
         RulesBundle.FORMAT, "acme", null, 3, "sha256:" + "a".repeat(64), null, List.of());
@@ -80,7 +81,7 @@ class LocalRunnerServiceTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15);
         service = new LocalRunnerService(runRepository, userRepository, visibilityGuard, deliveryRunner, settings, activityService,
-            rulesService, evidenceService, presence, providers);
+            rulesService, evidenceService, presence, providers, feed);
         owner = User.builder().id(7L).email(OWNER_EMAIL).keycloakId("kc-7").isActive(true).build();
     }
 
@@ -158,6 +159,8 @@ class LocalRunnerServiceTest {
         // Les règles partent avec la tâche, et le run note ce qui lui a été remis (spécification de la v2, §6.4).
         assertThat(claim.rules()).isSameAs(RULES);
         verify(runRepository).recordRules(100L, 3, RULES.digest());
+        // Partie : le topic des missions du projet le dit, des identifiants lus avant la mise à jour en masse (R166).
+        verify(feed).run(12L, 100L, 55L, DeliveryRunStatus.RUNNING);
     }
 
     @Test
@@ -263,6 +266,7 @@ class LocalRunnerServiceTest {
         when(runRepository.claim(anyLong(), anyString(), anyString(), any(), any(), any())).thenReturn(0);
 
         assertThat(service.claim(RUNNER)).isEmpty();
+        verify(feed, never()).run(anyLong(), anyLong(), anyLong(), any());
     }
 
     @Test

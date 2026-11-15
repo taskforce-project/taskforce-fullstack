@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -38,6 +39,39 @@ public interface DeliveryRunRepository extends JpaRepository<DeliveryRun, Long> 
         WHERE p.id IN :projectIds ORDER BY r.updatedAt DESC
         """)
     List<DeliveryRun> findByProjectIds(@Param("projectIds") Collection<Long> projectIds, Pageable pageable);
+
+    /**
+     * Les missions d'un projet, page par page (la vue du workflow, R166) : les plus récentes d'abord, dans un ordre qui ne
+     * bouge pas quand une mission avance (sa date de création, puis son numéro). L'issue, le projet et la personne qui a
+     * délégué viennent avec, comme pour la liste de l'espace.
+     */
+    @Query(value = """
+        SELECT r FROM DeliveryRun r JOIN FETCH r.issue i JOIN FETCH i.project p LEFT JOIN FETCH r.startedBy
+        WHERE p.id = :projectId ORDER BY r.createdAt DESC, r.id DESC
+        """,
+        countQuery = "SELECT COUNT(r) FROM DeliveryRun r WHERE r.issue.project.id = :projectId")
+    Page<DeliveryRun> findByProjectId(@Param("projectId") Long projectId, Pageable pageable);
+
+    /** Une mission de ce projet, avec son issue, son projet et la personne qui a délégué ; vide pour une mission d'ailleurs. */
+    @Query("""
+        SELECT r FROM DeliveryRun r JOIN FETCH r.issue i JOIN FETCH i.project p LEFT JOIN FETCH r.startedBy
+        WHERE r.id = :runId AND p.id = :projectId
+        """)
+    Optional<DeliveryRun> findInProject(@Param("runId") Long runId, @Param("projectId") Long projectId);
+
+    /** Une mission qui en reprend une autre (R139) : l'une et l'autre. */
+    interface FollowUpRow {
+        Long getParentId();
+
+        Long getRunId();
+    }
+
+    /** Les missions qui reprennent celles-ci, de la plus ancienne à la plus récente. */
+    @Query("""
+        SELECT r.parentRun.id AS parentId, r.id AS runId FROM DeliveryRun r
+        WHERE r.parentRun.id IN :runIds ORDER BY r.id ASC
+        """)
+    List<FollowUpRow> findFollowUps(@Param("runIds") Collection<Long> runIds);
 
     // =========================================================================
     // Runner local (ADR-013) : file d'attente « pull »

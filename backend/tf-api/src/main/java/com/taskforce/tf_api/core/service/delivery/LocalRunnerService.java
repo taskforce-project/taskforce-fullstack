@@ -60,6 +60,7 @@ public class LocalRunnerService {
     private final MissionEvidenceService evidenceService;
     private final RunnerPresenceService presence;
     private final DeliveryAgentProviderRegistry providers;
+    private final ProjectDeliveryFeed feed;
 
     public LocalRunnerService(
         DeliveryRunRepository runRepository,
@@ -71,7 +72,8 @@ public class LocalRunnerService {
         HarnessRulesService rulesService,
         MissionEvidenceService evidenceService,
         RunnerPresenceService presence,
-        DeliveryAgentProviderRegistry providers
+        DeliveryAgentProviderRegistry providers,
+        ProjectDeliveryFeed feed
     ) {
         this.runRepository = runRepository;
         this.userRepository = userRepository;
@@ -83,6 +85,7 @@ public class LocalRunnerService {
         this.evidenceService = evidenceService;
         this.presence = presence;
         this.providers = providers;
+        this.feed = feed;
     }
 
     /**
@@ -166,6 +169,8 @@ public class LocalRunnerService {
                 }
                 runRepository.findById(runId).ifPresent(run ->
                     evidenceService.append(run, "mission.started", MissionEvidenceService.Actor.SERVER, started));
+                // La mise à jour en masse a détaché les entités : les identifiants lus plus haut suffisent à l'annonce.
+                feed.run(project.getId(), runId, issue.getId(), DeliveryRunStatus.RUNNING);
                 log.info("Run {} réclamé par le runner {} (issue {}, pour {})",
                     runId, runner.clientId(), claim.issueKey(), owner.getId());
                 return Optional.of(claim);

@@ -269,9 +269,36 @@ public class IssueMaterial {
             case "MISSION_RETRIED" -> "sent the mission back to its agent";
             case "MISSION_MARKED_DONE" -> "marked the mission done with no change needed";
             case "MISSION_CHANGES_ASKED" -> "asked the agent for changes";
+            case "RELATION_ADDED" -> "added a link" + link(event.getNewValue(), ADDED_LINKS);
+            case "RELATION_REMOVED" -> "removed a link" + link(event.getOldValue(), REMOVED_LINKS);
             default -> event.getAction() == null ? "changed it" : event.getAction().name().toLowerCase(Locale.ROOT).replace('_', ' ');
         };
         return (event.getCreatedAt() == null ? "" : day(event.getCreatedAt()) + ", ") + who + " " + what.strip();
+    }
+
+    /**
+     * Un lien tel que l'activité le garde, vu de cette issue (« BLOCKS WEB-12 »), dit pour un lien posé, avec les mots de
+     * l'activité à l'écran ({@code issueActivity.links} de {@code constants_en.ts}).
+     */
+    private static final Map<String, String> ADDED_LINKS = Map.of(
+        "BLOCKS", "this issue blocks",
+        "BLOCKED_BY", "this issue is blocked by",
+        "DUPLICATE_OF", "this issue is a duplicate of",
+        "DUPLICATED_BY", "this issue is duplicated by",
+        "RELATES_TO", "this issue relates to");
+    /** Le même, dit pour un lien retiré. */
+    private static final Map<String, String> REMOVED_LINKS = Map.of(
+        "BLOCKS", "this issue no longer blocks",
+        "BLOCKED_BY", "this issue is no longer blocked by",
+        "DUPLICATE_OF", "this issue is no longer a duplicate of",
+        "DUPLICATED_BY", "this issue is no longer duplicated by",
+        "RELATES_TO", "this issue no longer relates to");
+
+    /** « : this issue blocks WEB-12 » ; une valeur qui ne se lit pas dit seulement qu'il touche une autre issue. */
+    private static String link(String value, Map<String, String> words) {
+        String[] parts = flat(value).split(" ", 2);
+        String said = parts.length == 2 ? words.get(parts[0]) : null;
+        return said == null ? " to another issue" : ": " + said + " " + clip(parts[1], 40);
     }
 
     private static String change(IssueActivityResponse event) {

@@ -68,6 +68,7 @@ class DeliveryRunnerTest {
     @Mock private MissionEvidenceService evidenceService;
     @Mock private IssueService issueService;
     @Mock private DeliveryActivityService activityService;
+    @Mock private ProjectDeliveryFeed feed;
 
     @InjectMocks private DeliveryRunner runner;
 
@@ -105,6 +106,8 @@ class DeliveryRunnerTest {
             order.verify(activityService).closeApprovals(run);
             order.verify(evidenceService).end(run, poll);
         }
+        // Le topic des missions du projet (R166) : une fin s'annonce, un poll qui la trouve toujours au travail non.
+        verify(feed, times(closed ? 1 : 0)).run(run);
     }
 
     @Test
@@ -142,6 +145,8 @@ class DeliveryRunnerTest {
         verify(issue).setStatus(any(IssueStatus.class));       // issue déplacée
         verify(issueRepository).save(issue);
         verify(issueStatusRepository).save(any(IssueStatus.class)); // colonne créée
+        // Partie, puis finie : le topic des missions du projet le dit les deux fois (R166).
+        verify(feed, times(2)).run(run);
     }
 
     @Test
@@ -187,6 +192,7 @@ class DeliveryRunnerTest {
 
         assertThat(run.getStatus()).isEqualTo(DeliveryRunStatus.FAILED);
         assertThat(run.getError()).isNotBlank();
+        verify(feed).run(run);
     }
 
     @Test
@@ -402,8 +408,10 @@ class DeliveryRunnerTest {
                 any(), eq(DeliveryRunStatus.QUEUED), eq(DeliveryRunStatus.FAILED));
             verify(issue).setStatus(any(IssueStatus.class)); // issue déplacée vers « Blocked »
             verify(issueRepository).save(issue);
+            verify(feed).run(run);
         } else {
             verify(issueRepository, never()).save(any());
+            verify(feed, never()).run(any(DeliveryRun.class));
         }
         // Jamais d'écriture de la copie chargée : elle pourrait écraser un claim arrivé entre-temps.
         verify(runRepository, never()).save(any());

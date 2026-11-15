@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildRealtimeUrls, subscribeTopic } from './use-stomp';
+import { buildRealtimeUrls, subscribeTopic, subscribeTopics } from './use-stomp';
 
 // --- Clients STOMP simulés : la configuration reçue, l'abonnement, la fermeture ---
 interface FakeConfig {
@@ -14,6 +14,7 @@ interface FakeClient {
   config: FakeConfig;
   topic: string | null;
   handler: ((msg: { body: string }) => void) | null;
+  subscriptions: Record<string, (msg: { body: string }) => void>;
   deactivated: boolean;
 }
 
@@ -23,6 +24,7 @@ vi.mock('@stomp/stompjs', () => {
   class Client implements FakeClient {
     topic: string | null = null;
     handler: ((msg: { body: string }) => void) | null = null;
+    subscriptions: Record<string, (msg: { body: string }) => void> = {};
     deactivated = false;
     constructor(public config: FakeConfig) {
       clients.push(this);
@@ -31,6 +33,7 @@ vi.mock('@stomp/stompjs', () => {
     subscribe(topic: string, handler: (msg: { body: string }) => void) {
       this.topic = topic;
       this.handler = handler;
+      this.subscriptions[topic] = handler;
     }
     deactivate() {
       this.deactivated = true;
@@ -157,5 +160,51 @@ describe('subscribeTopic', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('subscribeTopics', () => {
+  beforeEach(() => {
+    clients.length = 0;
+    token.value = null;
+  });
+
+  it('subscribes every topic on one connection, each to its own handler', async () => {
+    const delivery: string[] = [];
+    const analysis: string[] = [];
+    subscribeTopics({
+      '/topic/projects.30.delivery': (body) => delivery.push(body),
+      '/topic/projects.30.analysis': (body) => analysis.push(body),
+    });
+    await settle();
+
+    expect(clients).toHaveLength(1);
+    clients[0]?.config.onConnect();
+    expect(Object.keys(clients[0]?.subscriptions ?? {})).toEqual(['/topic/projects.30.delivery', '/topic/projects.30.analysis']);
+    clients[0]?.subscriptions['/topic/projects.30.delivery']?.({ body: '{"type":"run"}' });
+    clients[0]?.subscriptions['/topic/projects.30.analysis']?.({ body: '{"id":4}' });
+    expect(delivery).toEqual(['{"type":"run"}']);
+    expect(analysis).toEqual(['{"id":4}']);
+  });
+
+  it('calls back on every connection, the first and those after a cut', async () => {
+    const onConnect = vi.fn();
+    subscribeTopics({ '/topic/projects.30.delivery': () => {} }, onConnect);
+    await settle();
+
+    clients[0]?.config.onConnect();
+    clients[0]?.config.onConnect();
+
+    expect(onConnect).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes its one connection when unsubscribed', async () => {
+    const unsubscribe = subscribeTopics({ '/topic/projects.30.delivery': () => {}, '/topic/projects.30.analysis': () => {} });
+    await settle();
+
+    unsubscribe();
+
+    expect(clients).toHaveLength(1);
+    expect(clients[0]?.deactivated).toBe(true);
   });
 });
