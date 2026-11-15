@@ -208,6 +208,14 @@ function workflowWithout(current: WorkflowIssues | null, issueId: number): Workf
   return { ...current, issues: current.issues.filter((i) => i.id !== issueId) };
 }
 
+/**
+ * Le projet de la dernière lecture des issues du workflow, et celui de la dernière lecture de ses documents. Une réponse
+ * en retard d'un projet quitté (la personne est passée du projet 3 au projet 5) ne se pose pas : elle remettrait le
+ * projet ouvert sur son squelette, ou lui donnerait les documents d'un autre. Vider le store les oublie.
+ */
+let workflowIssuesFor: number | null = null;
+let documentCountsFor: number | null = null;
+
 /** Lance `task` sur chaque élément, `limit` à la fois ; rend les résultats dans l'ordre des éléments. */
 async function pooled<T, R>(items: readonly T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -241,12 +249,17 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   documentCounts: null,
   issueActivity: {},
 
-  clearIssues: () => set({
-    issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null,
-    projectRelations: {}, workflowIssues: null, documentCounts: null, issueActivity: {},
-  }),
+  clearIssues: () => {
+    workflowIssuesFor = null;
+    documentCountsFor = null;
+    set({
+      issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null,
+      projectRelations: {}, workflowIssues: null, documentCounts: null, issueActivity: {},
+    });
+  },
 
   fetchWorkflowIssues: async (slug, projectId) => {
+    workflowIssuesFor = projectId;
     try {
       const first = await listIssuesPage(slug, projectId, 0, ISSUES_PAGE_MAX);
       const rest = Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) => i + 1);
@@ -255,6 +268,8 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       const byId = new Map<number, Issue>();
       for (const page of [first, ...pages]) for (const issue of page.content) byId.set(issue.id, issue);
       const issues = [...byId.values()].filter((issue) => !issue.archived);
+      // Un autre projet a été demandé depuis : cette lecture ne se pose pas.
+      if (workflowIssuesFor !== projectId) return null;
       set({ workflowIssues: { projectId, issues } });
       return issues;
     } catch {
@@ -263,10 +278,12 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   },
 
   fetchDocumentCounts: async (slug, projectId) => {
+    documentCountsFor = projectId;
     try {
       const rows = await listAttachmentCounts(slug, projectId);
       const counts: Record<number, number> = {};
       for (const row of rows) counts[row.issueId] = row.count;
+      if (documentCountsFor !== projectId) return null;
       set({ documentCounts: { projectId, counts } });
       return counts;
     } catch {

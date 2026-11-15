@@ -889,6 +889,36 @@ describe('issue-store : les issues du workflow', () => {
     expect(useIssueStore.getState().workflowIssues?.issues).toHaveLength(1);
   });
 
+  it('une lecture en retard d’un projet quitté ne se pose pas : le projet ouvert garde ses issues et ses documents', async () => {
+    type Page = Awaited<ReturnType<typeof svc.listIssuesPage>>;
+    let release: (value: Page) => void = () => {};
+    vi.mocked(svc.listIssuesPage).mockImplementation((_slug, project) => (project === 3
+      ? new Promise<Page>((resolve) => { release = resolve; })
+      : Promise.resolve(page([makeIssue({ id: 50, projectId: 5 })], 0, 1, 1))));
+    let late: Issue[] | null = [];
+    await act(async () => {
+      const left = useIssueStore.getState().fetchWorkflowIssues('acme', 3);
+      await useIssueStore.getState().fetchWorkflowIssues('acme', 5);
+      release(page([makeIssue({ id: 30, projectId: 3 })], 0, 1, 1));
+      late = await left;
+    });
+    expect(late).toBeNull();
+    expect(useIssueStore.getState().workflowIssues).toMatchObject({ projectId: 5, issues: [{ id: 50 }] });
+
+    type Counts = Awaited<ReturnType<typeof attachments.listAttachmentCounts>>;
+    let releaseCounts: (value: Counts) => void = () => {};
+    vi.mocked(attachments.listAttachmentCounts).mockImplementation((_slug, project) => (project === 3
+      ? new Promise<Counts>((resolve) => { releaseCounts = resolve; })
+      : Promise.resolve([{ issueId: 50, count: 2 }])));
+    await act(async () => {
+      const left = useIssueStore.getState().fetchDocumentCounts('acme', 3);
+      await useIssueStore.getState().fetchDocumentCounts('acme', 5);
+      releaseCounts([{ issueId: 30, count: 9 }]);
+      await left;
+    });
+    expect(useIssueStore.getState().documentCounts).toEqual({ projectId: 5, counts: { 50: 2 } });
+  });
+
   it('le temps réel et les gestes les tiennent à jour : ajoutée, changée, archivée, supprimée ; rien pour un autre projet', async () => {
     useIssueStore.setState({ workflowIssues: { projectId: 10, issues: [makeIssue({ id: 1 }), makeIssue({ id: 2 })] } });
     const ids = () => useIssueStore.getState().workflowIssues?.issues.map((i) => i.id + ':' + i.title);
