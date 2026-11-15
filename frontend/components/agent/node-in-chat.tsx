@@ -16,7 +16,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 import { isMine } from "@/lib/window/missions"
-import { issueKey } from "@/lib/workflow/model"
+import { blockersOf, issueKey } from "@/lib/workflow/model"
 import { nodeStateOf } from "@/lib/workflow/node-state"
 import { nodeSentence, type SentenceNode } from "@/lib/workflow/sentence"
 
@@ -62,14 +62,23 @@ export function NodeInChat({ slug, target, withSentence = true }: Readonly<{
   const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
   const issue = useIssueStore((s) => s.workflowIssues?.issues.find((i) => i.id === target.issueId)
     ?? s.issues.find((i) => i.id === target.issueId) ?? null)
+  // Les liens du projet, quand la vue ou le tableau les a lus : la carte dit « Blocked » comme la carte du projet.
+  const relations = useIssueStore((s) => s.projectRelations[target.projectId]?.relations)
+  const workflowIssues = useIssueStore((s) => s.workflowIssues)
+  const blockers = useMemo(() => {
+    if (!relations) return []
+    const known = new Map((workflowIssues?.issues ?? []).map((i) => [i.id, i.status.category] as const))
+    return blockersOf(target.issueId, relations, (summary) => known.get(summary.id) ?? summary.status?.category)
+  }, [relations, workflowIssues, target.issueId])
 
   const node = useMemo(() => {
     // La ligne du projet porte ce que la personne peut décider ; sinon, la mission de l'issue et sa chronologie lue.
     const row = projectRow && (!run || projectRow.run.id >= run.id) ? projectRow : run ? rowOf(run, activity, sequence, isMine(run, me)) : null
-    const { state, reason } = nodeStateOf({ category: issue?.status.category ?? "UNSTARTED", run: row, blockers: [], me })
+    // Sans l'issue, sa colonne ne se devine pas : la mission seule dit où elle en est.
+    const { state, reason } = nodeStateOf({ category: issue?.status.category ?? null, run: row, blockers, me })
     const sentenceNode: SentenceNode = { reason, run: row, overdue: false, issue: issue ?? NO_ISSUE }
     return { state, reason, row, sentenceNode }
-  }, [projectRow, run, activity, sequence, issue, me])
+  }, [projectRow, run, activity, sequence, issue, blockers, me])
 
   const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence }, { me, now: new Date(now) })
   const word = t.state[node.state]

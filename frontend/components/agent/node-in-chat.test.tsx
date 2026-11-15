@@ -12,7 +12,7 @@ import type { AuthUser } from "@/lib/auth"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useUserStore } from "@/lib/store/user-store"
-import { approval, deliveryRun, DONE, issue, projectRun } from "@/lib/workflow/__tests__/fixtures"
+import { approval, deliveryRun, DONE, issue, projectRun, relation } from "@/lib/workflow/__tests__/fixtures"
 
 const TARGET: AssistantTarget = { issueId: 1, projectId: 3, key: "WEB-1", title: "Release", runId: 4 }
 
@@ -23,7 +23,27 @@ describe("NodeInChat", () => {
     globalThis.history.replaceState(null, "", "/acme?c=9")
     useUserStore.setState({ user: { id: "7" } as AuthUser })
     useDeliveryStore.setState({ runs: {}, activity: {}, projectRuns: {}, retryRun: vi.fn() })
-    useIssueStore.setState({ issues: [], workflowIssues: null })
+    useIssueStore.setState({ issues: [], workflowIssues: null, projectRelations: {} })
+  })
+
+  it("without its issue (another project), reads the state from the mission alone, never a guessed column", () => {
+    useDeliveryStore.setState({ runs: { 1: deliveryRun(4, 1, { status: "DONE", outcome: "APPLIED" }) } })
+    const { rerender } = render(<NodeInChat slug="acme" target={TARGET} />)
+    expect(screen.getByRole("group", { name: "Release, Done" })).toBeInTheDocument()
+
+    useDeliveryStore.setState({ runs: { 1: deliveryRun(4, 1, { status: "DONE", outcome: "DISCARDED" }) } })
+    rerender(<NodeInChat slug="acme" target={TARGET} />)
+    expect(screen.getByRole("group", { name: "Release, Skipped" })).toBeInTheDocument()
+  })
+
+  it("reads its blockers from the project's links, as the map does: « Blocked », not « Not started »", () => {
+    const blocker = issue(2, { projectId: 3, title: "Schema" })
+    useIssueStore.setState({
+      issues: [issue(1, { projectId: 3 })],
+      projectRelations: { 3: { relations: [relation(1, blocker, issue(1, { projectId: 3 }))], subIssues: [] } },
+    })
+    render(<NodeInChat slug="acme" target={{ ...TARGET, runId: null }} />)
+    expect(screen.getByRole("group", { name: "Release, Blocked" })).toBeInTheDocument()
   })
 
   it("reads the project's row when the workflow has it: what the person may decide, and « Decide » opens the node", () => {

@@ -44,7 +44,8 @@ export interface NodeState {
 
 /** Ce qu'un nœud lit de son issue et de sa mission. */
 export interface NodeFacts {
-  readonly category: IssueStatusCategory
+  /** La catégorie de la colonne de l'issue ; null quand on ne connaît pas l'issue (la conversation, un autre projet). */
+  readonly category: IssueStatusCategory | null
   /** La dernière mission de l'issue et ses demandes ouvertes ; null sans mission. */
   readonly run: ProjectRun | null
   /** Une mission d'avant a été relancée : celle-ci en est le nouvel essai. */
@@ -79,6 +80,14 @@ export function nodeStateOf(facts: NodeFacts): NodeState {
     if (pending.length > 0) return { state: "waiting", reason: { kind: "waitingApproval", approvals: pending } }
     if (mission.status === "QUEUED") return { state: "waiting", reason: { kind: "queued" } }
     return { state: "working", reason: { kind: "mission", retried: facts.retried === true } }
+  }
+
+  // Une issue qu'on ne connaît pas : sa mission dit seule où elle en est. Livrée, elle est faite ; son résultat écarté,
+  // elle a été laissée de côté. On ne devine jamais la colonne.
+  if (category === null && mission?.status === "DONE" && !awaitsJudgment(mission)) {
+    return mission.outcome === "DISCARDED"
+      ? { state: "skipped", reason: { kind: "cancelled" } }
+      : { state: "done", reason: { kind: "done" } }
   }
 
   if (category === "COMPLETED") return { state: "done", reason: { kind: "done" } }

@@ -1,5 +1,5 @@
 import type { ProjectRun } from "@/lib/api/delivery-service"
-import type { Issue, IssueStatus, IssueSummary, ProjectIssueRelation } from "@/lib/api/issue-service"
+import type { Issue, IssueStatus, IssueStatusCategory, IssueSummary, ProjectIssueRelation } from "@/lib/api/issue-service"
 import { parseServerDate } from "@/lib/utils/server-date"
 import { isFinished, nodeStateOf, type NodeReason } from "@/lib/workflow/node-state"
 import { STATE_RANK, type WorkflowState } from "@/lib/workflow/states"
@@ -92,6 +92,24 @@ function boardOrder(a: Issue, b: Issue): number {
 }
 
 /** Une liste sans doublon d'issue, dans l'ordre d'arrivée. */
+/**
+ * Les issues pas finies qui bloquent une issue, quel que soit le sens où le lien a été posé : ce que lit une carte hors de
+ * la vue (la conversation), avec les mêmes règles que la carte du projet.
+ */
+export function blockersOf(
+  issueId: number,
+  relations: readonly ProjectIssueRelation[],
+  categoryOf: (summary: IssueSummary) => IssueStatusCategory | null | undefined,
+): IssueSummary[] {
+  const found: IssueSummary[] = []
+  for (const relation of relations) {
+    const other = relation.relationType === "BLOCKS" && relation.target.id === issueId ? relation.source
+      : relation.relationType === "BLOCKED_BY" && relation.source.id === issueId ? relation.target : null
+    if (other && !found.some((known) => known.id === other.id) && !isFinished(categoryOf(other))) found.push(other)
+  }
+  return found
+}
+
 function pushOnce(map: Map<number, IssueSummary[]>, issueId: number, other: IssueSummary): void {
   const list = map.get(issueId)
   if (!list) map.set(issueId, [other])
