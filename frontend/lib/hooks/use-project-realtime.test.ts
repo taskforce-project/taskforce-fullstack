@@ -80,6 +80,16 @@ describe("useProjectRealtime", () => {
     expect(mockUpsert).not.toHaveBeenCalled()
   })
 
+  it("l'objectif et les documents d'une issue s'annoncent sans contenu : le rappel les reçoit, le store n'y touche pas", () => {
+    const onChange = vi.fn()
+    renderHook(() => useProjectRealtime(30, onChange))
+    messageHandler?.({ body: JSON.stringify({ action: "objective.changed", projectId: 30, issueId: null, issue: null }) })
+    messageHandler?.({ body: JSON.stringify({ action: "attachments.changed", projectId: 30, issueId: 7, issue: null }) })
+    expect(onChange).toHaveBeenNthCalledWith(1, { action: "objective.changed", projectId: 30, issueId: null })
+    expect(onChange).toHaveBeenNthCalledWith(2, { action: "attachments.changed", projectId: 30, issueId: 7 })
+    expect(mockUpsert).not.toHaveBeenCalled()
+  })
+
   it("un lien posé entre deux issues du projet entre dans ses liens (R166)", () => {
     renderHook(() => useProjectRealtime(30))
     const relation = { id: 5, relationType: "BLOCKS", source: { id: 7 }, target: { id: 8 } }

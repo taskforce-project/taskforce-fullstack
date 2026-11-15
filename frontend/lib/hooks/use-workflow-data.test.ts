@@ -23,7 +23,8 @@ vi.mock("@/lib/store/issue-store", () => {
 vi.mock("@/lib/store/project-store", () => ({ useProjectStore: (selector: (s: typeof projects) => unknown) => selector(projects) }))
 vi.mock("@/lib/store/delivery-store", () => ({ useDeliveryStore: (selector: (s: typeof delivery) => unknown) => selector(delivery) }))
 
-import { RUNS_WAIT_MS, useWorkflowData } from "./use-workflow-data"
+import { DOCUMENTS_SETTLE_MS, RUNS_WAIT_MS, useWorkflowData } from "./use-workflow-data"
+import { useProjectRealtime, type ProjectChange } from "@/lib/hooks/use-project-realtime"
 
 describe("useWorkflowData : ce que le workflow d'un projet lit (séance n°25, W1)", () => {
   beforeEach(() => {
@@ -107,6 +108,28 @@ describe("useWorkflowData : ce que le workflow d'un projet lit (séance n°25, W
     expect(issues.fetchWorkflowIssues).toHaveBeenCalledWith("acme", 3)
     expect(issues.fetchDocumentCounts).toHaveBeenCalledWith("acme", 3)
     expect(projects.fetchObjective).toHaveBeenCalledWith("acme", 3)
+  })
+
+  it("reads the objective and the document counts again when the project's topic says they changed elsewhere", async () => {
+    renderHook(() => useWorkflowData("acme", 3))
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    const onChange = vi.mocked(useProjectRealtime).mock.calls.at(-1)?.[1] as (change: ProjectChange) => void
+    vi.clearAllMocks()
+
+    act(() => onChange({ action: "objective.changed", projectId: 3, issueId: null }))
+    expect(projects.fetchObjective).toHaveBeenCalledWith("acme", 3)
+
+    // Trois documents ajoutés d'un coup : une seule relecture, un moment après le dernier ; rien pour un autre projet.
+    act(() => {
+      onChange({ action: "attachments.changed", projectId: 3, issueId: 7 })
+      onChange({ action: "attachments.changed", projectId: 3, issueId: 8 })
+      onChange({ action: "attachments.changed", projectId: 3, issueId: 7 })
+      onChange({ action: "attachments.changed", projectId: 4, issueId: 9 })
+    })
+    expect(issues.fetchDocumentCounts).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(DOCUMENTS_SETTLE_MS) })
+    expect(issues.fetchDocumentCounts).toHaveBeenCalledTimes(1)
+    expect(issues.fetchDocumentCounts).toHaveBeenCalledWith("acme", 3)
   })
 
   it("reads nothing without a project", () => {

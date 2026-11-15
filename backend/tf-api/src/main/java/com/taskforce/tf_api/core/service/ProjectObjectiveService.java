@@ -42,7 +42,8 @@ import lombok.extern.slf4j.Slf4j;
  * responsable (LEAD), ou un propriétaire ou administrateur de l'espace. Elle refuse en 403, et {@code canEdit} la
  * reprend telle quelle.</p>
  *
- * <p>Poser ou retirer l'objectif entre au journal d'audit après le commit, sans le texte.</p>
+ * <p>Poser ou retirer l'objectif entre au journal d'audit après le commit, sans le texte, et s'annonce sur le topic du
+ * projet ({@code objective.changed}) : la vue ouverte chez les autres le relit.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -73,6 +74,7 @@ public class ProjectObjectiveService {
     private final UserRepository userRepository;
     private final ProjectVisibilityGuard visibilityGuard;
     private final AuditService audit;
+    private final ProjectTopic topic;
 
     /** L'objectif du projet, ou l'objectif vide quand il n'en a pas. */
     @Transactional(readOnly = true)
@@ -133,6 +135,7 @@ public class ProjectObjectiveService {
         ProjectObjective saved = objectiveRepository.save(objective);
 
         record(project, userId, "set", saved);
+        topic.announce(ProjectTopic.OBJECTIVE_CHANGED, project.getId(), null);
         log.info("Projet {} : objectif posé par {} ({} critère(s))", project.getId(), userId, criteria.size());
         return toResponse(saved, true);
     }
@@ -146,6 +149,7 @@ public class ProjectObjectiveService {
         objectiveRepository.findById(project.getId()).ifPresent(objective -> {
             objectiveRepository.delete(objective);
             record(project, userId, "cleared", objective);
+            topic.announce(ProjectTopic.OBJECTIVE_CHANGED, project.getId(), null);
             log.info("Projet {} : objectif retiré par {}", project.getId(), userId);
         });
         return ProjectObjectiveResponse.none(true);

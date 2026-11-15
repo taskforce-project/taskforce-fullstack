@@ -77,6 +77,7 @@ class ProjectObjectiveServiceTest {
     @Mock private WorkspaceMemberRepository workspaceMemberRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditService audit;
+    @Mock private ProjectTopic topic;
 
     private ProjectObjectiveService service;
     private Workspace workspace;
@@ -87,7 +88,7 @@ class ProjectObjectiveServiceTest {
     void setUp() {
         ProjectVisibilityGuard guard = new ProjectVisibilityGuard(projectMemberRepository, workspaceMemberRepository, projectRepository);
         service = new ProjectObjectiveService(objectiveRepository, projectRepository, projectMemberRepository, workspaceRepository,
-            workspaceMemberRepository, userRepository, guard, audit);
+            workspaceMemberRepository, userRepository, guard, audit, topic);
 
         ada = User.builder().id(LEAD).email("ada@example.com").displayName("Ada").build();
         workspace = Workspace.builder().id(WS).slug(SLUG).build();
@@ -261,6 +262,17 @@ class ProjectObjectiveServiceTest {
             .isInstanceOf(BusinessException.class).hasMessageContaining("200");
 
         verify(objectiveRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("poser et retirer l'objectif s'annoncent sur le topic du projet : la vue ouverte chez les autres le relit")
+    void setting_and_clearing_announce_the_change() {
+        service.set(SLUG, PROJECT, LEAD, request("Ship it", null, "Fine"));
+        verify(topic).announce(ProjectTopic.OBJECTIVE_CHANGED, PROJECT, null);
+
+        stored();
+        service.clear(SLUG, PROJECT, LEAD);
+        verify(topic, org.mockito.Mockito.times(2)).announce(ProjectTopic.OBJECTIVE_CHANGED, PROJECT, null);
     }
 
     @Test

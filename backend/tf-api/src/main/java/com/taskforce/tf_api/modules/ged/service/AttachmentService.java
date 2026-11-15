@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.ProjectTopic;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.modules.ged.domain.Attachment;
 import com.taskforce.tf_api.modules.ged.dto.response.AttachmentResponse;
@@ -62,6 +63,8 @@ public class AttachmentService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final ProjectRepository projectRepository;
+    /** Une pièce jointe ajoutée ou retirée s'annonce sur le topic du projet : la vue du workflow relit ses nombres. */
+    private final ProjectTopic topic;
 
     @Transactional
     public AttachmentResponse upload(String slug, Long projectId, Long issueId, MultipartFile file, Long userId) {
@@ -100,6 +103,7 @@ public class AttachmentService {
                 .build();
 
         Attachment saved = attachmentRepository.save(attachment);
+        topic.announce(ProjectTopic.ATTACHMENTS_CHANGED, projectId, issueId);
         return toResponse(saved);
     }
 
@@ -151,6 +155,7 @@ public class AttachmentService {
 
         objectStorage.delete(attachment.getStoredKey());
         attachmentRepository.delete(attachment);
+        topic.announce(ProjectTopic.ATTACHMENTS_CHANGED, projectId, issueId);
     }
 
     /** Issue de l'URL + droit de LECTURE sur son projet (projet invisible → 404, pas de fuite). */

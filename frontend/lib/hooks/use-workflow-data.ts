@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { useProjectLive, type ProjectLive } from "@/lib/hooks/use-project-live"
-import { useProjectRealtime } from "@/lib/hooks/use-project-realtime"
+import { useProjectRealtime, type ProjectChange } from "@/lib/hooks/use-project-realtime"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectStore } from "@/lib/store/project-store"
 
 /** Ce que le workflow a lu : en cours, prêt, ou en échec (l'écran le dit, avec « Try again »). */
 export type WorkflowLoad = "loading" | "ready" | "error"
+
+/** Plusieurs documents ajoutés d'un coup ne relisent les nombres qu'une fois, ce délai après le dernier. */
+export const DOCUMENTS_SETTLE_MS = 300
 
 /** Les missions qui tardent ne retiennent pas la carte au-delà : elle se montre, et leurs nœuds se mettent à jour à leur arrivée. */
 export const RUNS_WAIT_MS = 6_000
@@ -35,7 +38,23 @@ export function useWorkflowData(slug: string, projectId: number): WorkflowData {
   const fetchProjectProviders = useDeliveryStore((s) => s.fetchProjectProviders)
   const runsRead = useDeliveryStore((s) => s.projectRuns[projectId] !== undefined)
 
-  useProjectRealtime(projectId || null)
+  // L'objectif et les documents changés ailleurs (une autre personne, la fiche d'une issue) : la vue les relit.
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onChange = useCallback((change: ProjectChange) => {
+    if (!slug || change.projectId !== projectId) return
+    if (change.action === "objective.changed") {
+      void fetchObjective(slug, projectId)
+      return
+    }
+    if (settle.current) clearTimeout(settle.current)
+    settle.current = setTimeout(() => {
+      settle.current = null
+      void fetchDocumentCounts(slug, projectId)
+    }, DOCUMENTS_SETTLE_MS)
+  }, [slug, projectId, fetchObjective, fetchDocumentCounts])
+  useEffect(() => () => { if (settle.current) clearTimeout(settle.current) }, [])
+
+  useProjectRealtime(projectId || null, onChange)
   const live = useProjectLive(slug, projectId || null)
 
   const [read, setRead] = useState<{ key: string; state: "loading" | "ready" | "error" }>({ key: "", state: "loading" })

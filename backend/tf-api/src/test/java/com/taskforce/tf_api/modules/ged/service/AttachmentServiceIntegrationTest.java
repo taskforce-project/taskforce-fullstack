@@ -70,6 +70,7 @@ class AttachmentServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired private AttachmentRepository attachmentRepository;
 
     @MockitoBean private ObjectStorage objectStorage;
+    @MockitoBean private com.taskforce.tf_api.core.service.ProjectTopic topic;
 
     private static final String SLUG = "ws-att-it";
     private User owner;
@@ -138,6 +139,8 @@ class AttachmentServiceIntegrationTest extends AbstractIntegrationTest {
         attachmentService.delete(SLUG, project.getId(), issueId, attId, owner.getId());
 
         assertThat(attachmentService.listByIssue(SLUG, project.getId(), issueId, owner.getId())).isEmpty();
+        // L'ajout puis le retrait s'annoncent sur le topic du projet : la vue du workflow relit ses nombres (R159, L7).
+        verify(topic, org.mockito.Mockito.times(2)).announce("attachments.changed", project.getId(), issueId);
     }
 
     /**
