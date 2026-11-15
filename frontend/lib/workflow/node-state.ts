@@ -6,19 +6,20 @@ import type { WorkflowState } from "@/lib/workflow/states"
 /**
  * D'où vient l'état d'un nœud (séance n°25, spécification d'UX §4.5), pour W1 : une issue, sa dernière mission et les
  * demandes ouvertes de celle-ci, ses liens « bloquée par ». Une logique pure, testée cas par cas. Le premier état qui
- * s'applique l'emporte :
+ * s'applique l'emporte, dans l'ordre du tri de la spécification :
  * 1. Needs you : une demande que la personne qui regarde peut décider (`canDecide`, calculé par le serveur comme les règles
  *    le décident), ou un résultat prêt pour sa revue ;
- * 2. une mission en cours ou en file n'est jamais finie : bloquée, en attente d'une autre personne ou du runner, ou au
- *    travail (une mission relancée reste au travail jusqu'à son résultat : jamais de faux vert) ;
- * 3. Done et Skipped viennent de la colonne : une issue terminée, une issue annulée ;
- * 4. Failed : la dernière mission a échoué, ni refusée au départ, ni arrêtée par une personne, ni relancée ;
- * 5. Blocked : un lien « bloquée par » vers une issue qui n'est pas finie ;
- * 6. Waiting : un résultat qu'une autre personne doit revoir ;
- * 7. Stopped : une personne a arrêté la mission ;
- * 8. Working : une issue en cours, tenue par une personne ;
- * 9. Not started : une issue d'une colonne de départ (une mission refusée au départ par une règle en est une, R38).
- * Missing n'existe qu'avec les processus (W5) : rien ne le produit ici.
+ * 2. Failed : la dernière mission a échoué et n'a pas été relancée, quelle que soit la colonne (une issue passée à Done
+ *    après l'échec de sa mission reste Failed) ; une mission refusée au départ par une règle (R38) ou arrêtée par une
+ *    personne n'est pas une panne ;
+ * 3. Missing n'existe qu'avec les processus (W5) : rien ne le produit ici ;
+ * 4. Blocked : un lien « bloquée par » vers une issue qui n'est pas finie (une issue finie n'attend plus rien, sauf si une
+ *    mission y travaille encore) ;
+ * 5. Working : une mission au travail (relancée, elle reste au travail jusqu'à son résultat : jamais de faux vert) ;
+ * 6. Waiting : une demande qu'une autre personne doit décider, une mission en file, un résultat qu'une autre personne revoit ;
+ * 7. puis la colonne et la mission : Done et Skipped pour une issue terminée ou annulée, Stopped pour une mission qu'une
+ *    personne a arrêtée, Working pour une issue en cours tenue par une personne (sa marque ne tourne pas : seul l'anneau
+ *    d'une mission bouge, §1), Not started pour une issue d'une colonne de départ.
  */
 
 /** Pourquoi un nœud est dans son état : ce que sa phrase dira. */
@@ -56,6 +57,9 @@ export interface NodeFacts {
   readonly me: string | number | null | undefined
 }
 
+/** La marque d'un nœud ne tourne que pour une mission au travail : une issue tenue par une personne garde une marque fixe. */
+export const markStill = (reason: NodeReason): boolean => reason.kind === "person"
+
 /** Une issue finie, au sens des liens : terminée ou annulée. */
 export const isFinished = (category: IssueStatusCategory | null | undefined): boolean =>
   category === "COMPLETED" || category === "CANCELLED"
@@ -70,17 +74,25 @@ export function nodeStateOf(facts: NodeFacts): NodeState {
   const { category, run, blockers, me } = facts
   const mission = run?.run ?? null
   const pending = pendingOf(run)
+  const active = mission !== null && (mission.status === "RUNNING" || mission.status === "QUEUED")
+  const stopped = mission?.status === "FAILED" && mission.outcome === "STOPPED"
 
   const mine = pending.find((approval) => approval.canDecide)
   if (mine) return { state: "needsYou", reason: { kind: "approval", approval: mine } }
   if (mission && awaitsJudgment(mission) && isMine(mission, me)) return { state: "needsYou", reason: { kind: "review" } }
 
-  if (mission && (mission.status === "RUNNING" || mission.status === "QUEUED")) {
-    if (blockers.length > 0) return { state: "blocked", reason: { kind: "blocked", blockers } }
+  if (mission?.status === "FAILED" && !mission.refused && !stopped && mission.outcome !== "RETRIED") {
+    return { state: "failed", reason: { kind: "failed", cause: mission.error?.trim() || null } }
+  }
+
+  if (blockers.length > 0 && (active || !isFinished(category))) return { state: "blocked", reason: { kind: "blocked", blockers } }
+
+  if (mission && active) {
     if (pending.length > 0) return { state: "waiting", reason: { kind: "waitingApproval", approvals: pending } }
     if (mission.status === "QUEUED") return { state: "waiting", reason: { kind: "queued" } }
     return { state: "working", reason: { kind: "mission", retried: facts.retried === true } }
   }
+  if (mission && awaitsJudgment(mission)) return { state: "waiting", reason: { kind: "reviewOther" } }
 
   // Une issue qu'on ne connaît pas : sa mission dit seule où elle en est. Livrée, elle est faite ; son résultat écarté,
   // elle a été laissée de côté. On ne devine jamais la colonne.
@@ -92,13 +104,6 @@ export function nodeStateOf(facts: NodeFacts): NodeState {
 
   if (category === "COMPLETED") return { state: "done", reason: { kind: "done" } }
   if (category === "CANCELLED") return { state: "skipped", reason: { kind: "cancelled" } }
-
-  const stopped = mission?.status === "FAILED" && mission.outcome === "STOPPED"
-  if (mission?.status === "FAILED" && !mission.refused && !stopped && mission.outcome !== "RETRIED") {
-    return { state: "failed", reason: { kind: "failed", cause: mission.error?.trim() || null } }
-  }
-  if (blockers.length > 0) return { state: "blocked", reason: { kind: "blocked", blockers } }
-  if (mission && awaitsJudgment(mission)) return { state: "waiting", reason: { kind: "reviewOther" } }
   if (stopped) return { state: "stopped", reason: { kind: "stopped" } }
   if (category === "STARTED") return { state: "working", reason: { kind: "person" } }
   return {

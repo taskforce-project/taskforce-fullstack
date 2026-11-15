@@ -45,9 +45,17 @@ describe("l'état d'un nœud", () => {
   it("Done et Skipped viennent de la colonne", () => {
     expect(nodeStateOf({ category: "COMPLETED", run: null, blockers: [], me: ME }).state).toBe("done")
     expect(nodeStateOf({ category: "CANCELLED", run: null, blockers: [blocker], me: ME }).state).toBe("skipped")
-    // Une issue terminée à la main garde son vert, même si sa dernière mission avait échoué.
+  })
+
+  it("Failed passe avant la colonne (§4.5) : une issue passée à Done après l'échec de sa dernière mission reste Failed", () => {
     const failed = projectRun(deliveryRun(1, 11, { status: "FAILED", error: "Tests failed" }))
-    expect(nodeStateOf({ category: "COMPLETED", run: failed, blockers: [], me: ME }).state).toBe("done")
+    expect(nodeStateOf({ category: "COMPLETED", run: failed, blockers: [], me: ME }))
+      .toEqual({ state: "failed", reason: { kind: "failed", cause: "Tests failed" } })
+    // Un résultat qu'une autre personne revoit attend, même dans une colonne finie.
+    const review = projectRun(deliveryRun(1, 11, { status: "DONE" }))
+    expect(nodeStateOf({ category: "COMPLETED", run: review, blockers: [], me: "8" }).reason).toEqual({ kind: "reviewOther" })
+    // Une issue finie n'attend plus rien : un lien vers une issue pas finie ne la bloque pas.
+    expect(nodeStateOf({ category: "COMPLETED", run: null, blockers: [blocker], me: ME }).state).toBe("done")
   })
 
   it("Failed : la dernière mission a échoué, avec sa cause ; ni refusée au départ, ni arrêtée, ni relancée", () => {

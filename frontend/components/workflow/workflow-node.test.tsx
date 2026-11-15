@@ -101,6 +101,25 @@ describe("SummaryNodeCard", () => {
   })
 })
 
+describe("la marque d'un nœud", () => {
+  it("ne tourne que pour une mission au travail : une issue en cours tenue par une personne garde une marque fixe", () => {
+    const person = buildWorkflow({
+      statuses: STATUSES, issues: [issue(1, { title: "Hand-made", status: DOING })], runs: [], relations: [], documents: {}, me: ME,
+      today: "2026-11-13",
+    }).byKey.get("issue-1")
+    const agent = buildWorkflow({
+      statuses: STATUSES, issues: [issue(1, { title: "Agent-made", status: DOING })], runs: [projectRun(deliveryRun(1, 1))],
+      relations: [], documents: {}, me: ME, today: "2026-11-13",
+    }).byKey.get("issue-1")
+    if (!person || !agent) throw new Error("fixture")
+    const { container, rerender } = render(<WorkflowNodeCard view={viewOf({ node: person })} density="plan" selected={false} focusable t={t} handlers={handlers()} />)
+    expect(person.state).toBe("working")
+    expect(container.querySelector("[data-state=working] svg")?.getAttribute("class")).not.toContain("animate-spin")
+    rerender(<WorkflowNodeCard view={viewOf({ node: agent })} density="plan" selected={false} focusable t={t} handlers={handlers()} />)
+    expect(container.querySelector("[data-state=working] svg")?.getAttribute("class")).toContain("animate-spin")
+  })
+})
+
 describe("StateMark", () => {
   it("each state has its mark and its word, written or on hover; Working alone turns", () => {
     const { rerender } = render(<StateMark state="working" word="Working" />)

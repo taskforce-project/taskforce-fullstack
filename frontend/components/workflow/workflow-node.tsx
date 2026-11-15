@@ -9,6 +9,7 @@ import { UserAvatar } from "@/components/ui/user-avatar"
 import { fillText } from "@/lib/delivery/result-card"
 import { cn } from "@/lib/utils"
 import type { WorkflowNode } from "@/lib/workflow/model"
+import { markStill } from "@/lib/workflow/node-state"
 import { countWords, firstName, type Governance, type NodeAction, type WorkflowTexts } from "@/lib/workflow/sentence"
 import type { Density } from "@/lib/workflow/states"
 
@@ -111,7 +112,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         className="absolute inset-0 z-0 cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
       <div className="pointer-events-none relative z-10 flex h-5 min-w-0 items-center gap-2">
-        <StateMark state={state} word={word} />
+        <StateMark state={state} word={word} still={markStill(node.reason)} />
         <button
           type="button"
           tabIndex={-1}
@@ -231,7 +232,7 @@ export const SummaryNodeCard = memo(function SummaryNodeCard({ view, selected, f
         onKeyDown={(event) => keyOpens(event, () => handlers.onOpen(node.key))}
         className="absolute inset-0 z-0 cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
-      <StateMark state={node.state} word={word} className="pointer-events-none relative z-10" />
+      <StateMark state={node.state} word={word} still={markStill(node.reason)} className="pointer-events-none relative z-10" />
       <span className="pointer-events-none relative z-10 min-w-0 flex-1 truncate text-xs text-foreground">{node.issue.title}</span>
       <span className="pointer-events-none relative z-10 max-w-[44px] shrink-0 truncate text-[11px] text-muted-foreground">{who}</span>
     </div>

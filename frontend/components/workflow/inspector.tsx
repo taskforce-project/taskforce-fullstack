@@ -22,7 +22,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
 import { isMine } from "@/lib/window/missions"
 import { issueKey, nextStage, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
-import { pendingOf } from "@/lib/workflow/node-state"
+import { markStill, pendingOf } from "@/lib/workflow/node-state"
 import { countWords, momentWords, nodeSentence } from "@/lib/workflow/sentence"
 import type { WorkflowState } from "@/lib/workflow/states"
 import type { NodeAgent } from "@/components/workflow/workflow-node"
@@ -158,7 +158,7 @@ export function Inspector({
           )}
         </div>
         <div className="flex min-w-0 items-center gap-2 px-1 text-xs text-muted-foreground">
-          <StateMark state={node.state} word={word} showWord className="shrink-0" />
+          <StateMark state={node.state} word={word} still={markStill(node.reason)} showWord className="shrink-0" />
           <span className="shrink-0 whitespace-nowrap font-mono text-subtle">{node.issue.identifier}</span>
           <Button variant="ghost" size="sm" className="ml-auto h-7 shrink-0 gap-1.5 px-2 text-xs" onClick={() => gestures.ask(node)}>
             <Sparkles className="size-3.5" aria-hidden="true" />
@@ -208,7 +208,7 @@ function LinkList({ items, model, onSelect, more }: Readonly<{
               onClick={() => onSelect(issueKey(item.id))}
               className="flex h-9 w-full items-center gap-2 px-1 text-left text-[13px] hover:bg-muted"
             >
-              {other && <StateMark state={other.state} word={t.state[other.state]} />}
+              {other && <StateMark state={other.state} word={t.state[other.state]} still={markStill(other.reason)} />}
               <span className="shrink-0 font-mono text-xs text-subtle">{item.identifier}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{item.title}</span>
             </button>

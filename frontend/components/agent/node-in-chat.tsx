@@ -17,7 +17,7 @@ import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 import { isMine } from "@/lib/window/missions"
 import { blockersOf, issueKey } from "@/lib/workflow/model"
-import { nodeStateOf } from "@/lib/workflow/node-state"
+import { markStill, nodeStateOf } from "@/lib/workflow/node-state"
 import { nodeSentence, type SentenceNode } from "@/lib/workflow/sentence"
 
 const NO_ISSUE = { assignee: null, completedAt: null, dueDate: null } as const
@@ -96,7 +96,7 @@ export function NodeInChat({ slug, target, withSentence = true }: Readonly<{
   return (
     <div className="flex flex-col gap-1 border border-border bg-card px-3 py-2" role="group" aria-label={`${target.title}, ${word}`}>
       <div className="flex min-w-0 items-center gap-2">
-        <StateMark state={node.state} word={word} />
+        <StateMark state={node.state} word={word} still={markStill(node.reason)} />
         <span className="min-w-0 flex-1 truncate text-[13px] font-[450] text-foreground" title={target.title}>{target.title}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{word}</span>
       </div>
