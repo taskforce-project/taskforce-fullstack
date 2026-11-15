@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.shared.config;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.Message;
@@ -26,8 +28,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Authentifie les frames STOMP {@code CONNECT} et autorise les {@code SUBSCRIBE}.
- * Le client envoie {@code Authorization: Bearer <token>} dans les headers STOMP CONNECT.
+ * Authentifie les frames STOMP {@code CONNECT}, autorise les {@code SUBSCRIBE} et refuse les {@code SEND} d'un client
+ * vers les destinations du broker. Le client envoie {@code Authorization: Bearer <token>} dans les headers STOMP CONNECT.
  *
  * <p><b>Correctif {@code TF-RT-AUTH}.</b> Cette classe <i>documentait</i> son propre trou :
  * « STOMP CONNECT sans token JWT — connexion acceptée sans authentification », puis {@code return} —
@@ -49,18 +51,25 @@ import lombok.extern.slf4j.Slf4j;
 public class StompAuthInterceptor implements ChannelInterceptor {
 
     /** Topic dont la clé EST l'identité de l'abonné : {@code /topic/notifications.{userId}}. */
-    private static final String USER_TOPIC_PREFIX     = "/topic/notifications.";
+    private static final Pattern NOTIFICATIONS_TOPIC = Pattern.compile("/topic/notifications\\.([1-9]\\d*)");
     /** Les étapes des réponses de Cortex : même règle, {@code /topic/cortex.{userId}} n'est lu que par cette personne. */
-    private static final String CORTEX_TOPIC_PREFIX   = "/topic/cortex.";
+    private static final Pattern CORTEX_TOPIC = Pattern.compile("/topic/cortex\\.([1-9]\\d*)");
     /**
      * Flux temps réel d'un projet, autorisés par visibilité projet : {@code /topic/projects.{projectId}} (le board),
-     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA) et {@code /topic/projects.{projectId}.delivery}
-     * (ses missions et leurs demandes, la vue du workflow, R166).
+     * {@code /topic/projects.{projectId}.analysis} (ses workflows d'analyse IA) et
+     * {@code /topic/projects.{projectId}.delivery} (ses missions et leurs demandes, la vue du workflow, R166).
      */
-    private static final String PROJECT_TOPIC_PREFIX  = "/topic/projects.";
-    private static final List<String> PROJECT_TOPIC_SUFFIXES = List.of(".analysis", ".delivery");
+    private static final Pattern PROJECT_TOPIC =
+        Pattern.compile("/topic/projects\\.([1-9]\\d*)(?:\\.analysis|\\.delivery)?");
+    /** Les caractères de motif n'appartiennent à aucune de ces formes. */
+    private static final Pattern PATTERN_CHARACTERS = Pattern.compile("[*?{}#]");
     /** Ancien flux d'analyse IA par espace, {@code /topic/analysis.{workspaceId}} : retiré, tout abonnement est refusé. */
     private static final String RETIRED_ANALYSIS_PREFIX = "/topic/analysis.";
+    /**
+     * Les destinations que le broker remet à leurs abonnés : {@code /topic} et {@code /queue}, et {@code /user}, qui s'y
+     * résout. Seul le serveur y publie. Le préfixe se compare comme le broker le compare : au début de la destination.
+     */
+    private static final List<String> BROKER_PREFIXES = List.of("/topic", "/queue", "/user");
 
     private final JwtDecoder                   jwtDecoder;
     private final UserRepository               userRepository;
@@ -79,8 +88,22 @@ public class StompAuthInterceptor implements ChannelInterceptor {
             accessor.setUser(authenticateConnect(accessor));
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             authorizeSubscribe(accessor);
+        } else if (StompCommand.SEND.equals(accessor.getCommand())) {
+            refuseSendToBroker(accessor);
         }
         return message;
+    }
+
+    /**
+     * Un client ne publie sur aucune destination du broker : un {@code SEND} sous {@code /topic}, {@code /queue} ou
+     * {@code /user}, ou sans destination, est refusé. Le serveur seul y publie ; le front n'envoie aucun {@code SEND}.
+     */
+    private void refuseSendToBroker(StompHeaderAccessor accessor) {
+        String destination = accessor.getDestination();
+        if (destination == null || BROKER_PREFIXES.stream().anyMatch(destination::startsWith)) {
+            log.warn("STOMP SEND refusé sur {} : seul le serveur publie sur les destinations du broker", destination);
+            throw new MessageDeliveryException("Sending to this destination is not allowed");
+        }
     }
 
     /** @return le Principal authentifié — ne rend jamais {@code null} : tout échec lève. */
@@ -143,8 +166,8 @@ public class StompAuthInterceptor implements ChannelInterceptor {
      * <ul>
      *   <li>{@code /topic/notifications.{userId}} — l'abonné doit être ce {@code userId} ;</li>
      *   <li>{@code /topic/projects.{projectId}}, {@code /topic/projects.{projectId}.analysis} et
-     *       {@code /topic/projects.{projectId}.delivery} : l'abonné doit <b>voir</b> le projet (public / membre /
-     *       OWNER-ADMIN).</li>
+     *       {@code /topic/projects.{projectId}.delivery} : l'abonné doit <b>voir</b> le projet (membre de son espace,
+     *       puis public / membre / OWNER-ADMIN).</li>
      * </ul>
      * Avant, seul le topic notifications était contrôlé : {@code projects.*} / {@code analysis.*} n'exigeaient
      * qu'une session authentifiée → n'importe qui pouvait streamer l'activité d'un autre compte par simple
@@ -154,12 +177,13 @@ public class StompAuthInterceptor implements ChannelInterceptor {
      * <p>Les workflows d'analyse IA passaient par {@code /topic/analysis.{workspaceId}}, ouvert à tout membre de
      * l'espace : le nom d'un projet privé et la question du modèle y sortaient du cercle du projet. Ils ont rejoint
      * les flux du projet (31/10/2026) ; plus rien n'est publié sur l'ancien canal, et tout abonnement y est refusé.</p>
+     *
+     * <p>Une destination n'est acceptée que si elle a exactement l'une de ces formes, chacune avec sa vérification.
+     * Toute autre est refusée : une autre forme sous {@code /topic} ou {@code /queue}, une destination hors de ces
+     * préfixes, une destination absente, et toute destination qui porte un caractère de motif.</p>
      */
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
-        if (destination == null) {
-            return;
-        }
         String principal = accessor.getUser() != null ? accessor.getUser().getName() : null;
         if (principal == null) {
             log.warn("STOMP SUBSCRIBE refusé sur {} : session non authentifiée", destination);
@@ -171,36 +195,36 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         } catch (NumberFormatException ex) {
             throw new MessageDeliveryException("Unreadable identity");
         }
+        if (destination == null || PATTERN_CHARACTERS.matcher(destination).find()) {
+            log.warn("STOMP SUBSCRIBE refusé : user {} sur une destination qui n'est pas celle de l'app", userId);
+            throw new MessageDeliveryException("Invalid channel");
+        }
 
-        String ownTopic = destination.startsWith(USER_TOPIC_PREFIX) ? USER_TOPIC_PREFIX
-            : destination.startsWith(CORTEX_TOPIC_PREFIX) ? CORTEX_TOPIC_PREFIX : null;
-        if (ownTopic != null) {
-            if (!principal.equals(destination.substring(ownTopic.length()))) {
+        Matcher notifications = NOTIFICATIONS_TOPIC.matcher(destination);
+        Matcher cortex = CORTEX_TOPIC.matcher(destination);
+        if (notifications.matches() || cortex.matches()) {
+            String owner = notifications.matches() ? notifications.group(1) : cortex.group(1);
+            if (!principal.equals(owner)) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} a tenté de lire le canal personnel d'un autre", principal);
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
-        } else if (destination.startsWith(PROJECT_TOPIC_PREFIX)) {
-            String projectId = projectIdOf(destination.substring(PROJECT_TOPIC_PREFIX.length()));
-            if (!realtimeAuth.canSubscribeProject(userId, parseId(projectId))) {
+            return;
+        }
+        Matcher project = PROJECT_TOPIC.matcher(destination);
+        if (project.matches()) {
+            if (!realtimeAuth.canSubscribeProject(userId, parseId(project.group(1)))) {
                 log.warn("STOMP SUBSCRIBE refusé : user {} sans accès au canal {}", userId, destination);
                 throw new MessageDeliveryException("Access to this channel is denied");
             }
-        } else if (destination.startsWith(RETIRED_ANALYSIS_PREFIX)) {
+            return;
+        }
+        if (destination.startsWith(RETIRED_ANALYSIS_PREFIX)) {
             // Rien n'y est plus publié ; le refuser empêche de le rouvrir par mégarde à tout l'espace.
             log.warn("STOMP SUBSCRIBE refusé : user {} sur le canal retiré {}", userId, destination);
             throw new MessageDeliveryException("This channel no longer exists");
         }
-        // Autres canaux : la session authentifiée suffit (aucun flux cross-tenant connu au-delà de ceux-ci).
-    }
-
-    /** L'id du projet d'un flux de projet ({@code 12}, {@code 12.analysis}, {@code 12.delivery}) ; un seul suffixe connu. */
-    private static String projectIdOf(String channel) {
-        for (String suffix : PROJECT_TOPIC_SUFFIXES) {
-            if (channel.endsWith(suffix)) {
-                return channel.substring(0, channel.length() - suffix.length());
-            }
-        }
-        return channel;
+        log.warn("STOMP SUBSCRIBE refusé : user {} sur une destination qui n'est pas celle de l'app : {}", userId, destination);
+        throw new MessageDeliveryException("Invalid channel");
     }
 
     /** Id numérique d'un canal ; refuse une destination malformée. */
