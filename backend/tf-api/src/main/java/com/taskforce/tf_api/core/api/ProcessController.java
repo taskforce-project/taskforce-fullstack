@@ -75,9 +75,15 @@ public class ProcessController {
 
     /**
      * Publie une version du processus : la première pour une clé nouvelle, la suivante sinon. Un processus que le
-     * vérificateur refuse n'entre pas : 422, avec ses refus.
+     * vérificateur refuse n'entre pas : 422, avec ses refus. La référence d'API dit les deux réponses.
      */
     @PostMapping("/projects/{projectId}/processes")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", useReturnTypeSchema = true,
+            description = "The version is published: data.version holds it, with its number and its fingerprint."),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", useReturnTypeSchema = true,
+            description = "The validator refused the process, or nothing changed since the current version: "
+                + "data.refused holds the refusals, each a sentence with its code.")})
     public ResponseEntity<ApiResponse<ProcessResponse.Publication>> publishProcess(
         @PathVariable String slug, @PathVariable Long projectId, @Valid @RequestBody PublishProcessRequest body,
         @AuthenticationPrincipal Jwt jwt) {

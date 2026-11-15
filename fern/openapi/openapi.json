@@ -2036,8 +2036,18 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
+          "201": {
+            "description": "The version is published: data.version holds it, with its number and its fingerprint.",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseProcessPublication"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The validator refused the process, or nothing changed since the current version: data.refused holds the refusals, each a sentence with its code.",
             "content": {
               "*/*": {
                 "schema": {
