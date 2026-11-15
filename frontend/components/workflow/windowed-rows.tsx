@@ -7,7 +7,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
  * colonnes du workflow : 2 000 issues dans un projet n'en rendent que quelques dizaines. Chaque ligne a une hauteur
  * estimée, remplacée par sa mesure dès qu'elle s'est rendue ; au-dessus et au-dessous de ce qui se voit, un espace de la
  * même hauteur garde la barre de défilement juste. Le défilement de la personne n'est jamais touché, sauf pour amener
- * sous ses yeux le nœud qu'elle vient de choisir au clavier (`revealKey`).
+ * sous ses yeux le nœud qu'elle vient de choisir au clavier (`revealKey`). Plusieurs listes peuvent partager l'élément qui
+ * défile (les sections de la liste de l'écran étroit) : chacune lit où elle commence dans cet élément.
  */
 
 /** Ce qu'on rend au-delà de ce qui se voit, en pixels, au-dessus et au-dessous. */
@@ -51,7 +52,7 @@ export function rowWindow(
   return { start, end, before: offsets[start], after: Math.max(0, total - (offsets[end] + heights[end])), offsets }
 }
 
-export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrollRef, revealKey, renderRow }: Readonly<{
+export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrollRef, revealKey, renderRow, list = false }: Readonly<{
   rows: readonly R[]
   /** La hauteur supposée d'une ligne pas encore mesurée. */
   estimate: (row: R) => number
@@ -62,9 +63,13 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
   /** Une ligne à amener sous les yeux quand elle change (le nœud choisi au clavier). */
   revealKey?: string | null
   renderRow: (row: R) => ReactNode
+  /** Une liste pour les lecteurs d'écran (la liste par étape de l'écran étroit). */
+  list?: boolean
 }>) {
   const [measured, setMeasured] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [viewport, setViewport] = useState({ top: 0, height: 0 })
+  const listRef = useRef<HTMLDivElement>(null)
+  const scheduleRead = useRef<() => void>(() => {})
 
   // Ce qui se voit : relu à chaque défilement (une fois par image) et à chaque changement de taille. Un effet, pas un effet
   // de mise en page : l'élément qui défile appartient au parent, et React ne pose sa référence qu'après les effets de mise
@@ -75,20 +80,30 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
     let frame = 0
     const read = () => {
       frame = 0
-      setViewport((was) => (was.top === element.scrollTop && was.height === element.clientHeight
-        ? was : { top: element.scrollTop, height: element.clientHeight }))
+      // Le haut de ce qui se voit, compté depuis le début de cette liste : elle peut commencer plus bas dans l'élément.
+      // Sans mise en page (un élément caché, un test), la liste commence en haut.
+      const list = listRef.current
+      const start = list && element.clientHeight > 0
+        ? list.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop : 0
+      const top = element.scrollTop - Math.round(start)
+      setViewport((was) => (was.top === top && was.height === element.clientHeight ? was : { top, height: element.clientHeight }))
     }
     const schedule = () => { if (!frame) frame = requestAnimationFrame(read) }
+    scheduleRead.current = schedule
     schedule()
     element.addEventListener("scroll", schedule, { passive: true })
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule)
     observer?.observe(element)
     return () => {
+      scheduleRead.current = () => {}
       element.removeEventListener("scroll", schedule)
       observer?.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
   }, [scrollRef])
+
+  // Les lignes ont changé (« Show more », une section au-dessus qui grandit) : où la liste commence se relit.
+  useEffect(() => { scheduleRead.current() }, [rows])
 
   // Une mesure par ligne rendue, une seule observation pour toute la liste ; une mesure qui ne change rien ne rend rien.
   const remember = useCallback((entries: readonly (readonly [string, number])[]) => {
@@ -145,10 +160,10 @@ export function WindowedRows<R extends WindowedRow>({ rows, estimate, gap, scrol
 
   if (rows.length === 0) return null
   return (
-    <div style={{ paddingTop: before, paddingBottom: after }}>
-      <div className="flex flex-col" style={{ gap }}>
+    <div ref={listRef} style={{ paddingTop: before, paddingBottom: after }}>
+      <div className="flex flex-col" style={{ gap }} role={list ? "list" : undefined}>
         {rows.slice(start, end + 1).map((row) => (
-          <div key={row.key} data-row-key={row.key} ref={measure}>
+          <div key={row.key} data-row-key={row.key} ref={measure} role={list ? "listitem" : undefined}>
             {renderRow(row)}
           </div>
         ))}

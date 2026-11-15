@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useRef, type ReactNode } from "react"
+import { memo, useRef, type ReactNode, type RefObject } from "react"
 
 import { SummaryNodeCard, WorkflowNodeCard, type NodeHandlers, type NodeView } from "@/components/workflow/workflow-node"
 import { WindowedRows } from "@/components/workflow/windowed-rows"
@@ -33,7 +33,7 @@ export interface ColumnState {
  */
 export const StageColumn = memo(function StageColumn({
   stage, rows, density, views, selectedKey, focusKey, related, revealKey, t, handlers, onShowDone, onShowAll, onOpenParent,
-  stacked = false,
+  stacked = false, listScrollRef,
 }: Readonly<{
   stage: StageModel
   rows: readonly ColumnRow[]
@@ -53,6 +53,8 @@ export const StageColumn = memo(function StageColumn({
   onOpenParent: (parentKey: string) => void
   /** L'écran étroit : la colonne devient une section de la liste, en pleine largeur, sans défilement à elle. */
   stacked?: boolean
+  /** L'élément qui fait défiler la liste de l'écran étroit, où la section ne rend aussi que ce qui se voit. */
+  listScrollRef?: RefObject<HTMLElement | null>
 }>) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const total = stage.nodes.length
@@ -104,9 +106,16 @@ export const StageColumn = memo(function StageColumn({
     return (
       <section aria-label={fillText(t.stage, { name, count: total })} className="flex flex-col">
         <div className="sticky top-0 z-10 bg-background">{header}</div>
-        <ul className="flex flex-col gap-2 pb-4">
-          {rows.map((row) => <li key={row.key} className="[content-visibility:auto] [contain-intrinsic-size:auto_92px]">{renderRow(row)}</li>)}
-        </ul>
+        <div className="pb-4">
+          <WindowedRows
+            rows={rows}
+            gap={CARD_GAP}
+            estimate={(row) => estimateRow(row, density)}
+            scrollRef={listScrollRef ?? scrollRef}
+            renderRow={renderRow}
+            list
+          />
+        </div>
       </section>
     )
   }

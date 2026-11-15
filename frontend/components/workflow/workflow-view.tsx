@@ -113,6 +113,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
 
   const rootRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const paneWidth = useElementWidth(rootRef)
   const wideWindow = useMinWidth(NARROW_BELOW)
   const narrow = !wideWindow
@@ -335,7 +336,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         ) : filteredEmpty ? (
           <p className="p-6 text-sm text-muted-foreground">{filter === "needs-you" ? t.empty.nothingNeedsYou : t.empty.nothingMatches}</p>
         ) : narrow ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
+          <div ref={listRef} data-workflow-list className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
             {model.stages.map((stage, index) => (
               <StageColumn
                 key={stage.status.id}
@@ -353,6 +354,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
                 onShowAll={(id) => setExpanded((was) => ({ ...was, [id]: { ...was[id], all: true } }))}
                 onOpenParent={(key) => setOpenParents((was) => new Set([...was, key]))}
                 stacked
+                listScrollRef={listRef}
               />
             ))}
           </div>

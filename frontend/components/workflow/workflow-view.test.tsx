@@ -86,6 +86,15 @@ function serve({ issues, runs = [], relations = [] }: { issues: Issue[]; runs?: 
   vi.mocked(listProjectRelations).mockResolvedValue({ relations, subIssues: [] })
 }
 
+/** Fait défiler un élément, et laisse la liste relire ce qui se voit (une image plus tard). */
+async function scrollTo(element: HTMLElement, top: number) {
+  await act(async () => {
+    element.scrollTop = top
+    fireEvent.scroll(element)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  })
+}
+
 const card = (title: string) => screen.getByRole("button", { name: new RegExp(`^${title}, `) })
 
 beforeEach(() => {
@@ -286,8 +295,9 @@ describe("un grand projet", () => {
     // Toutes les pages lues (20 d'issues, 6 de missions), jamais tout en un appel.
     expect(listIssuesPage).toHaveBeenCalledTimes(20)
     expect(listProjectRuns).toHaveBeenCalledTimes(6)
+    // Sans fenêtre, les colonnes repliées en rendraient 163 : la borne tient seulement si les colonnes ne rendent que ce qui se voit.
     const rendered = document.querySelectorAll("[data-node-focus]").length
-    expect(rendered).toBeLessThan(200)
+    expect(rendered).toBeLessThan(80)
 
     const target = document.querySelectorAll<HTMLButtonElement>("[data-node-focus]")[3]
     const key = target.dataset.nodeFocus as string
@@ -301,5 +311,35 @@ describe("un grand projet", () => {
     console.info(`[workflow] 2000 issues: first render ${Math.round(firstRender)} ms, ${rendered} cards rendered, select ${Math.round(selection)} ms`)
     expect(firstRender).toBeLessThan(8000)
     expect(selection).toBeLessThan(1500)
+
+    // « Show {count} more » ouvre toute la colonne : elle ne rend toujours que ce qui se voit. Le bouton suit la
+    // cinquantième carte : on fait d'abord défiler la colonne jusqu'à lui.
+    await scrollTo(document.querySelector<HTMLElement>("[data-stage-scroll]") as HTMLElement, 5000)
+    const mores = screen.getAllByRole("button", { name: /^Show \d+ more$/ })
+    const hidden = Number(/\d+/.exec(mores[0].textContent ?? "")?.[0])
+    expect(hidden).toBeGreaterThan(100)
+    act(() => { mores[0].click() })
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: /^Show \d+ more$/ })).toHaveLength(mores.length - 1))
+    expect(document.querySelectorAll("[data-node-focus]").length).toBeLessThan(80)
+  }, 30_000)
+
+  it("la liste de l'écran étroit ne rend aussi que ce qui se voit, même après « Show more »", async () => {
+    Object.defineProperty(globalThis.window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false, media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+      })),
+    })
+    serve(bigProject(2000, 300, 3000))
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(document.querySelectorAll("[data-node-focus]").length).toBeGreaterThan(0), { timeout: 10_000 })
+    // Une section ne rend que ce qui se voit : sans fenêtre, la liste en rendrait 163.
+    expect(document.querySelectorAll("[data-node-focus]").length).toBeLessThan(100)
+    await scrollTo(document.querySelector<HTMLElement>("[data-workflow-list]") as HTMLElement, 5000)
+    const mores = screen.getAllByRole("button", { name: /^Show \d+ more$/ })
+    act(() => { mores[0].click() })
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: /^Show \d+ more$/ })).toHaveLength(mores.length - 1))
+    expect(document.querySelectorAll("[data-node-focus]").length).toBeLessThan(100)
   }, 30_000)
 })
