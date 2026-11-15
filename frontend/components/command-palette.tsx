@@ -1,10 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent, type ReactNode } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter } from "next/navigation"
 import {
   Activity, AtSign, Bug, CalendarRange, CircleDot, FileText, FolderKanban, Inbox, LayoutDashboard, ListChecks, MessageSquare,
-  MessagesSquare, Monitor, Moon, Plus, Repeat, Settings, ShieldAlert, Sparkles, Sun, TrendingUp, User, Users, type LucideIcon,
+  MessagesSquare, Monitor, Moon, Plus, Repeat, Settings, ShieldAlert, Sparkles, Sun, TrendingUp, User, Users, Workflow,
+  type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -22,9 +23,9 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import { cn } from "@/lib/utils"
-import { withConversation } from "@/lib/window/address"
+import { withConversation, workflowProjectOf } from "@/lib/window/address"
 import { commentsApart, pick } from "@/lib/window/palette"
-import { homePath, PROGRESS } from "@/lib/window/pane"
+import { homePath, paneOf, PROGRESS } from "@/lib/window/pane"
 
 /** Les bugs et idées se signalent sur le dépôt du projet (open source), pas dans l'instance. */
 const REPORT_ISSUE_URL = "https://github.com/taskforce-project/taskforce-fullstack/issues/new/choose"
@@ -119,7 +120,12 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
   const openSettings = useSettingsStore((s) => s.openSettings)
   const members = useWorkspaceStore((s) => s.members)
   const fetchMembers = useWorkspaceStore((s) => s.fetchMembers)
-  const { openIssue, openBoard } = usePaneNavigation()
+  const { openIssue, openBoard, openWorkflow } = usePaneNavigation()
+  const pathname = usePathname()
+  const workflowText = usePreferencesStore((s) => s.t.workflow)
+  // Le projet du volet : sans rien taper, son workflow s'ouvre d'ici (séance n°25) ; ses touches se disent au pied.
+  const paneProject = paneOf(pathname)?.projectId ?? null
+  const onWorkflow = workflowProjectOf(pathname) !== null
   const { setTheme } = useTheme()
   const mod = useModKeyLabel()
   const search = usePaletteSearch(slug, open)
@@ -174,13 +180,23 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
       })),
     ]
 
-    const projectRows = pick(projects.filter((p) => p.status !== "ARCHIVED"), q, (p) => `${p.name} ${p.identifier ?? ""}`, q ? SECTION_ROWS : FIRST_LOOK_ROWS)
-      .map((project): Row => ({
+    const picked = pick(projects.filter((p) => p.status !== "ARCHIVED"), q, (p) => `${p.name} ${p.identifier ?? ""}`, q ? SECTION_ROWS : FIRST_LOOK_ROWS)
+    const workflowRow = (project: (typeof projects)[number]): Row => ({
+      value: `workflow-${project.id}`,
+      icon: glyph(Workflow),
+      body: <Words name={fillText(workflowText.paletteOpen, { project: project.name })} />,
+      run: run(() => openWorkflow(project.id)),
+    })
+    // Le workflow d'un projet suit son tableau quand on le cherche ; sans rien taper, celui du projet du volet seulement.
+    const projectRows = picked.flatMap((project): Row[] => {
+      const board: Row = {
         value: `project-${project.id}`,
         icon: glyph(FolderKanban),
         body: <Words name={project.name} />,
         run: run(() => openBoard(project.id)),
-      }))
+      }
+      return q || project.id === paneProject ? [board, workflowRow(project)] : [board]
+    })
 
     const peopleRows = q && !IS_DESKTOP
       ? pick(members, q, (m) => `${m.displayName ?? ""} ${m.email}`, SECTION_ROWS).map((member): Row => ({
@@ -260,7 +276,8 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
       : found
   }, [
     shown, issues, comments, notes, projects, members, conversations, slug, t, w, router, openIssue, openBoard, openConversation,
-    newConversation, setDraft, setChatOpen, openCreateProject, openSettings, setTheme, close,
+    newConversation, setDraft, setChatOpen, openCreateProject, openSettings, setTheme, close, openWorkflow, workflowText,
+    paneProject,
   ])
 
   const firstRow = sections[0]?.rows[0]
@@ -329,6 +346,18 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
         ))}
       </CommandList>
 
+      {/* Les touches du workflow, quand il est le volet : elles ne se disent qu'ici (séance n°25, §6.3, R134). */}
+      {onWorkflow && (
+        <div className="flex min-h-9 shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5"><Key>J</Key><Key>K</Key>{workflowText.keys.move}</span>
+          <span className="flex items-center gap-1.5"><Key>F</Key>{workflowText.keys.attention}</span>
+          <span className="flex items-center gap-1.5"><Key>D</Key>{workflowText.keys.decide}</span>
+          <span className="flex items-center gap-1.5"><Key>.</Key>{workflowText.keys.ask}</span>
+          <span className="flex items-center gap-1.5"><Key>M</Key>{workflowText.keys.moveTo}</span>
+          <span className="flex items-center gap-1.5"><Key>1</Key><Key>2</Key><Key>3</Key>{workflowText.keys.density}</span>
+          <span className="flex items-center gap-1.5"><Key>?</Key>{workflowText.keys.legend}</span>
+        </div>
+      )}
       {/* Les rappels du clavier. */}
       <div className="flex h-9 shrink-0 items-center gap-4 whitespace-nowrap border-t border-border px-3 text-xs text-muted-foreground">
         <span className="hidden items-center gap-1.5 sm:flex"><Key>↑</Key><Key>↓</Key>{t.navigate}</span>

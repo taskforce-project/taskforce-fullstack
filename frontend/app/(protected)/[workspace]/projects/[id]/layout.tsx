@@ -13,6 +13,7 @@ import {
   Plus,
   MoreHorizontal,
   Star,
+  Workflow,
 } from "lucide-react"
 
 import { useTranslation } from "@/lib/i18n"
@@ -31,6 +32,9 @@ import { cn } from "@/lib/utils"
 import { useProjectStore } from "@/lib/store/project-store"
 import { IS_DESKTOP } from "@/lib/desktop"
 import type { UpdateProjectPayload } from "@/lib/api/project-service"
+import { WorkflowTitleControls } from "@/components/workflow/workflow-title-controls"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useWorkflowViewStore } from "@/lib/store/workflow-view-store"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +58,8 @@ type ProjectTab = {
 
 const PROJECT_TABS: ProjectTab[] = [
   { key: "detail.board", icon: LayoutGrid, pathSuffix: "" },
+  // Le workflow du projet (séance n°25, W1) : la même carte que le tableau, pilotée sur ses nœuds.
+  { key: "detail.workflow", icon: Workflow, pathSuffix: "/workflow" },
   { key: "detail.list", icon: List, pathSuffix: "/list" },
   { key: "detail.roadmap", icon: CalendarRange, pathSuffix: "/roadmap" },
   { key: "detail.backlog", icon: AlignLeft, pathSuffix: "/backlog" },
@@ -76,6 +82,8 @@ export default function ProjectLayout({ children }: { readonly children: React.R
   const projectId = extractParam(params.id) || "0"
 
   const { projects, fetchProjects, archiveProject, updateProject, setActiveProject, toggleFavorite } = useProjectStore()
+  const setLegendOpen = useWorkflowViewStore((s) => s.setLegendOpen)
+  const legend = usePreferencesStore((s) => s.t.workflow.legend)
 
   useEffect(() => {
     if (workspace && projects.length === 0) {
@@ -97,6 +105,8 @@ export default function ProjectLayout({ children }: { readonly children: React.R
     }
     return pathname.startsWith(basePath + suffix)
   }
+  // Le workflow met dans cette ligne son direct, sa densité et son filtre (séance n°25, §3), à la place des visages.
+  const onWorkflow = isTabActive("/workflow")
 
   return (
     <div className="mx-auto flex h-full w-full max-w-screen-2xl flex-col">
@@ -136,8 +146,9 @@ export default function ProjectLayout({ children }: { readonly children: React.R
         </div>
 
           <div className="flex shrink-0 items-center gap-2 pb-1.5">
+            {onWorkflow && <WorkflowTitleControls projectId={Number(projectId)} />}
             {/* Members avatars */}
-            <div className="hidden sm:flex -space-x-2 mr-1">
+            <div className={cn("-space-x-2 mr-1", onWorkflow ? "hidden" : "hidden sm:flex")}>
               {(project?.members ?? []).slice(0, 3).map((m) => (
                 <UserAvatar
                   key={m.userId}
@@ -180,6 +191,7 @@ export default function ProjectLayout({ children }: { readonly children: React.R
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {onWorkflow && <DropdownMenuItem onClick={() => setLegendOpen(true)}>{legend}</DropdownMenuItem>}
                 {project?.status === "ARCHIVED" ? (
                   <DropdownMenuItem
                     onClick={() => updateProject(workspace, Number(projectId), { status: "ACTIVE" } as UpdateProjectPayload)}

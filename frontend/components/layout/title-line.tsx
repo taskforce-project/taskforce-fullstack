@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from "react"
 import { useParams, usePathname } from "next/navigation"
-import { Activity, LayoutGrid, PanelRight } from "lucide-react"
+import { Activity, LayoutGrid, PanelRight, Workflow } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -18,7 +18,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWindowStore } from "@/lib/store/window-store"
 import { cn } from "@/lib/utils"
-import { missionOf } from "@/lib/window/address"
+import { missionOf, workflowProjectOf } from "@/lib/window/address"
 import { changesOf } from "@/lib/window/changes"
 import { projectInView } from "@/lib/window/environment"
 import { conversationMission, runLabel } from "@/lib/window/missions"
@@ -60,7 +60,7 @@ export function TitleLine() {
   const rightDrawer = useWindowStore((s) => s.rightDrawer)
   const toggleRight = useWindowStore((s) => s.toggleRight)
   const setRightDrawer = useWindowStore((s) => s.setRightDrawer)
-  const { openBoard, openMission } = usePaneNavigation()
+  const { openBoard, openMission, openWorkflow } = usePaneNavigation()
 
   // App desktop : les boutons du système aux couleurs du thème, sur la hauteur de cette ligne.
   useEffect(() => {
@@ -95,6 +95,18 @@ export function TitleLine() {
           >
             <LayoutGrid className="size-4" />
             {t.board}
+          </button>
+        )}
+        {/* Le workflow du projet en vue (séance n°25), à côté de son tableau, sauf s'il est déjà le volet. */}
+        {project && workflowProjectOf(pathname) !== project.id && (
+          <button
+            type="button"
+            onClick={() => openWorkflow(project.id)}
+            title={fillText(t.workflowOf, { project: project.name })}
+            className={TEXT_BUTTON}
+          >
+            <Workflow className="size-4" />
+            {t.workflow}
           </button>
         )}
         {showMission && (

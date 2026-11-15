@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 
-const nav = vi.hoisted(() => ({ push: vi.fn() }))
+const nav = vi.hoisted(() => ({ push: vi.fn(), pathname: "/acme" }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push, back: vi.fn() }),
   useParams: () => ({ workspace: "acme" }),
+  usePathname: () => nav.pathname,
 }))
 
 import { LinkedText } from "./answer-links"
@@ -62,6 +63,22 @@ describe("les liens des réponses", () => {
     expect(board).toHaveAttribute("href", "/acme/projects/4")
     fireEvent.click(board)
     expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/4?c=9", { scroll: false })
+  })
+
+  // Le volet est le workflow du projet nommé (séance n°25) : l'issue s'y choisit, nœud dans l'adresse (critère 1).
+  it("on its project's workflow, an issue link opens the view on its node, and its project stays there", () => {
+    nav.pathname = "/acme/projects/4/workflow"
+    globalThis.history.replaceState(null, "", "/acme/projects/4/workflow?c=9")
+    render(<AnswerText text="See OPS-35 in Operations, and WEB-28." toolCalls={[UPDATED]} />)
+
+    const node = screen.getByRole("link", { name: "OPS-35" })
+    expect(node).toHaveAttribute("href", "/acme/projects/4/workflow?node=issue-35")
+    fireEvent.click(node)
+    expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/4/workflow?c=9&node=issue-35", { scroll: false })
+    expect(screen.getByRole("link", { name: "Operations" })).toHaveAttribute("href", "/acme/projects/4/workflow")
+    // Une issue d'un autre projet garde son lien vers son tableau.
+    expect(screen.getByRole("link", { name: "WEB-28" })).toHaveAttribute("href", "/acme/projects/3?issue=28")
+    nav.pathname = "/acme"
   })
 
   it("leaves the rest as text: code, other keys, a workspace without projects", () => {

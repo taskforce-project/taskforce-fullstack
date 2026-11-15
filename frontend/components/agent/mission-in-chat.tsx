@@ -1,5 +1,6 @@
 "use client"
 
+import { NodeInChat } from "@/components/agent/node-in-chat"
 import { PaneLink } from "@/components/layout/pane-link"
 import { DelegateAgentControl } from "@/components/sheets/delegate-agent-control"
 import type { AssistantTarget } from "@/lib/api/assistant-service"
@@ -37,6 +38,9 @@ export function MissionInChat({ slug, target }: Readonly<{ slug: string; target:
           {label}
         </PaneLink>
       )}
+      {/* Le nœud de l'issue, comme le workflow le montre, et de quoi l'y ouvrir (séance n°25, §9) ; sa phrase est celle de
+          la mission, dite juste dessous. */}
+      <NodeInChat slug={slug} target={target} withSentence={false} />
       <DelegateAgentControl workspaceSlug={slug} projectId={target.projectId} issueId={target.issueId}
         goal={key ? `${target.title} (${key})` : target.title} />
     </div>
