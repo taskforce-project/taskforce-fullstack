@@ -205,4 +205,13 @@ public class DeliveryRun extends AuditableEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "follow_up", columnDefinition = "jsonb")
     private List<Map<String, Object>> followUp;
+
+    /**
+     * La mission attend encore des réponses : en cours, et son runner a donné signe de vie depuis {@code aliveSince}, ou pas
+     * encore. Un run « pull » perdu reste RUNNING tant que personne ne le relit ; « Waiting for you » lit la même règle en
+     * base ({@code DeliveryRunApprovalRepository.findOpen}), la page des missions d'un projet de ses lignes.
+     */
+    public boolean awaitsAnswers(LocalDateTime aliveSince) {
+        return status == DeliveryRunStatus.RUNNING && (heartbeatAt == null || !heartbeatAt.isBefore(aliveSince));
+    }
 }

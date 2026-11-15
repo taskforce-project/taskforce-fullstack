@@ -404,17 +404,19 @@ public class DeliveryActivityService {
     /**
      * Les demandes encore ouvertes de ces missions, par mission (la vue du projet, R166), avec les champs de la chronologie :
      * {@code canDecide} pour cette personne, comme les règles de l'espace en décident ({@link RuleApprovers}). Une demande
-     * échue passe EXPIRED ici, comme à la lecture de la chronologie. Seule une mission en cours a des demandes ouvertes ;
-     * l'appelant a vérifié que la personne voit le projet de ces missions.
+     * échue passe EXPIRED ici, comme à la lecture de la chronologie. Seule une mission qui attend encore des réponses en a,
+     * avec la règle de « Waiting for you » ({@link #openApprovals}) : en cours, et son runner donne signe de vie
+     * ({@link DeliveryRun#awaitsAnswers}). L'appelant a vérifié que la personne voit le projet de ces missions.
      */
     @Transactional
     public Map<Long, List<DeliveryRunActivityResponse.Approval>> pendingApprovals(Collection<DeliveryRun> runs, Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime aliveSince = now.minus(settings.heartbeatTimeout());
         Map<Long, DeliveryRun> running = new LinkedHashMap<>();
         for (DeliveryRun run : runs) {
-            if (run.getStatus() == DeliveryRunStatus.RUNNING) running.put(run.getId(), run);
+            if (run.awaitsAnswers(aliveSince)) running.put(run.getId(), run);
         }
         if (running.isEmpty()) return Map.of();
-        LocalDateTime now = LocalDateTime.now();
         Map<Long, List<DeliveryRunActivityResponse.Approval>> pending = new LinkedHashMap<>();
         for (DeliveryRunApproval approval : approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(running.keySet(),
                 DeliveryApprovalStatus.PENDING)) {

@@ -560,6 +560,22 @@ class DeliveryActivityServiceTest {
     }
 
     @Test
+    void a_mission_whose_runner_went_quiet_shows_its_requests_nowhere_on_the_page() {
+        // Le délai de battement des réglages du test est de 10 minutes, comme « Waiting for you » le lit.
+        run.setHeartbeatAt(LocalDateTime.now().minusMinutes(11));
+
+        assertThat(service.pendingApprovals(List.of(run), 7L)).isEmpty();
+        verify(approvalRepository, never()).findByRunIdInAndStatusOrderByCreatedAtAsc(any(), any());
+
+        // Un runner qui donne signe de vie dans le délai : ses demandes s'affichent.
+        run.setHeartbeatAt(LocalDateTime.now().minusMinutes(9));
+        DeliveryRunApproval waiting = approval(DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        when(approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(java.util.Set.of(100L), DeliveryApprovalStatus.PENDING))
+            .thenReturn(List.of(waiting));
+        assertThat(service.pendingApprovals(List.of(run), 7L)).containsOnlyKeys(100L);
+    }
+
+    @Test
     void a_page_without_a_mission_at_work_reads_no_request() {
         run.setStatus(DeliveryRunStatus.QUEUED);
 
