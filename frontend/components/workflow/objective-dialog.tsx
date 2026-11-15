@@ -117,6 +117,8 @@ function ObjectiveForm({ slug, projectId, objective, onDone }: Readonly<{
         <Input
           id="objective-date"
           type="date"
+          min="2000-01-01"
+          max="2100-12-31"
           value={targetDate}
           onChange={(event) => setTargetDate(event.target.value)}
           className="w-44"

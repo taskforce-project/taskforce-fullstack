@@ -263,6 +263,19 @@ class ProjectObjectiveServiceTest {
         verify(objectiveRepository, never()).save(any());
     }
 
+    @Test
+    @DisplayName("la date visée tombe entre 2000 et 2100 : +9999999-01-01 et 1999-12-31 sont refusées, 2100-12-31 passe")
+    void the_target_date_is_bounded() {
+        assertThatThrownBy(() -> service.set(SLUG, PROJECT, LEAD, request("Ship it", LocalDate.of(9_999_999, 1, 1), "Fine")))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("between 2000 and 2100");
+        assertThatThrownBy(() -> service.set(SLUG, PROJECT, LEAD, request("Ship it", LocalDate.of(1999, 12, 31), "Fine")))
+            .isInstanceOf(BusinessException.class).hasMessageContaining("between 2000 and 2100");
+        verify(objectiveRepository, never()).save(any());
+
+        assertThat(service.set(SLUG, PROJECT, LEAD, request("Ship it", LocalDate.of(2100, 12, 31), "Fine")).targetDate())
+            .isEqualTo(LocalDate.of(2100, 12, 31));
+    }
+
     // --------------------------------------------------------------------- les droits, dans l'ordre du projet
 
     @Test

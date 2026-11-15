@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -57,6 +58,10 @@ public class ProjectObjectiveService {
     /** La longueur d'un critère, au plus. */
     static final int MAX_CRITERION = 200;
 
+    /** Les années où peut tomber la date visée : sans borne, +9999999-01-01 passait la validation. */
+    static final int MIN_TARGET_YEAR = 2000;
+    static final int MAX_TARGET_YEAR = 2100;
+
     static final String CANNOT_EDIT =
         "Only the project's lead or a workspace admin can change its objective. Ask one of them to do it.";
 
@@ -111,13 +116,17 @@ public class ProjectObjectiveService {
         if (criteria.isEmpty() || criteria.size() > MAX_CRITERIA) {
             throw new BusinessException("Give one to five success criteria.");
         }
+        LocalDate targetDate = request.targetDate();
+        if (targetDate != null && (targetDate.getYear() < MIN_TARGET_YEAR || targetDate.getYear() > MAX_TARGET_YEAR)) {
+            throw new BusinessException("Pick a target date between 2000 and 2100.");
+        }
 
         User author = userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         ProjectObjective objective = objectiveRepository.findById(project.getId())
             .orElseGet(() -> ProjectObjective.builder().projectId(project.getId()).build());
         objective.setGoal(goal);
-        objective.setTargetDate(request.targetDate());
+        objective.setTargetDate(targetDate);
         objective.setCriteria(criteria);
         objective.setUpdatedBy(author);
         objective.setUpdatedAt(LocalDateTime.now());
