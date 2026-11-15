@@ -13,7 +13,7 @@ The code: `backend/tf-api/src/main/java/com/taskforce/tf_api/core/process` (`Pro
 | File | What it is | Proved by |
 | --- | --- | --- |
 | `integrate-a-module.bpmn` | The first default workflow, of software delivery ("integrate a module", E20), as TaskForce exports it. Open it in any BPMN modeler. | `ProcessContractTest`: it is the export of the model, valid for the BPMN 2.0 XSD and for `taskforce-process-1.xsd` |
-| `round-trip/*.bpmn` | The same file as a modeler rewrites it: bpmn-moddle, the model library of bpmn.io under Camunda's modelers, and Camunda's Web Modeler (8.10) itself | `integrate-a-module.bpmn-moddle.bpmn` is written by `frontend/lib/process/bpmn-moddle.test.ts`; `integrate-a-module.camunda-web-modeler.bpmn` was opened in Camunda's Web Modeler and downloaded unchanged on 15/11/2026; `ProcessContractTest` imports each one and finds the same fingerprint |
+| `round-trip/*.bpmn` | The same file as a modeler rewrites it: bpmn-moddle, the model library of bpmn.io under Camunda's modelers, and Camunda's Web Modeler (8.10) itself | `integrate-a-module.bpmn-moddle.bpmn` is written by `frontend/lib/process/bpmn-moddle.test.ts` from today's export; `integrate-a-module.camunda-web-modeler.bpmn` was opened in Camunda's Web Modeler and downloaded unchanged on 15/11/2026, from the export of that day, kept as `round-trip/sources/integrate-a-module.camunda-web-modeler.bpmn` (before the pause point before every mission); `ProcessContractTest` imports each one and finds the fingerprint of the export it was made from |
 | `taskforce-process-1.xsd` | The XML Schema of the `tf:` extension; the import follows it, from a copy in the server (`backend/tf-api/src/main/resources/process/`) | the same contract test validates the export against it, and checks that the server's copy is this one |
 
 The default workflow itself lives with the backend, as a model:
@@ -21,7 +21,9 @@ The default workflow itself lives with the backend, as a model:
 writes when it proposes a process) is `backend/tf-api/src/main/resources/process/taskforce-process-draft-1.schema.json`.
 
 After a wanted change of the export: run `ProcessContractTest` with `-Dprocess.contracts.write=true`, then the
-bpmn-moddle test with `PROCESS_CONTRACTS_WRITE=1`, then `ProcessContractTest` again.
+bpmn-moddle test with `PROCESS_CONTRACTS_WRITE=1`, then `ProcessContractTest` again. A file rewritten by a tool nobody
+here can run (Camunda's Web Modeler) keeps the export it was made from in `round-trip/sources/`, under the same name;
+open today's export in that tool, download it unchanged in place of the old one, and delete its source.
 
 ## The model
 
@@ -101,7 +103,7 @@ are BPMN), and a round trip keeps it.
 | `tf:process` `format` `derivedFrom` | the process | the format of the model; the default workflow it derives from |
 | `tf:step` `answeredBy` `lock` `lockRef` `issue` | every step | who answers for the step (`person:<id>` with 18 digits at most, `role:owner`, `role:admin`, `project-lead`); its lock and the source of the lock (`floor`, `rule`, `author`, `pause-point`) with its reference (for a pause point: `before-mission`, `before-apply`, `before-delivery`); the issue it carries, by its key |
 | `tf:agent` `provider` `model` `attempts` `timeout`, `tf:tool` `name` | an agent step | the agent (`claude-code`, `cortex`...), its model (none: the workspace's), the company tools it may use, its attempts (three at most, then an incident) and its time limit |
-| `tf:human` `who` `kind` `meaning` `question`, `tf:item` `text`, `tf:field` `id` `label` `type`, `tf:choice` `value` | a human task | who does it, what it asks, its kind (`approval`, `input`, `checklist`), what signing it means (`review`, `approval`, `responsibility`, `authorship`), the lines of its checklist (under ten), the typed fields of an input |
+| `tf:human` `who` `kind` `meaning` `question` `prefill`, `tf:item` `text`, `tf:field` `id` `label` `type`, `tf:choice` `value` | a human task | who does it, what it asks, its kind (`approval`, `input`, `checklist`), what signing it means (`review`, `approval`, `responsibility`, `authorship`), for a checklist whether it opens with its last answer (`last-answer`: the last answer given in the same run to the same pause point, or to the same step for another checklist, line by line; the person confirms or changes it), the lines of its checklist (under ten), the typed fields of an input |
 | `tf:wait` `from` | a wait for something provided | who must provide it |
 | `tf:rule` `ref` `version` | a step | a rule that applies to it, and the version of its layer when it is known |
 | `tf:document` `name` | a step | a document it expects |
@@ -115,8 +117,11 @@ who answers for it, an agent step outside an agent zone or with no rules (its ow
 version it replaces or of its default workflow that is missing or no longer locked, a missing or bypassed pause point,
 a decision path judged on words alone, a wait that doesn't say what it waits for, a step that leads to no end.
 
-The pause points of TF-J2-10 can't be skipped. As soon as agents work in the process, the three are there; no agent
-zone starts without passing the point before a mission; the point before applying comes after some agent's work, and
+The pause points of TF-J2-10 can't be skipped. As soon as agents work in the process, the three are there. The point
+before a mission comes before every agent mission, not only the first (the President's decision of 15/11/2026): no
+agent zone starts without passing one, neither from the start nor after any agent's work, its own included when it
+starts again (`missionWithoutPausePoint`); the checklist opens with its last answer in the run. The point before
+applying comes after some agent's work, and
 the point before delivering is never reached without passing it; no agent's work reaches an end of the process without
 passing the point before delivering (an end that stops everything abandons the work, it delivers nothing). A pause
 point has no deadline, and is on none of the paths a split runs in parallel.
