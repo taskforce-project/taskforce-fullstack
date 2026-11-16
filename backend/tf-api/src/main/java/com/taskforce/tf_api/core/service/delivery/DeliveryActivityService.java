@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,7 @@ public class DeliveryActivityService {
     private final RuleApprovers approvers;
     private final DeliveryRunApprovalSignatureRepository signatureRepository;
     private final WorkspaceMemberRepository workspaceMembers;
+    private final ProjectDeliveryFeed feed;
 
     /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
     private static final Map<String, String> EVIDENCE_TYPE = Map.of(
@@ -99,10 +101,12 @@ public class DeliveryActivityService {
     /**
      * Ajoute des événements à la suite de la chronologie et du dossier de preuve ; le run est verrouillé par
      * l'appelant. La chronologie a son plafond d'affichage ; le dossier, le sien, plus haut, et le dit quand il est atteint.
+     * Quand la chronologie avance, le topic du projet le dit, une fois par lot, avec la nouvelle étape en cours.
      */
     @Transactional
     public void appendEvents(DeliveryRun run, List<RunnerEventsRequest.Event> events) {
         int seq = eventRepository.maxSeq(run.getId());
+        DeliveryRunEvent last = null;
         for (RunnerEventsRequest.Event event : events) {
             evidenceService.append(run, EVIDENCE_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event), evidenceData(event));
             if (EVIDENCE_ONLY.contains(event.kind())) {
@@ -112,7 +116,7 @@ public class DeliveryActivityService {
                 log.debug("Run {} : chronologie pleine, événement {} gardé au seul dossier de preuve", run.getId(), event.kind());
                 continue;
             }
-            eventRepository.save(DeliveryRunEvent.builder()
+            last = eventRepository.save(DeliveryRunEvent.builder()
                 .run(run)
                 .seq(++seq)
                 .kind(event.kind())
@@ -120,6 +124,7 @@ public class DeliveryActivityService {
                 .text(clip(event.text()))
                 .build());
         }
+        if (last != null) feed.step(run, last);
     }
 
     /** Qui agit : la règle pour ses décisions, le runner pour les sorties et le plafond, l'agent pour le reste. */
@@ -201,6 +206,7 @@ public class DeliveryActivityService {
                 notificationService.notifyAgentApproval(run.getIssue(), signer, approval.getTool(), approval.getSummary(), byRunner);
             }
         }
+        feed.approval(run, approval);
         log.info("Run {} : validation {} demandée ({}){}", run.getId(), approval.getId(), approval.getTool(),
             refused ? ", refusée par les règles du serveur" : "");
         return toRunnerResponse(approval);
@@ -312,15 +318,22 @@ public class DeliveryActivityService {
         return toRunnerResponse(approval);
     }
 
-    /** Run terminé : ses demandes encore ouvertes ne recevront plus de réponse utile, et le dossier le dit. */
+    /**
+     * Run terminé : ses demandes encore ouvertes ne recevront plus de réponse utile, et le dossier le dit, une fois chacune
+     * (une lecture qui close la même demande au même moment ne l'écrit pas une seconde fois).
+     */
     @Transactional
     public void closeApprovals(DeliveryRun run) {
+        LocalDateTime now = LocalDateTime.now();
         for (DeliveryRunApproval approval : approvalRepository.findByRunIdOrderByCreatedAtAsc(run.getId())) {
-            if (approval.getStatus() == DeliveryApprovalStatus.PENDING) {
+            if (approval.getStatus() == DeliveryApprovalStatus.PENDING && approvalRepository.expireIfPending(approval.getId(), now,
+                    DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED) == 1) {
+                approval.setStatus(DeliveryApprovalStatus.EXPIRED);
                 recordUnanswered(run, approval, "The mission ended before an answer.");
             }
         }
-        approvalRepository.expirePending(run.getId(), LocalDateTime.now(), DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        // Une demande ouverte pendant la clôture, que la liste n'avait pas encore : close aussi.
+        approvalRepository.expirePending(run.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
         notificationService.readAgentApprovals(run.getIssue(), run.getStartedBy());
     }
 
@@ -381,22 +394,58 @@ public class DeliveryActivityService {
             .findByRunIdAndSeqGreaterThanOrderBySeqAsc(runId, Math.max(after, 0), PageRequest.of(0, PAGE)).stream()
             .map(e -> new DeliveryRunActivityResponse.Event(e.getSeq(), e.getKind(), e.getTool(), e.getText(), e.getCreatedAt()))
             .toList();
-        Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
         List<DeliveryRunActivityResponse.Approval> approvals = approvalRepository.findByRunIdOrderByCreatedAtAsc(runId).stream()
             .peek(a -> expireIfDue(a, now))
-            .map(a -> {
-                RulesEngine.Obligations require = a.obligations();
-                List<String> signedBy = RuleApprovers.ordinary(require) ? List.of()
-                    : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
-                        .filter(DeliveryRunApprovalSignature::isAllow).map(s -> displayName(s.getUser())).toList();
-                return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
-                    a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
-                    canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
-                    approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
-                    require != null && require.separate(), signedBy, a.isBinding());
-            })
+            .map(a -> approvalView(run, a, userId))
             .toList();
         return new DeliveryRunActivityResponse(events, approvals);
+    }
+
+    /**
+     * Les demandes encore ouvertes de ces missions, par mission (la vue du projet, R166), avec les champs de la chronologie :
+     * {@code canDecide} pour cette personne, comme les règles de l'espace en décident ({@link RuleApprovers}). Une demande
+     * échue passe EXPIRED ici, comme à la lecture de la chronologie. Seule une mission qui attend encore des réponses en a,
+     * avec la règle de « Waiting for you » ({@link #openApprovals}) : en cours, et son runner donne signe de vie
+     * ({@link DeliveryRun#awaitsAnswers}). L'appelant a vérifié que la personne voit le projet de ces missions.
+     */
+    @Transactional
+    public Map<Long, List<DeliveryRunActivityResponse.Approval>> pendingApprovals(Collection<DeliveryRun> runs, Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime aliveSince = now.minus(settings.heartbeatTimeout());
+        Map<Long, DeliveryRun> running = new LinkedHashMap<>();
+        for (DeliveryRun run : runs) {
+            if (run.awaitsAnswers(aliveSince)) running.put(run.getId(), run);
+        }
+        if (running.isEmpty()) return Map.of();
+        Map<Long, List<DeliveryRunActivityResponse.Approval>> pending = new LinkedHashMap<>();
+        for (DeliveryRunApproval approval : approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(running.keySet(),
+                DeliveryApprovalStatus.PENDING)) {
+            DeliveryRun run = running.get(approval.getRun().getId());
+            if (run == null) continue;
+            if (!expireIfDue(approval, now)) continue;
+            pending.computeIfAbsent(run.getId(), id -> new ArrayList<>()).add(approvalView(run, approval, userId));
+        }
+        return pending;
+    }
+
+    /**
+     * Une demande telle que la chronologie et la vue du projet la montrent. {@code canDecide} : cette personne peut encore y
+     * répondre, comme {@link #decide} l'accepterait.
+     */
+    private DeliveryRunActivityResponse.Approval approvalView(DeliveryRun run, DeliveryRunApproval a, Long userId) {
+        Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
+        RulesEngine.Obligations require = a.obligations();
+        List<DeliveryRunApprovalSignature> allowed = RuleApprovers.ordinary(require) ? List.of()
+            : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
+                .filter(DeliveryRunApprovalSignature::isAllow).toList();
+        // Qui a signé, et quand : chaque signature garde son heure, celle de la décision finale n'est que la dernière.
+        List<String> signedBy = allowed.stream().map(s -> displayName(s.getUser())).toList();
+        List<LocalDateTime> signedAt = allowed.stream().map(DeliveryRunApprovalSignature::getSignedAt).toList();
+        return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
+            a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
+            canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
+            approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
+            require != null && require.separate(), signedBy, a.isBinding(), signedAt);
     }
 
     /** Le dossier de preuve du run, en JSON ou en Markdown, si le projet est visible ; vide pour un run de la v1. */
@@ -413,16 +462,26 @@ public class DeliveryActivityService {
         decide(slug, runId, approvalId, allow, false, userId);
     }
 
+    /** Autorise ou refuse une action de l'agent, sans dire pourquoi. */
+    @Transactional
+    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
+        return decide(slug, runId, approvalId, allow, forMission, null, userId);
+    }
+
     /**
      * Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. Un accord
      * {@code forMission} vaut pour le reste de la mission (R46) : le runner ne redemande plus ce que la même règle demande.
      * Une décision qui lie (une couche de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois.
      *
+     * @param reason pourquoi, en une ligne, si la personne le dit : il entre au dossier de preuve avec la décision (ou la
+     *     signature), sans les espaces qui l'entourent ; vide, il n'y entre pas. Il ne change rien d'autre à la décision.
      * @return la portée enregistrée ({@link #SCOPE_ONCE} ou {@link #SCOPE_MISSION}), ou nul quand seule la signature est
      *     enregistrée et que la demande attend encore les autres personnes que la règle désigne
      */
     @Transactional
-    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
+    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, String reason,
+                         Long userId) {
+        String why = blankToNull(reason);
         DeliveryRun run = scopedRun(slug, runId);
         Project project = run.getIssue().getProject();
         visibilityGuard.assertCanView(project, userId);
@@ -437,11 +496,14 @@ public class DeliveryActivityService {
                 : "Your workspace's rules ask other people to approve this request.");
         }
         LocalDateTime now = LocalDateTime.now();
-        expireIfDue(approval, now);
-        if (approval.getStatus() == DeliveryApprovalStatus.EXPIRED || run.getStatus() != DeliveryRunStatus.RUNNING) {
+        boolean open = expireIfDue(approval, now);
+        // Échue : close ici, ou par une autre lecture au même moment (la demande attend encore ici, plus en base).
+        boolean expired = approval.getStatus() == DeliveryApprovalStatus.EXPIRED
+            || (!open && approval.getStatus() == DeliveryApprovalStatus.PENDING);
+        if (expired || run.getStatus() != DeliveryRunStatus.RUNNING) {
             throw new BusinessException("This request has expired: the agent already went on without it.");
         }
-        if (approval.getStatus() != DeliveryApprovalStatus.PENDING) {
+        if (!open) {
             throw new BusinessException("This request was already answered.");
         }
         User person = userRepository.getReferenceById(userId);
@@ -461,7 +523,10 @@ public class DeliveryActivityService {
                 Map<String, Object> signed = approvalData(approval);
                 signed.put("decision", "SIGNED");
                 signed.put("signatures", allowed.size());
+                if (why != null) signed.put("reason", why);
                 evidenceService.append(run, "human.decision", personActor(run, userId), signed);
+                // Une signature de plus : la demande attend encore, mais qui a signé et qui peut encore signer ont changé.
+                feed.approval(run, approval);
                 log.info("Run {} : validation {} signée par {} ({} sur {})", runId, approvalId, userId, allowed.size(),
                     require.signatures());
                 return null;
@@ -479,7 +544,9 @@ public class DeliveryActivityService {
         Map<String, Object> decided = approvalData(approval);
         decided.put("decision", approval.getStatus().name());
         decided.put("scope", approval.getScope());
+        if (why != null) decided.put("reason", why);
         evidenceService.append(run, "human.decision", personActor(run, userId), decided);
+        feed.approval(run, approval);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);
         return approval.getScope();
     }
@@ -495,13 +562,22 @@ public class DeliveryActivityService {
 
     // ---------------------------------------------------------------------
 
-    private void expireIfDue(DeliveryRunApproval approval, LocalDateTime now) {
-        if (approval.getStatus() == DeliveryApprovalStatus.PENDING && !now.isBefore(approval.getExpiresAt())) {
+    /**
+     * Une demande restée sans réponse au-delà de son échéance passe EXPIRED, une seule fois : la ligne ne change que si elle
+     * attend encore, et seule la lecture qui l'a close l'écrit au dossier et l'annonce. Une lecture qui en croise une autre
+     * ne touche pas à la demande. Rend vrai si la demande attend encore une réponse.
+     */
+    private boolean expireIfDue(DeliveryRunApproval approval, LocalDateTime now) {
+        if (approval.getStatus() != DeliveryApprovalStatus.PENDING) return false;
+        if (now.isBefore(approval.getExpiresAt())) return true;
+        if (approvalRepository.expireIfPending(approval.getId(), now, DeliveryApprovalStatus.PENDING,
+                DeliveryApprovalStatus.EXPIRED) == 1) {
             approval.setStatus(DeliveryApprovalStatus.EXPIRED);
-            approvalRepository.save(approval);
             recordUnanswered(approval.getRun(), approval, "No answer in time.");
             readNotificationsIfSettled(approval.getRun());
+            feed.approval(approval.getRun(), approval);
         }
+        return false;
     }
 
     /** La dernière demande ouverte du run vient de se clore : ses notifications d'accord ne restent pas non lues. */

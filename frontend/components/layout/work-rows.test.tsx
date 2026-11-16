@@ -7,9 +7,6 @@ vi.mock("next/navigation", () => ({
   useParams: () => ({ workspace: "acme" }),
   useRouter: () => ({ push: nav.push }),
 }))
-vi.mock("@/components/workflows/workflow-canvas-dialog", () => ({
-  WorkflowCanvasDialog: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="workflow canvas" /> : null),
-}))
 vi.mock("@/lib/api/assistant-service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/assistant-service")>()),
   undoAction: vi.fn(),
@@ -19,7 +16,9 @@ import { ChangesRow, MissionsRow } from "./work-rows"
 import type { AnalysisJob } from "@/lib/api/analysis-service"
 import { undoAction, type AssistantToolCall } from "@/lib/api/assistant-service"
 import type { DeliveryRun } from "@/lib/api/delivery-service"
+import type { Project } from "@/lib/api/project-service"
 import type { AuthUser } from "@/lib/auth"
+import { useProjectStore } from "@/lib/store/project-store"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
@@ -202,14 +201,27 @@ describe("les lignes du travail de la zone de droite", () => {
     await waitFor(() => expect(reply).toHaveValue(""))
   })
 
-  it("says when no mission runs, and keeps the history and the workflow canvas two clicks away", () => {
+  it("says when no mission runs, and keeps the history and the project's workflow two clicks away", () => {
+    useProjectStore.setState({ projects: [{ id: 3, name: "Website" } as Project] })
     useDeliveryStore.setState({ workspaceRuns: [run(2, { status: "DONE", outcome: "APPLIED" })] })
     render(<MissionsRow />)
     expect(screen.getByRole("button", { name: /^Missions/ })).toHaveTextContent("Nothing running")
     unfold("Missions")
 
     expect(screen.getByRole("button", { name: "Done: 1" })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole("button", { name: "Open the workflow canvas" }))
-    expect(screen.getByRole("dialog", { name: "workflow canvas" })).toBeInTheDocument()
+    // La carte mène au workflow du projet de la dernière mission (aucun projet en vue) : une adresse, plus un dialogue.
+    const link = screen.getByRole("link", { name: "Open the workflow of Website" })
+    expect(link).toHaveAttribute("href", "/acme/projects/3/workflow")
+    fireEvent.click(link)
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3/workflow", { scroll: false })
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+  })
+
+  it("leads nowhere without a project to show", () => {
+    useProjectStore.setState({ projects: [] })
+    useDeliveryStore.setState({ workspaceRuns: [run(2, { status: "DONE", outcome: "APPLIED" })] })
+    render(<MissionsRow />)
+    unfold("Missions")
+    expect(screen.queryByRole("link", { name: /Open the workflow/ })).not.toBeInTheDocument()
   })
 })

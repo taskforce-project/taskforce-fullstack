@@ -4,17 +4,23 @@
  * n'est un lien que si son préfixe est celui d'un projet de l'espace : « UTF-8 » ou « ISO-8601 » restent du texte.
  */
 
-/** Ce qu'un morceau de réponse ouvre : une issue (par son id quand la fenêtre le connaît, sinon par sa clé), un projet. */
+/**
+ * Ce qu'un morceau de réponse ouvre : une issue (par son id quand la fenêtre le connaît, sinon par sa clé), avec la
+ * mission que la réponse a lancée ou touchée quand elle en nomme une (`runId`), ou un projet.
+ */
 export type AnswerLink =
-  | { readonly kind: "issue"; readonly text: string; readonly projectId: number; readonly issueId: number | null; readonly key: string }
+  | {
+    readonly kind: "issue"; readonly text: string; readonly projectId: number; readonly issueId: number | null; readonly key: string
+    readonly runId: number | null
+  }
   | { readonly kind: "project"; readonly text: string; readonly projectId: number }
 
 export type Segment = string | AnswerLink
 
 /** Ce que la fenêtre connaît pour faire les liens : les projets de l'espace, et les issues qu'elle a sous la main. */
 export interface LinkIndex {
-  /** Les issues connues, par leur clé. */
-  readonly issues: ReadonlyMap<string, { readonly projectId: number; readonly issueId: number }>
+  /** Les issues connues, par leur clé, avec la mission qu'un geste de la réponse nomme. */
+  readonly issues: ReadonlyMap<string, { readonly projectId: number; readonly issueId: number; readonly runId: number | null }>
   /** Les projets, par le préfixe de leurs clés. */
   readonly prefixes: ReadonlyMap<string, number>
   /** Les projets, par leur nom. */
@@ -26,6 +32,8 @@ export interface KnownIssue {
   readonly projectId: number | null
   readonly issueId: number
   readonly key: string | null
+  /** La mission qu'un geste de la réponse a lancée ou touchée : son lien ouvre son nœud du workflow. */
+  readonly runId?: number | null
 }
 
 /** Un nom de projet plus court n'est pas un lien : trop de mots ordinaires le seraient. */
@@ -35,9 +43,13 @@ export function linkIndex(
   projects: readonly { readonly id: number; readonly name: string; readonly identifier: string }[],
   known: readonly (KnownIssue | null | undefined)[],
 ): LinkIndex {
-  const issues = new Map<string, { projectId: number; issueId: number }>()
+  const issues = new Map<string, { projectId: number; issueId: number; runId: number | null }>()
   for (const issue of known) {
-    if (issue?.key && issue.projectId !== null) issues.set(issue.key.toUpperCase(), { projectId: issue.projectId, issueId: issue.issueId })
+    if (!issue?.key || issue.projectId === null) continue
+    const key = issue.key.toUpperCase()
+    // La mission d'un geste reste attachée à sa clé, même quand le tableau ou les missions de l'espace la connaissent aussi.
+    const runId = issue.runId ?? issues.get(key)?.runId ?? null
+    issues.set(key, { projectId: issue.projectId, issueId: issue.issueId, runId })
   }
   const prefixes = new Map<string, number>()
   const names = new Map<string, number>()
@@ -78,9 +90,9 @@ export function splitLinks(text: string, index: LinkIndex): Segment[] {
 function linkOf(key: string | undefined, name: string | undefined, index: LinkIndex): AnswerLink | null {
   if (key) {
     const known = index.issues.get(key)
-    if (known) return { kind: "issue", text: key, projectId: known.projectId, issueId: known.issueId, key }
+    if (known) return { kind: "issue", text: key, projectId: known.projectId, issueId: known.issueId, key, runId: known.runId }
     const projectId = index.prefixes.get(key.slice(0, key.lastIndexOf("-")))
-    return projectId === undefined ? null : { kind: "issue", text: key, projectId, issueId: null, key }
+    return projectId === undefined ? null : { kind: "issue", text: key, projectId, issueId: null, key, runId: null }
   }
   const projectId = name ? index.names.get(name) : undefined
   return name && projectId !== undefined ? { kind: "project", text: name, projectId } : null

@@ -153,6 +153,37 @@ class IssueMaterialTest {
     }
 
     @Test
+    @DisplayName("un lien posé ou retiré se lit avec l'issue qu'il touche, vu de cette issue")
+    void a_link_reads_with_the_issue_it_touches() {
+        List<IssueActivityResponse> activity = List.of(
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_ADDED)
+                .newValue("BLOCKS WEB-12").createdAt(CREATED).build(),
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_ADDED)
+                .newValue("DUPLICATED_BY WEB-14").createdAt(CREATED).build(),
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_REMOVED)
+                .oldValue("BLOCKED_BY WEB-11").createdAt(CREATED.plusDays(1)).build(),
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_REMOVED)
+                .oldValue("RELATES_TO WEB-9").createdAt(CREATED.plusDays(1)).build(),
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_REMOVED)
+                .oldValue("DUPLICATE_OF WEB-2").createdAt(CREATED.plusDays(1)).build(),
+            // Une valeur qui ne se lit pas ne casse rien : la ligne dit seulement qu'un lien touche une autre issue.
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_ADDED).createdAt(CREATED).build(),
+            IssueActivityResponse.builder().actor(PIERRE).action(IssueActivityType.RELATION_REMOVED)
+                .oldValue("SOMETHING_NEW WEB-3").createdAt(CREATED).build());
+
+        String text = IssueMaterial.text(ops35().build(), List.of(), List.of(), activity);
+
+        assertThat(text).contains("Activity, oldest first: "
+            + "12 Oct 2026, Pierre MICHEL added a link: this issue blocks WEB-12; "
+            + "12 Oct 2026, Pierre MICHEL added a link: this issue is duplicated by WEB-14; "
+            + "13 Oct 2026, Pierre MICHEL removed a link: this issue is no longer blocked by WEB-11; "
+            + "13 Oct 2026, Pierre MICHEL removed a link: this issue no longer relates to WEB-9; "
+            + "13 Oct 2026, Pierre MICHEL removed a link: this issue is no longer a duplicate of WEB-2; "
+            + "12 Oct 2026, Pierre MICHEL added a link to another issue; "
+            + "12 Oct 2026, Pierre MICHEL removed a link to another issue.");
+    }
+
+    @Test
     @DisplayName("un plafond : les plus anciens commentaires tombent d'abord, et le bloc le dit")
     void a_long_issue_keeps_its_last_comments() {
         List<IssueCommentResponse> comments = IntStream.range(0, 30).mapToObj(i -> IssueCommentResponse.builder()

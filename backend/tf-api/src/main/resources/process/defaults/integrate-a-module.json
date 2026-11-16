@@ -1,0 +1,442 @@
+{
+  "format": "taskforce-process/1",
+  "key": "integrate-a-module",
+  "name": "Integrate a module",
+  "description": "The default workflow of software delivery: integrate a new module into the company's base tool, from its scope to its delivery, with who answers for each step, who decides, and three pause points: before every agent mission (the checklist opens with its last answer), before the agents' changes are applied, and before the work is delivered.",
+  "steps": [
+    { "id": "requested", "type": "start", "name": "Module requested" },
+    {
+      "id": "frame", "type": "stage", "name": "Frame",
+      "steps": [
+        { "id": "frame-start", "type": "start", "name": "Framing starts" },
+        {
+          "id": "write-scope", "type": "human", "name": "Write the module's scope", "answeredBy": "project-lead",
+          "human": {
+            "who": "project-lead", "question": "What must the module do, and by when?", "kind": "input",
+            "fields": [
+              { "id": "goal", "label": "What the module must do", "type": "text" },
+              { "id": "due", "label": "When it is needed", "type": "date" },
+              { "id": "out-of-scope", "label": "What it won't do", "type": "text" }
+            ]
+          }
+        },
+        {
+          "id": "approve-scope", "type": "human", "name": "Approve the scope", "answeredBy": "role:owner",
+          "human": { "who": "role:owner", "question": "Do we integrate this module, with this scope?", "kind": "approval", "meaning": "approval" }
+        },
+        { "id": "frame-end", "type": "end", "name": "Scope decided" }
+      ],
+      "flows": [
+        { "id": "frame-start-write-scope", "from": "frame-start", "to": "write-scope" },
+        { "id": "write-scope-approve-scope", "from": "write-scope", "to": "approve-scope" },
+        { "id": "approve-scope-frame-end", "from": "approve-scope", "to": "frame-end" }
+      ]
+    },
+    { "id": "go-ahead", "type": "decision", "name": "Go ahead with the module?", "answeredBy": "role:owner" },
+    { "id": "stopped", "type": "end", "name": "Integration stopped", "terminate": true },
+    {
+      "id": "specify", "type": "stage", "name": "Specify",
+      "steps": [
+        { "id": "specify-start", "type": "start", "name": "Specification starts" },
+        {
+          "id": "before-mission", "type": "human", "name": "Before the agents start", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        {
+          "id": "spec-zone", "type": "zone", "name": "Draft the specification", "answeredBy": "project-lead",
+          "rules": [{ "ref": "read-files" }, { "ref": "search-files" }, { "ref": "search-knowledge" }, { "ref": "no-agent-push" }],
+          "steps": [
+            {
+              "id": "draft-spec", "type": "agent", "name": "Draft the specification from the base tool's documentation", "answeredBy": "project-lead",
+              "agent": { "provider": "cortex", "attempts": 3, "timeout": "PT1H" }
+            }
+          ]
+        },
+        {
+          "id": "review-spec", "type": "human", "name": "Review the specification", "answeredBy": "project-lead",
+          "human": { "who": "project-lead", "question": "Does the specification say what the module must do, in the base tool's terms?", "kind": "approval", "meaning": "review" },
+          "documents": ["Specification"]
+        },
+        { "id": "spec-approved", "type": "decision", "name": "Is the specification approved?", "answeredBy": "project-lead" },
+        { "id": "specify-end", "type": "end", "name": "Specification approved" }
+      ],
+      "flows": [
+        { "id": "specify-start-before-mission", "from": "specify-start", "to": "before-mission" },
+        { "id": "before-mission-spec-zone", "from": "before-mission", "to": "spec-zone" },
+        { "id": "spec-zone-review-spec", "from": "spec-zone", "to": "review-spec" },
+        { "id": "review-spec-spec-approved", "from": "review-spec", "to": "spec-approved" },
+        {
+          "id": "spec-approved-specify-end", "from": "spec-approved", "to": "specify-end", "name": "Yes",
+          "condition": { "text": "The specification is approved", "step": "review-spec", "outcome": "approved" }
+        },
+        { "id": "spec-approved-before-mission", "from": "spec-approved", "to": "before-mission", "name": "Otherwise", "otherwise": true }
+      ]
+    },
+    {
+      "id": "break-down", "type": "stage", "name": "Break down",
+      "steps": [
+        { "id": "break-down-start", "type": "start", "name": "Breakdown starts" },
+        {
+          "id": "before-mission-breakdown", "type": "human", "name": "Before the agents break the work down", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        {
+          "id": "breakdown-zone", "type": "zone", "name": "Break the work down", "answeredBy": "project-lead",
+          "rules": [{ "ref": "read-issues" }, { "ref": "create-issue" }, { "ref": "update-issue" }],
+          "steps": [
+            {
+              "id": "split-into-issues", "type": "agent", "name": "Split the specification into issues, each with its acceptance criteria", "answeredBy": "project-lead",
+              "agent": { "provider": "cortex", "attempts": 3, "timeout": "PT1H" }
+            }
+          ]
+        },
+        {
+          "id": "approve-breakdown", "type": "human", "name": "Approve the breakdown", "answeredBy": "project-lead",
+          "human": { "who": "project-lead", "question": "Do these issues cover the specification, each with its acceptance criteria?", "kind": "approval", "meaning": "approval" }
+        },
+        { "id": "break-down-end", "type": "end", "name": "Work broken down" }
+      ],
+      "flows": [
+        { "id": "break-down-start-before-mission-breakdown", "from": "break-down-start", "to": "before-mission-breakdown" },
+        { "id": "before-mission-breakdown-breakdown-zone", "from": "before-mission-breakdown", "to": "breakdown-zone" },
+        { "id": "breakdown-zone-approve-breakdown", "from": "breakdown-zone", "to": "approve-breakdown" },
+        { "id": "approve-breakdown-break-down-end", "from": "approve-breakdown", "to": "break-down-end" }
+      ]
+    },
+    {
+      "id": "build", "type": "stage", "name": "Build",
+      "steps": [
+        { "id": "build-start", "type": "start", "name": "Build starts" },
+        {
+          "id": "before-mission-build", "type": "human", "name": "Before the agents build", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        {
+          "id": "build-zone", "type": "zone", "name": "Build the module", "answeredBy": "project-lead",
+          "rules": [
+            { "ref": "no-mission-public-repo" }, { "ref": "no-agent-push" }, { "ref": "no-agent-gh" },
+            { "ref": "push-agent-branch-private" }, { "ref": "open-pull-request" }, { "ref": "floor-irreversible" }
+          ],
+          "steps": [
+            {
+              "id": "write-code", "type": "agent", "name": "Write the module's code", "answeredBy": "project-lead",
+              "agent": { "provider": "claude-code", "attempts": 3, "timeout": "PT4H" }
+            },
+            {
+              "id": "write-tests", "type": "agent", "name": "Write the module's tests", "answeredBy": "project-lead",
+              "agent": { "provider": "claude-code", "attempts": 3, "timeout": "PT4H" }
+            },
+            {
+              "id": "update-docs", "type": "agent", "name": "Update the module's documentation", "answeredBy": "project-lead",
+              "agent": { "provider": "claude-code", "attempts": 3, "timeout": "PT2H" }
+            }
+          ]
+        },
+        { "id": "build-failed", "type": "failure", "name": "The build failed", "attachedTo": "build-zone" },
+        { "id": "build-late", "type": "deadline", "name": "Two days without a result", "attachedTo": "build-zone", "duration": "P2D" },
+        {
+          "id": "unblock-build", "type": "human", "name": "Look at what blocks the build", "answeredBy": "project-lead",
+          "human": {
+            "who": "project-lead", "question": "What should the agent change before it tries again?", "kind": "input",
+            "fields": [{ "id": "instructions", "label": "What to change", "type": "text" }]
+          }
+        },
+        { "id": "build-end", "type": "end", "name": "Module built" }
+      ],
+      "flows": [
+        { "id": "build-start-before-mission-build", "from": "build-start", "to": "before-mission-build" },
+        { "id": "before-mission-build-build-zone", "from": "before-mission-build", "to": "build-zone" },
+        { "id": "build-zone-build-end", "from": "build-zone", "to": "build-end" },
+        { "id": "build-failed-unblock-build", "from": "build-failed", "to": "unblock-build" },
+        { "id": "build-late-unblock-build", "from": "build-late", "to": "unblock-build" },
+        { "id": "unblock-build-before-mission-build", "from": "unblock-build", "to": "before-mission-build" }
+      ]
+    },
+    {
+      "id": "test", "type": "stage", "name": "Test",
+      "steps": [
+        { "id": "test-start", "type": "start", "name": "Tests start" },
+        {
+          "id": "before-mission-test", "type": "human", "name": "Before the agents test", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        {
+          "id": "test-zone", "type": "zone", "name": "Test the module", "answeredBy": "project-lead",
+          "rules": [{ "ref": "no-agent-scripts" }, { "ref": "no-agent-push" }, { "ref": "push-agent-branch-private" }],
+          "steps": [
+            {
+              "id": "test-criteria", "type": "agent", "name": "Test the module against each acceptance criterion", "answeredBy": "project-lead",
+              "agent": { "provider": "claude-code", "attempts": 3, "timeout": "PT2H" }
+            }
+          ]
+        },
+        { "id": "tests-failed", "type": "failure", "name": "The tests fail", "attachedTo": "test-zone" },
+        {
+          "id": "before-mission-fix", "type": "human", "name": "Before the agents fix what the tests found", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        {
+          "id": "fix-zone", "type": "zone", "name": "Fix what the tests found", "answeredBy": "project-lead",
+          "rules": [{ "ref": "no-agent-push" }, { "ref": "no-agent-gh" }, { "ref": "push-agent-branch-private" }, { "ref": "floor-irreversible" }],
+          "steps": [
+            {
+              "id": "fix-tests", "type": "agent", "name": "Fix what the tests found", "answeredBy": "project-lead",
+              "agent": { "provider": "claude-code", "attempts": 3, "timeout": "PT4H" }
+            }
+          ]
+        },
+        { "id": "test-end", "type": "end", "name": "Module tested" }
+      ],
+      "flows": [
+        { "id": "test-start-before-mission-test", "from": "test-start", "to": "before-mission-test" },
+        { "id": "before-mission-test-test-zone", "from": "before-mission-test", "to": "test-zone" },
+        { "id": "test-zone-test-end", "from": "test-zone", "to": "test-end" },
+        { "id": "tests-failed-before-mission-fix", "from": "tests-failed", "to": "before-mission-fix" },
+        { "id": "before-mission-fix-fix-zone", "from": "before-mission-fix", "to": "fix-zone" },
+        { "id": "fix-zone-before-mission-test", "from": "fix-zone", "to": "before-mission-test" }
+      ]
+    },
+    {
+      "id": "review", "type": "stage", "name": "Review",
+      "steps": [
+        { "id": "review-start", "type": "start", "name": "Review starts" },
+        {
+          "id": "review-code", "type": "human", "name": "Review the code", "answeredBy": "project-lead",
+          "human": { "who": "project-lead", "question": "Does the change do what the specification says, the way the base tool does things?", "kind": "approval", "meaning": "review" }
+        },
+        { "id": "review-approved", "type": "decision", "name": "Is the review approved?", "answeredBy": "project-lead" },
+        {
+          "id": "before-mission-remarks", "type": "human", "name": "Before the agents apply the review's remarks", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        {
+          "id": "remarks-zone", "type": "zone", "name": "Apply the review's remarks", "answeredBy": "project-lead",
+          "rules": [{ "ref": "no-agent-push" }, { "ref": "no-agent-gh" }, { "ref": "push-agent-branch-private" }, { "ref": "floor-irreversible" }],
+          "steps": [
+            {
+              "id": "apply-remarks", "type": "agent", "name": "Apply the review's remarks", "answeredBy": "project-lead",
+              "agent": { "provider": "claude-code", "attempts": 3, "timeout": "PT4H" }
+            }
+          ]
+        },
+        {
+          "id": "before-apply", "type": "human", "name": "Before applying the changes", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-apply" },
+          "human": {
+            "who": "project-lead", "question": "Can the module's changes be applied to the base tool?", "kind": "checklist", "meaning": "approval",
+            "checklist": [
+              "The tests pass with the environment sheet's command.",
+              "The review is approved.",
+              "No protected branch was touched.",
+              "The module's documentation is up to date.",
+              "Every change to the data can be undone."
+            ]
+          }
+        },
+        { "id": "review-end", "type": "end", "name": "Changes applied" }
+      ],
+      "flows": [
+        { "id": "review-start-review-code", "from": "review-start", "to": "review-code" },
+        { "id": "review-code-review-approved", "from": "review-code", "to": "review-approved" },
+        {
+          "id": "review-approved-before-apply", "from": "review-approved", "to": "before-apply", "name": "Yes",
+          "condition": { "text": "The review is approved", "step": "review-code", "outcome": "approved" }
+        },
+        { "id": "review-approved-before-mission-remarks", "from": "review-approved", "to": "before-mission-remarks", "name": "Otherwise", "otherwise": true },
+        { "id": "before-mission-remarks-remarks-zone", "from": "before-mission-remarks", "to": "remarks-zone" },
+        { "id": "remarks-zone-review-code", "from": "remarks-zone", "to": "review-code" },
+        { "id": "before-apply-review-end", "from": "before-apply", "to": "review-end" }
+      ]
+    },
+    {
+      "id": "accept", "type": "stage", "name": "Accept",
+      "steps": [
+        { "id": "accept-start", "type": "start", "name": "Acceptance starts" },
+        {
+          "id": "before-mission-notes", "type": "human", "name": "Before the agents write the release notes", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-mission" },
+          "human": {
+            "who": "project-lead", "question": "Is everything ready for the agents?", "kind": "checklist", "meaning": "responsibility",
+            "checklist": [
+              "The base tool's documentation is imported, with its version.",
+              "The environment sheet is validated: install, build, test and run.",
+              "The approved scope is written in the project.",
+              "The rules that apply to the module are written.",
+              "The agents work on a branch of their own, never on a protected branch."
+            ],
+            "prefill": "last-answer"
+          }
+        },
+        { "id": "accept-split", "type": "parallel" },
+        {
+          "id": "acceptance-report", "type": "wait", "name": "Wait for the acceptance report", "answeredBy": "project-lead",
+          "wait": { "kind": "message", "what": "The acceptance report from the client's tester", "from": "project-lead" },
+          "documents": ["Acceptance report"]
+        },
+        {
+          "id": "notes-zone", "type": "zone", "name": "Prepare the release notes", "answeredBy": "project-lead",
+          "rules": [{ "ref": "read-files" }, { "ref": "search-knowledge" }, { "ref": "create-note" }],
+          "steps": [
+            {
+              "id": "write-notes", "type": "agent", "name": "Write the release notes from the applied changes", "answeredBy": "project-lead",
+              "agent": { "provider": "cortex", "attempts": 3, "timeout": "PT1H" }
+            }
+          ]
+        },
+        { "id": "accept-join", "type": "parallel" },
+        {
+          "id": "sign-acceptance", "type": "human", "name": "Sign the acceptance", "answeredBy": "role:owner",
+          "human": { "who": "role:owner", "question": "Is the module accepted, as the acceptance report says?", "kind": "approval", "meaning": "approval" },
+          "documents": ["Acceptance report"]
+        },
+        { "id": "accept-end", "type": "end", "name": "Acceptance decided" }
+      ],
+      "flows": [
+        { "id": "accept-start-before-mission-notes", "from": "accept-start", "to": "before-mission-notes" },
+        { "id": "before-mission-notes-accept-split", "from": "before-mission-notes", "to": "accept-split" },
+        { "id": "accept-split-acceptance-report", "from": "accept-split", "to": "acceptance-report" },
+        { "id": "accept-split-notes-zone", "from": "accept-split", "to": "notes-zone" },
+        { "id": "acceptance-report-accept-join", "from": "acceptance-report", "to": "accept-join" },
+        { "id": "notes-zone-accept-join", "from": "notes-zone", "to": "accept-join" },
+        { "id": "accept-join-sign-acceptance", "from": "accept-join", "to": "sign-acceptance" },
+        { "id": "sign-acceptance-accept-end", "from": "sign-acceptance", "to": "accept-end" }
+      ]
+    },
+    { "id": "accepted", "type": "decision", "name": "Is the module accepted?", "answeredBy": "role:owner" },
+    {
+      "id": "deliver", "type": "stage", "name": "Deliver",
+      "steps": [
+        { "id": "deliver-start", "type": "start", "name": "Delivery starts" },
+        {
+          "id": "before-delivery", "type": "human", "name": "Before delivering", "answeredBy": "project-lead",
+          "lock": { "by": "pause-point", "ref": "before-delivery" },
+          "human": {
+            "who": "project-lead", "question": "Can the module go to the client?", "kind": "checklist", "meaning": "approval",
+            "checklist": [
+              "The acceptance is signed.",
+              "The release notes are written.",
+              "The version number follows the base tool's numbering.",
+              "The way back to the previous version is written.",
+              "The client knows when the module arrives."
+            ]
+          }
+        },
+        {
+          "id": "deliver-module", "type": "human", "name": "Deliver the module", "answeredBy": "project-lead",
+          "lock": { "by": "floor" },
+          "human": {
+            "who": "project-lead", "question": "Which version went to the client, and when?", "kind": "input",
+            "fields": [
+              { "id": "version", "label": "Version delivered", "type": "text" },
+              { "id": "delivered-on", "label": "Delivered on", "type": "date" }
+            ]
+          }
+        },
+        {
+          "id": "watch", "type": "wait", "name": "Watch the module in use", "answeredBy": "project-lead",
+          "wait": { "kind": "timer", "duration": "P7D" }
+        },
+        {
+          "id": "close-integration", "type": "human", "name": "Close the integration", "answeredBy": "project-lead",
+          "human": { "who": "project-lead", "question": "Did the module run without a problem since it was delivered?", "kind": "approval", "meaning": "approval" }
+        },
+        { "id": "deliver-end", "type": "end", "name": "Integration closed" }
+      ],
+      "flows": [
+        { "id": "deliver-start-before-delivery", "from": "deliver-start", "to": "before-delivery" },
+        { "id": "before-delivery-deliver-module", "from": "before-delivery", "to": "deliver-module" },
+        { "id": "deliver-module-watch", "from": "deliver-module", "to": "watch" },
+        { "id": "watch-close-integration", "from": "watch", "to": "close-integration" },
+        { "id": "close-integration-deliver-end", "from": "close-integration", "to": "deliver-end" }
+      ]
+    },
+    { "id": "delivered", "type": "end", "name": "Module delivered" }
+  ],
+  "flows": [
+    { "id": "requested-frame", "from": "requested", "to": "frame" },
+    { "id": "frame-go-ahead", "from": "frame", "to": "go-ahead" },
+    {
+      "id": "go-ahead-specify", "from": "go-ahead", "to": "specify", "name": "Yes",
+      "condition": { "text": "The scope is approved", "step": "approve-scope", "outcome": "approved" }
+    },
+    { "id": "go-ahead-stopped", "from": "go-ahead", "to": "stopped", "name": "Otherwise", "otherwise": true },
+    { "id": "specify-break-down", "from": "specify", "to": "break-down" },
+    { "id": "break-down-build", "from": "break-down", "to": "build" },
+    { "id": "build-test", "from": "build", "to": "test" },
+    { "id": "test-review", "from": "test", "to": "review" },
+    { "id": "review-accept", "from": "review", "to": "accept" },
+    { "id": "accept-accepted", "from": "accept", "to": "accepted" },
+    {
+      "id": "accepted-deliver", "from": "accepted", "to": "deliver", "name": "Yes",
+      "condition": { "text": "The acceptance is signed", "step": "sign-acceptance", "outcome": "approved" }
+    },
+    { "id": "accepted-build", "from": "accepted", "to": "build", "name": "Otherwise", "otherwise": true },
+    { "id": "deliver-delivered", "from": "deliver", "to": "delivered" }
+  ]
+}

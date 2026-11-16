@@ -23,6 +23,20 @@ export interface Attachment {
 // API calls
 // ---------------------------------------------------------------------------
 
+/** Le nombre de pièces jointes d'une issue, telle que le workflow la montre ; seules les issues qui en ont. */
+export interface IssueAttachmentCount {
+  issueId: number
+  count: number
+}
+
+/** Le nombre de documents de chaque issue d'un projet, en une lecture. Lu en arrière-plan : jamais de toast. */
+export async function listAttachmentCounts(slug: string, projectId: number): Promise<IssueAttachmentCount[]> {
+  const res = await apiClient.get<{ data: IssueAttachmentCount[] }>(ATTACHMENT_ROUTES.COUNTS(slug, projectId), {
+    silentError: true,
+  })
+  return res.data.data ?? []
+}
+
 export async function listAttachments(
   slug: string,
   projectId: number,

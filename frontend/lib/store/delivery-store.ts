@@ -21,6 +21,8 @@ import {
   revertMissionFile,
   askForChanges as askForChangesApi,
   sendCorrection as sendCorrectionApi,
+  listProjectRuns,
+  getProjectRun,
   type ChangeComment,
   type DeliveryProvider,
   type DeliveryRun,
@@ -29,10 +31,14 @@ import {
   type MissionEvidence,
   type MissionFileDiff,
   type OpenApproval,
+  type ProjectRun,
+  type ProjectRunsPage,
+  type ProjectRunStep,
   type RunnerProvision,
   type RunnerStatus,
 } from "../api/delivery-service";
 import { getErrorMessage, getErrorStatus } from "../api/client";
+import { parseServerDate } from "../utils/server-date";
 
 // ---------------------------------------------------------------------------
 // Store de délégation à un agent (TF-AGENT-DELIVERY). Un domaine = un store.
@@ -49,6 +55,11 @@ interface DeliveryState {
   runs: Record<number, DeliveryRun | null>;
   /** Runs de délégation du workspace (vue « workflow »), les plus récents d'abord. */
   workspaceRuns: DeliveryRun[];
+  /**
+   * Les missions de chaque projet lu (R166), avec leur étape en cours, leurs liens et leurs demandes ouvertes : les pages
+   * lues, les plus récentes d'abord. Le topic des missions du projet les tient à jour (`useProjectLive`).
+   */
+  projectRuns: Record<number, ProjectRunsState>;
   /**
    * Ce qui attend la personne (R128, séance n°19) : ses demandes encore ouvertes, une ligne par mission. La liste de
    * l'arrivée, le nombre de la barre de gauche et le volet « Waiting for you » lisent ceci, jamais les notifications.
@@ -78,6 +89,28 @@ interface DeliveryState {
   fetchProjectProviders: (slug: string, projectId: number) => Promise<DeliveryProvider[]>;
   fetchRun: (slug: string, issueId: number) => Promise<DeliveryRun | null>;
   fetchWorkspaceRuns: (slug: string) => Promise<DeliveryRun[]>;
+  /**
+   * Lit une page des missions du projet : la première remplace ce qui était lu, les suivantes s'ajoutent. Rend les lignes
+   * du projet ; `null` en cas d'échec, où celles d'avant restent.
+   */
+  fetchProjectRuns: (slug: string, projectId: number, page?: number) => Promise<ProjectRun[] | null>;
+  /**
+   * Lit toutes les missions du projet (le workflow, séance n°25), page après page, jamais en un seul appel : la première
+   * page, puis les autres, trois à la fois, jusqu'à `PROJECT_RUN_PAGES_MAX` pages. Elles se posent une fois toutes lues,
+   * à la place de celles d'avant (rien ne saute à l'écran). Rend les lignes ; `null` en cas d'échec, où celles d'avant
+   * restent.
+   */
+  fetchAllProjectRuns: (slug: string, projectId: number) => Promise<ProjectRun[] | null>;
+  /**
+   * Relit une mission du projet (le topic l'a annoncée) : sa ligne est remplacée, ou une mission nouvelle prend sa place
+   * dans l'ordre du serveur. `null` en cas d'échec ; une mission que la personne ne voit plus quitte la liste.
+   */
+  fetchProjectRun: (slug: string, projectId: number, runId: number) => Promise<ProjectRun | null>;
+  /**
+   * Pose l'étape en cours d'une mission lue, telle que le topic l'annonce ; `false` si la mission n'est pas lue, ou si
+   * l'étape vient d'un événement plus ancien que celle qu'elle a.
+   */
+  applyProjectRunStep: (projectId: number, runId: number, step: ProjectRunStep) => boolean;
   /** Relit ce qui attend la personne ; `null` en cas d'échec, où la liste d'avant reste. */
   fetchOpenApprovals: (slug: string) => Promise<OpenApproval[] | null>;
   delegate: (slug: string, issueId: number, providerKey: string, model?: string) => Promise<DeliveryRun | null>;
@@ -86,8 +119,11 @@ interface DeliveryState {
   provisionRunner: () => Promise<RunnerProvision | null>;
   /** Lit la suite de la chronologie d'un run (après le dernier événement connu) et ses demandes. */
   fetchActivity: (slug: string, runId: number) => Promise<DeliveryRunActivity | null>;
-  /** Autorise une fois, ou pour le reste de la mission (`forMission`, R46), ou refuse ; `true` si la décision est enregistrée. */
-  decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean, forMission?: boolean) => Promise<boolean>;
+  /**
+   * Autorise une fois, ou pour le reste de la mission (`forMission`, R46), ou refuse ; `true` si la décision est enregistrée.
+   * `reason` (le workflow) entre au dossier avec elle.
+   */
+  decideApproval: (slug: string, runId: number, approvalId: number, allow: boolean, forMission?: boolean, reason?: string | null) => Promise<boolean>;
   /** Télécharge le dossier de preuve d'un run ; `false` si le run n'en a pas (run de la v1) ou en cas d'erreur. */
   downloadEvidence: (slug: string, runId: number, format: "json" | "md") => Promise<boolean>;
   /**
@@ -120,6 +156,62 @@ interface DeliveryState {
 /** Un commentaire de relecture pas encore envoyé. */
 export interface DraftChangeComment extends ChangeComment {
   id: string;
+}
+
+/** Les missions lues d'un projet : les lignes des pages lues, la dernière page lue, s'il en reste, et combien il y en a. */
+export interface ProjectRunsState {
+  rows: ProjectRun[];
+  page: number;
+  last: boolean;
+  total: number;
+}
+
+/** La taille d'une page des missions d'un projet quand le workflow les lit toutes : le plafond du serveur. */
+export const PROJECT_RUN_PAGE_SIZE = 50;
+/** Les pages lues au plus : 2 000 missions. Au-delà, les plus anciennes restent à lire (elles ne portent rien qui attend). */
+export const PROJECT_RUN_PAGES_MAX = 40;
+/** Les pages lues en même temps, au plus. */
+const PROJECT_RUN_CONCURRENCY = 3;
+
+/** Les lignes d'une page ajoutées à celles déjà lues, une fois chacune (une mission a pu glisser d'une page à l'autre). */
+/**
+ * Une horloge qui ne fait qu'avancer : quand chaque mission a été relue seule (un événement l'a demandé), et quand chaque
+ * lecture de toutes les pages a commencé. Une ligne relue après le début de la lecture des pages est au moins aussi
+ * récente que l'événement qui l'a fait relire : quand les pages arrivent, elle reste, au lieu de la ligne de la page.
+ */
+let readClock = 0;
+const rowReadAt = new Map<number, number>();
+
+function appendRows(rows: ProjectRun[], next: ProjectRun[]): ProjectRun[] {
+  const fresh = new Map(next.map((row) => [row.run.id, row]));
+  return [...rows.filter((row) => !fresh.has(row.run.id)), ...next];
+}
+
+/** L'ordre de la liste du serveur : la mission créée la plus récemment d'abord, puis le plus grand numéro. */
+function newerFirst(a: ProjectRun, b: ProjectRun): number {
+  const created = (row: ProjectRun): number => (row.run.createdAt ? parseServerDate(row.run.createdAt).getTime() : 0);
+  return created(b) - created(a) || b.run.id - a.run.id;
+}
+
+/**
+ * La mission relue, à sa place parmi les lignes du projet. Une mission nouvelle prend sa place dans l'ordre du serveur ;
+ * une mission plus ancienne que les pages lues y reste, elle viendra avec sa page.
+ */
+function withRow(current: ProjectRunsState, row: ProjectRun): ProjectRunsState {
+  if (current.rows.some((r) => r.run.id === row.run.id)) {
+    return { ...current, rows: current.rows.map((r) => (r.run.id === row.run.id ? row : r)) };
+  }
+  const oldest = current.rows.at(-1);
+  if (!current.last && oldest && newerFirst(oldest, row) < 0) return current;
+  return { ...current, rows: [...current.rows, row].sort(newerFirst), total: current.total + 1 };
+}
+
+/** La mission relue, aussi dans la liste de l'espace et comme dernière mission de son issue, là où c'est bien elle. */
+function freshRun(state: Pick<DeliveryState, "workspaceRuns" | "runs">, run: DeliveryRun): Pick<DeliveryState, "workspaceRuns" | "runs"> {
+  return {
+    workspaceRuns: state.workspaceRuns.map((r) => (r.id === run.id ? run : r)),
+    runs: state.runs[run.issueId]?.id === run.id ? { ...state.runs, [run.issueId]: run } : state.runs,
+  };
 }
 
 /** La clé d'une erreur qui ne porte pas sur un fichier : la relecture. */
@@ -162,6 +254,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   providersLoading: false,
   runs: {},
   workspaceRuns: [],
+  projectRuns: {},
   openApprovals: [],
   runner: null,
   activity: {},
@@ -296,6 +389,101 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
+  fetchProjectRuns: async (slug, projectId, page = 0) => {
+    try {
+      const result = await listProjectRuns(slug, projectId, page);
+      const rows = page === 0 ? result.content : appendRows(get().projectRuns[projectId]?.rows ?? [], result.content);
+      set((state) => ({
+        projectRuns: {
+          ...state.projectRuns,
+          [projectId]: { rows, page: result.pageNumber, last: result.last, total: result.totalElements },
+        },
+      }));
+      return rows;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchAllProjectRuns: async (slug, projectId) => {
+    const started = ++readClock;
+    try {
+      const first = await listProjectRuns(slug, projectId, 0, PROJECT_RUN_PAGE_SIZE);
+      const pages = Math.min(first.totalPages, PROJECT_RUN_PAGES_MAX);
+      const rest = Array.from({ length: Math.max(0, pages - 1) }, (_, i) => i + 1);
+      const read: ProjectRunsPage[] = [first];
+      for (let at = 0; at < rest.length; at += PROJECT_RUN_CONCURRENCY) {
+        const batch = rest.slice(at, at + PROJECT_RUN_CONCURRENCY);
+        read.push(...await Promise.all(batch.map((page) => listProjectRuns(slug, projectId, page, PROJECT_RUN_PAGE_SIZE))));
+      }
+      // Une mission créée pendant la lecture fait glisser les pages : une fois chacune, dans l'ordre du serveur.
+      const paged = read.reduce<ProjectRun[]>((all, page) => appendRows(all, page.content), []);
+      const last = read.at(-1) ?? first;
+      let rows: ProjectRun[] = paged;
+      set((state) => {
+        // Les lignes relues seules pendant la lecture des pages gardent leur version, plus récente ; une mission créée
+        // pendant la lecture, que les pages n'ont pas encore, reste aussi.
+        const fresher = (state.projectRuns[projectId]?.rows ?? []).filter((row) => (rowReadAt.get(row.run.id) ?? 0) > started);
+        const byId = new Map(fresher.map((row) => [row.run.id, row] as const));
+        rows = [...paged.map((row) => byId.get(row.run.id) ?? row), ...fresher.filter((row) => !paged.some((p) => p.run.id === row.run.id))]
+          .sort(newerFirst);
+        return {
+          projectRuns: {
+            ...state.projectRuns,
+            [projectId]: { rows, page: last.pageNumber, last: pages >= first.totalPages, total: first.totalElements },
+          },
+        };
+      });
+      return rows;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchProjectRun: async (slug, projectId, runId) => {
+    try {
+      const row = await getProjectRun(slug, projectId, runId);
+      rowReadAt.set(runId, ++readClock);
+      set((state) => {
+        // Les missions d'un projet pas encore lu ne commencent pas par une ligne seule : la liste se lit d'abord.
+        const current = state.projectRuns[projectId];
+        return {
+          ...(current ? { projectRuns: { ...state.projectRuns, [projectId]: withRow(current, row) } } : {}),
+          ...freshRun(state, row.run),
+        };
+      });
+      return row;
+    } catch (e) {
+      // 404 : la mission n'est plus à lire pour cette personne (projet devenu privé, mission d'ailleurs) ; elle quitte la liste.
+      if (getErrorStatus(e) === 404) {
+        set((state) => {
+          const current = state.projectRuns[projectId];
+          if (!current?.rows.some((r) => r.run.id === runId)) return {};
+          const rows = current.rows.filter((r) => r.run.id !== runId);
+          return { projectRuns: { ...state.projectRuns, [projectId]: { ...current, rows, total: Math.max(0, current.total - 1) } } };
+        });
+      }
+      return null;
+    }
+  },
+
+  applyProjectRunStep: (projectId, runId, step) => {
+    const current = get().projectRuns[projectId];
+    const row = current?.rows.find((r) => r.run.id === runId);
+    // Une étape d'un événement plus ancien ne remplace jamais la sienne. Au même événement, l'étape peut changer : une
+    // demande ouverte ou tranchée, la mission finie.
+    const known = row?.step?.seq;
+    const older = known != null && (step.seq == null || step.seq < known);
+    if (!current || !row || older) return false;
+    set((state) => ({
+      projectRuns: {
+        ...state.projectRuns,
+        [projectId]: { ...current, rows: current.rows.map((r) => (r.run.id === runId ? { ...r, step } : r)) },
+      },
+    }));
+    return true;
+  },
+
   fetchOpenApprovals: async (slug) => {
     try {
       const openApprovals = await listOpenApprovals(slug);
@@ -354,9 +542,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
-  decideApproval: async (slug, runId, approvalId, allow, forMission = false) => {
+  decideApproval: async (slug, runId, approvalId, allow, forMission = false, reason = null) => {
     try {
-      await decideApprovalApi(slug, runId, approvalId, allow, forMission);
+      await decideApprovalApi(slug, runId, approvalId, allow, forMission, reason);
       // Répondre fait baisser le nombre aussitôt (R128) ; la relecture qui suit dit la vérité du serveur.
       set((state) => ({ openApprovals: answered(state.openApprovals, runId) }));
       await Promise.all([get().fetchActivity(slug, runId), get().fetchOpenApprovals(slug)]);

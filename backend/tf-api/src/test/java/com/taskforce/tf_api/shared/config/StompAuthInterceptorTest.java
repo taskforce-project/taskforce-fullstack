@@ -281,8 +281,10 @@ class StompAuthInterceptorTest {
         @CsvSource({
             "/topic/projects.3.analysis, true",
             "/topic/projects.3.analysis, false",
+            "/topic/projects.3.delivery, true",
+            "/topic/projects.3.delivery, false",
         })
-        @DisplayName("🔒 projects.{id}.analysis : les analyses IA d'un projet suivent sa visibilité, comme son board")
+        @DisplayName("🔒 projects.{id}.analysis et .delivery : les analyses et les missions d'un projet suivent sa visibilité, comme son board")
         void project_analysis_stream_follows_project_visibility(String destination, boolean canView) {
             when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(canView);
             Message<byte[]> msg = subscribe(destination, "7");
@@ -306,7 +308,8 @@ class StompAuthInterceptorTest {
 
         @ParameterizedTest(name = "{0} → REFUSÉ, sans lire les droits")
         @ValueSource(strings = {"/topic/projects.3.board", "/topic/projects.abc.analysis", "/topic/projects..analysis",
-            "/topic/projects.3.analysis.analysis"})
+            "/topic/projects.3.analysis.analysis", "/topic/projects.abc.delivery", "/topic/projects..delivery",
+            "/topic/projects.3.delivery.analysis", "/topic/projects.3.analysis.delivery"})
         @DisplayName("🔒 projects.* malformé → REFUSÉ")
         void malformed_project_channels_are_rejected(String destination) {
             assertThatThrownBy(() -> interceptor.preSend(subscribe(destination, "7"), channel))
@@ -322,7 +325,7 @@ class StompAuthInterceptorTest {
             "/topic/projects.*", "/topic/projects.3.*", "/topic/projects.#", "/topic/projects.{id}",
             "/topic/notifications.*", "/topic/notifications.7*", "/topic/cortex.?", "/queue/*",
             // Une autre forme sous /topic ou /queue, ou hors de ces préfixes.
-            "/topic/x", "/topic", "/topic/", "/topic/projects.", "/topic/projects.07", "/topic/projects.3.delivery",
+            "/topic/x", "/topic", "/topic/", "/topic/projects.", "/topic/projects.07", "/topic/projects.3.deliveries",
             "/topic/projects.3/analysis", " /topic/projects.3", "/topic/projects.3 ", "/topic/notifications.",
             "/topic/notifications.7.extra", "/topic/cortex.007", "/queue/x", "/queue/notifications.7",
             "/user/queue/x", "/app/x", "/exchange/amq.topic/projects.3", ""
@@ -345,7 +348,8 @@ class StompAuthInterceptorTest {
         }
 
         @ParameterizedTest(name = "{0} → autorisé")
-        @ValueSource(strings = {"/topic/notifications.7", "/topic/cortex.7", "/topic/projects.3", "/topic/projects.3.analysis"})
+        @ValueSource(strings = {"/topic/notifications.7", "/topic/cortex.7", "/topic/projects.3", "/topic/projects.3.analysis",
+            "/topic/projects.3.delivery"})
         @DisplayName("chaque destination de l'app reste ouverte à qui y a droit")
         void each_destination_of_the_app_stays_open_to_its_reader(String destination) {
             lenient().when(realtimeAuth.canSubscribeProject(7L, 3L)).thenReturn(true);
@@ -362,8 +366,8 @@ class StompAuthInterceptorTest {
 
         @ParameterizedTest(name = "{0} → REFUSÉ")
         @ValueSource(strings = {
-            "/topic/projects.3", "/topic/projects.3.analysis", "/topic/notifications.7", "/topic/cortex.7",
-            "/topic/x", "/topic/*", "/topic", "/topic/", "/topicx",
+            "/topic/projects.3", "/topic/projects.3.analysis", "/topic/projects.3.delivery", "/topic/notifications.7",
+            "/topic/cortex.7", "/topic/x", "/topic/*", "/topic", "/topic/", "/topicx",
             "/queue/x", "/queue/notifications.7", "/queue", "/queuex",
             "/user/queue/x", "/user/7/queue/notifications", "/user/7/topic/projects.3", "/user"
         })

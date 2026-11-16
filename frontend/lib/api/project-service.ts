@@ -150,6 +150,47 @@ export interface Project {
   updatedAt: string;
 }
 
+/**
+ * L'objectif d'un projet (le workflow, séance n°25, W1) : le but en une phrase, une date visée, d'un à cinq critères de
+ * réussite. `goal` nul : le projet n'en a pas. `canEdit` : la personne peut le poser ou le retirer (le responsable du
+ * projet, un propriétaire ou un administrateur de l'espace), comme le serveur en décide.
+ */
+export interface ProjectObjective {
+  goal: string | null;
+  /** `AAAA-MM-JJ`, ou null. */
+  targetDate: string | null;
+  criteria: string[];
+  updatedBy: string | null;
+  /** Date-heure du serveur, en UTC sans fuseau : la lire avec parseServerDate(). */
+  updatedAt: string | null;
+  canEdit: boolean;
+}
+
+/** Ce qu'on pose : le but, la date visée (ou null), d'un à cinq critères. */
+export interface ProjectObjectivePayload {
+  goal: string;
+  targetDate: string | null;
+  criteria: string[];
+}
+
+/** L'objectif du projet. Lu en arrière-plan : jamais de toast, l'écran dit l'échec. */
+export async function getProjectObjective(slug: string, id: number): Promise<ProjectObjective> {
+  const res = await apiClient.get<{ data: ProjectObjective }>(PROJECT_ROUTES.OBJECTIVE(slug, id), { silentError: true });
+  return res.data.data;
+}
+
+/** Pose l'objectif du projet, ou le remplace en entier ; une erreur remonte à l'appelant, qui la dit dans le dialogue. */
+export async function setProjectObjective(slug: string, id: number, payload: ProjectObjectivePayload): Promise<ProjectObjective> {
+  const res = await apiClient.put<{ data: ProjectObjective }>(PROJECT_ROUTES.OBJECTIVE(slug, id), payload, { silentError: true });
+  return res.data.data;
+}
+
+/** Retire l'objectif du projet. */
+export async function clearProjectObjective(slug: string, id: number): Promise<ProjectObjective> {
+  const res = await apiClient.delete<{ data: ProjectObjective }>(PROJECT_ROUTES.OBJECTIVE(slug, id), { silentError: true });
+  return res.data.data;
+}
+
 /** Corps de PUT …/projects/{id}/repo : crée un dépôt (CREATE) ou lie un existant (LINK). */
 export interface ProjectRepoLinkPayload {
   mode: "CREATE" | "LINK";

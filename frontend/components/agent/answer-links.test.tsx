@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 
-const nav = vi.hoisted(() => ({ push: vi.fn() }))
+const nav = vi.hoisted(() => ({ push: vi.fn(), pathname: "/acme" }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: nav.push, back: vi.fn() }),
   useParams: () => ({ workspace: "acme" }),
+  usePathname: () => nav.pathname,
 }))
 
 import { LinkedText } from "./answer-links"
@@ -41,6 +42,9 @@ describe("les liens des réponses", () => {
     expect(screen.getByRole("link", { name: "OPS-35" }).closest("strong")).not.toBeNull()
     expect(screen.getByRole("link", { name: "WEB-28" })).toHaveAttribute("href", "/acme/projects/3?issue=28")
     expect(screen.getByRole("link", { name: "OPS-40" })).toHaveAttribute("href", "/acme/projects/4?issue=40")
+    // L'encre des liens : lisible sur les deux fonds (4.5:1 au moins), ce que `text-primary` ne tenait pas en sombre (R161, N11).
+    expect(screen.getByRole("link", { name: "WEB-28" }).className).toContain("text-ink-blue")
+    expect(screen.getByRole("link", { name: "WEB-28" }).className).not.toContain("text-primary")
   })
 
   it("opens the issue in the pane, without leaving the conversation", () => {
@@ -62,6 +66,38 @@ describe("les liens des réponses", () => {
     expect(board).toHaveAttribute("href", "/acme/projects/4")
     fireEvent.click(board)
     expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/4?c=9", { scroll: false })
+  })
+
+  // Le volet est le workflow du projet nommé (séance n°25) : l'issue s'y choisit, nœud dans l'adresse (critère 1).
+  it("on its project's workflow, an issue link opens the view on its node, and its project stays there", () => {
+    nav.pathname = "/acme/projects/4/workflow"
+    globalThis.history.replaceState(null, "", "/acme/projects/4/workflow?c=9")
+    render(<AnswerText text="See OPS-35 in Operations, and WEB-28." toolCalls={[UPDATED]} />)
+
+    const node = screen.getByRole("link", { name: "OPS-35" })
+    expect(node).toHaveAttribute("href", "/acme/projects/4/workflow?node=issue-35")
+    // Le survol dit ce que fait le lien : il choisit le nœud sur le workflow (R161, L9).
+    expect(node).toHaveAttribute("title", "Show OPS-35 on its workflow")
+    fireEvent.click(node)
+    expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/4/workflow?c=9&node=issue-35", { scroll: false })
+    expect(screen.getByRole("link", { name: "Operations" })).toHaveAttribute("href", "/acme/projects/4/workflow")
+    // Une issue d'un autre projet garde son lien vers son tableau.
+    expect(screen.getByRole("link", { name: "WEB-28" })).toHaveAttribute("href", "/acme/projects/3?issue=28")
+    nav.pathname = "/acme"
+  })
+
+  // Une mission que la réponse a lancée (séance n°25, §9) : son lien ouvre son nœud du workflow, cette mission-là.
+  it("a mission the answer started opens its node on the workflow, that very mission", () => {
+    const delegated: AssistantToolCall = {
+      name: "delegate_issue", status: "success", input: null, output: null, record: "rec",
+      target: { issueId: 28, projectId: 3, key: "WEB-28", title: "Fix the form", runId: 12 },
+    }
+    render(<AnswerText text="I handed WEB-28 to Claude Code." toolCalls={[delegated]} />)
+    const link = screen.getByRole("link", { name: "WEB-28" })
+    expect(link).toHaveAttribute("href", "/acme/projects/3/workflow?node=run-12")
+    expect(link).toHaveAttribute("title", "Show the mission of WEB-28 on its workflow")
+    fireEvent.click(link)
+    expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/3/workflow?c=9&node=run-12", { scroll: false })
   })
 
   it("leaves the rest as text: code, other keys, a workspace without projects", () => {

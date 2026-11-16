@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -23,14 +24,19 @@ public class RealtimeAuthorizationService {
 
     private final ProjectRepository projectRepository;
     private final ProjectVisibilityGuard visibilityGuard;
+    private final WorkspaceMemberRepository workspaceMembers;
 
     /**
-     * Vrai si l'utilisateur peut s'abonner aux flux d'un projet, son board et ses analyses IA (public, membre, ou
-     * OWNER/ADMIN du workspace).
+     * Vrai si l'utilisateur peut s'abonner aux flux d'un projet, son board, ses analyses IA et ses missions : un membre de
+     * son espace qui voit le projet (public, membre du projet, ou OWNER/ADMIN de l'espace). L'appartenance à l'espace
+     * d'abord, comme les lectures de l'API : un projet public l'est pour les membres de son espace, pas pour les comptes
+     * d'un autre espace de l'instance, qui lisaient jusqu'ici son flux en direct.
      */
     @Transactional(readOnly = true)
     public boolean canSubscribeProject(Long userId, Long projectId) {
         return projectRepository.findById(projectId)
+            .filter(project -> project.getWorkspace() != null
+                && workspaceMembers.existsByWorkspaceIdAndUserId(project.getWorkspace().getId(), userId))
             .map(project -> visibilityGuard.canView(project, userId))
             .orElse(false);
     }

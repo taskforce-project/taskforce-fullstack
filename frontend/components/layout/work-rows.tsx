@@ -2,14 +2,13 @@
 
 import { useMemo, useState, type FormEvent } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
-import { ArrowUp, ChevronRight, ExternalLink, Loader2, Network, Undo2 } from "lucide-react"
+import { useParams, usePathname } from "next/navigation"
+import { ArrowUp, ChevronRight, ExternalLink, Loader2, Undo2, Workflow } from "lucide-react"
 
 import { UndoAction } from "@/components/agent/undo-action"
 import { PANEL_ITEM, PanelRow } from "@/components/layout/panel-row"
 import { PaneLink } from "@/components/layout/pane-link"
 import { WorkDot } from "@/components/layout/work-dot"
-import { WorkflowCanvasDialog } from "@/components/workflows/workflow-canvas-dialog"
 import { useNow } from "@/hooks/use-now"
 import type { AnalysisJob } from "@/lib/api/analysis-service"
 import { isUndoable } from "@/lib/api/assistant-service"
@@ -19,15 +18,17 @@ import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { deletionKey, useCortexStore } from "@/lib/store/cortex-store"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useProjectStore } from "@/lib/store/project-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkflowStore } from "@/lib/store/workflow-store"
 import { cn } from "@/lib/utils"
 import { missionPath } from "@/lib/window/address"
 import { changesOf, type Change } from "@/lib/window/changes"
+import { projectInView } from "@/lib/window/environment"
 import {
   elapsedMinutes, isActiveJob, isActiveRun, isMine, jobState, resultsToJudge, runLabel, runState,
 } from "@/lib/window/missions"
-import { issuePath } from "@/lib/window/pane"
+import { issuePath, workflowPath } from "@/lib/window/pane"
 
 function useSlug(): string {
   const params = useParams()
@@ -220,9 +221,16 @@ export function MissionsRow() {
   const me = useUserStore((s) => s.user?.id)
   const now = useNow(30_000)
   const [showDone, setShowDone] = useState(false)
-  const [canvasOpen, setCanvasOpen] = useState(false)
+  const pathname = usePathname()
+  const projects = useProjectStore((s) => s.projects)
+  const conversation = useCortexStore((s) => s.conversations.find((c) => c.id === s.conversationId))
+  const { openWorkflow } = usePaneNavigation()
 
   const mine = runs.filter((run) => isMine(run, me))
+  // Le projet du workflow : celui en vue, sinon celui de la dernière mission de la personne.
+  const inView = projectInView(pathname, conversation, projects)
+  const lastProjectId = mine.find((run) => run.projectId !== null)?.projectId ?? null
+  const workflowProject = inView ?? projects.find((p) => p.id === lastProjectId) ?? null
   const results = resultsToJudge(runs, me)
   const toJudge = new Set(results.map((run) => run.id))
   const runningRuns = mine.filter((run) => isActiveRun(run.status))
@@ -298,11 +306,17 @@ export function MissionsRow() {
           )}
         </>
       )}
-      <button type="button" onClick={() => setCanvasOpen(true)} className={cn(PANEL_ITEM, "mt-1 text-muted-foreground")}>
-        <Network className="size-4 shrink-0" />
-        {t.canvas}
-      </button>
-      <WorkflowCanvasDialog open={canvasOpen} onOpenChange={setCanvasOpen} />
+      {/* La carte mène au workflow du projet en vue (séance n°25), sinon à celui de la dernière mission : la vue a son adresse. */}
+      {workflowProject && (
+        <PaneLink
+          href={workflowPath(slug, workflowProject.id)}
+          open={() => openWorkflow(workflowProject.id)}
+          className={cn(PANEL_ITEM, "mt-1 text-muted-foreground")}
+        >
+          <Workflow className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{fillText(t.openWorkflow, { project: workflowProject.name })}</span>
+        </PaneLink>
+      )}
     </PanelRow>
   )
 }

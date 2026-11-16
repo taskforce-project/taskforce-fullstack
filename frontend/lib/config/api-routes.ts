@@ -58,6 +58,11 @@ export const DELIVERY_ROUTES = {
   RUN: (slug: string, issueId: number) => `/api/workspaces/${slug}/delivery/issues/${issueId}/run`,
   /** Runs de délégation du workspace (GET) - vue « workflow » (agents en parallèle). */
   RUNS: (slug: string) => `/api/workspaces/${slug}/delivery/runs`,
+  /** Les missions d'un projet et leurs demandes ouvertes, page par page (GET, `?page=&size=`, R166). */
+  PROJECT_RUNS: (slug: string, projectId: number) => `/api/workspaces/${slug}/delivery/projects/${projectId}/runs`,
+  /** Une mission d'un projet, comme une ligne de la liste (GET) : relue quand le topic du projet l'annonce. */
+  PROJECT_RUN: (slug: string, projectId: number, runId: number) =>
+    `/api/workspaces/${slug}/delivery/projects/${projectId}/runs/${runId}`,
   /** Ce qui attend la personne connectée (GET, R128) : ses demandes encore ouvertes, une ligne par mission. */
   OPEN_APPROVALS: (slug: string) => `/api/workspaces/${slug}/delivery/approvals/open`,
   /** Chronologie en direct d'un run après l'événement `after`, et ses demandes de validation (GET, lot 5). */
@@ -237,6 +242,8 @@ export const PROJECT_ROUTES = {
   REPO:    (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo`,
   /** Commande de test du projet (PUT), lancée par le runner après l'agent (S1). */
   REPO_TEST_COMMAND: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/repo/test-command`,
+  /** L'objectif du projet (GET, PUT pour le poser ou le remplacer, DELETE pour le retirer) : le workflow, séance n°25, W1. */
+  OBJECTIVE: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/objective`,
   MEMBERS: (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/members`,
   MEMBER:  (slug: string, id: number, memberId: number) => `/api/workspaces/${slug}/projects/${id}/members/${memberId}`,
   LABELS:  (slug: string, id: number) => `/api/workspaces/${slug}/projects/${id}/labels`,
@@ -283,6 +290,8 @@ export const ISSUE_ROUTES = {
   CHILDREN:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/children`,
   CHECKLIST:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist`,
   CHECKLIST_ITEM:   (slug: string, projectId: number, issueId: number, itemId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/checklist/${itemId}`,
+  /** Les liens entre les issues du projet, en une lecture (GET, R166) : ses relations et ses sous-issues avec leur parent. */
+  PROJECT_RELATIONS: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/relations`,
   RELATIONS:        (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations`,
   RELATION:         (slug: string, projectId: number, issueId: number, relationId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/relations/${relationId}`,
   WORKLOGS:         (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/worklogs`,
@@ -410,6 +419,27 @@ export const RULES_ROUTES = {
   DRAFTS: (slug: string) => `/api/workspaces/${slug}/rules/drafts`,
   RULE: (slug: string, group: string) => `/api/workspaces/${slug}/rules/${encodeURIComponent(group)}`,
   CHECK: (slug: string) => `/api/workspaces/${slug}/rules/check`,
+} as const;
+
+/**
+ * Les processus (ADR-027) : les workflows par défaut, et les processus d'un projet, leurs versions, leur vérification,
+ * l'import et l'export en BPMN 2.0, la publication d'une version. Backend: @RequestMapping("/api/workspaces/{slug}")
+ * de ProcessController.
+ */
+export const PROCESS_ROUTES = {
+  DEFAULTS: (slug: string) => `/api/workspaces/${slug}/processes/defaults`,
+  DEFAULT_BPMN: (slug: string, key: string) =>
+    `/api/workspaces/${slug}/processes/defaults/${encodeURIComponent(key)}/bpmn`,
+  /** Les processus du projet (GET) ; publier une version (POST, le modèle). */
+  PROCESSES: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/processes`,
+  CHECK: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/processes/check`,
+  IMPORT: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/processes/import`,
+  PROCESS: (slug: string, projectId: number, key: string) =>
+    `/api/workspaces/${slug}/projects/${projectId}/processes/${encodeURIComponent(key)}`,
+  VERSION: (slug: string, projectId: number, key: string, version: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/processes/${encodeURIComponent(key)}/versions/${version}`,
+  VERSION_BPMN: (slug: string, projectId: number, key: string, version: number) =>
+    `/api/workspaces/${slug}/projects/${projectId}/processes/${encodeURIComponent(key)}/versions/${version}/bpmn`,
 } as const;
 
 /**
@@ -596,6 +626,8 @@ export const ATTACHMENT_ROUTES = {
   LIST:   (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
   UPLOAD: (slug: string, projectId: number, issueId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments`,
   DELETE: (slug: string, projectId: number, issueId: number, attachmentId: number) => `/api/workspaces/${slug}/projects/${projectId}/issues/${issueId}/attachments/${attachmentId}`,
+  /** Le nombre de pièces jointes de chaque issue du projet, en une lecture (le workflow, séance n°25, W1). */
+  COUNTS: (slug: string, projectId: number) => `/api/workspaces/${slug}/projects/${projectId}/attachments/counts`,
 } as const;
 
 /**

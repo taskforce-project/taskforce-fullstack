@@ -51,6 +51,7 @@ class CoreControllersWebMvcTest {
 
     @MockitoBean private ProjectService projectService;
     @MockitoBean private com.taskforce.tf_api.core.service.ProjectRepoService projectRepoService;
+    @MockitoBean private com.taskforce.tf_api.core.service.ProjectObjectiveService objectiveService;
     @MockitoBean private WorkspaceService workspaceService;
     @MockitoBean private CycleService cycleService;
     @MockitoBean private UserRepository userRepository;

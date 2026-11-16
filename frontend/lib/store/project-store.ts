@@ -1,13 +1,18 @@
 import { create } from "zustand";
-import { getErrorMessage } from "../api/client";
+import { getErrorMessage, getErrorStatus } from "../api/client";
 import type {
   Project,
   CreateProjectPayload,
   UpdateProjectPayload,
+  ProjectObjective,
+  ProjectObjectivePayload,
   ProjectRepoLinkPayload,
   ProjectRepoResult,
 } from "../api/project-service";
 import {
+  getProjectObjective,
+  setProjectObjective,
+  clearProjectObjective,
   listProjects,
   createProject as createProjectApi,
   updateProject as updateProjectApi,
@@ -68,6 +73,22 @@ interface ProjectState {
   /** Définit le projet actif */
   setActiveProject: (project: Project | null) => void;
 
+  /**
+   * L'objectif de chaque projet lu (le workflow, séance n°25, W1) : son but, sa date visée, ses critères, et si la personne
+   * peut le changer. Un objectif sans `goal` : le projet n'en a pas.
+   */
+  objectives: Record<number, ProjectObjective>;
+  /** Lit l'objectif d'un projet ; `null` en cas d'échec, où celui d'avant reste et `objectiveReadFailed` le dit. */
+  fetchObjective: (slug: string, id: number) => Promise<ProjectObjective | null>;
+  /** La dernière lecture de l'objectif de ce projet a échoué : l'en-tête dit qu'il n'a pas pu se lire, jamais qu'il n'y en a pas. */
+  objectiveReadFailed: Record<number, boolean>;
+  /** Pose ou remplace l'objectif ; `null` en cas d'échec, la raison du serveur (4xx) dans `objectiveError`. */
+  saveObjective: (slug: string, id: number, payload: ProjectObjectivePayload) => Promise<ProjectObjective | null>;
+  /** Retire l'objectif ; `false` en cas d'échec. */
+  clearObjective: (slug: string, id: number) => Promise<boolean>;
+  /** Pourquoi le dernier enregistrement d'un objectif a été refusé, quand le serveur le dit ; vide sinon. */
+  objectiveError: string | null;
+
   /** Réinitialise le store (ex : changement de workspace) */
   clearProjects: () => void;
 }
@@ -81,10 +102,50 @@ export const useProjectStore = create<ProjectState>((set) => ({
   activeProject: null,
   isLoading: false,
   error: null,
+  objectives: {},
+  objectiveError: null,
+  objectiveReadFailed: {},
 
-  clearProjects: () => set({ projects: [], activeProject: null, error: null }),
+  clearProjects: () => set({ projects: [], activeProject: null, error: null, objectives: {}, objectiveError: null, objectiveReadFailed: {} }),
 
   setActiveProject: (project) => set({ activeProject: project }),
+
+  fetchObjective: async (slug, id) => {
+    try {
+      const objective = await getProjectObjective(slug, id);
+      set((state) => ({
+        objectives: { ...state.objectives, [id]: objective },
+        objectiveReadFailed: { ...state.objectiveReadFailed, [id]: false },
+      }));
+      return objective;
+    } catch {
+      set((state) => ({ objectiveReadFailed: { ...state.objectiveReadFailed, [id]: true } }));
+      return null;
+    }
+  },
+
+  saveObjective: async (slug, id, payload) => {
+    try {
+      const objective = await setProjectObjective(slug, id, payload);
+      set((state) => ({ objectives: { ...state.objectives, [id]: objective }, objectiveError: null }));
+      return objective;
+    } catch (err) {
+      // Un refus du serveur (4xx) dit quoi faire ; une panne du réseau ou du serveur, l'écran le dit avec ses mots (R133).
+      const status = getErrorStatus(err);
+      set({ objectiveError: status !== undefined && status >= 400 && status < 500 ? getErrorMessage(err) : null });
+      return null;
+    }
+  },
+
+  clearObjective: async (slug, id) => {
+    try {
+      const objective = await clearProjectObjective(slug, id);
+      set((state) => ({ objectives: { ...state.objectives, [id]: objective } }));
+      return true;
+    } catch {
+      return false;
+    }
+  },
 
   fetchProjects: async (slug) => {
     set({ isLoading: true, error: null });

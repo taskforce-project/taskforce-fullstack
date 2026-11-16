@@ -7,6 +7,9 @@ import type {
   IssueType,
   IssueComment,
   IssueActivity,
+  IssueSummary,
+  ProjectIssueRelation,
+  ProjectIssueRelations,
 } from '../api/issue-service';
 import * as svc from '../api/issue-service';
 
@@ -28,7 +31,12 @@ vi.mock('../api/issue-service', () => ({
   updateComment: vi.fn(),
   deleteComment: vi.fn(),
   listActivity: vi.fn(),
+  listProjectRelations: vi.fn(),
+  listIssuesPage: vi.fn(),
+  ISSUES_PAGE_MAX: 100,
 }));
+vi.mock('../api/attachment-service', () => ({ listAttachmentCounts: vi.fn() }));
+import * as attachments from '../api/attachment-service';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -113,6 +121,7 @@ describe('issue-store', () => {
         isLoading: false,
         error: null,
         loadedProjectId: null,
+        projectRelations: {},
       });
     });
   });
@@ -646,5 +655,326 @@ describe('issue-store', () => {
     expect(s.activity).toEqual([]);
     expect(s.error).toBeNull();
     expect(s.loadedProjectId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Les liens entre les issues d'un projet (R166)
+// ---------------------------------------------------------------------------
+
+const ada = { id: 1, email: 'a@b.c', displayName: 'A', avatarUrl: null };
+const done: IssueStatus = { ...status, id: 2, name: 'Done', category: 'COMPLETED' };
+
+function summary(id: number, title = `Issue ${id}`): IssueSummary {
+  return { id, sequenceNumber: id, identifier: `TF-${id}`, title, status };
+}
+
+function relation(id: number, source: number, target: number): ProjectIssueRelation {
+  return { id, relationType: 'BLOCKS', source: summary(source), target: summary(target), createdBy: ada, createdAt: '2026-11-13T10:00:00' };
+}
+
+function links(over: Partial<ProjectIssueRelations> = {}): ProjectIssueRelations {
+  return { relations: [relation(1, 100, 101)], subIssues: [{ parent: summary(100), issue: summary(102) }], ...over };
+}
+
+describe('issue-store : les liens entre les issues du projet', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    act(() => {
+      useIssueStore.setState({ issues: [], activeIssue: null, projectRelations: {} });
+    });
+  });
+
+  const loaded = (projectId = 10, value: ProjectIssueRelations = links()) =>
+    act(() => useIssueStore.setState((state) => ({ projectRelations: { ...state.projectRelations, [projectId]: value } })));
+  const linksOf = (projectId = 10): ProjectIssueRelations | undefined => useIssueStore.getState().projectRelations[projectId];
+
+  it('fetchProjectRelations lit les liens du projet et les range sous ce projet', async () => {
+    const value = links();
+    vi.mocked(svc.listProjectRelations).mockResolvedValue(value);
+
+    let result: ProjectIssueRelations | null = null;
+    await act(async () => {
+      result = await useIssueStore.getState().fetchProjectRelations('ws', 10);
+    });
+
+    expect(svc.listProjectRelations).toHaveBeenCalledWith('ws', 10);
+    expect(result).toEqual(value);
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: value });
+  });
+
+  it('fetchProjectRelations rend null en cas d’échec, et les liens d’avant du projet restent', async () => {
+    loaded();
+    vi.mocked(svc.listProjectRelations).mockRejectedValue(new Error('down'));
+
+    let result: ProjectIssueRelations | null = links();
+    await act(async () => {
+      result = await useIssueStore.getState().fetchProjectRelations('ws', 10);
+    });
+
+    expect(result).toBeNull();
+    expect(linksOf(10)).toEqual(links());
+  });
+
+  it('un projet dont la lecture échoue reste sans liens : jamais ceux du projet d’avant', async () => {
+    loaded(10);
+    vi.mocked(svc.listProjectRelations).mockRejectedValue(new Error('down'));
+
+    await act(async () => {
+      await useIssueStore.getState().fetchProjectRelations('ws', 11);
+    });
+
+    expect(linksOf(11)).toBeUndefined();
+    expect(linksOf(10)).toEqual(links());
+  });
+
+  it('une réponse en retard du projet quitté ne range que ses liens à lui', async () => {
+    const before = links({ relations: [relation(7, 300, 301)] });
+    const now = links({ relations: [relation(8, 400, 401)] });
+    let answerBefore: (value: ProjectIssueRelations) => void = () => {};
+    vi.mocked(svc.listProjectRelations)
+      .mockImplementationOnce(() => new Promise((resolve) => { answerBefore = resolve; }))
+      .mockResolvedValueOnce(now);
+
+    let late: Promise<ProjectIssueRelations | null> = Promise.resolve(null);
+    await act(async () => {
+      late = useIssueStore.getState().fetchProjectRelations('ws', 10);
+      await useIssueStore.getState().fetchProjectRelations('ws', 11);
+    });
+    await act(async () => {
+      answerBefore(before);
+      await late;
+    });
+
+    expect(linksOf(11)).toEqual(now);
+    expect(linksOf(10)).toEqual(before);
+  });
+
+  it('upsertRelationLocal ajoute un lien posé, et remplace un lien déjà là', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertRelationLocal(10, relation(2, 101, 100)));
+    expect(linksOf()?.relations.map((r) => r.id)).toEqual([1, 2]);
+
+    const changed = { ...relation(2, 101, 100), relationType: 'RELATES_TO' as const };
+    act(() => useIssueStore.getState().upsertRelationLocal(10, changed));
+    expect(linksOf()?.relations).toEqual([relation(1, 100, 101), changed]);
+  });
+
+  it('removeRelationLocal retire un lien', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().removeRelationLocal(10, 1));
+
+    expect(linksOf()?.relations).toEqual([]);
+    expect(linksOf()?.subIssues).toHaveLength(1);
+  });
+
+  it('un lien d’un autre projet, ou avant la lecture des liens, ne change rien', () => {
+    act(() => useIssueStore.getState().upsertRelationLocal(10, relation(2, 101, 100)));
+    act(() => useIssueStore.getState().removeRelationLocal(10, 2));
+    expect(useIssueStore.getState().projectRelations).toEqual({});
+
+    loaded(10);
+    act(() => useIssueStore.getState().upsertRelationLocal(11, relation(3, 201, 200)));
+    act(() => useIssueStore.getState().removeRelationLocal(11, 1));
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: links() });
+  });
+
+  it('une issue qui change garde ses liens à jour : son nom et son statut', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 101, identifier: 'TF-101', sequenceNumber: 101, title: 'Renamed', status: done })));
+
+    const target = linksOf()?.relations[0].target;
+    expect(target).toEqual({ id: 101, sequenceNumber: 101, identifier: 'TF-101', title: 'Renamed', status: done });
+  });
+
+  it('une sous-issue qui change de parent change de lien ; celle qui n’en a plus le quitte', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 102, identifier: 'TF-102', sequenceNumber: 102, title: 'Child', parent: summary(101) })));
+    expect(linksOf()?.subIssues).toEqual([
+      { parent: summary(101), issue: { id: 102, sequenceNumber: 102, identifier: 'TF-102', title: 'Child', status } },
+    ]);
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 102, parent: null })));
+    expect(linksOf()?.subIssues).toEqual([]);
+  });
+
+  it('le parent qui change de nom le dit sur ses sous-issues', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 100, identifier: 'TF-100', sequenceNumber: 100, title: 'Parent renamed' })));
+
+    expect(linksOf()?.subIssues[0].parent.title).toBe('Parent renamed');
+  });
+
+  it('une issue archivée quitte les liens, comme la lecture du serveur la laisse de côté', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 100, archived: true })));
+
+    expect(linksOf()).toEqual({ relations: [], subIssues: [] });
+  });
+
+  it('une issue d’un autre projet ne touche pas aux liens lus', () => {
+    loaded(10);
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 101, projectId: 11, title: 'Elsewhere' })));
+
+    expect(useIssueStore.getState().projectRelations).toEqual({ 10: links() });
+  });
+
+  it('une issue supprimée emporte ses liens et laisse ses sous-issues sans parent ; les autres projets ne changent pas', () => {
+    const elsewhere = links({ relations: [relation(5, 200, 201)], subIssues: [] });
+    loaded(10, links({ relations: [relation(1, 100, 101), relation(2, 103, 104)] }));
+    loaded(11, elsewhere);
+
+    act(() => useIssueStore.getState().removeIssueLocal(100));
+
+    expect(linksOf(10)).toEqual({ relations: [relation(2, 103, 104)], subIssues: [] });
+    expect(linksOf(11)).toBe(elsewhere);
+  });
+
+  it('clearIssues oublie aussi les liens', () => {
+    loaded();
+
+    act(() => useIssueStore.getState().clearIssues());
+
+    expect(useIssueStore.getState().projectRelations).toEqual({});
+  });
+});
+
+// Le workflow d'un projet (séance n°25, W1) : toutes ses issues, sous-issues comprises, lues page par page.
+describe('issue-store : les issues du workflow', () => {
+  const page = (content: Issue[], pageNumber: number, totalPages: number, totalElements: number) => ({
+    content, pageNumber, pageSize: 100, totalElements, totalPages, first: pageNumber === 0, last: pageNumber >= totalPages - 1,
+    empty: content.length === 0,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useIssueStore.getState().clearIssues();
+  });
+
+  it('lit la première page, puis les autres, et ne pose les issues qu’une fois toutes lues', async () => {
+    const all = Array.from({ length: 250 }, (_, i) => makeIssue({ id: i + 1, identifier: 'TF-' + (i + 1) }));
+    vi.mocked(svc.listIssuesPage).mockImplementation(async (_slug, _project, n) => page(all.slice(n * 100, (n + 1) * 100), n, 3, 250));
+
+    let read: Issue[] | null = null;
+    await act(async () => { read = await useIssueStore.getState().fetchWorkflowIssues('acme', 10); });
+
+    expect(vi.mocked(svc.listIssuesPage).mock.calls.map((call) => [call[2], call[3]])).toEqual([[0, 100], [1, 100], [2, 100]]);
+    expect(read).toHaveLength(250);
+    expect(useIssueStore.getState().workflowIssues).toMatchObject({ projectId: 10 });
+    expect(useIssueStore.getState().workflowIssues?.issues).toHaveLength(250);
+  });
+
+  it('garde une issue une fois, même glissée d’une page à l’autre, et laisse les archivées', async () => {
+    const one = makeIssue({ id: 1 });
+    vi.mocked(svc.listIssuesPage).mockImplementation(async (_slug, _project, n) => page(
+      n === 0 ? [one, makeIssue({ id: 2, archived: true })] : [one, makeIssue({ id: 3 })], n, 2, 4,
+    ));
+    await act(async () => { await useIssueStore.getState().fetchWorkflowIssues('acme', 10); });
+    expect(useIssueStore.getState().workflowIssues?.issues.map((i) => i.id)).toEqual([1, 3]);
+  });
+
+  it('rend null en cas d’échec, et les issues d’avant restent', async () => {
+    useIssueStore.setState({ workflowIssues: { projectId: 10, issues: [makeIssue()] } });
+    vi.mocked(svc.listIssuesPage).mockRejectedValue(new Error('down'));
+    let read: Issue[] | null = [];
+    await act(async () => { read = await useIssueStore.getState().fetchWorkflowIssues('acme', 10); });
+    expect(read).toBeNull();
+    expect(useIssueStore.getState().workflowIssues?.issues).toHaveLength(1);
+  });
+
+  it('une lecture en retard d’un projet quitté ne se pose pas : le projet ouvert garde ses issues et ses documents', async () => {
+    type Page = Awaited<ReturnType<typeof svc.listIssuesPage>>;
+    let release: (value: Page) => void = () => {};
+    vi.mocked(svc.listIssuesPage).mockImplementation((_slug, project) => (project === 3
+      ? new Promise<Page>((resolve) => { release = resolve; })
+      : Promise.resolve(page([makeIssue({ id: 50, projectId: 5 })], 0, 1, 1))));
+    let late: Issue[] | null = [];
+    await act(async () => {
+      const left = useIssueStore.getState().fetchWorkflowIssues('acme', 3);
+      await useIssueStore.getState().fetchWorkflowIssues('acme', 5);
+      release(page([makeIssue({ id: 30, projectId: 3 })], 0, 1, 1));
+      late = await left;
+    });
+    expect(late).toBeNull();
+    expect(useIssueStore.getState().workflowIssues).toMatchObject({ projectId: 5, issues: [{ id: 50 }] });
+
+    type Counts = Awaited<ReturnType<typeof attachments.listAttachmentCounts>>;
+    let releaseCounts: (value: Counts) => void = () => {};
+    vi.mocked(attachments.listAttachmentCounts).mockImplementation((_slug, project) => (project === 3
+      ? new Promise<Counts>((resolve) => { releaseCounts = resolve; })
+      : Promise.resolve([{ issueId: 50, count: 2 }])));
+    await act(async () => {
+      const left = useIssueStore.getState().fetchDocumentCounts('acme', 3);
+      await useIssueStore.getState().fetchDocumentCounts('acme', 5);
+      releaseCounts([{ issueId: 30, count: 9 }]);
+      await left;
+    });
+    expect(useIssueStore.getState().documentCounts).toEqual({ projectId: 5, counts: { 50: 2 } });
+  });
+
+  it('le temps réel et les gestes les tiennent à jour : ajoutée, changée, archivée, supprimée ; rien pour un autre projet', async () => {
+    useIssueStore.setState({ workflowIssues: { projectId: 10, issues: [makeIssue({ id: 1 }), makeIssue({ id: 2 })] } });
+    const ids = () => useIssueStore.getState().workflowIssues?.issues.map((i) => i.id + ':' + i.title);
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 3, title: 'New' })));
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 1, title: 'Renamed' })));
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 9, projectId: 11 })));
+    expect(ids()).toEqual(['1:Renamed', '2:Issue title', '3:New']);
+
+    act(() => useIssueStore.getState().upsertIssueLocal(makeIssue({ id: 2, archived: true })));
+    expect(ids()).toEqual(['1:Renamed', '3:New']);
+    act(() => useIssueStore.getState().removeIssueLocal(3));
+    expect(ids()).toEqual(['1:Renamed']);
+
+    vi.mocked(svc.updateIssue).mockResolvedValue(makeIssue({ id: 1, title: 'Moved' }));
+    await act(async () => { await useIssueStore.getState().updateIssue('acme', 10, 1, { statusId: 2 }); });
+    expect(ids()).toEqual(['1:Moved']);
+    vi.mocked(svc.createIssue).mockResolvedValue(makeIssue({ id: 4, title: 'Created' }));
+    await act(async () => { await useIssueStore.getState().createIssue('acme', 10, { title: 'Created' } as never); });
+    vi.mocked(svc.setIssuePinned).mockResolvedValue(makeIssue({ id: 4, title: 'Pinned', pinned: true }));
+    await act(async () => { await useIssueStore.getState().pinIssue('acme', 10, 4, true); });
+    expect(ids()).toEqual(['1:Moved', '4:Pinned']);
+    vi.mocked(svc.setIssueArchived).mockResolvedValue(makeIssue({ id: 4, archived: true }));
+    await act(async () => { await useIssueStore.getState().archiveIssue('acme', 10, 4, true); });
+    vi.mocked(svc.deleteIssue).mockResolvedValue(undefined);
+    await act(async () => { await useIssueStore.getState().deleteIssue('acme', 10, 1); });
+    expect(ids()).toEqual([]);
+  });
+
+  it('une suppression annulable retire l’issue du workflow, et l’y remet si on l’annule', () => {
+    vi.useFakeTimers();
+    const kept = makeIssue({ id: 1 });
+    useIssueStore.setState({ issues: [kept], workflowIssues: { projectId: 10, issues: [kept, makeIssue({ id: 2 })] } });
+    act(() => useIssueStore.getState().deleteIssueWithUndo('acme', 10, 1));
+    expect(useIssueStore.getState().workflowIssues?.issues.map((i) => i.id)).toEqual([2]);
+    vi.useRealTimers();
+  });
+
+  it('le nombre de documents de chaque issue, et l’activité d’une issue pour l’inspecteur', async () => {
+    vi.mocked(attachments.listAttachmentCounts).mockResolvedValue([{ issueId: 1, count: 2 }, { issueId: 5, count: 1 }]);
+    await act(async () => { await useIssueStore.getState().fetchDocumentCounts('acme', 10); });
+    expect(useIssueStore.getState().documentCounts).toEqual({ projectId: 10, counts: { 1: 2, 5: 1 } });
+    vi.mocked(attachments.listAttachmentCounts).mockRejectedValue(new Error('down'));
+    let counts: Record<number, number> | null = {};
+    await act(async () => { counts = await useIssueStore.getState().fetchDocumentCounts('acme', 10); });
+    expect(counts).toBeNull();
+    expect(useIssueStore.getState().documentCounts?.counts[1]).toBe(2);
+
+    vi.mocked(svc.listActivity).mockResolvedValue([activity]);
+    await act(async () => { await useIssueStore.getState().fetchIssueActivity('acme', 10, 100); });
+    expect(useIssueStore.getState().issueActivity[100]).toEqual([activity]);
+    // Celle de la fiche ouverte, à part, ne bouge pas.
+    expect(useIssueStore.getState().activity).toEqual([]);
+    vi.mocked(svc.listActivity).mockRejectedValue(new Error('down'));
+    let read: IssueActivity[] | null = [];
+    await act(async () => { read = await useIssueStore.getState().fetchIssueActivity('acme', 10, 100); });
+    expect(read).toBeNull();
   });
 });

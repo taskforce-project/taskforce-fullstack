@@ -23,6 +23,7 @@ import { IS_DESKTOP } from "@/lib/desktop"
 import { useConversationAddress } from "@/lib/hooks/use-conversation-address"
 import { useLastPlace } from "@/lib/hooks/use-last-place"
 import { useMissionsSync } from "@/lib/hooks/use-missions-sync"
+import { useWaitingLive } from "@/lib/hooks/use-waiting-live"
 import { useNotificationsSync } from "@/lib/hooks/use-notifications-sync"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useAiStatusStore } from "@/lib/store/ai-status-store"
@@ -59,6 +60,8 @@ function useWindowData(slug: string) {
   React.useEffect(() => { void fetchAiStatus() }, [fetchAiStatus])
   useNotificationsSync(slug)
   useMissionsSync(slug)
+  // Une demande décidée ailleurs quitte « Waiting for you » sans attendre (séance n°25, W1).
+  useWaitingLive(slug)
 }
 
 /** Ctrl+K (⌘K) ouvre la recherche, depuis n'importe où dans la fenêtre. */
