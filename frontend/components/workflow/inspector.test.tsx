@@ -181,6 +181,27 @@ describe("Inspector", () => {
     expect(screen.getByText(/^Ada, today at \d\d:30\. Meaning: Approval\.$/)).toBeInTheDocument()
   })
 
+  it("its links take the blue ink that reads in light and dark (AA), never the brand blue", () => {
+    const model = buildWorkflow({
+      statuses: STATUSES, issues: [issue(1, { status: DOING })], relations: [], documents: {}, me: ME, today: "2026-11-13",
+      runs: [{
+        ...projectRun(deliveryRun(1, 1, { status: "DONE" })),
+        links: { branch: "feat/x", pullRequestUrl: "https://github.com/acme/web/pull/87", followUpOf: null, followedUpBy: null },
+      }],
+    })
+    const node = model.byKey.get("issue-1")
+    if (!node) throw new Error("no node")
+    const { unmount } = render(
+      <Inspector slug="acme" projectId={3} node={node} model={model} stages={STATUSES} agents={[]} agent={null} me={ME} tab="evidence"
+        mode="side" width={360} gestures={{ move: vi.fn(), stop: vi.fn(), retry: vi.fn(), handTo: vi.fn(), ask: vi.fn() }} menuOpen={false}
+        now={now} onTab={vi.fn()} onResize={vi.fn()} onClose={vi.fn()} onSelect={vi.fn()} onOpen={vi.fn()} onOpenMission={vi.fn()} onMenuOpen={vi.fn()} />,
+    )
+    const link = document.querySelector<HTMLAnchorElement>("a[href='https://github.com/acme/web/pull/87']")
+    expect(link?.className).toContain("text-ink-blue")
+    expect(link?.className).not.toContain("text-primary")
+    unmount()
+  })
+
   it("Evidence of an issue without a mission says the record starts with one", () => {
     const model = buildWorkflow({ statuses: STATUSES, issues: [issue(1)], relations: [], documents: {}, me: ME, today: "2026-11-13", runs: [] })
     const node = model.byKey.get("issue-1")

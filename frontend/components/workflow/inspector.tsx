@@ -329,7 +329,7 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
       )}
 
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <button type="button" onClick={() => onOpen(node)} className="text-primary underline-offset-2 hover:underline">{i.openIssue}</button>
+        <button type="button" onClick={() => onOpen(node)} className="text-ink-blue underline-offset-2 hover:underline">{i.openIssue}</button>
         <button type="button" onClick={() => setRaw((was) => !was)} aria-expanded={raw} className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
           {raw ? i.hideRaw : i.showRaw}
         </button>
@@ -499,7 +499,7 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
       </Row>
       {pr && (
         <Row label={t.pullRequest}>
-          <a href={pr} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline">
+          <a href={pr} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-ink-blue underline-offset-2 hover:underline">
             {pr.replace(/^https:\/\/github\.com\//, "")}
             <ExternalLink className="size-3" aria-hidden="true" />
           </a>
