@@ -106,7 +106,8 @@ export const StageColumn = memo(function StageColumn({
   if (stacked) {
     return (
       <section aria-label={label} data-stage={stage.status.id} className="flex flex-col">
-        <div className="sticky top-0 z-10 bg-background">{header}</div>
+        {/* Au-dessus des cartes qui défilent dessous : leur contenu se pose à z-10. */}
+        <div data-stage-header className="sticky top-0 z-20 bg-background">{header}</div>
         <div className="pb-4">
           <WindowedRows
             rows={rows}

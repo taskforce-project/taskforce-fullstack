@@ -66,6 +66,8 @@ describe("StageColumn", () => {
         handlers={handlers} onShowDone={vi.fn()} onShowAll={onShowAll} onOpenParent={onOpenParent} stacked />,
     )
     expect(screen.getAllByRole("listitem")).toHaveLength(4)
+    // L'en-tête collant passe au-dessus des cartes, dont le contenu se pose à z-10 (R161, L1).
+    expect(document.querySelector("[data-stage-header]")?.className).toContain("z-20")
     fireEvent.click(screen.getByRole("button", { name: "Show 4 more" }))
     expect(onShowAll).toHaveBeenCalledWith(TODO.id)
     fireEvent.click(screen.getByRole("button", { name: "Show 2 more sub-issues" }))
