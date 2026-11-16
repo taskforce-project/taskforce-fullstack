@@ -24,12 +24,12 @@ describe("rowWindow", () => {
   })
 })
 
-function Column({ count }: Readonly<{ count: number }>) {
+function Column({ count, revealKey = null }: Readonly<{ count: number; revealKey?: string | null }>) {
   const ref = useRef<HTMLDivElement>(null)
   const rows = Array.from({ length: count }, (_, i) => ({ key: `row-${i}` }))
   return (
     <div ref={ref} style={{ height: 600, overflow: "auto" }}>
-      <WindowedRows rows={rows} gap={8} estimate={() => 92} scrollRef={ref} renderRow={(row) => <p>{row.key}</p>} />
+      <WindowedRows rows={rows} gap={8} estimate={() => 92} scrollRef={ref} revealKey={revealKey} renderRow={(row) => <p>{row.key}</p>} />
     </div>
   )
 }
@@ -82,6 +82,16 @@ describe("WindowedRows", () => {
     } finally {
       globalThis.ResizeObserver = real
     }
+  })
+
+  it("brings the row chosen with the keyboard under the eyes, once per choice", () => {
+    const { container, rerender } = render(<Column count={2000} />)
+    const scroller = container.firstElementChild as HTMLElement
+    rerender(<Column count={2000} revealKey="row-300" />)
+    // La ligne 300 est à 30 000 px : l'élément défile jusqu'à elle.
+    expect(scroller.scrollTop).toBeGreaterThan(29_000)
+    rerender(<Column count={2000} revealKey="row-1" />)
+    expect(scroller.scrollTop).toBeLessThan(200)
   })
 
   it("renders nothing for an empty column", () => {
