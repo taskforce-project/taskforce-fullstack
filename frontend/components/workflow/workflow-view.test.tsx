@@ -60,7 +60,9 @@ vi.mock("@/lib/api/project-service", async (importOriginal) => ({
   getProjectObjective: vi.fn(async () => ({ goal: null, targetDate: null, criteria: [], updatedBy: null, updatedAt: null, canEdit: true })),
 }))
 
-import { WorkflowView } from "./workflow-view"
+import { WorkflowView, detailLine } from "./workflow-view"
+import { CONSTANTS_EN } from "@/lib/constants_en"
+import { fillText } from "@/lib/delivery/result-card"
 import { decideApproval, getProjectRun, listProjectRuns, type ProjectRun } from "@/lib/api/delivery-service"
 import { listIssuesPage, listProjectRelations, listStatuses, type Issue, type ProjectIssueRelation } from "@/lib/api/issue-service"
 import type { AuthUser } from "@/lib/auth"
@@ -305,6 +307,21 @@ function paneOf(width: number): typeof ResizeObserver {
     disconnect() {}
   } as unknown as typeof ResizeObserver
 }
+
+/** La ligne de l'ingénieur, en Detail (R161, L7). */
+describe("la ligne de Detail", () => {
+  it("dit d'abord les tests, puis le modèle et la branche, sans répéter l'agent de la ligne 2", () => {
+    const run = projectRun(deliveryRun(1, 1, { model: "claude-opus-5", branch: "feat/a-very-long-branch-name-for-the-export",
+      tests: { command: "npm test", ran: true, passed: true, passedCount: 12, total: 12 } }))
+    const node = { run, issue: issue(1) } as unknown as Parameters<typeof detailLine>[0]
+    const gov = CONSTANTS_EN.workflow.gov
+    expect(detailLine(node, { name: "Claude Code", logoKey: null, model: null }, gov))
+      .toBe(`${fillText(gov.tests, { passed: 12, total: 12 })} · claude-opus-5 · feat/a-very-long-branch-name-for-the-export`)
+    // Le modèle déjà sur la ligne de l'agent ne se répète pas.
+    expect(detailLine(node, { name: "TaskForce agent", logoKey: null, model: "claude-opus-5" }, gov))
+      .toBe(`${fillText(gov.tests, { passed: 12, total: 12 })} · feat/a-very-long-branch-name-for-the-export`)
+  })
+})
 
 /** La vue dans un volet de 592 px, la largeur par défaut de la fenêtre avec la conversation ouverte (R161, H2). */
 describe("la vue dans un volet étroit", () => {

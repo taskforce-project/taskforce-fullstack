@@ -474,6 +474,20 @@ function agentView(node: WorkflowNode, agentOf: (key: string) => DeliveryProvide
   }
 }
 
+/**
+ * La ligne de l'ingénieur (Detail) : le résultat des tests d'abord, qu'une longue branche ne coupe jamais, puis le modèle
+ * (s'il n'est pas déjà sur la ligne de l'agent) et la branche. L'agent est sur la ligne 2 : il ne se répète pas.
+ */
+export function detailLine(node: WorkflowNode, agent: NodeAgent | null, gov: SentenceTexts["workflow"]["gov"]): string | null {
+  const run = node.run?.run
+  if (!run) return null
+  const tests = run.tests?.ran && run.tests.passedCount !== null && run.tests.total !== null
+    ? fillText(gov.tests, { passed: run.tests.passedCount, total: run.tests.total })
+    : run.tests?.ran ? (run.tests.passed ? gov.testsRan : gov.testsFailed) : null
+  const model = agent?.model ? null : (run.model ?? null)
+  return [tests, model, node.run?.links.branch ?? null].filter(Boolean).join(" · ") || null
+}
+
 /** Ce qu'une carte montre d'un nœud : sa phrase, sa gouvernance, son bouton, son agent, la ligne de l'ingénieur. */
 function nodeViewOf(
   node: WorkflowNode,
@@ -486,13 +500,7 @@ function nodeViewOf(
   const run = node.run?.run ?? null
   const agent = agentView(node, agentOf)
   const sentence = nodeSentence(node, texts, { me, now })
-  const detail = run ? [
-    agent ? (run.model ? `${agent.name} · ${run.model}` : agent.name) : null,
-    node.run?.links.branch ?? null,
-    run.tests?.ran && run.tests.passedCount !== null && run.tests.total !== null
-      ? fillText(texts.workflow.gov.tests, { passed: run.tests.passedCount, total: run.tests.total })
-      : run.tests?.ran ? (run.tests.passed ? texts.workflow.gov.testsRan : texts.workflow.gov.testsFailed) : null,
-  ].filter(Boolean).join(" · ") : null
+  const detail = run ? detailLine(node, agent, texts.workflow.gov) : null
   return {
     node,
     sentence,
