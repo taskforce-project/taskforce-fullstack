@@ -139,6 +139,26 @@ class ModelBenchmarkOllamaTest {
         });
     }
 
+    /**
+     * Appelé à la main le 16/11/2026, mimo-v2.6:9b remplit {@code thinking} à côté de sa réponse tant qu'on ne lui dit pas
+     * {@code think: false} : un Qwen3.5 sous un autre nom, que la passerelle ne reconnaissait qu'à un nom en « qwen3 ».
+     */
+    @Test
+    @DisplayName("mimo-v2.6:9b, un Qwen3.5 sous un autre nom : sa fiche le dit, il répond sans raisonner, et sa réponse se note")
+    void mimoAnswersWithoutThinking() {
+        service.load("acme", 7L, RUN);
+
+        ModelBenchmarkResponse.CaseDetail graded = service.play("acme", 7L, RUN, CODE_CASE);
+
+        assertThat(graded.passed()).isTrue();
+        assertThat(graded.answer()).isEqualTo(FIXED).doesNotContain("The user wants");
+        assertThat(ollama.questions()).singleElement().satisfies(question -> {
+            assertThat(question.body().path("think").isBoolean()).as("think is sent").isTrue();
+            assertThat(question.body().path("think").asBoolean()).isFalse();
+            assertThat(question.body().path("messages").path(1).path("content").asText()).doesNotContain("/no_think");
+        });
+    }
+
     @Test
     @DisplayName("« Stop » pendant que le modèle calcule : le cas s'arrête tout de suite, « Stopped », sans note")
     void aRealStopStaysStopped() throws Exception {
