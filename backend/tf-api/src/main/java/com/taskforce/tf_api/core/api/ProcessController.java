@@ -27,6 +27,9 @@ import com.taskforce.tf_api.shared.dto.ApiResponse;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.shared.security.JwtIdentityResolver;
 
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -44,6 +47,9 @@ import lombok.RequiredArgsConstructor;
 public class ProcessController {
 
     private static final MediaType BPMN = new MediaType("application", "xml", StandardCharsets.UTF_8);
+    /** Ce que la référence d'API dit d'un téléchargement BPMN. */
+    private static final String BPMN_FILE = "The BPMN 2.0 file, with the tf: extension, to download "
+        + "(Content-Disposition: attachment).";
 
     private final ProcessService processes;
     private final UserRepository userRepository;
@@ -60,6 +66,8 @@ public class ProcessController {
 
     /** Un workflow par défaut en BPMN 2.0, pour l'ouvrir dans un autre outil. */
     @GetMapping("/processes/defaults/{key}/bpmn")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = BPMN_FILE,
+        content = @Content(mediaType = "application/xml", schema = @Schema(type = "string")))
     public ResponseEntity<String> exportDefaultProcess(
         @PathVariable String slug, @PathVariable String key, @AuthenticationPrincipal Jwt jwt) {
         return file(processes.exportDefault(slug, key, resolveUserId(jwt)));
@@ -129,6 +137,8 @@ public class ProcessController {
 
     /** Une version en BPMN 2.0, son extension {@code tf:} comprise, pour l'ouvrir dans un modeleur. */
     @GetMapping("/projects/{projectId}/processes/{key}/versions/{version}/bpmn")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = BPMN_FILE,
+        content = @Content(mediaType = "application/xml", schema = @Schema(type = "string")))
     public ResponseEntity<String> exportProcessVersion(
         @PathVariable String slug, @PathVariable Long projectId, @PathVariable String key,
         @PathVariable int version, @AuthenticationPrincipal Jwt jwt) {

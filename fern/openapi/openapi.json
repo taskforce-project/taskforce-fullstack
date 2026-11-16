@@ -9361,9 +9361,9 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "The BPMN 2.0 file, with the tf: extension, to download (Content-Disposition: attachment).",
             "content": {
-              "*/*": {
+              "application/xml": {
                 "schema": {
                   "type": "string"
                 }
@@ -9939,9 +9939,9 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "The BPMN 2.0 file, with the tf: extension, to download (Content-Disposition: attachment).",
             "content": {
-              "*/*": {
+              "application/xml": {
                 "schema": {
                   "type": "string"
                 }

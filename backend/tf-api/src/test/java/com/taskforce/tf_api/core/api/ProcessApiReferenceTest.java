@@ -38,6 +38,19 @@ class ProcessApiReferenceTest {
     }
 
     @Test
+    @DisplayName("les téléchargements BPMN disent leur type, application/xml")
+    void the_bpmn_downloads_say_their_type() throws IOException {
+        JsonNode paths = spec().path("paths");
+        for (String path : new String[] {"/api/workspaces/{slug}/processes/defaults/{key}/bpmn",
+            "/api/workspaces/{slug}/projects/{projectId}/processes/{key}/versions/{version}/bpmn"}) {
+            JsonNode content = paths.path(path).path("get").path("responses").path("200").path("content");
+
+            assertThat(content.has("application/xml")).as(path).isTrue();
+            assertThat(content.has("*/*")).as(path).isFalse();
+        }
+    }
+
+    @Test
     @DisplayName("publier répond 201 avec la version, ou 422 avec les refus : jamais 200")
     void publishing_answers_201_or_422() throws IOException {
         JsonNode responses = spec().path("paths").path("/api/workspaces/{slug}/projects/{projectId}/processes")
