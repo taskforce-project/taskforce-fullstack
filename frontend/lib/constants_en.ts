@@ -494,10 +494,11 @@ export const CONSTANTS_EN = {
     // The sentence of a node: what happens or what waits.
     now: {
       approval: "Waiting for your approval: {what}.",
-      review: "Ready for your review",
-      reviewBy: "Ready for review by {who}",
+      // Each sentence of a node ends with a period (R161, L5).
+      review: "Ready for your review.",
+      reviewBy: "Ready for review by {who}.",
       waitingFor: "Waiting for {who}.",
-      queued: "Waiting for your runner to pick it up",
+      queued: "Waiting for your runner to pick it up.",
       blockedBy: "Blocked by {key}: {title}.",
       blockedByMany: "Blocked by {count} issues.",
       failed: "{step} failed: {cause}.",
@@ -511,8 +512,8 @@ export const CONSTANTS_EN = {
       lastFailed: "Last mission failed.",
       due: "Due {time}.",
       overdue: "Was due {time}.",
-      stoppedByYou: "Stopped by you",
-      stoppedBy: "Stopped by {who}",
+      stoppedByYou: "Stopped by you.",
+      stoppedBy: "Stopped by {who}.",
       you: "you",
       theDelegator: "the person who delegated it",
     },

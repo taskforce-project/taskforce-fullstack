@@ -41,15 +41,15 @@ describe("la phrase d'un nœud", () => {
 
   it("une revue : à la personne, ou à celle qui a délégué", () => {
     const mine = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1, { status: "DONE" }))] })
-    expect(nodeSentence(mine, texts, context)).toBe("Ready for your review")
+    expect(nodeSentence(mine, texts, context)).toBe("Ready for your review.")
     expect(nodeAction(mine, ME)).toBe("review")
     const theirs = nodeOf({ ...base, me: "8", issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1, { status: "DONE" }))] })
-    expect(nodeSentence(theirs, texts, { ...context, me: "8" })).toBe("Ready for review by Pierre Martin")
+    expect(nodeSentence(theirs, texts, { ...context, me: "8" })).toBe("Ready for review by Pierre Martin.")
   })
 
   it("une mission en file : « your runner » pour qui l'a déléguée, son nom pour les autres", () => {
     const queued = { ...base, issues: [issue(1)], runs: [projectRun(deliveryRun(1, 1, { status: "QUEUED" }))] }
-    expect(nodeSentence(nodeOf(queued), texts, context)).toBe("Waiting for your runner to pick it up")
+    expect(nodeSentence(nodeOf(queued), texts, context)).toBe("Waiting for your runner to pick it up.")
     expect(nodeSentence(nodeOf({ ...queued, me: "8" }), texts, { ...context, me: "8" })).toBe("Waiting for Pierre Martin.")
   })
 
@@ -74,9 +74,10 @@ describe("la phrase d'un nœud", () => {
 
   it("au travail : ce que l'agent fait à son étape, ou le nouvel essai et son heure, ou la personne", () => {
     const agent = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1))] })
-    expect(nodeSentence(agent, texts, context)).toBe("Doing the work")
+    // L'étape en cours, en mots de la séquence, finit aussi par un point : une seule règle pour toutes les phrases (R161, L5).
+    expect(nodeSentence(agent, texts, context)).toBe("Doing the work.")
     const checking = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1), [], "check")] })
-    expect(nodeSentence(checking, texts, context)).toBe("Checking the work")
+    expect(nodeSentence(checking, texts, context)).toBe("Checking the work.")
     const retried = nodeOf({
       ...base, issues: [issue(1, { status: DOING })],
       runs: [
@@ -107,13 +108,16 @@ describe("la phrase d'un nœud", () => {
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1, { status: DONE })] }), texts, context)).toBeNull()
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1, { status: STATUSES[3] })] }), texts, context)).toBeNull()
     const stopped = nodeOf({ ...base, issues: [issue(1)], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED", outcome: "STOPPED" }))] })
-    expect(nodeSentence(stopped, texts, context)).toBe("Stopped by you")
-    expect(nodeSentence(stopped, texts, { ...context, me: "8" })).toBe("Stopped by Pierre Martin")
+    expect(nodeSentence(stopped, texts, context)).toBe("Stopped by you.")
+    expect(nodeSentence(stopped, texts, { ...context, me: "8" })).toBe("Stopped by Pierre Martin.")
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1, { dueDate: "2026-11-14" })] }), texts, context)).toBe("Due tomorrow.")
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1, { dueDate: "2026-11-10" })] }), texts, context)).toBe("Was due on 10 Nov.")
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1)] }), texts, context)).toBeNull()
     const refused = nodeOf({ ...base, issues: [issue(1)], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED", refused: true, error: "A rule asks first" }))] })
-    expect(nodeSentence(refused, texts, context)).toBe("Not started: A rule asks first")
+    expect(nodeSentence(refused, texts, context)).toBe("Not started: A rule asks first.")
+    // Une raison qui finit déjà par un point n'en prend pas un second.
+    const dotted = nodeOf({ ...base, issues: [issue(1)], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED", refused: true, error: "A rule asks first." }))] })
+    expect(nodeSentence(dotted, texts, context)).toBe("Not started: A rule asks first.")
   })
 
   it("qui doit agir, en un mot, pour Summary", () => {

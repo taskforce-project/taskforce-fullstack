@@ -79,8 +79,17 @@ export type SentenceNode = Pick<WorkflowNode, "reason" | "run" | "overdue"> & {
   readonly issue: Pick<WorkflowNode["issue"], "assignee" | "completedAt" | "dueDate">
 }
 
-/** La phrase de ce qui se passe ou attend (§11.4) ; null quand l'état n'a rien de plus à dire que son mot. */
+/**
+ * La phrase de ce qui se passe ou attend (§11.4) ; null quand l'état n'a rien de plus à dire que son mot. Une seule règle :
+ * elle finit par un point, même quand elle reprend une raison du serveur ou l'étape en cours d'une mission (R161, L5).
+ */
 export function nodeSentence(node: SentenceNode, t: SentenceTexts, context: SentenceContext): string | null {
+  const words = nodeWords(node, t, context)?.trim()
+  if (!words) return null
+  return /[.!?…]$/.test(words) ? words : `${words}.`
+}
+
+function nodeWords(node: SentenceNode, t: SentenceTexts, context: SentenceContext): string | null {
   const w = t.workflow
   const run = node.run?.run ?? null
   const { reason } = node
