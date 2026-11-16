@@ -22981,6 +22981,13 @@
           },
           "binding": {
             "type": "boolean"
+          },
+          "signedAt": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            }
           }
         }
       },
