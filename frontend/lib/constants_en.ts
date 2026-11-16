@@ -438,6 +438,7 @@ export const CONSTANTS_EN = {
       saved: "Objective saved",
       removed: "Objective removed",
       undo: "Undo",
+      undoFailed: "Couldn't put the objective back. Add it again from the header.",
       needGoal: "Write the objective in one sentence.",
       needCriterion: "Add at least one criterion.",
       failed: "Couldn't save the objective. Check what you wrote, then try again.",

@@ -105,9 +105,11 @@ function ObjectiveForm({ slug, projectId, objective, onDone }: Readonly<{
     const ok = await clearObjective(slug, projectId)
     setBusy(null)
     if (ok) {
-      toast.success(t.removed, previous ? {
-        action: { label: t.undo, onClick: () => void saveObjective(slug, projectId, previous) },
-      } : undefined)
+      // « Undo » remet l'objectif tel qu'il était ; s'il n'y parvient pas, il le dit (R159, N5).
+      const undo = async (objective: NonNullable<typeof previous>) => {
+        if (!(await saveObjective(slug, projectId, objective))) toast.error(t.undoFailed)
+      }
+      toast.success(t.removed, previous ? { action: { label: t.undo, onClick: () => void undo(previous) } } : undefined)
       onDone()
     } else {
       setFailed(t.removeFailed)

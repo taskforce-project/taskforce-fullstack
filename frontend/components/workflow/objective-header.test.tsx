@@ -150,6 +150,12 @@ describe("ObjectiveHeader", () => {
     await waitFor(() => expect(setProjectObjective).toHaveBeenCalledWith("acme", 3, {
       goal: set.goal, targetDate: set.targetDate, criteria: set.criteria,
     }))
+    expect(toast.error).not.toHaveBeenCalled()
+
+    // Un « Undo » qui échoue le dit (R159, N5).
+    vi.mocked(setProjectObjective).mockRejectedValue(new Error("offline"))
+    options.action.onClick()
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn't put the objective back. Add it again from the header."))
   })
 })
 
