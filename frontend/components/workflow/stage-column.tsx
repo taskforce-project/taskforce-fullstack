@@ -33,7 +33,7 @@ export interface ColumnState {
  */
 export const StageColumn = memo(function StageColumn({
   stage, rows, density, views, selectedKey, focusKey, related, revealKey, t, handlers, onShowDone, onShowAll, onOpenParent,
-  stacked = false, listScrollRef,
+  stacked = false, listScrollRef, matching,
 }: Readonly<{
   stage: StageModel
   rows: readonly ColumnRow[]
@@ -55,11 +55,16 @@ export const StageColumn = memo(function StageColumn({
   stacked?: boolean
   /** L'élément qui fait défiler la liste de l'écran étroit, où la section ne rend aussi que ce qui se voit. */
   listScrollRef?: RefObject<HTMLElement | null>
+  /** Sous un filtre, combien de ses issues il garde : la colonne le dit, sur son total. */
+  matching?: number
 }>) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const total = stage.nodes.length
   const name = stage.status.name
-  const label = total === 1 ? fillText(t.stageOne, { name }) : fillText(t.stage, { name, count: total })
+  const filtered = matching !== undefined
+  const label = filtered
+    ? fillText(t.stageFiltered, { name, count: matching, total })
+    : total === 1 ? fillText(t.stageOne, { name }) : fillText(t.stage, { name, count: total })
 
   const renderRow = (row: ColumnRow): ReactNode => {
     switch (row.type) {
@@ -94,7 +99,7 @@ export const StageColumn = memo(function StageColumn({
   const header = (
     <div className={cn("flex h-9 shrink-0 items-center gap-2 bg-background", stacked ? "px-0" : "px-3")}>
       <h3 className="min-w-0 truncate text-sm font-[550] text-foreground" title={name}>{name}</h3>
-      <span className="shrink-0 font-mono text-xs text-subtle">{total}</span>
+      <span className="shrink-0 font-mono text-xs text-subtle">{filtered ? fillText(t.countFiltered, { count: matching, total }) : total}</span>
     </div>
   )
   const countLine = density === "summary" && total > 0 ? (

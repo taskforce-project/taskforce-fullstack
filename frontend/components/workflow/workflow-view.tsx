@@ -34,7 +34,7 @@ import { canWriteProject } from "@/lib/workflow/rights"
 import {
   governanceOf, nodeAction, nodeSentence, whoActs, type NodeAction, type SentenceTexts, type WorkflowTexts,
 } from "@/lib/workflow/sentence"
-import { COLUMN_WIDTH, isDensity, isFilter, type Density, type WorkflowFilter } from "@/lib/workflow/states"
+import { COLUMN_WIDTH, FILTER_STATE, isDensity, isFilter, type Density, type WorkflowFilter } from "@/lib/workflow/states"
 import {
   columnRows, dependenciesOf, neighborNode, nextAttention, relatedKeys, stepNode, visibleOrder, type ColumnRow,
 } from "@/lib/workflow/view"
@@ -389,6 +389,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
                 onOpenParent={(key) => setOpenParents((was) => new Set([...was, key]))}
                 stacked
                 listScrollRef={listRef}
+                matching={matchingOf(stage, filter)}
               />
             ))}
           </div>
@@ -410,6 +411,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
                 onShowDone={(id) => setExpanded((was) => ({ ...was, [id]: { ...was[id], done: true } }))}
                 onShowAll={(id) => setExpanded((was) => ({ ...was, [id]: { ...was[id], all: true } }))}
                 onOpenParent={(key) => setOpenParents((was) => new Set([...was, key]))}
+                matching={matchingOf(stage, filter)}
               />
             ))}
           </div>
@@ -448,6 +450,11 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
       <LegendDialog />
     </div>
   )
+}
+
+/** Sous un filtre, combien des issues d'une colonne il garde ; rien sans filtre. */
+function matchingOf(stage: WorkflowModel["stages"][number], filter: WorkflowFilter | null): number | undefined {
+  return filter === null ? undefined : stage.nodes.filter((node) => node.state === FILTER_STATE[filter]).length
 }
 
 /** Sous un filtre, une colonne sans résultat ne se montre pas : « Needs you » ne montre que là où l'on vous attend. */

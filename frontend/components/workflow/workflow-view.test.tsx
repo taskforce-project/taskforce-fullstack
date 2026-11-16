@@ -222,6 +222,9 @@ describe("le workflow d'un projet", () => {
     render(<WorkflowView slug="acme" projectId={3} />)
     await waitFor(() => expect(card("Build it")).toBeInTheDocument())
     expect(document.querySelectorAll("[data-stage]")).toHaveLength(1)
+    // La colonne gardée dit combien le filtre en garde, sur son total (R161, L4).
+    expect(screen.getByRole("region", { name: "In Progress, 1 of 1 issues" })).toBeInTheDocument()
+    expect(screen.getByText("1 of 1")).toBeInTheDocument()
   })
 
   it("un compteur de l'en-tête est un filtre, un seul à la fois", async () => {

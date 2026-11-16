@@ -651,6 +651,8 @@ export const CONSTANTS_EN = {
     },
     stage: "{name}, {count} issues",
     stageOne: "{name}, 1 issue",
+    stageFiltered: "{name}, {count} of {total} issues",
+    countFiltered: "{count} of {total}",
     overdue: "Overdue",
     who: {
       you: "You",
