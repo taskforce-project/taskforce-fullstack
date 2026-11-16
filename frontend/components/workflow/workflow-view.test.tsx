@@ -311,6 +311,16 @@ describe("la vue dans un volet étroit", () => {
   const RealObserver = globalThis.ResizeObserver
   afterEach(() => { globalThis.ResizeObserver = RealObserver })
 
+  it("sur un volet étroit, la densité et le filtre passent dans l'en-tête : la ligne des onglets n'en a plus", async () => {
+    globalThis.ResizeObserver = paneOf(820)
+    serve({ issues: [issue(1, { title: "Write the spec" })] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    expect(useWorkflowViewStore.getState().controlsInView).toBe(true)
+    expect(screen.getByRole("radiogroup", { name: "How much to show" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Filter/ })).toBeInTheDocument()
+  })
+
   it("une vue de 528 px dans une fenêtre large devient la liste par étape : l'étroit se décide sur la vue", async () => {
     globalThis.ResizeObserver = paneOf(528)
     serve({ issues: [issue(1, { title: "Write the spec" }), issue(2, { title: "Build it", status: DOING })] })

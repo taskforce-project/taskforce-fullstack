@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Pencil } from "lucide-react"
 
 import { ObjectiveDialog } from "@/components/workflow/objective-dialog"
@@ -41,6 +41,7 @@ const COUNTERS: readonly { filter: WorkflowFilter; key: keyof WorkflowCounts; in
  */
 export function ObjectiveHeader({
   slug, projectId, objective, readFailed = false, onRetry, projectStart, counts, done, total, filter, onFilter, now, narrow, t,
+  controls = null,
 }: Readonly<{
   slug: string
   projectId: number
@@ -58,6 +59,8 @@ export function ObjectiveHeader({
   now: Date
   narrow: boolean
   t: WorkflowTexts
+  /** Le direct, la densité et le filtre, quand la vue est étroite : ils quittent la ligne des onglets pour celle-ci. */
+  controls?: ReactNode
 }>) {
   const [editing, setEditing] = useState(false)
   const o = t.objective
@@ -172,6 +175,7 @@ export function ObjectiveHeader({
             </button>
           )
         })}
+        {controls}
       </div>
 
       {/* La part faite : une forme, pas un pourcentage. */}

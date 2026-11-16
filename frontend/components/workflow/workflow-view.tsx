@@ -7,6 +7,7 @@ import { CreateIssueDialog } from "@/components/dialogs/create-issue-dialog"
 import { DependencyLayer } from "@/components/workflow/dependency-layer"
 import { Inspector, type InspectorMode, type InspectorTab } from "@/components/workflow/inspector"
 import { useNodeGestures } from "@/components/workflow/node-gestures"
+import { WorkflowTitleControls } from "@/components/workflow/workflow-title-controls"
 import { ObjectiveHeader } from "@/components/workflow/objective-header"
 import { StageColumn } from "@/components/workflow/stage-column"
 import { LegendDialog } from "@/components/workflow/workflow-controls"
@@ -129,6 +130,13 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const wideWindow = useMinWidth(NARROW_BELOW)
   // La largeur de la vue décide, dès qu'elle est mesurée ; avant (le premier rendu, un test sans mise en page), la fenêtre.
   const narrow = paneWidth > 0 ? paneWidth < NARROW_BELOW : !wideWindow
+  // Une vue étroite prend le direct, la densité et le filtre dans son en-tête : la ligne des onglets garde « Workflow ».
+  const compact = paneWidth > 0 && paneWidth < SHEET_BELOW
+  const setControlsInView = useWorkflowViewStore((s) => s.setControlsInView)
+  useEffect(() => {
+    setControlsInView(compact)
+    return () => setControlsInView(false)
+  }, [compact, setControlsInView])
 
   // La minute en cours : les phrases (« Done today at 14:05 ») ne se recalculent qu'à la minute.
   const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60_000))
@@ -353,6 +361,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         now={now}
         narrow={narrow}
         t={t}
+        controls={compact ? <WorkflowTitleControls projectId={projectId} inHeader densities={!narrow} /> : null}
       />
       <p aria-live="polite" className="sr-only">{announce}</p>
       <div className="relative flex min-h-0 flex-1">

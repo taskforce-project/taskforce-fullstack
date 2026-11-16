@@ -27,11 +27,17 @@ interface WorkflowViewState {
   legendOpen: boolean
   /** L'état du direct du workflow ouvert, et l'heure de sa dernière lecture : la ligne du titre le dit. */
   live: { projectId: number; state: LiveState; readAt: number | null } | null
+  /**
+   * La vue est étroite : le direct, la densité et le filtre sont dans la ligne de son en-tête, et la ligne des onglets du
+   * projet ne les montre pas (sans eux, l'onglet « Workflow » reste visible). Jamais gardé d'une visite à l'autre.
+   */
+  controlsInView: boolean
 
   setDensity: (person: string, density: Density) => void
   setInspectorWidth: (person: string, width: number) => void
   setLegendOpen: (open: boolean) => void
   setLive: (live: WorkflowViewState["live"]) => void
+  setControlsInView: (inView: boolean) => void
 }
 
 export const useWorkflowViewStore = create<WorkflowViewState>()(
@@ -41,6 +47,7 @@ export const useWorkflowViewStore = create<WorkflowViewState>()(
       inspectorWidths: {},
       legendOpen: false,
       live: null,
+      controlsInView: false,
 
       setDensity: (person, density) => set((s) => (s.densities[person] === density ? s : { densities: { ...s.densities, [person]: density } })),
       setInspectorWidth: (person, width) => set((s) => ({ inspectorWidths: { ...s.inspectorWidths, [person]: clampInspector(width) } })),
@@ -50,6 +57,7 @@ export const useWorkflowViewStore = create<WorkflowViewState>()(
         if (was && live && was.projectId === live.projectId && was.state === live.state && was.readAt === live.readAt) return s
         return { live }
       }),
+      setControlsInView: (inView) => set((s) => (s.controlsInView === inView ? s : { controlsInView: inView })),
     }),
     {
       name: "tf-workflow-view",
