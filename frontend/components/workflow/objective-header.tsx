@@ -41,7 +41,7 @@ const COUNTERS: readonly { filter: WorkflowFilter; key: keyof WorkflowCounts; in
  */
 export function ObjectiveHeader({
   slug, projectId, objective, readFailed = false, onRetry, projectStart, counts, done, total, filter, onFilter, now, narrow, t,
-  controls = null,
+  controls = null, inert = false,
 }: Readonly<{
   slug: string
   projectId: number
@@ -61,6 +61,8 @@ export function ObjectiveHeader({
   t: WorkflowTexts
   /** Le direct, la densité et le filtre, quand la vue est étroite : ils quittent la ligne des onglets pour celle-ci. */
   controls?: ReactNode
+  /** Une feuille plein écran la couvre : ni focus ni lecteur d'écran derrière elle (R161, N4). */
+  inert?: boolean
 }>) {
   const [editing, setEditing] = useState(false)
   const o = t.objective
@@ -79,7 +81,11 @@ export function ObjectiveHeader({
   ].filter((part): part is string => part !== null)
 
   return (
-    <div className={cn("relative flex shrink-0 gap-x-4 gap-y-2 border-b border-border bg-paper-soft px-4 pb-2.5 pt-2", narrow ? "flex-col" : "min-h-14 items-center")}>
+    <div
+      data-objective-header
+      inert={inert}
+      className={cn("relative flex shrink-0 gap-x-4 gap-y-2 border-b border-border bg-paper-soft px-4 pb-2.5 pt-2", narrow ? "flex-col" : "min-h-14 items-center")}
+    >
       {/* Aujourd'hui, dans la bande du bas, sous les mots (il ne barre aucun texte) ; « Today » au survol. */}
       {mark !== null && (
         <span

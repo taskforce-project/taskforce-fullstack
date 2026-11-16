@@ -391,6 +391,46 @@ describe("la vue dans un volet étroit", () => {
     fireEvent.click(card("Write the spec"))
     await waitFor(() => expect(screen.getByRole("region", { name: /, in detail$/ })).toHaveAttribute("data-mode", mode))
   })
+
+  it("à 592 px, la feuille prend le focus, rend inerte ce qu'elle cache, et le rend à la carte en se fermant (R161, N4)", async () => {
+    globalThis.ResizeObserver = paneOf(592)
+    serve({ issues: [issue(1, { title: "Write the spec" })] })
+    render(<div id="app-root"><nav><button type="button">Projects</button></nav><WorkflowView slug="acme" projectId={3} /></div>)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    fireEvent.click(card("Write the spec"))
+    const back = await screen.findByRole("button", { name: "Back to the workflow" })
+    await waitFor(() => expect(back).toHaveFocus())
+    expect(document.querySelector("[data-workflow-list]")).toHaveAttribute("inert")
+    expect(document.querySelector("[data-objective-header]")).toHaveAttribute("inert")
+    // À côté de la conversation, la feuille ne couvre que la vue : ce qui l'entoure reste à la personne.
+    expect(screen.getByRole("navigation")).not.toHaveAttribute("inert")
+
+    fireEvent.click(back)
+    await waitFor(() => expect(card("Write the spec")).toHaveFocus())
+    expect(document.querySelector("[data-workflow-list]")).not.toHaveAttribute("inert")
+    expect(document.querySelector("[data-objective-header]")).not.toHaveAttribute("inert")
+  })
+
+  it("sur un téléphone, la feuille rend aussi inerte ce qui entoure la vue, le temps d'être ouverte ; Échap rend le focus à la carte", async () => {
+    Object.defineProperty(globalThis.window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false, media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+      })),
+    })
+    serve({ issues: [issue(1, { title: "Write the spec" })] })
+    render(<div id="app-root"><nav><button type="button">Projects</button></nav><WorkflowView slug="acme" projectId={3} /></div>)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    fireEvent.click(card("Write the spec"))
+    await waitFor(() => expect(screen.getByRole("button", { name: "Back to the workflow" })).toHaveFocus())
+    expect(screen.getByRole("navigation")).toHaveAttribute("inert")
+
+    fireEvent.keyDown(document, { key: "Escape" })
+    await waitFor(() => expect(card("Write the spec")).toHaveFocus())
+    expect(screen.getByRole("navigation")).not.toHaveAttribute("inert")
+    expect(document.querySelector("[data-workflow-list]")).not.toHaveAttribute("inert")
+  })
 })
 
 /**

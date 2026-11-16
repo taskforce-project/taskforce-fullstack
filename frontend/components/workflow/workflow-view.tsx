@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils"
 import { INSPECTOR_DEFAULT, useWorkflowViewStore } from "@/lib/store/workflow-view-store"
 import { replaceQuery } from "@/lib/window/address"
 import { buildWorkflow, issueKey, resolveNode, todayKey, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
+import { inertOutside } from "@/lib/workflow/inert-outside"
 import { canWriteProject } from "@/lib/workflow/rights"
 import {
   governanceOf, nodeAction, nodeSentence, whoActs, type NodeAction, type SentenceTexts, type WorkflowTexts,
@@ -209,7 +210,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     const key = focusNext.current
     if (!key) return
     const card = document.querySelector<HTMLElement>(`[data-node-focus="${key}"]`)
-    if (card) {
+    // Une carte sous une feuille (inerte) attend que la feuille se ferme.
+    if (card && !card.closest("[inert]")) {
       focusNext.current = null
       card.focus({ preventScroll: true })
     }
@@ -222,6 +224,24 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     setRevealKey(reveal ? key : null)
     focusNext.current = reveal ? key : null
   }, [])
+
+  // Fermer l'inspecteur rend le focus à la carte du nœud quand il était dans l'inspecteur (son retour, sa croix, Échap depuis
+  // lui) : il ne reste ni derrière une feuille fermée, ni sur un bouton disparu (R161, N4).
+  const closeInspector = useCallback(() => {
+    const active = document.activeElement
+    const inside = active !== null && (active === document.body || active.closest("[data-inspector]") !== null)
+    if (selectedKey && inside) focusNext.current = selectedKey
+    setInspectorOpen(false)
+  }, [selectedKey, setInspectorOpen])
+
+  // Une feuille plein écran couvre la vue (l'inspecteur d'une vue étroite) : l'en-tête et la liste qu'elle cache deviennent
+  // inertes ; sur un téléphone, où elle couvre tout l'écran, ce qui entoure la vue aussi, le temps qu'elle soit ouverte.
+  const covered = selected !== null && inspectorOpen && narrow
+  useEffect(() => {
+    const root = rootRef.current
+    if (!covered || wideWindow || !root) return
+    return inertOutside(root, document.getElementById("app-root") ?? document.body)
+  }, [covered, wideWindow])
 
   const open = useCallback((node: WorkflowNode) => {
     openIssue({ projectId, issueId: node.issue.id })
@@ -307,7 +327,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         case "Escape":
           if (inspectorOpen && selected) {
             event.preventDefault()
-            setInspectorOpen(false)
+            closeInspector()
           } else if (selected) {
             event.preventDefault()
             select(null)
@@ -333,7 +353,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [model, issueOpen, order, columns, selected, selectedKey, inspectorOpen, setInspectorOpen, narrow, select, open, gestures,
+  }, [model, issueOpen, order, columns, selected, selectedKey, inspectorOpen, setInspectorOpen, closeInspector, narrow, select, open, gestures,
     chooseDensity, setLegendOpen, allLinks, setAllLinks, person])
 
   const dependencies = useMemo(() => dependenciesOf(selected), [selected])
@@ -373,6 +393,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         narrow={narrow}
         t={t}
         controls={compact ? <WorkflowTitleControls projectId={projectId} inHeader densities={!narrow} /> : null}
+        inert={covered}
       />
       <p aria-live="polite" className="sr-only">{announce}</p>
       {/* Sur une vue étroite, la feuille de l'inspecteur se pose sur la vue entière (sa racine), en-tête compris. */}
@@ -382,7 +403,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         ) : filteredEmpty ? (
           <p className="p-6 text-sm text-muted-foreground">{filter === "needs-you" ? t.empty.nothingNeedsYou : t.empty.nothingMatches}</p>
         ) : narrow ? (
-          <div ref={listRef} data-workflow-list className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
+          <div ref={listRef} data-workflow-list inert={covered} className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
             {model.stages.map((stage, index) => hiddenByFilter(columns[index], filter) ? null : (
               <StageColumn
                 key={stage.status.id}
@@ -456,7 +477,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             screen={!wideWindow}
             width={inspectorWidth}
             onResize={(width) => setInspectorWidth(person, width)}
-            onClose={() => setInspectorOpen(false)}
+            onClose={closeInspector}
             onSelect={(key) => select(key, true)}
             onOpen={open}
             onOpenMission={openMission}

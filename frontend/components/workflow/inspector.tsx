@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react"
 import { ArrowLeft, ExternalLink, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 
@@ -103,6 +103,17 @@ export function Inspector({
   const word = t.state[node.state]
   const can = nodeCan(node, me, agents, canWrite)
 
+  // En plein écran (un volet étroit, un téléphone), la feuille prend le focus à l'ouverture, et le reprend quand le nœud change
+  // sous elle et que le focus s'est perdu : il ne reste jamais derrière elle, sur une carte qu'elle cache (R161, N4).
+  const sectionRef = useRef<HTMLElement>(null)
+  const backRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (mode !== "full") return
+    const active = document.activeElement
+    if (active && active !== document.body && sectionRef.current?.contains(active)) return
+    backRef.current?.focus({ preventScroll: true })
+  }, [mode, node.key])
+
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault()
     const startX = event.clientX
@@ -118,6 +129,7 @@ export function Inspector({
 
   return (
     <section
+      ref={sectionRef}
       aria-label={fillText(t.inspector.region, { title: node.issue.title })}
       data-inspector
       data-mode={mode}
@@ -147,6 +159,7 @@ export function Inspector({
         <div className="flex items-start gap-1">
           {mode !== "side" && (
             <button
+              ref={backRef}
               type="button"
               onClick={onClose}
               aria-label={t.inspector.back}
