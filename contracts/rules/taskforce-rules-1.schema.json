@@ -275,7 +275,7 @@
           "maxItems": 10,
           "items": {
             "type": "string",
-            "pattern": "^(person:[0-9]{1,19}|role:(owner|admin)|project-lead)$"
+            "pattern": "^(person:[0-9]{1,18}|role:(owner|admin)|project-lead)$"
           }
         },
         "signatures": {

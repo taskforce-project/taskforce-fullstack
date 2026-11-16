@@ -55,7 +55,11 @@ public final class RuleValidator {
     static final Set<String> CONDITIONS = Set.of("action", "tool", "command", "path", "branch", "repoVisibility",
         "server", "sensitivity", "actor", "over");
     static final Set<String> GLOBS = Set.of("tool", "command", "path", "branch", "server");
-    static final Pattern APPROVER = Pattern.compile("^(person:[0-9]{1,19}|role:(owner|admin)|project-lead)$");
+    /**
+     * Qui accorde : une personne de l'espace, un rôle, le responsable du projet. Le numéro d'une personne a dix-huit
+     * chiffres au plus, qui tiennent toujours dans son identifiant : plus long, c'est une personne inconnue.
+     */
+    static final Pattern APPROVER = Pattern.compile("^(person:[0-9]{1,18}|role:(owner|admin)|project-lead)$");
     static final Pattern FACT = Pattern.compile("^arg\\.[A-Za-z0-9_]{1,40}$");
     static final int MAX_PATTERN = 200;
     static final int MAX_APPROVERS = 10;
