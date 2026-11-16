@@ -70,9 +70,10 @@ describe("ObjectiveHeader", () => {
     expect(screen.queryByRole("button", { name: /^Missing/ })).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Needs you 2" }))
     expect(onFilter).toHaveBeenCalledWith("needs-you")
-    // L'avance se lit à la forme : la part faite et le trait d'aujourd'hui, sans pourcentage écrit.
+    // L'avance se lit à la forme : la part faite, et le trait d'aujourd'hui sur toute la hauteur, sans pourcentage écrit.
     const line = screen.getByRole("img", { name: /14 of 31 done/ })
-    expect(line.children).toHaveLength(2)
+    expect(line.children).toHaveLength(1)
+    expect(document.querySelector("[data-today]")).not.toBeNull()
     expect(screen.queryByText(/%/)).toBeNull()
   })
 
@@ -134,6 +135,14 @@ describe("the objective's words and line", () => {
     expect(objectivePayload("Goal", "", ["a", "b", "c", "d", "e", "f"])).toBeNull()
     expect(objectivePayload("Goal", "", ["x".repeat(201)])).toBeNull()
     expect(objectivePayload(" Goal ", "", [" a "])).toEqual({ goal: "Goal", targetDate: null, criteria: ["a"] })
+  })
+
+  it("draws today the full height of the header, « Today » on hover, and the share done on 4 px", () => {
+    header(set)
+    const today = document.querySelector<HTMLElement>("[data-today]")
+    expect(today).toHaveAttribute("title", "Today")
+    expect(today?.className).toContain("inset-y-0")
+    expect(document.querySelector("[data-progress]")?.className).toContain("h-1")
   })
 
   it("today between the start and the target date, only with a date ahead", () => {

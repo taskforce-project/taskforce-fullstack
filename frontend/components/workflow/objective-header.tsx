@@ -34,9 +34,10 @@ const COUNTERS: readonly { filter: WorkflowFilter; key: keyof WorkflowCounts; in
 /**
  * L'en-tête de l'objectif (séance n°25, §3), la première lecture du dirigeant : le but en une ligne, la date visée, ce qui
  * est fait sur le total et le nombre de critères (un clic les montre) ; à droite, des compteurs qui sont des filtres
- * (Needs you, Blocked, Missing, Failed ; un compteur à zéro disparaît) ; en bas, la part faite sur deux pixels et un trait
- * d'un pixel pour aujourd'hui, entre le début du projet et la date visée : l'avance ou le retard se lit à la forme, jamais
- * à un pourcentage (R56). Sans objectif, il le dit et propose de l'écrire, à qui le peut.
+ * (Needs you, Blocked, Missing, Failed ; un compteur à zéro disparaît) ; en bas, la part faite sur quatre pixels, et un trait
+ * d'un pixel pour aujourd'hui sur toute la hauteur de l'en-tête, entre le début du projet et la date visée (« Today » au
+ * survol) : l'avance ou le retard se lit à la forme, la part faite d'un côté du trait, jamais à un pourcentage (R56). Sans
+ * objectif, il le dit et propose de l'écrire, à qui le peut.
  */
 export function ObjectiveHeader({
   slug, projectId, objective, readFailed = false, onRetry, projectStart, counts, done, total, filter, onFilter, now, narrow, t,
@@ -74,7 +75,18 @@ export function ObjectiveHeader({
 
   return (
     <div className={cn("relative flex shrink-0 gap-x-4 gap-y-2 border-b border-border bg-paper-soft px-4 pb-2.5 pt-2", narrow ? "flex-col" : "min-h-14 items-center")}>
-      <div className="min-w-0 flex-1">
+      {/* Aujourd'hui, sur toute la hauteur : derrière les mots, et « Today » au survol d'une marge de quelques pixels. */}
+      {mark !== null && (
+        <span
+          data-today
+          title={o.today}
+          className="absolute inset-y-0 z-0 flex w-2 -translate-x-1/2 justify-center"
+          style={{ left: `${Math.round(mark * 1000) / 10}%` }}
+        >
+          <span aria-hidden="true" className="h-full w-px bg-foreground/50" />
+        </span>
+      )}
+      <div className="relative z-10 min-w-0 flex-1">
         {goal ? (
           <div className="group/goal flex min-w-0 items-center gap-1.5">
             <p className="min-w-0 truncate text-base font-[550] text-foreground" title={goal}>{goal}</p>
@@ -137,7 +149,7 @@ export function ObjectiveHeader({
         </p>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-1" role="group" aria-label={t.filter.label}>
+      <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-1" role="group" aria-label={t.filter.label}>
         {COUNTERS.map(({ filter: value, key, ink, dot }) => {
           const count = counts[key]
           if (count === 0) return null
@@ -162,10 +174,9 @@ export function ObjectiveHeader({
         })}
       </div>
 
-      {/* La part faite, et le trait d'aujourd'hui : une forme, pas un pourcentage. */}
-      <div role="img" aria-label={progressLabel} title={progressLabel} className="absolute inset-x-0 bottom-0 h-[2px] bg-muted">
+      {/* La part faite : une forme, pas un pourcentage. */}
+      <div role="img" aria-label={progressLabel} title={progressLabel} data-progress className="absolute inset-x-0 bottom-0 h-1 bg-muted">
         <span className="absolute inset-y-0 left-0 bg-primary" style={{ width: `${Math.round(share * 1000) / 10}%` }} />
-        {mark !== null && <span className="absolute -top-1 bottom-0 w-px bg-foreground" style={{ left: `${Math.round(mark * 1000) / 10}%` }} />}
       </div>
 
       <ObjectiveDialog slug={slug} projectId={projectId} objective={objective} open={editing} onOpenChange={setEditing} />

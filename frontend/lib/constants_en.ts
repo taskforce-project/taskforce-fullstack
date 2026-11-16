@@ -418,6 +418,7 @@ export const CONSTANTS_EN = {
       remove: "Remove the objective",
       target: "Target {date}",
       noTarget: "No target date",
+      today: "Today",
       done: "{done} of {total} done",
       criteriaOne: "1 success criterion",
       criteriaMany: "{count} success criteria",
