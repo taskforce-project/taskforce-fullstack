@@ -463,7 +463,6 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
           <DependencyLayer
             boardRef={boardRef}
             edges={allLinks ? everyEdge : dependencies.edges}
-            labels={{ blocks: t.inspector.blocks, blockedBy: t.inspector.blockedBy }}
             limit={allLinks ? MAX_ALL_EDGES : MAX_EDGES}
             revision={columns}
             focus={allLinks ? selectedKey : null}

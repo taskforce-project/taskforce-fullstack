@@ -23,7 +23,6 @@ describe("Show all links", () => {
               { from: "issue-3", to: "issue-4", side: "blocks" },
               { from: "issue-4", to: "issue-9", side: "blocks" },
             ]}
-            labels={{ blocks: "Blocks", blockedBy: "Blocked by" }}
             limit={2}
             moreLabel={(count) => `and ${count} more links`}
           />
@@ -45,7 +44,7 @@ describe("Show all links", () => {
     const { container } = render(
       <div ref={(element) => { board.current = element }}>
         <div data-node-key="issue-1" />
-        <DependencyLayer boardRef={board} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} limit={200}
+        <DependencyLayer boardRef={board} edges={edges} limit={200}
           moreLabel={(count) => `and ${count} more links`} />
       </div>,
     )
@@ -64,7 +63,7 @@ describe("la carte choisie parmi tous les liens", () => {
     const { container } = render(
       <div ref={(element) => { board.current = element }}>
         {["issue-1", "issue-2", "issue-3", "issue-4"].map((key) => <div key={key} data-node-key={key} />)}
-        <DependencyLayer boardRef={board} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} limit={200} focus="issue-2" />
+        <DependencyLayer boardRef={board} edges={edges} limit={200} focus="issue-2" />
       </div>,
     )
     await waitFor(() => expect(container.querySelectorAll("g[data-strong]")).toHaveLength(2))
@@ -94,7 +93,7 @@ describe("les liens suivent les cartes", () => {
         }}>
           <div data-node-key="issue-1" ref={card("issue-1")} />
           <div data-node-key="issue-2" ref={card("issue-2")} />
-          <DependencyLayer boardRef={board} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} revision={revision} />
+          <DependencyLayer boardRef={board} edges={edges} revision={revision} />
         </div>
       )
     }
@@ -137,7 +136,7 @@ function Board({ edges }: Readonly<{ edges: DependencyEdge[] }>) {
     <div ref={ref} data-testid="board">
       <div data-node-key="issue-1" />
       <div data-node-key="issue-2" />
-      <DependencyLayer boardRef={ref} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} />
+      <DependencyLayer boardRef={ref} edges={edges} />
     </div>
   )
 }
@@ -147,7 +146,7 @@ describe("DependencyLayer", () => {
     vi.restoreAllMocks()
   })
 
-  it("draws the edges of the chosen node between cards on screen, with their word on hover", async () => {
+  it("draws the edges of the chosen node between cards on screen, and none of them takes the pointer", async () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
       const key = this.dataset.nodeKey
       const rect = key === "issue-1" ? box(0, 0) : key === "issue-2" ? box(300, 100) : { left: 0, right: 1000, top: 0, bottom: 800 }
@@ -156,7 +155,11 @@ describe("DependencyLayer", () => {
     render(<Board edges={[{ from: "issue-1", to: "issue-2", side: "blocks" }, { from: "issue-9", to: "issue-2", side: "blockedBy" }]} />)
 
     await waitFor(() => expect(document.querySelectorAll("path.stroke-primary")).toHaveLength(1))
-    expect(screen.getByText("Blocks", { selector: "title" })).toBeInTheDocument()
+    // Ni bande invisible, ni groupe qui reprend le pointeur : un clic sur une carte lui revient, liens montrés ou non (R159, N1).
+    const layer = document.querySelector("[data-links-layer]") as SVGElement
+    expect(layer.getAttribute("class")).toContain("pointer-events-none")
+    expect(layer.querySelectorAll(".pointer-events-auto, [pointer-events]")).toHaveLength(0)
+    expect(layer.querySelectorAll("path.stroke-transparent, title")).toHaveLength(0)
   })
 
   it("draws nothing without a chosen node", async () => {

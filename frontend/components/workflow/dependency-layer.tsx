@@ -58,11 +58,10 @@ export function edgePath(
   return guttered(from.left, fy, x - GUTTER, to.left - 2, ty)
 }
 
-export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, moreLabel, revision, focus = null }: Readonly<{
+export function DependencyLayer({ boardRef, edges, limit = MAX_EDGES, moreLabel, revision, focus = null }: Readonly<{
   /** Le plateau des colonnes : le calque se pose sur lui, et suit son défilement et celui de chaque colonne. */
   boardRef: RefObject<HTMLElement | null>
   edges: readonly DependencyEdge[]
-  labels: { readonly blocks: string; readonly blockedBy: string }
   /** Les arêtes dessinées, au plus : les plus proches du centre de ce qui se voit d'abord. */
   limit?: number
   /** La ligne des arêtes au-delà de la limite ; sans elle, rien ne se dit (l'inspecteur le dit pour un nœud choisi). */
@@ -147,7 +146,8 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
         {more}
       </p>
     )}
-    {/* Sous les colonnes (le plateau est au-dessus, z-10) : les cartes, opaques, cachent ce qui passe dessous. */}
+    {/* Sous les colonnes (le plateau est au-dessus, z-10) : les cartes, opaques, cachent ce qui passe dessous. Aucune courbe
+        ne prend le pointeur : un clic va toujours à la carte ou à la colonne, jamais à une ligne (R159, N1). */}
     <svg aria-hidden="true" data-links-layer className="pointer-events-none absolute inset-0 z-0 size-full overflow-visible">
       <defs>
         <marker id="workflow-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -156,7 +156,6 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
       </defs>
       {drawn.map((edge) => (
         <g key={edge.key} data-strong={edge.strong} className={edge.strong ? undefined : "opacity-25"}>
-          <title>{edge.side === "blocks" ? labels.blocks : labels.blockedBy}</title>
           <path d={edge.d} className="fill-none stroke-primary" strokeWidth={2} markerEnd="url(#workflow-arrow)" />
         </g>
       ))}
