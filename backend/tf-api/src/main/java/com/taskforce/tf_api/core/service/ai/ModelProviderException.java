@@ -54,6 +54,14 @@ public class ModelProviderException extends RuntimeException {
         return new ModelProviderException("AI provider refused the request (HTTP " + status + ")", null, whyRefused(status, body), null);
     }
 
+    /**
+     * Le fournisseur répond, mais ne sert pas ce modèle (désinstallé, ou mal nommé) : rien ne lui est demandé, et la phrase dit
+     * lequel manque.
+     */
+    public static ModelProviderException notServed(String model) {
+        return new ModelProviderException("AI provider doesn't serve " + model, null, Why.MODEL_MISSING, null).about(model);
+    }
+
     /** Une requête trop grande pour le fournisseur, même réduite à un seul outil. */
     public static ModelProviderException tooLarge(String message) {
         return new ModelProviderException(message, null, Why.TOO_LARGE, null);
