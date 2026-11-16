@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 
-import { DensitySwitch, FilterMenu, LinksSwitch, LiveIndicator } from "@/components/workflow/workflow-controls"
+import { DensitySwitch, FilterMenu, LiveIndicator } from "@/components/workflow/workflow-controls"
 import { useMinWidth } from "@/hooks/use-min-width"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkflowViewStore } from "@/lib/store/workflow-view-store"
@@ -13,6 +13,8 @@ import { isDensity, isFilter, type Density, type WorkflowFilter } from "@/lib/wo
  * Ce que le workflow met dans la ligne du titre de son volet (séance n°25, §3), à droite des onglets : l'indicateur du
  * direct, le sélecteur de densité (sur un écran large) et « Filter ». « Legend » est dans le menu « ... » du projet. Quand la
  * vue est étroite, ils passent dans la ligne de son en-tête (`inHeader`), et la ligne des onglets ne les montre plus.
+ * « Show all links » vit dans l'en-tête de la vue, à toutes les largeurs : dans la ligne des onglets, il poussait « Settings »
+ * hors d'elle à 1440 px (R161, N9).
  */
 export function WorkflowTitleControls({ projectId, inHeader = false, densities }: Readonly<{
   projectId: number
@@ -26,8 +28,6 @@ export function WorkflowTitleControls({ projectId, inHeader = false, densities }
   const live = useWorkflowViewStore((s) => (s.live?.projectId === projectId ? s.live : null))
   const remembered = useWorkflowViewStore((s) => s.densities[person])
   const setDensity = useWorkflowViewStore((s) => s.setDensity)
-  const allLinks = useWorkflowViewStore((s) => s.allLinks[person] === true)
-  const setAllLinks = useWorkflowViewStore((s) => s.setAllLinks)
   const wide = useMinWidth(768)
   const moved = useWorkflowViewStore((s) => s.controlsInView)
   const view = search.get("view")
@@ -48,7 +48,6 @@ export function WorkflowTitleControls({ projectId, inHeader = false, densities }
           }}
         />
       )}
-      <LinksSwitch value={allLinks} onChange={(on) => setAllLinks(person, on)} />
       <FilterMenu value={filter} onChange={(next) => replaceQuery({ filter: next })} />
     </div>
   )

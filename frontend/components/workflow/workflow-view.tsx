@@ -10,7 +10,7 @@ import { useNodeGestures } from "@/components/workflow/node-gestures"
 import { WorkflowTitleControls } from "@/components/workflow/workflow-title-controls"
 import { ObjectiveHeader } from "@/components/workflow/objective-header"
 import { StageColumn } from "@/components/workflow/stage-column"
-import { LegendDialog } from "@/components/workflow/workflow-controls"
+import { LegendDialog, LinksSwitch } from "@/components/workflow/workflow-controls"
 import type { NodeAgent, NodeHandlers, NodeView } from "@/components/workflow/workflow-node"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -395,7 +395,13 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         now={now}
         narrow={narrow}
         t={t}
-        controls={compact ? <WorkflowTitleControls projectId={projectId} inHeader densities={!narrow} /> : null}
+        controls={(
+          <>
+            {compact && <WorkflowTitleControls projectId={projectId} inHeader densities={!narrow} />}
+            {/* Dans l'en-tête de la vue à toutes les largeurs : la ligne des onglets garde « Settings » (R161, N9). */}
+            <LinksSwitch value={allLinks} onChange={(on) => setAllLinks(person, on)} />
+          </>
+        )}
         inert={covered}
       />
       <p aria-live="polite" className="sr-only">{announce}</p>

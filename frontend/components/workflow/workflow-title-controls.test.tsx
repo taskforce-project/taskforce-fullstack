@@ -24,6 +24,8 @@ describe("WorkflowTitleControls", () => {
     expect(screen.getByRole("radiogroup", { name: "How much to show" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /^Filter/ })).toBeInTheDocument()
     expect(screen.getByText("Live")).toBeInTheDocument()
+    // « Show all links » vit dans l'en-tête de la vue : ici, il poussait « Settings » hors de la ligne à 1440 px (R161, N9).
+    expect(screen.queryByRole("button", { name: "Show all links" })).toBeNull()
   })
 
   it("when the view is narrow, they leave the tab line for the view's header, without the density on a list", () => {

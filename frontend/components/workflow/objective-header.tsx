@@ -163,29 +163,33 @@ export function ObjectiveHeader({
         </p>
       </div>
 
-      <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-1" role="group" aria-label={t.filter.label}>
-        {COUNTERS.map(({ filter: value, key, ink, dot }) => {
-          const count = counts[key]
-          if (count === 0) return null
-          const label = fillText(t.count[key], { count })
-          const on = filter === value
-          return (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onFilter(on ? null : value)}
-              className={cn(
-                "flex h-7 items-center gap-1.5 px-2 text-xs font-medium transition-colors duration-150 hover:bg-muted motion-reduce:transition-none",
-                ink,
-                on && "bg-muted ring-1 ring-inset ring-border",
-              )}
-            >
-              {dot && <span aria-hidden="true" className="size-2 rounded-full bg-primary" />}
-              <span className="tabular-nums">{label}</span>
-            </button>
-          )
-        })}
+      {/* Les compteurs (un filtre chacun), puis les outils de la vue : « Show all links », et sur une vue étroite le direct, la
+          densité et « Filter ». */}
+      <div className="relative z-10 flex shrink-0 flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t.filter.label}>
+          {COUNTERS.map(({ filter: value, key, ink, dot }) => {
+            const count = counts[key]
+            if (count === 0) return null
+            const label = fillText(t.count[key], { count })
+            const on = filter === value
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onFilter(on ? null : value)}
+                className={cn(
+                  "flex h-7 items-center gap-1.5 px-2 text-xs font-medium transition-colors duration-150 hover:bg-muted motion-reduce:transition-none",
+                  ink,
+                  on && "bg-muted ring-1 ring-inset ring-border",
+                )}
+              >
+                {dot && <span aria-hidden="true" className="size-2 rounded-full bg-primary" />}
+                <span className="tabular-nums">{label}</span>
+              </button>
+            )
+          })}
+        </div>
         {controls}
       </div>
 

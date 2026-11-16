@@ -250,6 +250,16 @@ describe("le workflow d'un projet", () => {
     await waitFor(() => expect(screen.queryByText("1 link")).toBeNull())
   })
 
+  it("Show all links est dans l'en-tête de la vue, même large : la ligne des onglets garde « Settings » (R161, N9)", async () => {
+    serve({ issues: [issue(1, { title: "Write the spec" })] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    const header = document.querySelector("[data-objective-header]") as HTMLElement
+    fireEvent.click(within(header).getByRole("button", { name: "Show all links" }))
+    expect(useWorkflowViewStore.getState().allLinks["7"]).toBe(true)
+    expect(within(header).getByRole("button", { name: "Show all links" })).toHaveAttribute("aria-pressed", "true")
+  })
+
   it("un compteur de l'en-tête est un filtre, un seul à la fois", async () => {
     serve({
       issues: [issue(1, { title: "Calm" }), issue(2, { title: "Asks", status: DOING })],
