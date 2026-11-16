@@ -97,9 +97,12 @@ describe("the workflow's title line", () => {
     // Neuf des dix : Missing vient avec les processus (W5), et ne s'offre pas encore.
     expect(dialog.querySelectorAll("li")).toHaveLength(9)
     expect(screen.queryByText("A document or an answer is expected from someone.")).toBeNull()
-    // Les liens, et « Show all links » avec sa touche (décision du CEO, 16/11/2026).
+    // Les liens et « Show all links » (décision du CEO, 16/11/2026) ; les touches ne se disent qu'au pied de Ctrl+K (R134),
+    // et « Stuck » n'existe pas encore : la légende n'en parle pas (R161, N10).
     expect(screen.getByText("Links")).toBeInTheDocument()
-    expect(screen.getByText(/Show all links \(L\) draws every link between the cards on screen, 200 at most/)).toBeInTheDocument()
+    expect(screen.getByText(/Show all links draws every link between the cards on screen, 200 at most/)).toBeInTheDocument()
+    expect(screen.getByText("The last try failed and nobody tried again.")).toBeInTheDocument()
+    expect(dialog.textContent).not.toMatch(/\([A-Z?]\)|Stuck/)
     expect(screen.getByText("Waits for you: a request to decide, or a result to review.")).toBeInTheDocument()
     expect(screen.getAllByRole("img").map((mark) => mark.getAttribute("aria-label"))).toContain("Stopped")
   })

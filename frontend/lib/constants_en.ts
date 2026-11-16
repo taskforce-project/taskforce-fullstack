@@ -468,7 +468,7 @@ export const CONSTANTS_EN = {
     // The legend: the ten marks, their word, and what they mean.
     meaning: {
       needsYou: "Waits for you: a request to decide, or a result to review.",
-      failed: "The last try failed and nobody tried again. Stuck: an incident waits for someone.",
+      failed: "The last try failed and nobody tried again.",
       missing: "A document or an answer is expected from someone.",
       blocked: "Another issue must be finished first.",
       working: "An agent works on it now, its mark turning; a person who holds it shows a still mark.",
@@ -685,7 +685,7 @@ export const CONSTANTS_EN = {
       countOne: "1 link",
       countMany: "{count} links",
       legendTitle: "Links",
-      legend: "A line goes from an issue to the one it blocks. The chosen card shows its own links; Show all links (L) draws every link between the cards on screen, 200 at most, the nearest first.",
+      legend: "A line goes from an issue to the one it blocks. The chosen card shows its own links; Show all links draws every link between the cards on screen, 200 at most, the nearest first.",
       on: "All links shown",
       off: "Only the chosen card's links",
     },
