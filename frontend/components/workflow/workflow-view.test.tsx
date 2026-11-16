@@ -265,7 +265,7 @@ describe("le workflow d'un projet", () => {
     await waitFor(() => expect(card("Release")).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole("button", { name: "Decide" }))
-    const decision = await screen.findByRole("region", { name: "Approve build the project?" })
+    const decision = await screen.findByRole("region", { name: /^Let .* build the project\?$/ })
     expect(within(decision).getByText("Rule: Builds can touch the release")).toBeInTheDocument()
     expect(within(decision).getByText(/^Expires .*Then: No answer in time: refused\.$/)).toBeInTheDocument()
     expect(within(decision).getByText("Signing as Pierre Martin. Meaning: Approval.")).toBeInTheDocument()

@@ -30,9 +30,9 @@ describe("DecisionPanel", () => {
       reason: "Releases need two people", signatures: 2, signedBy: ["Sam"], separate: true, binding: true,
       expiresAt: "2026-11-13T23:30:00",
     })
-    render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={asks} now={now} />)
+    render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={asks} now={now} agent="Claude Code" />)
 
-    expect(screen.getByRole("heading", { name: "Approve build the project?" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Let Claude Code build the project?" })).toBeInTheDocument()
     expect(screen.getByText("Rule: Releases need two people")).toBeInTheDocument()
     expect(screen.getByText("2 different people approve: 1 so far.")).toBeInTheDocument()
     expect(screen.getByText("The person who delegated this task can't approve it.")).toBeInTheDocument()
@@ -73,6 +73,24 @@ describe("DecisionPanel", () => {
     render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={approval(9, { signatures: 2 })} now={now} />)
     fireEvent.click(screen.getByRole("button", { name: "Approve" }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Signed: the request waits for the other people"))
+  })
+
+  it("asks in words: TaskForce for its own requests, the agent's name otherwise", () => {
+    const { unmount } = render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={approval(9, { askedBy: "runner" })} now={now} />)
+    expect(screen.getByRole("heading", { name: "Let TaskForce build the project?" })).toBeInTheDocument()
+    unmount()
+    render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={approval(9)} now={now} />)
+    expect(screen.getByRole("heading", { name: "Let Claude Code build the project?" })).toBeInTheDocument()
+  })
+
+  it("for who can't decide and a rule that names a role: only who it waits for, the rest on their own lines", () => {
+    const asks = approval(9, { canDecide: false, waitingFor: [["role:admin"]], signatures: 2, signedBy: ["Sam"], separate: true })
+    render(<DecisionPanel slug="acme" projectId={3} run={deliveryRun(1, 2)} approval={asks} now={now} />)
+    expect(screen.getByText("Waiting for an admin. You can't decide this one.")).toBeInTheDocument()
+    expect(screen.getByText("2 different people approve: 1 so far.")).toBeInTheDocument()
+    expect(screen.getByText("The person who delegated this task can't approve it.")).toBeInTheDocument()
+    expect(screen.getByText("Approved by Sam.")).toBeInTheDocument()
+    expect(screen.queryByRole("button")).toBeNull()
   })
 
   it("for who can't decide: who it waits for, and no button", () => {

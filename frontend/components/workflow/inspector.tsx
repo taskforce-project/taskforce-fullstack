@@ -275,7 +275,8 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
       <p className="text-[13px] text-foreground">{what}</p>
 
       {node.reason.kind === "approval" && run && (
-        <DecisionPanel slug={slug} projectId={projectId} run={run} approval={node.reason.approval} now={now} />
+        <DecisionPanel slug={slug} projectId={projectId} run={run} approval={node.reason.approval} now={now}
+          agent={agents.find((a) => a.key === run.providerKey)?.displayName ?? null} />
       )}
       {node.reason.kind === "review" && (
         <div className="flex items-center justify-between gap-2 border border-border bg-card p-3">
@@ -292,7 +293,8 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
         </div>
       )}
       {node.reason.kind === "waitingApproval" && run && pending[0] && (
-        <DecisionPanel slug={slug} projectId={projectId} run={run} approval={pending[0]} now={now} />
+        <DecisionPanel slug={slug} projectId={projectId} run={run} approval={pending[0]} now={now}
+          agent={agents.find((a) => a.key === run.providerKey)?.displayName ?? null} />
       )}
 
       <dl className="flex flex-col gap-3">

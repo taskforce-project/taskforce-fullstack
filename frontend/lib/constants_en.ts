@@ -581,7 +581,8 @@ export const CONSTANTS_EN = {
       signedByUndated: "{who}. Meaning: Approval.",
     },
     decide: {
-      title: "Approve {what}?",
+      title: "Let {agent} {what}?",
+      theAgent: "the agent",
       rule: "Rule: {sentence}",
       noRule: "No rule of your workspace covers this: the agent asks before it acts.",
       expires: "Expires {time}. Then: {then}",
@@ -597,6 +598,7 @@ export const CONSTANTS_EN = {
       why: "Why? (optional)",
       final: "This can't be undone.",
       notYours: "Waiting for {who}. You can't decide this one.",
+      delegator: "the person who delegated it",
       approve: "Approve",
       refuse: "Refuse",
       approved: "Approved",

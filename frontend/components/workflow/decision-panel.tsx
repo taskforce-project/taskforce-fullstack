@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import type { DeliveryRun, DeliveryRunApproval } from "@/lib/api/delivery-service"
 import { requestWant } from "@/lib/delivery/mission-sequence"
 import { fillText } from "@/lib/delivery/result-card"
-import { obligationWords } from "@/lib/rules/rule-words"
+import { allOf, obligationWords } from "@/lib/rules/rule-words"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
@@ -21,23 +21,27 @@ import { momentWords } from "@/lib/workflow/sentence"
 export const REASON_MAX = 500
 
 /**
- * Décider (séance n°25, §6.1), là où l'on voit, la règle sur la décision : « Approve {what}? », la règle et sa phrase, les
+ * Décider (séance n°25, §6.1), là où l'on voit, la règle sur la décision : « Let {agent} {what}? », la règle et sa phrase, les
  * signatures qu'elle demande, l'échéance et ce qui suit, la signification de la signature, une raison facultative, puis
  * « Refuse » et « Approve » en bas à droite ; « This can't be undone. » quand l'accord engage. Jamais un « Approve » nu. La
  * décision passe par la route qui existe, déjà jugée par les règles et entrée au dossier ; la raison y entre avec elle. Un
- * accord donné ici vaut une fois. Pour qui ne peut pas décider : qui l'on attend, sans bouton. Une demande échue ne se
+ * accord donné ici vaut une fois. Pour qui ne peut pas décider : qui l'on attend (les personnes ou les rôles que la règle
+ * nomme, en mots), puis les autres obligations chacune sur sa ligne, sans bouton. Une demande échue ne se
  * décide plus : elle le dit, sans bouton, en attendant que la mission relue la montre close.
  */
-export function DecisionPanel({ slug, projectId, run, approval, now }: Readonly<{
+export function DecisionPanel({ slug, projectId, run, approval, now, agent = null }: Readonly<{
   slug: string
   projectId: number
   run: DeliveryRun
   approval: DeliveryRunApproval
   now: Date
+  /** Le nom de l'agent de la mission, quand on le connaît (« Claude Code ») ; sinon le mot des cartes de mission. */
+  agent?: string | null
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow.decide)
   const sequence = usePreferencesStore((s) => s.t.missionSequence)
   const rulesText = usePreferencesStore((s) => s.t.rules)
+  const missions = usePreferencesStore((s) => s.t.missions)
   const person = useUserStore((s) => s.user?.displayName?.trim() || s.user?.email || "")
   const decide = useDeliveryStore((s) => s.decideApproval)
   const fetchProjectRun = useDeliveryStore((s) => s.fetchProjectRun)
@@ -48,7 +52,9 @@ export function DecisionPanel({ slug, projectId, run, approval, now }: Readonly<
   const reason = approval.reason?.trim()
   const obligations = obligationWords(approval, rulesText)
   const fieldId = `decide-why-${approval.id}`
-  const title = fillText(t.title, { what })
+  // Qui demande, comme la carte de la mission le dit : TaskForce lui-même, ou l'agent.
+  const asker = approval.askedBy === "runner" ? missions.taskforce : (agent?.trim() || missions.agent)
+  const title = fillText(t.title, { agent: asker, what })
   const expired = approval.expiresAt !== null && parseServerDate(approval.expiresAt).getTime() <= now.getTime()
 
   if (expired && approval.expiresAt) {
@@ -56,8 +62,16 @@ export function DecisionPanel({ slug, projectId, run, approval, now }: Readonly<
   }
 
   if (!approval.canDecide) {
-    const who = obligations.length > 0 ? obligations.join(" ").replace(/\.$/, "") : (run.startedByName?.trim() || t.someone)
-    return <p className="text-sm text-muted-foreground">{fillText(t.notYours, { who })}</p>
+    // Qui l'on attend, seulement : les personnes ou les rôles que la règle nomme (« an admin »), sinon qui a délégué.
+    const sets = approval.waitingFor ?? []
+    const who = sets.length > 0 ? allOf(sets, rulesText) : (run.startedByName?.trim() || t.delegator)
+    const others = obligationWords({ ...approval, waitingFor: [] }, rulesText)
+    return (
+      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+        <p>{fillText(t.notYours, { who })}</p>
+        {others.map((line) => <p key={line}>{line}</p>)}
+      </div>
+    )
   }
 
   async function onDecide(allow: boolean) {

@@ -58,7 +58,7 @@ describe("Inspector", () => {
     const region = screen.getByRole("complementary", { name: "About the chosen node" })
     expect(within(region).getByRole("heading", { name: "Release" })).toBeInTheDocument()
     expect(within(region).getByText("An issue in In Progress, with a mission by Claude Code.")).toBeInTheDocument()
-    expect(within(region).getByRole("region", { name: "Approve build the project?" })).toBeInTheDocument()
+    expect(within(region).getByRole("region", { name: "Let Claude Code build the project?" })).toBeInTheDocument()
     expect(within(region).getByText("Alex Chen")).toBeInTheDocument()
     expect(within(region).getByText("Done")).toBeInTheDocument()
     fireEvent.click(within(region).getByRole("button", { name: /WEB-1/ }))
