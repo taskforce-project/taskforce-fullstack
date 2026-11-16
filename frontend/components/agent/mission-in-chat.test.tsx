@@ -53,6 +53,8 @@ describe("MissionInChat : la mission d'une issue, dans la conversation", () => {
     expect(screen.getByText("Waiting for you: 1 request")).toBeInTheDocument();
     expect(screen.getByText("Understand: Wants to open nodejs.org")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refuse" })).toBeInTheDocument();
+    // La demande ne s'offre qu'une fois : la carte du nœud ne redit pas « Decide » (R161, M3).
+    expect(screen.queryByRole("button", { name: "Decide" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Allow for this mission" }));
 
@@ -104,12 +106,26 @@ describe("MissionInChat : la mission d'une issue, dans la conversation", () => {
     expect(screen.getByRole("link", { name: "Work view" })).toHaveAttribute("href", "/acme/missions/100");
   });
 
-  it("an issue without a mission shows no card to decide on", () => {
+  it("an issue without a mission shows no card to decide on, only its node and the way to its workflow", () => {
     useDeliveryStore.setState({ runs: { 28: null } });
     render(<MissionInChat slug="acme" target={{ ...TARGET, runId: null }} />);
 
     expect(screen.getByRole("group", { name: "Mission of TF-28: Fix the footer links" })).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    // Sans l'issue lue, ni mission : aucun état supposé (R159, N3).
+    expect(screen.getByRole("group", { name: "Fix the footer links" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Open in Workflow"]);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  // Le nœud de l'issue, comme le workflow le montre (séance n°25, §9) : « Decide » et « Open in Workflow » y mènent.
+  it("shows the issue's node, and opens it in its workflow, node chosen", () => {
+    useDeliveryStore.setState({ runs: { 28: RUN }, activity: { 100: ASKING } });
+    render(<MissionInChat slug="acme" target={TARGET} />);
+
+    expect(screen.getByRole("group", { name: "Fix the footer links, Needs you" })).toBeInTheDocument();
+    // La demande se décide sur la carte de la mission, juste dessous : le nœud n'offre que de s'ouvrir dans le workflow.
+    expect(screen.queryByRole("button", { name: "Decide" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Open in Workflow" }));
+    expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/3/workflow?node=issue-28", { scroll: false });
   });
 });

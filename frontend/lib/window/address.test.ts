@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import {
   closeIssueHref, conversationOf, hrefWith, issueHref, issueOf, issueRefOfUrl, missionOf, missionPath, previousAddress,
-  sameAddress, screenUnder, withConversation,
+  replaceQuery, sameAddress, screenUnder, withConversation, workflowProjectOf,
 } from "./address"
 
 const params = (query: string) => new URLSearchParams(query)
@@ -134,5 +134,38 @@ describe("previousAddress : l'entrée d'avant dans l'historique", () => {
     expect(previousAddress()).toBeNull()
     scope.navigation = { currentEntry: { index: 1 }, entries: () => [{ url: null }, { url: "/x" }] }
     expect(previousAddress()).toBeNull()
+  })
+})
+
+// Le workflow d'un projet (séance n°25, W1) : une issue s'y ouvre par-dessus, la vue reste dessous avec son nœud choisi.
+describe("le workflow dans l'adresse", () => {
+  afterEach(() => {
+    globalThis.history.replaceState(null, "", "/")
+  })
+
+  it("une issue de son projet s'ouvre par-dessus le workflow, le nœud choisi gardé", () => {
+    expect(issueHref("/acme/projects/3/workflow", "?node=issue-4&c=9", "acme", { projectId: 3, issueId: 7 }))
+      .toBe("/acme/projects/3/workflow?node=issue-4&c=9&issue=7")
+    expect(screenUnder("/acme/projects/3/workflow")).toBe("workflow")
+    // Une issue d'un autre projet s'ouvre sur son tableau.
+    expect(issueHref("/acme/projects/3/workflow", "?c=9", "acme", { projectId: 5, issueId: 8 })).toBe("/acme/projects/5?c=9&issue=8")
+  })
+
+  it("le projet dont le workflow est le volet", () => {
+    expect(workflowProjectOf("/acme/projects/3/workflow")).toBe(3)
+    expect(workflowProjectOf("/acme/projects/3")).toBeNull()
+    expect(workflowProjectOf("/acme/projects/3/workflow/extra")).toBeNull()
+    expect(workflowProjectOf(null)).toBeNull()
+  })
+
+  it("choisir un nœud remplace l'adresse, sans entrée de plus dans l'historique", () => {
+    globalThis.history.replaceState(null, "", "/acme/projects/3/workflow?c=9")
+    const length = globalThis.history.length
+    replaceQuery({ node: "issue-4" })
+    expect(globalThis.location.search).toBe("?c=9&node=issue-4")
+    replaceQuery({ node: null, view: "summary" })
+    expect(globalThis.location.search).toBe("?c=9&view=summary")
+    replaceQuery({ view: "summary" })
+    expect(globalThis.history.length).toBe(length)
   })
 })

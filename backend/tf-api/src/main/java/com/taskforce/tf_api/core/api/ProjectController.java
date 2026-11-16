@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.dto.request.AttachProjectTeamRequest;
 import com.taskforce.tf_api.core.dto.request.CreateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateLabelRequest;
 import com.taskforce.tf_api.core.dto.request.CreateProjectRequest;
+import com.taskforce.tf_api.core.dto.request.ProjectObjectiveRequest;
 import com.taskforce.tf_api.core.dto.request.ProjectRepoLinkRequest;
 import com.taskforce.tf_api.core.dto.request.ProjectTestCommandRequest;
 import com.taskforce.tf_api.core.dto.request.UpdateProjectRequest;
@@ -29,12 +30,14 @@ import com.taskforce.tf_api.core.dto.response.ProjectActivitySeriesResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectHealthPointResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectLabelResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectMemberResponse;
+import com.taskforce.tf_api.core.dto.response.ProjectObjectiveResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectRepoResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectTeamResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectTestCommandResponse;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.ProjectObjectiveService;
 import com.taskforce.tf_api.core.service.ProjectRepoService;
 import com.taskforce.tf_api.core.service.ProjectService;
 import com.taskforce.tf_api.shared.dto.ApiResponse;
@@ -57,6 +60,7 @@ public class ProjectController {
 
     private final ProjectService     projectService;
     private final ProjectRepoService projectRepoService;
+    private final ProjectObjectiveService objectiveService;
     private final UserRepository     userRepository;
 
     // -------------------------------------------------------------------------
@@ -262,6 +266,53 @@ public class ProjectController {
         Long userId = resolveUserId(jwt);
         projectService.deleteProject(slug, id, userId);
         return ResponseEntity.ok(ApiResponse.success("Project deleted", null));
+    }
+
+    // -------------------------------------------------------------------------
+    // Objectif (la vue du workflow, lot W1)
+    // -------------------------------------------------------------------------
+
+    /**
+     * GET /api/workspaces/{slug}/projects/{id}/objective : l'objectif du projet, ou l'objectif vide ({@code goal} null)
+     * quand il n'en a pas, et si l'appelant peut le changer ({@code canEdit}).
+     */
+    @GetMapping("/{id}/objective")
+    public ResponseEntity<ApiResponse<ProjectObjectiveResponse>> getObjective(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Objective retrieved", objectiveService.get(slug, id, userId)));
+    }
+
+    /**
+     * PUT /api/workspaces/{slug}/projects/{id}/objective : pose l'objectif du projet, ou le remplace en entier. Réservé au
+     * responsable du projet et aux propriétaires et administrateurs de l'espace (403 sinon).
+     */
+    @PutMapping("/{id}/objective")
+    public ResponseEntity<ApiResponse<ProjectObjectiveResponse>> setObjective(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id,
+        @Valid @RequestBody ProjectObjectiveRequest request
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Objective saved", objectiveService.set(slug, id, userId, request)));
+    }
+
+    /**
+     * DELETE /api/workspaces/{slug}/projects/{id}/objective : retire l'objectif du projet et rend l'objectif vide. Mêmes
+     * droits que pour le poser.
+     */
+    @DeleteMapping("/{id}/objective")
+    public ResponseEntity<ApiResponse<ProjectObjectiveResponse>> clearObjective(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long id
+    ) {
+        Long userId = resolveUserId(jwt);
+        return ResponseEntity.ok(ApiResponse.success("Objective removed", objectiveService.clear(slug, id, userId)));
     }
 
     // -------------------------------------------------------------------------

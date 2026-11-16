@@ -176,6 +176,49 @@ class DeliveryRunApprovalRepositoryIntegrationTest extends AbstractIntegrationTe
         assertThat(read(otherPerson)).isFalse();
     }
 
+    @Test
+    @DisplayName("findByRunIdInAndStatus : les demandes de ces missions dans cet état, la plus ancienne d'abord (R166)")
+    void requests_of_a_page_of_missions_in_one_state() {
+        // Deux missions de la même issue (une reprise) : un projet n'a qu'une colonne « Backlog ».
+        Issue footer = persistIssue(web, "Fix the footer");
+        DeliveryRun one = persistRun(footer, DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        DeliveryRun two = persistRun(footer, DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        DeliveryRun elsewhere = persistRun(persistIssue(api, "Rate limit"), DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        persistApproval(one, DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        persistApproval(two, DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        persistApproval(two, DeliveryApprovalStatus.ALLOWED, LocalDateTime.now().plusMinutes(5));
+        persistApproval(elsewhere, DeliveryApprovalStatus.PENDING, LocalDateTime.now().plusMinutes(5));
+        em.clear();
+
+        List<DeliveryRunApproval> pending = approvalRepository.findByRunIdInAndStatusOrderByCreatedAtAsc(
+            List.of(one.getId(), two.getId()), DeliveryApprovalStatus.PENDING);
+
+        assertThat(pending).extracting(a -> a.getRun().getId()).containsExactlyInAnyOrder(one.getId(), two.getId());
+        assertThat(pending).extracting(DeliveryRunApproval::getStatus).containsOnly(DeliveryApprovalStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("expireIfPending : une demande qui attend se clôt une fois ; une demande tranchée ne change pas")
+    void a_request_is_expired_once_and_a_decided_one_never() {
+        DeliveryRun run = persistRun(persistIssue(web, "Fix the footer"), DeliveryRunStatus.RUNNING, pierre, LocalDateTime.now());
+        DeliveryRunApproval waiting = approvalRepository.saveAndFlush(DeliveryRunApproval.builder()
+            .run(run).tool("Bash").summary("npm install").status(DeliveryApprovalStatus.PENDING)
+            .expiresAt(LocalDateTime.now().minusMinutes(1)).build());
+        DeliveryRunApproval allowed = approvalRepository.saveAndFlush(DeliveryRunApproval.builder()
+            .run(run).tool("Bash").summary("npm test").status(DeliveryApprovalStatus.ALLOWED)
+            .expiresAt(LocalDateTime.now().minusMinutes(1)).build());
+        LocalDateTime now = LocalDateTime.now();
+
+        int first = approvalRepository.expireIfPending(waiting.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        int second = approvalRepository.expireIfPending(waiting.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        int decided = approvalRepository.expireIfPending(allowed.getId(), now, DeliveryApprovalStatus.PENDING, DeliveryApprovalStatus.EXPIRED);
+        em.clear();
+
+        assertThat(List.of(first, second, decided)).containsExactly(1, 0, 0);
+        assertThat(approvalRepository.findById(waiting.getId()).orElseThrow().getStatus()).isEqualTo(DeliveryApprovalStatus.EXPIRED);
+        assertThat(approvalRepository.findById(allowed.getId()).orElseThrow().getStatus()).isEqualTo(DeliveryApprovalStatus.ALLOWED);
+    }
+
     private Notification persistNotification(User recipient, String issueIdentifier, String type) {
         return notificationRepository.saveAndFlush(Notification.builder()
             .recipient(recipient).workspace(workspace).type(type).urgency("warning").title("A title")

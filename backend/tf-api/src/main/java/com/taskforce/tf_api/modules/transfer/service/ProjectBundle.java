@@ -10,7 +10,7 @@ import java.util.Map;
  * inversement, puisque c'est le même backend des deux côtés : un projet passe ainsi d'un côté à l'autre, ou se garde
  * comme sauvegarde.
  *
- * <p>Ce qui voyage : le projet, ses statuts, types et labels, ses cycles, ses pages, et tous ses tickets (sous-tickets
+ * <p>Ce qui voyage : le projet, son objectif, ses statuts, types et labels, ses cycles, ses pages, et tous ses tickets (sous-tickets
  * et archivés compris) avec leurs labels, commentaires, historique, checklist, temps passé, liens, cycles, pièces
  * jointes et liens GitHub. Ce qui reste : les membres et équipes de l'espace, le Brain OS (propre à l'espace), les
  * connexions et clés (chiffrées pour une seule instance), l'historique des agents.</p>
@@ -53,6 +53,9 @@ final class ProjectBundle {
             Map.of("project_id", "projects", "created_by", "users"), true),
         new Table("pages", "project_id = :project", "id",
             Map.of("project_id", "projects", "created_by", "users"), true),
+        // L'objectif du projet (V133) : une ligne au plus, clée par le projet ; qui l'a posé suit la règle des personnes.
+        new Table("project_objectives", "project_id = :project", "project_id",
+            Map.of("project_id", "projects", "updated_by", "users"), false),
         new Table("issues", "project_id = :project", "id",
             Map.of("project_id", "projects", "status_id", "issue_statuses", "type_id", "issue_types",
                 "assignee_id", "users", "reporter_id", "users", "parent_id", "issues",

@@ -34,5 +34,12 @@ public enum IssueActivityType {
     /** L'issue terminée par la personne, la mission n'ayant rien changé (rejeu de la 1.8.0, V114). */
     MISSION_MARKED_DONE,
     /** La personne a commenté des lignes du diff : la mission repart sur la même branche (R139, V122). */
-    MISSION_CHANGES_ASKED
+    MISSION_CHANGES_ASKED,
+    /**
+     * Un lien posé entre deux issues, gardé sur chacune (V131) : {@code new_value} dit le lien vu de cette issue, puis la
+     * clé de l'autre ({@code BLOCKED_BY WEB-11}).
+     */
+    RELATION_ADDED,
+    /** Un lien retiré entre deux issues, gardé sur chacune (V131) : {@code old_value}, comme pour l'ajout. */
+    RELATION_REMOVED
 }

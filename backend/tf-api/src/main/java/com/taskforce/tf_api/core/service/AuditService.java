@@ -50,6 +50,12 @@ public class AuditService {
     public static final String COMPANY_APP_CHANGED = "COMPANY_APP_CHANGED";
     public static final String SHARED_CONNECTION_CHANGED = "SHARED_CONNECTION_CHANGED";
     public static final String STORAGE_TARGET_CHANGED = "STORAGE_TARGET_CHANGED";
+    /**
+     * L'objectif d'un projet posé ou retiré (la vue du workflow, lot W1). Le détail dit le changement ({@code change} :
+     * {@code set} ou {@code cleared}), le nombre de critères et s'il y a une date visée (pour un retrait : ceux de
+     * l'objectif retiré), jamais le texte du but ni des critères.
+     */
+    public static final String PROJECT_OBJECTIVE_CHANGED = "PROJECT_OBJECTIVE_CHANGED";
 
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;

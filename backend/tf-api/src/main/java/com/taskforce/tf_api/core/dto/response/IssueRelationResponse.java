@@ -20,6 +20,11 @@ public class IssueRelationResponse {
     private IssueSummaryResponse issue;
     /** Issue liée */
     private IssueSummaryResponse relatedIssue;
+    /**
+     * L'issue de l'appel est la cible de la relation telle qu'elle a été posée : {@code relationType} se lit alors depuis
+     * l'autre issue (« A BLOCKS B » lu depuis B dit « B est bloquée par A »), et l'écran la dit dans l'autre sens.
+     */
+    private boolean fromTarget;
     private UserSummaryResponse createdBy;
     private LocalDateTime createdAt;
 }

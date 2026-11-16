@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
 import com.taskforce.tf_api.core.model.DeliveryRun;
+import com.taskforce.tf_api.core.model.DeliveryRunEvent;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
@@ -45,6 +46,7 @@ class DeliveryRunRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Autowired private IssueStatusRepository issueStatusRepository;
     @Autowired private IssueRepository issueRepository;
     @Autowired private DeliveryRunRepository runRepository;
+    @Autowired private DeliveryRunEventRepository eventRepository;
     @Autowired private TestEntityManager em;
     @Autowired private JdbcTemplate jdbc;
 
@@ -124,6 +126,78 @@ class DeliveryRunRepositoryIntegrationTest extends AbstractIntegrationTest {
         em.clear();
 
         assertThat(runRepository.findByProjectIds(List.of(web.getId(), api.getId()), PageRequest.of(0, 2))).hasSize(2);
+    }
+
+    // =========================================================================
+    // Les missions d'un projet (la vue du workflow, R166)
+    // =========================================================================
+
+    @Test
+    @DisplayName("findByProjectId : une page du projet, la plus récemment créée d'abord, comptée, issue et délégant chargés")
+    void project_page_is_scoped_ordered_counted_and_fetched() {
+        DeliveryRun oldest = persistRun(webIssue, PROVIDER, DeliveryRunStatus.DONE, pierre, 60);
+        DeliveryRun middle = persistRun(webIssue, PROVIDER, DeliveryRunStatus.FAILED, pierre, 30);
+        DeliveryRun newest = persistRun(webIssue, PROVIDER, DeliveryRunStatus.RUNNING, pierre, 5);
+        persistRun(apiIssue, PROVIDER, DeliveryRunStatus.RUNNING, pierre, 1); // autre projet : hors de la page
+        // Une mission ancienne qui avance ne remonte pas : l'ordre des pages ne bouge pas avec l'activité.
+        jdbc.update("UPDATE delivery_runs SET updated_at = ? WHERE id = ?", LocalDateTime.now(), oldest.getId());
+        em.clear();
+
+        var first = runRepository.findByProjectId(web.getId(), PageRequest.of(0, 2));
+        var second = runRepository.findByProjectId(web.getId(), PageRequest.of(1, 2));
+
+        assertThat(first.getContent()).extracting(DeliveryRun::getId).containsExactly(newest.getId(), middle.getId());
+        assertThat(second.getContent()).extracting(DeliveryRun::getId).containsExactly(oldest.getId());
+        assertThat(first.getTotalElements()).isEqualTo(3);
+        DeliveryRun read = first.getContent().get(0);
+        assertThat(Hibernate.isInitialized(read.getIssue())).isTrue();
+        assertThat(Hibernate.isInitialized(read.getIssue().getProject())).isTrue();
+        assertThat(Hibernate.isInitialized(read.getStartedBy())).isTrue();
+    }
+
+    @Test
+    @DisplayName("findInProject : une mission de ce projet seulement")
+    void one_run_is_read_in_its_project_only() {
+        DeliveryRun run = persistRun(webIssue, PROVIDER, DeliveryRunStatus.RUNNING, pierre, 5);
+        em.clear();
+
+        assertThat(runRepository.findInProject(run.getId(), web.getId())).isPresent();
+        assertThat(runRepository.findInProject(run.getId(), api.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findFollowUps : les missions qui en reprennent d'autres, de la plus ancienne à la plus récente")
+    void follow_ups_name_their_parent() {
+        DeliveryRun first = persistRun(webIssue, PROVIDER, DeliveryRunStatus.DONE, pierre, 60);
+        DeliveryRun lonely = persistRun(apiIssue, PROVIDER, DeliveryRunStatus.DONE, pierre, 50);
+        DeliveryRun again = persistRun(webIssue, PROVIDER, DeliveryRunStatus.DONE, pierre, 30);
+        DeliveryRun last = persistRun(webIssue, PROVIDER, DeliveryRunStatus.QUEUED, pierre, 5);
+        jdbc.update("UPDATE delivery_runs SET parent_run_id = ? WHERE id IN (?, ?)", first.getId(), again.getId(), last.getId());
+        em.clear();
+
+        List<DeliveryRunRepository.FollowUpRow> rows = runRepository.findFollowUps(List.of(first.getId(), lonely.getId()));
+
+        assertThat(rows).extracting(DeliveryRunRepository.FollowUpRow::getParentId).containsOnly(first.getId());
+        assertThat(rows).extracting(DeliveryRunRepository.FollowUpRow::getRunId).containsExactly(again.getId(), last.getId());
+    }
+
+    @Test
+    @DisplayName("findLastByRunIds : le dernier événement de chaque mission, et rien pour une mission muette")
+    void the_last_event_of_each_run() {
+        DeliveryRun talking = persistRun(webIssue, PROVIDER, DeliveryRunStatus.RUNNING, pierre, 10);
+        DeliveryRun other = persistRun(apiIssue, PROVIDER, DeliveryRunStatus.RUNNING, pierre, 10);
+        DeliveryRun silent = persistRun(webIssue, PROVIDER, DeliveryRunStatus.QUEUED, pierre, 1);
+        for (int seq = 1; seq <= 3; seq++) {
+            eventRepository.save(DeliveryRunEvent.builder().run(talking).seq(seq).kind(seq == 3 ? "test" : "tool").tool("Bash").text("e" + seq).build());
+        }
+        eventRepository.save(DeliveryRunEvent.builder().run(other).seq(1).kind("start").text("Claude Code started").build());
+        eventRepository.flush();
+        em.clear();
+
+        List<DeliveryRunEvent> last = eventRepository.findLastByRunIds(List.of(talking.getId(), other.getId(), silent.getId()));
+
+        assertThat(last).extracting(e -> e.getRun().getId() + ":" + e.getSeq() + ":" + e.getKind())
+            .containsExactlyInAnyOrder(talking.getId() + ":3:test", other.getId() + ":1:start");
     }
 
     // =========================================================================

@@ -7,24 +7,39 @@ import { getSessionToken } from "@/lib/api/session-token"
 import { API_URL } from "@/lib/config/urls"
 import { buildRealtimeUrls } from "@/lib/hooks/use-stomp"
 import { useIssueStore } from "@/lib/store/issue-store"
-import type { Issue } from "@/lib/api/issue-service"
+import type { Issue, ProjectIssueRelation } from "@/lib/api/issue-service"
+
+/** Ce qui change dans le projet sans être une issue : l'objectif, les documents d'une issue (W1). Rien d'autre ne part. */
+export interface ProjectChange {
+  action: "objective.changed" | "attachments.changed"
+  projectId: number
+  issueId: number | null
+}
 
 interface IssueRealtimeEvent {
-  action: "created" | "updated" | "deleted"
+  action: "created" | "updated" | "deleted" | "activity" | "relation.added" | "relation.removed" | ProjectChange["action"]
   projectId: number
   issueId: number
   issue: Issue | null
+  /** Le lien posé ou retiré, pour `relation.added` et `relation.removed` (R166). */
+  relation?: ProjectIssueRelation | null
 }
 
 /**
  * Abonne le board d'un projet aux événements d'issues en temps réel (PROD-1.6).
  * Le backend publie sur `/topic/projects.{projectId}` (IssueService) ; on patche le store
- * (upsert/remove) - idempotent par id, donc pas de doublon avec ses propres actions.
+ * (upsert/remove) - idempotent par id, donc pas de doublon avec ses propres actions. Les liens entre issues posés ou
+ * retirés y passent aussi (R166) : ceux du projet, s'ils sont lus, se mettent à jour. L'objectif du projet et les
+ * documents d'une issue s'y annoncent sans contenu (W1) : `onChange` les reçoit, et l'écran relit ce qu'il montre.
  */
-export function useProjectRealtime(projectId: number | null) {
+export function useProjectRealtime(projectId: number | null, onChange?: (change: ProjectChange) => void) {
   const upsert = useIssueStore((s) => s.upsertIssueLocal)
   const remove = useIssueStore((s) => s.removeIssueLocal)
+  const upsertRelation = useIssueStore((s) => s.upsertRelationLocal)
+  const removeRelation = useIssueStore((s) => s.removeRelationLocal)
   const clientRef = useRef<Client | null>(null)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
 
   useEffect(() => {
     if (globalThis.window === undefined || !projectId) return
@@ -39,8 +54,14 @@ export function useProjectRealtime(projectId: number | null) {
     function handle(msg: IMessage) {
       try {
         const evt = JSON.parse(msg.body) as IssueRealtimeEvent
-        if (evt.action === "deleted") {
+        if (evt.action === "objective.changed" || evt.action === "attachments.changed") {
+          onChangeRef.current?.({ action: evt.action, projectId: evt.projectId, issueId: evt.issueId ?? null })
+        } else if (evt.action === "deleted") {
           remove(evt.issueId)
+        } else if (evt.action === "relation.added" && evt.relation) {
+          upsertRelation(evt.projectId, evt.relation)
+        } else if (evt.action === "relation.removed" && evt.relation) {
+          removeRelation(evt.projectId, evt.relation.id)
         } else if (evt.issue) {
           upsert(evt.issue)
         }
@@ -84,5 +105,5 @@ export function useProjectRealtime(projectId: number | null) {
       clientRef.current = null
       if (current) void current.deactivate()
     }
-  }, [projectId, upsert, remove])
+  }, [projectId, upsert, remove, upsertRelation, removeRelation])
 }
