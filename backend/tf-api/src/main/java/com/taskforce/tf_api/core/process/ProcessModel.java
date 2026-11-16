@@ -89,6 +89,13 @@ public record ProcessModel(
     public static final String PREFILL_LAST_ANSWER = "last-answer";
     public static final List<String> PREFILLS = List.of(PREFILL_LAST_ANSWER);
 
+    /**
+     * L'agent de TaskForce, qui lit et écrit dans TaskForce (les notes, les issues) et jamais dans le code : tout autre
+     * agent ({@code claude-code}...) travaille dans un bac à sable où la table des règles le laisse écrire, confier,
+     * pousser une branche et ouvrir une demande de fusion.
+     */
+    public static final String CORTEX = "cortex";
+
     // Ce qu'attend une attente : une durée, ou un message (un document fourni, une réponse).
     public static final String TIMER = "timer";
     public static final String MESSAGE = "message";

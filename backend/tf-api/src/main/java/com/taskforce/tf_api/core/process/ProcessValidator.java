@@ -1386,8 +1386,17 @@ public final class ProcessValidator {
             }
         }
 
-        /** Vrai pour une zone dont une règle, la sienne ou celle d'une de ses étapes, laisse l'agent changer le code. */
+        /**
+         * Vrai pour une zone dont le travail peut changer le code : un agent autre que Cortex, que rien ne tient aux
+         * règles que la zone cite (la table de TaskForce laisse tout agent écrire des fichiers, les confier, pousser une
+         * branche tf/** et ouvrir une demande de fusion ; R159, troisième passe, H2), ou une règle, la sienne ou celle
+         * d'une de ses étapes, qui le permet.
+         */
         private boolean changesCode(Step zone) {
+            if (zone.stepsOrEmpty().stream().anyMatch(s -> AGENT.equals(s.type())
+                && (s.agent() == null || !ProcessModel.CORTEX.equals(s.agent().provider())))) {
+                return true;
+            }
             List<RuleRef> rules = new ArrayList<>(zone.rules() == null ? List.of() : zone.rules());
             zone.stepsOrEmpty().forEach(s -> rules.addAll(s.rules() == null ? List.of() : s.rules()));
             return rules.stream().anyMatch(r -> r.ref() != null && context.codeRules().contains(r.ref()));

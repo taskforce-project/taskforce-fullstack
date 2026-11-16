@@ -155,6 +155,37 @@ public class ProcessValidatorTest {
         flows(root).add(newFlow("build-more-accept", "build-more", "accept"));
     }
 
+    /**
+     * Une phase « Polish » entre la revue et la recette, après le point d'avant d'appliquer (H2 de la troisième passe sur
+     * #538) : un point d'avant une mission, puis une zone où l'agent {@code provider} écrit le code du module, sous les
+     * seules règles {@code rules}.
+     */
+    public static void polish(ObjectNode root, String provider, String... rules) {
+        ObjectNode stage = JSON.createObjectNode().put("id", "polish").put("type", "stage").put("name", "Polish");
+        steps(stage).add(JSON.createObjectNode().put("id", "polish-start").put("type", "start"));
+        ObjectNode point = step(root, "before-mission-build").deepCopy();
+        point.put("id", "before-mission-polish").put("name", "Before the agents polish the module");
+        steps(stage).add(point);
+        ObjectNode zone = JSON.createObjectNode().put("id", "polish-zone").put("type", "zone")
+            .put("name", "Polish the module").put("answeredBy", "project-lead");
+        ArrayNode refs = zone.putArray("rules");
+        for (String rule : rules) {
+            refs.addObject().put("ref", rule);
+        }
+        ObjectNode agent = JSON.createObjectNode().put("id", "polish-code").put("type", "agent")
+            .put("name", "Write the module's code").put("answeredBy", "project-lead");
+        agent.putObject("agent").put("provider", provider);
+        steps(zone).add(agent);
+        steps(stage).add(zone);
+        steps(stage).add(JSON.createObjectNode().put("id", "polish-end").put("type", "end"));
+        flows(stage).add(newFlow("polish-start-point", "polish-start", "before-mission-polish"));
+        flows(stage).add(newFlow("polish-point-zone", "before-mission-polish", "polish-zone"));
+        flows(stage).add(newFlow("polish-zone-end", "polish-zone", "polish-end"));
+        steps(root).add(stage);
+        flow(root, "review-accept").put("to", "polish");
+        flows(root).add(newFlow("polish-accept", "polish", "accept"));
+    }
+
     /** Une décision devant le point d'avant de livrer, dont le chemin « signée » va droit à la livraison. */
     static void signedBypass(ObjectNode root) {
         ObjectNode deliver = step(root, "deliver");
@@ -338,6 +369,17 @@ public class ProcessValidatorTest {
                     ObjectNode agent = step(r, "write-notes");
                     agent.putArray("rules").addObject().put("ref", "open-pull-request");
                 }),
+            // Un agent autre que Cortex change le code, quelles que soient les règles que sa zone cite (R159, troisième
+            // passe, H2) : la table de TaskForce le laisse écrire, confier, pousser une branche tf/** et ouvrir une demande.
+            refusal("changeWithoutPausePoint", "un agent claude-code qui écrit le code après le point d'avant "
+                + "d'appliquer, sa zone ne citant que read-files et create-note",
+                r -> polish(r, "claude-code", "read-files", "create-note")),
+            refusal("changeWithoutPausePoint", "le même, sa zone ne citant que no-agent-push, une interdiction",
+                r -> polish(r, "claude-code", "no-agent-push")),
+            refusal("changeWithoutPausePoint", "le même, sa zone ne citant que run-reads",
+                r -> polish(r, "claude-code", "run-reads")),
+            refusal("changeWithoutPausePoint", "le même, sa zone ne citant que write-company-tools",
+                r -> polish(r, "claude-code", "write-company-tools")),
             // Un point de pause ne se contourne pas (R159, H1).
             refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant les agents, qui mène à leur zone",
                 r -> deadline(r, "specify", "before-mission", "spec-zone")),
@@ -746,6 +788,22 @@ public class ProcessValidatorTest {
                     + "that changes the code passes it on every way to the delivery. Put that pause point after “Prepare "
                     + "the release notes”.");
             });
+    }
+
+    @Test
+    @DisplayName("ce qui change le code se lit aussi dans l'agent : un autre que Cortex le change, quelles que soient les "
+        + "règles de sa zone ; Cortex, qui ne lit et n'écrit que dans TaskForce, non")
+    void an_agent_other_than_cortex_changes_the_code() {
+        ObjectNode claude = e20();
+        polish(claude, "claude-code", "read-files", "create-note");
+        ObjectNode cortex = e20();
+        polish(cortex, "cortex", "read-files", "create-note");
+
+        assertThat(check(claude)).singleElement().satisfies(p -> {
+            assertThat(p.code()).isEqualTo("changeWithoutPausePoint");
+            assertThat(p.stepId()).isEqualTo("polish-zone");
+        });
+        assertThat(check(cortex)).isEmpty();
     }
 
     @Test
