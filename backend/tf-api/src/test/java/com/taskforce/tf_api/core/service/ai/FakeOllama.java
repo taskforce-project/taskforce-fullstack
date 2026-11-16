@@ -12,6 +12,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -75,6 +76,7 @@ public final class FakeOllama implements AutoCloseable {
     private final List<Chat> chats = new CopyOnWriteArrayList<>();
     private final CountDownLatch asked = new CountDownLatch(1);
     private final CountDownLatch release = new CountDownLatch(1);
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private volatile long loadMillis;
     private volatile String answer = "ok";
@@ -143,8 +145,10 @@ public final class FakeOllama implements AutoCloseable {
         return chats.stream().filter(chat -> !chat.load()).toList();
     }
 
+    /** Arrête Ollama : la connexion est refusée ensuite. Une seconde fois ne fait rien. */
     @Override
     public void close() {
+        if (closed.getAndSet(true)) return;
         release.countDown();
         server.stop(0);
         executor.shutdownNow();

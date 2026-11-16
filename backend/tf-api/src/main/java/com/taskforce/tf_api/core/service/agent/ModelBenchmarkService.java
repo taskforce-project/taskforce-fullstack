@@ -316,7 +316,8 @@ public class ModelBenchmarkService {
 
     /**
      * Joue et note un cas d'un passage, une seule fois. Le quota et le frein de débit de l'IA valent comme pour une réponse. Un
-     * cas qui dépasse son budget se note « trop lent » ; une panne du modèle se dit, sans note, pour qu'on rejoue le cas.
+     * cas qui dépasse son budget se note « trop lent » ; une panne du modèle se dit, avec sa cause ({@link ModelRunFailure}) et
+     * sans note, pour qu'on rejoue le cas.
      */
     public CaseDetail play(String slug, Long userId, Long runId, String caseKey) {
         Workspace ws = access.resolveAndAuthorize(slug, userId);
@@ -350,7 +351,7 @@ public class ModelBenchmarkService {
             grade = new EvalGrader.Grade(false, List.of(new EvalGrader.Check(ModelCapabilityService.ANSWERS_IN_TIME, false,
                 ModelCapabilityService.TOO_SLOW_DETAIL)));
         } catch (AiGatewayClient.LlmException down) {
-            throw new BusinessException("MODEL_FAILED", run.getModel() + " stopped answering on this machine. Run it again, or leave it out of the run.");
+            throw ModelRunFailure.of(run.getModel(), down, "Run it again, or leave it out of the run.");
         }
         long durationMs = (System.nanoTime() - started) / 1_000_000;
         recordUsage(ws.getId(), outcome.usage());
@@ -517,7 +518,8 @@ public class ModelBenchmarkService {
             answer.setAnswer("");
             answer.setTooSlow(true);
         } catch (AiGatewayClient.LlmException down) {
-            throw new BusinessException("MODEL_FAILED", "This model stopped answering on this machine. Try again, or try another model.");
+            // Sans le nom du modèle : l'essai ne le dit qu'après le choix de la personne.
+            throw ModelRunFailure.of(null, down, "Try again, or try another model.");
         }
         answer.setDurationMs((System.nanoTime() - started) / 1_000_000);
         trialAnswers.save(answer);

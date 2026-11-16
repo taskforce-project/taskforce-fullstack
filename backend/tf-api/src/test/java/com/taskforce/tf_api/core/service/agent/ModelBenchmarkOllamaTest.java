@@ -34,6 +34,7 @@ import com.taskforce.tf_api.core.service.ai.FakeOllama;
 import com.taskforce.tf_api.core.service.ai.ModelDeadline;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -171,6 +172,31 @@ class ModelBenchmarkOllamaTest {
         service.stop("acme", 7L);
 
         assertThatThrownBy(() -> playing.get(10, TimeUnit.SECONDS)).hasCauseInstanceOf(ModelCallStops.Stopped.class);
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("un vrai refus d'Ollama dit sa cause, en mots : le modèle ne tient pas en mémoire")
+    void aRealFailureSaysItsCause() {
+        service.load("acme", 7L, RUN);
+        ollama.refuses(500, "{\"error\":\"model requires more system memory (7.2 GiB) than is available (1.8 GiB)\"}");
+
+        assertThatThrownBy(() -> service.play("acme", 7L, RUN, CODE_CASE)).isInstanceOfSatisfying(BusinessException.class, failure -> {
+            assertThat(failure.getErrorCode()).isEqualTo("MODEL_FAILED");
+            assertThat(failure.getMessage()).isEqualTo("mimo-v2.6:9b doesn't fit in this machine's memory right now. Run it again, "
+                + "or leave it out of the run.");
+        });
+        verify(results, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ollama arrêté au milieu du passage : le cas le dit, sans en accuser le modèle")
+    void ollamaStopsDuringTheRun() {
+        service.load("acme", 7L, RUN);
+        ollama.close();
+
+        assertThatThrownBy(() -> service.play("acme", 7L, RUN, CODE_CASE))
+            .hasMessage("The AI doesn't answer. Check that it is running. Run it again, or leave it out of the run.");
         verify(results, never()).save(any());
     }
 

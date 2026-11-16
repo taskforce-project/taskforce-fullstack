@@ -153,7 +153,7 @@ public class ModelCapabilityService {
             outcome = new ReplayOutcome("", List.of(), run.getModel(), LlmUsage.ZERO);
             grade = new EvalGrader.Grade(false, List.of(new EvalGrader.Check(ANSWERS_IN_TIME, false, TOO_SLOW_DETAIL)));
         } catch (AiGatewayClient.LlmException down) {
-            throw new BusinessException("MODEL_FAILED", run.getModel() + " stopped answering on this machine. Run it again, or leave it out of the run.");
+            throw ModelRunFailure.of(run.getModel(), down, "Run it again, or leave it out of the run.");
         }
         recordUsage(ws.getId(), outcome.usage());
         long prompt = outcome.usage() == null ? 0 : outcome.usage().promptTokens();
