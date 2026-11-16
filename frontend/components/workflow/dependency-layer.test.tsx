@@ -31,9 +31,26 @@ describe("Show all links", () => {
       )
     }
     const { container } = render(<Board />)
-    // issue-9 n'est pas à l'écran : sur trois arêtes visibles, deux se dessinent, la troisième se dit.
+    // issue-9 n'est pas à l'écran : sur trois arêtes visibles, deux se dessinent ; les deux autres se disent.
     await waitFor(() => expect(container.querySelectorAll("path.stroke-primary")).toHaveLength(2))
-    expect(screen.getByText("and 1 more links")).toBeInTheDocument()
+    expect(screen.getByText("and 2 more links")).toBeInTheDocument()
+  })
+
+  it("says how many links it doesn't draw, even when none of their cards is on screen", async () => {
+    const board = { current: null as HTMLDivElement | null }
+    const edges: DependencyEdge[] = [
+      { from: "issue-7", to: "issue-8", side: "blocks" },
+      { from: "issue-8", to: "issue-9", side: "blocks" },
+    ]
+    const { container } = render(
+      <div ref={(element) => { board.current = element }}>
+        <div data-node-key="issue-1" />
+        <DependencyLayer boardRef={board} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} limit={200}
+          moreLabel={(count) => `and ${count} more links`} />
+      </div>,
+    )
+    expect(await screen.findByText("and 2 more links")).toBeInTheDocument()
+    expect(container.querySelectorAll("path.stroke-primary")).toHaveLength(0)
   })
 })
 

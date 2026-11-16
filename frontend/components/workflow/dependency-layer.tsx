@@ -119,7 +119,8 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
         key: `${edge.from}>${edge.to}`, d: edgePath(from, to), side: edge.side,
         strong: focus === null || edge.from === focus || edge.to === focus,
       })))
-      setBeyond(Math.max(0, seen.length - limit))
+      // Ce qui ne se dessine pas, dit en nombre : au-delà de la limite, et les liens dont une carte n'est pas à l'écran.
+      setBeyond(Math.max(0, edges.length - Math.min(seen.length, limit)))
     }
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure) }
     schedule()
@@ -137,12 +138,13 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
     }
   }, [boardRef, edges, limit, revision, focus])
 
-  if (drawn.length === 0) return null
+  const more = moreLabel && beyond > 0 ? moreLabel(beyond) : null
+  if (drawn.length === 0 && !more) return null
   return (
     <>
-    {moreLabel && beyond > 0 && (
+    {more && (
       <p data-links-more className="pointer-events-none absolute bottom-2 left-3 z-20 bg-background/90 px-1.5 text-xs text-muted-foreground">
-        {moreLabel(beyond)}
+        {more}
       </p>
     )}
     {/* Sous les colonnes (le plateau est au-dessus, z-10) : les cartes, opaques, cachent ce qui passe dessous. */}
