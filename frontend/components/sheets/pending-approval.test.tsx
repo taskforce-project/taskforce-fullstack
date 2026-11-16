@@ -106,7 +106,7 @@ describe("PendingApproval : ce que l'agent demande, en mots (R78, R133)", () => 
     vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
     show(approval({ tool: "git push", askedBy: "runner", action: "git.push" }));
 
-    expect(screen.getByRole("group", { name: "TaskForce wants to push the branch" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "TaskForce wants to send the branch to the repository" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Allow for this mission" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Allow" }));
 

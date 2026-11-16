@@ -2396,7 +2396,8 @@ export const CONSTANTS_EN = {
         ifRefused: "The file stays.",
       },
       "git.push": {
-        want: "push the branch",
+        // The words of the mission's sequence (missionSequence.gestures.pushed), read the same in the chat and the workflow.
+        want: "send the branch to the repository",
         will: "Send the branch to the repository on GitHub, where the people who see the repository can read it.",
         ifRefused: "The branch stays on this computer.",
       },
