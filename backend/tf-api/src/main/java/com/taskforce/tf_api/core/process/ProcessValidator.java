@@ -241,13 +241,13 @@ public final class ProcessValidator {
                 settings(step);
             }
             boolean sound = problems.stream().noneMatch(p -> STRUCTURAL.contains(p.code()));
-            if (sound) {
-                Graph graph = Graph.of(model);
+            Graph graph = sound ? Graph.of(model) : null;
+            if (graph != null) {
                 conditions(graph);
                 decisionLoops(graph);
                 pausePoints(graph);
             }
-            locked();
+            locked(graph);
             return problems;
         }
 
@@ -1353,9 +1353,11 @@ public final class ProcessValidator {
 
         /**
          * Les étapes verrouillées ne s'en vont jamais (ADR-027, séance n°25) : celles de la version en vigueur, et celles
-         * du workflow par défaut dont le processus dérive, restent là, verrouillées par la même source.
+         * du workflow par défaut dont le processus dérive, restent là, verrouillées par la même source, et à leur place :
+         * ce qu'elles précédaient sur tout chemin, elles le précèdent encore (quand la forme du processus permet de le
+         * lire).
          */
-        private void locked() {
+        private void locked(Graph graph) {
             List<ProcessModel> bases = new ArrayList<>(context.bases());
             if (model.derivedFrom() != null) {
                 ProcessModel origin = context.defaults().get(model.derivedFrom());
@@ -1368,6 +1370,7 @@ public final class ProcessValidator {
             }
             Set<String> reported = new HashSet<>();
             for (ProcessModel base : bases) {
+                Graph before = null;
                 for (Step required : base.allSteps()) {
                     if (required.lock() == null || required.id() == null || !reported.add(required.id())) {
                         continue;
@@ -1381,9 +1384,42 @@ public final class ProcessValidator {
                         || !Objects.equals(kept.lock(), required.lock())) {
                         add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
                             + "required by " + source + ": it stays what it is, and locked.");
+                    } else if (graph != null) {
+                        if (before == null) {
+                            before = Graph.of(base);
+                        }
+                        String lost = lostPlace(before, graph, required.id());
+                        if (lost != null) {
+                            add("lockedStepMoved", required.id(), required.name(), "“" + required.label() + "” is "
+                                + "required by " + source + " before “" + label(lost) + "”: a locked step keeps its place, "
+                                + "and what came after it still comes after it.");
+                        }
                     }
                 }
             }
+        }
+
+        /**
+         * Une étape que l'étape verrouillée précédait sur tout chemin dans sa base, et qu'un chemin du processus rejoint
+         * maintenant sans elle ; une étape qu'on voit (une étape, une échéance, un échec) d'abord ; null quand il n'y en a
+         * pas.
+         */
+        private String lostPlace(Graph before, Graph after, String locked) {
+            Set<String> around = after.reachableAvoiding(Set.of(locked));
+            String lost = null;
+            for (String id : before.dominatedBy(locked)) {
+                Step step = byId.get(id);
+                if (step == null || !around.contains(id)) {
+                    continue;
+                }
+                if (step.workStep() || step.boundary()) {
+                    return id;
+                }
+                if (lost == null) {
+                    lost = id;
+                }
+            }
+            return lost;
         }
 
         private static String source(Lock lock) {
@@ -1500,6 +1536,14 @@ public final class ProcessValidator {
         boolean reaches(String from, String to) {
             Set<String> next = edges.getOrDefault(from, Set.of());
             return walk(next, edges).contains(to);
+        }
+
+        /** Ce que {@code id} précède sur tout chemin depuis le début : ce qu'on ne rejoint plus sans passer par lui. */
+        Set<String> dominatedBy(String id) {
+            Set<String> out = new LinkedHashSet<>(reachableAvoiding(Set.of()));
+            out.removeAll(reachableAvoiding(Set.of(id)));
+            out.remove(id);
+            return out;
         }
 
         /** Ce qu'on rejoint depuis le début sans passer par {@code avoided}. */

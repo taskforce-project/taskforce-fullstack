@@ -586,8 +586,8 @@ public class ProcessValidatorTest {
         Set<String> tested = new java.util.HashSet<>();
         refusals().forEach(a -> tested.add((String) a.get()[0]));
         // Les cas écrits à part, plus bas : ceux qui demandent un contexte, un fichier importé ou un grand processus.
-        tested.addAll(Set.of("tooLarge", "tooDeep", "lockedStepMissing", "lockedStepUnlocked", "notInSubset", "badPerson",
-            "unknownRule"));
+        tested.addAll(Set.of("tooLarge", "tooDeep", "lockedStepMissing", "lockedStepUnlocked", "lockedStepMoved",
+            "notInSubset", "badPerson", "unknownRule"));
         String source = java.nio.file.Files.readString(java.nio.file.Path.of(
             "src/main/java/com/taskforce/tf_api/core/process/ProcessValidator.java"));
         Set<String> codes = new java.util.TreeSet<>();
@@ -622,6 +622,27 @@ public class ProcessValidatorTest {
                 assertThat(p.stepId()).isEqualTo("before-delivery");
                 assertThat(p.message()).isEqualTo("“Before delivering” is required by a pause point: it can't be removed.");
             });
+    }
+
+    @Test
+    @DisplayName("une étape verrouillée garde sa place : la liste d'avant de livrer ne passe pas après la livraison")
+    void a_locked_step_keeps_its_place() {
+        ObjectNode next = e20();
+        ObjectNode deliver = step(next, "deliver");
+        flow(deliver, "deliver-start-before-delivery").put("to", "deliver-module");
+        flow(deliver, "before-delivery-deliver-module").put("from", "deliver-module").put("to", "before-delivery");
+        flow(deliver, "deliver-module-watch").put("from", "before-delivery");
+
+        assertThat(check(next)).isEmpty();
+        List<Problem> problems = ProcessValidator.check(model(next),
+            new Context(List.of(ProcessFixtures.integrateAModule()), Map.of(), null, null));
+
+        assertRefused(problems, "lockedStepMoved");
+        assertThat(problems).singleElement().satisfies(p -> {
+            assertThat(p.stepId()).isEqualTo("before-delivery");
+            assertThat(p.message()).isEqualTo("“Before delivering” is required by a pause point before “Deliver the "
+                + "module”: a locked step keeps its place, and what came after it still comes after it.");
+        });
     }
 
     @Test
