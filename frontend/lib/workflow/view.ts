@@ -1,7 +1,8 @@
+import type { IssueStatusCategory } from "@/lib/api/issue-service"
 import type { StageModel, WorkflowModel, WorkflowNode } from "@/lib/workflow/model"
 import { issueKey } from "@/lib/workflow/model"
 import {
-  ATTENTION, EXCEPTIONS, FILTER_STATE, STATE_RANK, TERMINAL, type Density, type WorkflowFilter,
+  ATTENTION, EXCEPTIONS, FILTER_STATE, STATE_RANK, TERMINAL, type Density, type WorkflowFilter, type WorkflowState,
 } from "@/lib/workflow/states"
 
 /**
@@ -201,9 +202,23 @@ export function relatedKeys(node: WorkflowNode | null): ReadonlySet<string> {
   return new Set([node.key, ...node.blockedBy.map((o) => issueKey(o.id)), ...node.blocks.map((o) => issueKey(o.id))])
 }
 
-/** Le compte d'une colonne en Summary, des exceptions au reste : « 1 needs you · 3 working · 9 done ». */
+/**
+ * L'état que le nom d'une colonne dit déjà : Done pour une colonne finie, Skipped pour une colonne annulée, Not started pour
+ * une colonne de travail pas commencé. Son compte ne le redit pas : « Cancelled 1 · 1 skipped » disait deux mots pour une
+ * seule chose (R161, L5).
+ */
+const SAID_BY_COLUMN: Readonly<Partial<Record<IssueStatusCategory, WorkflowState>>> = {
+  BACKLOG: "notStarted", UNSTARTED: "notStarted", COMPLETED: "done", CANCELLED: "skipped",
+}
+
+/**
+ * Le compte d'une colonne en Summary, des exceptions au reste : « 1 needs you · 3 working ». Ce que le nom de la colonne
+ * dit déjà ne s'y redit pas ; une colonne où rien d'autre ne se passe n'a pas de compte (une chaîne vide).
+ */
 export function stageCountLine(stage: StageModel, words: Readonly<Record<string, string>>, fill: (text: string, values: Record<string, number>) => string): string {
+  const said = SAID_BY_COLUMN[stage.status.category]
   return Object.entries(stage.counts)
+    .filter(([state, count]) => state !== said && (count ?? 0) > 0)
     .sort(([a], [b]) => STATE_RANK[a as keyof typeof STATE_RANK] - STATE_RANK[b as keyof typeof STATE_RANK])
     .map(([state, count]) => fill(words[state] ?? "", { count: count ?? 0 }))
     .join(" · ")

@@ -6,13 +6,14 @@ import type { NodeView } from "./workflow-node"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { buildWorkflow } from "@/lib/workflow/model"
 import { columnRows } from "@/lib/workflow/view"
-import { DONE, issue, ME, STATUSES, TODO } from "@/lib/workflow/__tests__/fixtures"
+import type { ProjectRun } from "@/lib/api/delivery-service"
+import { deliveryRun, DONE, issue, ME, projectRun, STATUSES, TODO } from "@/lib/workflow/__tests__/fixtures"
 
 const t = CONSTANTS_EN.workflow
 const handlers = { onSelect: vi.fn(), onOpen: vi.fn(), onAction: vi.fn() }
 
-function setup(issues = Array.from({ length: 8 }, (_, i) => issue(i + 1, { status: DONE }))) {
-  const model = buildWorkflow({ statuses: STATUSES, issues, runs: [], relations: [], documents: {}, me: ME, today: "2026-11-13" })
+function setup(issues = Array.from({ length: 8 }, (_, i) => issue(i + 1, { status: DONE })), runs: ProjectRun[] = []) {
+  const model = buildWorkflow({ statuses: STATUSES, issues, runs, relations: [], documents: {}, me: ME, today: "2026-11-13" })
   const views = new Map<string, NodeView>([...model.byKey.values()].map((node) => [node.key, {
     node, sentence: null, governance: { rules: 0, ruleReasons: [], signed: null, documents: 0 }, action: null, agent: null, detail: null, who: "Nobody",
   }]))
@@ -38,15 +39,17 @@ describe("StageColumn", () => {
     expect(onShowDone).toHaveBeenCalledWith(DONE.id)
   })
 
-  it("in Summary, a count line from the exceptions to the rest", () => {
-    const { model, views } = setup([issue(1), issue(2)])
+  it("in Summary, a count line from the exceptions to the rest, without what the column's name says", () => {
+    const { model, views } = setup([issue(1), issue(2)], [projectRun(deliveryRun(1, 2, { status: "FAILED", error: "Tests failed" }))])
     const stage = model.stages.find((s) => s.status.id === TODO.id)
     if (!stage) throw new Error("no stage")
     render(
       <StageColumn stage={stage} rows={[]} density="summary" views={views} selectedKey={null} focusKey={null} related={null}
         revealKey={null} t={t} handlers={handlers} onShowDone={vi.fn()} onShowAll={vi.fn()} onOpenParent={vi.fn()} />,
     )
-    expect(screen.getByText("2 not started")).toBeInTheDocument()
+    expect(screen.getByText("1 failed")).toBeInTheDocument()
+    // « Todo » dit déjà « pas commencé » : le compte ne le redit pas (R161, L5).
+    expect(screen.queryByText(/not started/)).toBeNull()
     // La colonne de Summary se partage la largeur libre, 160 px au moins (R161, H5).
     const section = document.querySelector<HTMLElement>("[data-stage]") as HTMLElement
     expect(section.style.flex).toBe("1 1 160px")

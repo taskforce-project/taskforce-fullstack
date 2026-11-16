@@ -109,11 +109,9 @@ export const StageColumn = memo(function StageColumn({
       )}
     </div>
   )
-  const countLine = density === "summary" && total > 0 ? (
-    <p className="shrink-0 px-3 pb-2 text-[11px] leading-4 text-muted-foreground">
-      {stageCountLine(stage, t.countOf, fillText)}
-    </p>
-  ) : null
+  // Le compte de Summary ; rien quand la colonne ne compte que ce que son nom dit déjà.
+  const counted = density === "summary" && total > 0 ? stageCountLine(stage, t.countOf, fillText) : ""
+  const countLine = counted ? <p className="shrink-0 px-3 pb-2 text-[11px] leading-4 text-muted-foreground">{counted}</p> : null
 
   if (stacked) {
     return (

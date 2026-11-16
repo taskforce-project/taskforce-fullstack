@@ -9,7 +9,7 @@ import {
 } from "@/lib/workflow/view"
 import { COLUMN_WIDTH, DENSITIES, isDensity, isFilter, STATE_RANK, TERMINAL, WORKFLOW_STATES } from "@/lib/workflow/states"
 import {
-  approval, deliveryRun, DOING, DONE, issue, ME, projectRun, relation, STATUSES, TODO,
+  approval, CANCELLED, deliveryRun, DOING, DONE, issue, ME, projectRun, relation, STATUSES, TODO,
 } from "@/lib/workflow/__tests__/fixtures"
 
 const base = { statuses: STATUSES, runs: [], relations: [], documents: {}, me: ME, today: "2026-11-13" }
@@ -162,6 +162,18 @@ describe("les dépendances du nœud choisi", () => {
       runs: [projectRun(deliveryRun(1, 4), [approval(1)])],
     })
     expect(stageCountLine(model.stages[1], CONSTANTS_EN.workflow.countOf, fillText)).toBe("1 needs you · 2 working")
+  })
+
+  it("le compte ne redit pas ce que le nom de la colonne dit : ni « 1 skipped » sous « Cancelled », ni « done » sous « Done » (R161, L5)", () => {
+    const model = buildWorkflow({
+      ...base,
+      issues: [issue(1), issue(2), issue(3, { status: DONE }), issue(4, { status: CANCELLED })],
+      runs: [projectRun(deliveryRun(1, 2, { status: "FAILED", error: "Tests failed" }))],
+    })
+    const line = (index: number) => stageCountLine(model.stages[index], CONSTANTS_EN.workflow.countOf, fillText)
+    expect(line(0)).toBe("1 failed")
+    expect(line(2)).toBe("")
+    expect(line(3)).toBe("")
   })
 })
 
