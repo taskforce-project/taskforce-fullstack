@@ -625,6 +625,29 @@ public class ProcessValidatorTest {
     }
 
     @Test
+    @DisplayName("une liste verrouillée garde ses lignes, qui la signe, ce que signer veut dire et son ouverture ; des "
+        + "lignes s'ajoutent")
+    void a_locked_checklist_keeps_its_lines() {
+        Context context = new Context(List.of(), Map.of("integrate-a-module", ProcessFixtures.integrateAModule()),
+            null, null);
+        ObjectNode emptied = e20();
+        emptied.put("key", "integrate-billing").put("derivedFrom", "integrate-a-module");
+        ObjectNode human = (ObjectNode) step(emptied, "before-mission-build").get("human");
+        human.remove("prefill");
+        human.putArray("checklist").add("Fine.");
+        ObjectNode longer = e20();
+        longer.put("key", "integrate-billing").put("derivedFrom", "integrate-a-module");
+        ((ArrayNode) step(longer, "before-mission-build").get("human").get("checklist"))
+            .add("The client's tester knows the build starts.");
+
+        List<Problem> problems = ProcessValidator.check(model(emptied), context);
+
+        assertRefused(problems, "lockedStepUnlocked");
+        assertThat(problems).singleElement().extracting(Problem::stepId).isEqualTo("before-mission-build");
+        assertThat(ProcessValidator.check(model(longer), context)).isEmpty();
+    }
+
+    @Test
     @DisplayName("une étape verrouillée garde sa place : la liste d'avant de livrer ne passe pas après la livraison")
     void a_locked_step_keeps_its_place() {
         ObjectNode next = e20();

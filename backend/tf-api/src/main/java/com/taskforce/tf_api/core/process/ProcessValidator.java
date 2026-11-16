@@ -1384,6 +1384,10 @@ public final class ProcessValidator {
                         || !Objects.equals(kept.lock(), required.lock())) {
                         add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
                             + "required by " + source + ": it stays what it is, and locked.");
+                    } else if (!keepsItsTask(required.human(), kept.human())) {
+                        add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
+                            + "required by " + source + ": it keeps its kind, who does it, what signing it means, its "
+                            + "opening on the last answer and every line of its checklist. Lines can be added.");
                     } else if (graph != null) {
                         if (before == null) {
                             before = Graph.of(base);
@@ -1397,6 +1401,23 @@ public final class ProcessValidator {
                     }
                 }
             }
+        }
+
+        /**
+         * Une tâche humaine verrouillée reste la même : sa sorte, qui la fait, ce que signer veut dire, son ouverture sur
+         * la dernière réponse, et chaque ligne de sa liste ; des lignes peuvent s'ajouter.
+         */
+        private static boolean keepsItsTask(HumanTask was, HumanTask now) {
+            if (was == null) {
+                return true;
+            }
+            if (now == null) {
+                return false;
+            }
+            return Objects.equals(was.kind(), now.kind()) && Objects.equals(was.who(), now.who())
+                && Objects.equals(was.meaning(), now.meaning())
+                && (was.prefill() == null || was.prefill().equals(now.prefill()))
+                && (was.checklist() == null || (now.checklist() != null && now.checklist().containsAll(was.checklist())));
         }
 
         /**
