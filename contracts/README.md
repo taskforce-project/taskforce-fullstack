@@ -10,6 +10,7 @@ cases.
 | Evidence file, `taskforce-evidence/1` | `evidence/taskforce-evidence-1.schema.json` | the server writes the chain, anyone can check an export | `evidence/chain-cases.json`: the same events must give the same hashes on both sides |
 | Agent adapter | `agent/adapter.md` | the runner, one adapter per agent | the adapter tests in `taskforce-runner` |
 | Mission step, `taskforce-mission-steps/1` | `mission-steps/cases.json` | the server gives the step of each mission to the workflow view (`MissionSteps`), the screen draws the steps of one mission (`frontend/lib/delivery/mission-sequence.ts`) | the same cases: the same status, timeline and requests must give the same step on both sides |
+| Process, `taskforce-process/1` | `process/README.md` (the BPMN 2.0 subset, the `tf:` extension), `process/taskforce-process-1.xsd`, `process/integrate-a-module.bpmn` | the server exports and imports it; any BPMN modeler opens it | `ProcessContractTest` (the XSD, the round trip, the subset frozen on E20) and `frontend/lib/process/bpmn-moddle.test.ts` (bpmn-moddle reads and rewrites it) |
 
 ## One engine for both sides
 

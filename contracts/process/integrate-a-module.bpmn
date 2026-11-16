@@ -1,0 +1,1135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:tf="https://taskforce-project.fr/schema/process/1" id="integrate-a-module.definitions" targetNamespace="https://taskforce-project.fr/processes" exporter="TaskForce" exporterVersion="taskforce-process/1">
+  <bpmn:message id="acceptance-report.message" name="The acceptance report from the client's tester"/>
+  <bpmn:process id="integrate-a-module" name="Integrate a module" isExecutable="true">
+    <bpmn:documentation>The default workflow of software delivery: integrate a new module into the company's base tool, from its scope to its delivery, with who answers for each step, who decides, and three pause points: before every agent mission (the checklist opens with its last answer), before the agents' changes are applied, and before the work is delivered.</bpmn:documentation>
+    <bpmn:extensionElements>
+      <tf:process format="taskforce-process/1"/>
+    </bpmn:extensionElements>
+    <bpmn:startEvent id="requested" name="Module requested">
+      <bpmn:outgoing>requested-frame</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:subProcess id="frame" name="Frame">
+      <bpmn:incoming>requested-frame</bpmn:incoming>
+      <bpmn:outgoing>frame-go-ahead</bpmn:outgoing>
+      <bpmn:startEvent id="frame-start" name="Framing starts">
+        <bpmn:outgoing>frame-start-write-scope</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="write-scope" name="Write the module's scope">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:human who="project-lead" kind="input" question="What must the module do, and by when?">
+              <tf:field id="goal" label="What the module must do" type="text"/>
+              <tf:field id="due" label="When it is needed" type="date"/>
+              <tf:field id="out-of-scope" label="What it won't do" type="text"/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>frame-start-write-scope</bpmn:incoming>
+        <bpmn:outgoing>write-scope-approve-scope</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:userTask id="approve-scope" name="Approve the scope">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="role:owner">
+            <tf:human who="role:owner" kind="approval" meaning="approval" question="Do we integrate this module, with this scope?"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>write-scope-approve-scope</bpmn:incoming>
+        <bpmn:outgoing>approve-scope-frame-end</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:endEvent id="frame-end" name="Scope decided">
+        <bpmn:incoming>approve-scope-frame-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="frame-start-write-scope" sourceRef="frame-start" targetRef="write-scope"/>
+      <bpmn:sequenceFlow id="write-scope-approve-scope" sourceRef="write-scope" targetRef="approve-scope"/>
+      <bpmn:sequenceFlow id="approve-scope-frame-end" sourceRef="approve-scope" targetRef="frame-end"/>
+    </bpmn:subProcess>
+    <bpmn:exclusiveGateway id="go-ahead" name="Go ahead with the module?" default="go-ahead-stopped">
+      <bpmn:extensionElements>
+        <tf:step answeredBy="role:owner"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>frame-go-ahead</bpmn:incoming>
+      <bpmn:outgoing>go-ahead-specify</bpmn:outgoing>
+      <bpmn:outgoing>go-ahead-stopped</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="stopped" name="Integration stopped">
+      <bpmn:incoming>go-ahead-stopped</bpmn:incoming>
+      <bpmn:terminateEventDefinition id="stopped.terminate"/>
+    </bpmn:endEvent>
+    <bpmn:subProcess id="specify" name="Specify">
+      <bpmn:incoming>go-ahead-specify</bpmn:incoming>
+      <bpmn:outgoing>specify-break-down</bpmn:outgoing>
+      <bpmn:startEvent id="specify-start" name="Specification starts">
+        <bpmn:outgoing>specify-start-before-mission</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="before-mission" name="Before the agents start">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>specify-start-before-mission</bpmn:incoming>
+        <bpmn:incoming>spec-approved-before-mission</bpmn:incoming>
+        <bpmn:outgoing>before-mission-spec-zone</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:adHocSubProcess id="spec-zone" name="Draft the specification">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="read-files"/>
+            <tf:rule ref="search-files"/>
+            <tf:rule ref="search-knowledge"/>
+            <tf:rule ref="no-agent-push"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-mission-spec-zone</bpmn:incoming>
+        <bpmn:outgoing>spec-zone-review-spec</bpmn:outgoing>
+        <bpmn:serviceTask id="draft-spec" name="Draft the specification from the base tool's documentation">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="cortex" attempts="3" timeout="PT1H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:userTask id="review-spec" name="Review the specification">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:human who="project-lead" kind="approval" meaning="review" question="Does the specification say what the module must do, in the base tool's terms?"/>
+            <tf:document name="Specification"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>spec-zone-review-spec</bpmn:incoming>
+        <bpmn:outgoing>review-spec-spec-approved</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:exclusiveGateway id="spec-approved" name="Is the specification approved?" default="spec-approved-before-mission">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead"/>
+        </bpmn:extensionElements>
+        <bpmn:incoming>review-spec-spec-approved</bpmn:incoming>
+        <bpmn:outgoing>spec-approved-specify-end</bpmn:outgoing>
+        <bpmn:outgoing>spec-approved-before-mission</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="specify-end" name="Specification approved">
+        <bpmn:incoming>spec-approved-specify-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="specify-start-before-mission" sourceRef="specify-start" targetRef="before-mission"/>
+      <bpmn:sequenceFlow id="before-mission-spec-zone" sourceRef="before-mission" targetRef="spec-zone"/>
+      <bpmn:sequenceFlow id="spec-zone-review-spec" sourceRef="spec-zone" targetRef="review-spec"/>
+      <bpmn:sequenceFlow id="review-spec-spec-approved" sourceRef="review-spec" targetRef="spec-approved"/>
+      <bpmn:sequenceFlow id="spec-approved-specify-end" name="Yes" sourceRef="spec-approved" targetRef="specify-end">
+        <bpmn:extensionElements>
+          <tf:condition step="review-spec" outcome="approved"/>
+        </bpmn:extensionElements>
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="https://taskforce-project.fr/schema/process/1#condition">The specification is approved</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="spec-approved-before-mission" name="Otherwise" sourceRef="spec-approved" targetRef="before-mission"/>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="break-down" name="Break down">
+      <bpmn:incoming>specify-break-down</bpmn:incoming>
+      <bpmn:outgoing>break-down-build</bpmn:outgoing>
+      <bpmn:startEvent id="break-down-start" name="Breakdown starts">
+        <bpmn:outgoing>break-down-start-before-mission-breakdown</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-breakdown" name="Before the agents break the work down">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>break-down-start-before-mission-breakdown</bpmn:incoming>
+        <bpmn:outgoing>before-mission-breakdown-breakdown-zone</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:adHocSubProcess id="breakdown-zone" name="Break the work down">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="read-issues"/>
+            <tf:rule ref="create-issue"/>
+            <tf:rule ref="update-issue"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-mission-breakdown-breakdown-zone</bpmn:incoming>
+        <bpmn:outgoing>breakdown-zone-approve-breakdown</bpmn:outgoing>
+        <bpmn:serviceTask id="split-into-issues" name="Split the specification into issues, each with its acceptance criteria">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="cortex" attempts="3" timeout="PT1H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:userTask id="approve-breakdown" name="Approve the breakdown">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:human who="project-lead" kind="approval" meaning="approval" question="Do these issues cover the specification, each with its acceptance criteria?"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>breakdown-zone-approve-breakdown</bpmn:incoming>
+        <bpmn:outgoing>approve-breakdown-break-down-end</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:endEvent id="break-down-end" name="Work broken down">
+        <bpmn:incoming>approve-breakdown-break-down-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="break-down-start-before-mission-breakdown" sourceRef="break-down-start" targetRef="before-mission-breakdown"/>
+      <bpmn:sequenceFlow id="before-mission-breakdown-breakdown-zone" sourceRef="before-mission-breakdown" targetRef="breakdown-zone"/>
+      <bpmn:sequenceFlow id="breakdown-zone-approve-breakdown" sourceRef="breakdown-zone" targetRef="approve-breakdown"/>
+      <bpmn:sequenceFlow id="approve-breakdown-break-down-end" sourceRef="approve-breakdown" targetRef="break-down-end"/>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="build" name="Build">
+      <bpmn:incoming>break-down-build</bpmn:incoming>
+      <bpmn:incoming>accepted-build</bpmn:incoming>
+      <bpmn:outgoing>build-test</bpmn:outgoing>
+      <bpmn:startEvent id="build-start" name="Build starts">
+        <bpmn:outgoing>build-start-before-mission-build</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-build" name="Before the agents build">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>build-start-before-mission-build</bpmn:incoming>
+        <bpmn:incoming>unblock-build-before-mission-build</bpmn:incoming>
+        <bpmn:outgoing>before-mission-build-build-zone</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:adHocSubProcess id="build-zone" name="Build the module">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="no-mission-public-repo"/>
+            <tf:rule ref="no-agent-push"/>
+            <tf:rule ref="no-agent-gh"/>
+            <tf:rule ref="push-agent-branch-private"/>
+            <tf:rule ref="open-pull-request"/>
+            <tf:rule ref="floor-irreversible"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-mission-build-build-zone</bpmn:incoming>
+        <bpmn:outgoing>build-zone-build-end</bpmn:outgoing>
+        <bpmn:serviceTask id="write-code" name="Write the module's code">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="claude-code" attempts="3" timeout="PT4H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+        <bpmn:serviceTask id="write-tests" name="Write the module's tests">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="claude-code" attempts="3" timeout="PT4H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+        <bpmn:serviceTask id="update-docs" name="Update the module's documentation">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="claude-code" attempts="3" timeout="PT2H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:boundaryEvent id="build-failed" name="The build failed" attachedToRef="build-zone">
+        <bpmn:outgoing>build-failed-unblock-build</bpmn:outgoing>
+        <bpmn:errorEventDefinition id="build-failed.event"/>
+      </bpmn:boundaryEvent>
+      <bpmn:boundaryEvent id="build-late" name="Two days without a result" attachedToRef="build-zone">
+        <bpmn:outgoing>build-late-unblock-build</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="build-late.event">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P2D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:userTask id="unblock-build" name="Look at what blocks the build">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:human who="project-lead" kind="input" question="What should the agent change before it tries again?">
+              <tf:field id="instructions" label="What to change" type="text"/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>build-failed-unblock-build</bpmn:incoming>
+        <bpmn:incoming>build-late-unblock-build</bpmn:incoming>
+        <bpmn:outgoing>unblock-build-before-mission-build</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:endEvent id="build-end" name="Module built">
+        <bpmn:incoming>build-zone-build-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="build-start-before-mission-build" sourceRef="build-start" targetRef="before-mission-build"/>
+      <bpmn:sequenceFlow id="before-mission-build-build-zone" sourceRef="before-mission-build" targetRef="build-zone"/>
+      <bpmn:sequenceFlow id="build-zone-build-end" sourceRef="build-zone" targetRef="build-end"/>
+      <bpmn:sequenceFlow id="build-failed-unblock-build" sourceRef="build-failed" targetRef="unblock-build"/>
+      <bpmn:sequenceFlow id="build-late-unblock-build" sourceRef="build-late" targetRef="unblock-build"/>
+      <bpmn:sequenceFlow id="unblock-build-before-mission-build" sourceRef="unblock-build" targetRef="before-mission-build"/>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="test" name="Test">
+      <bpmn:incoming>build-test</bpmn:incoming>
+      <bpmn:outgoing>test-review</bpmn:outgoing>
+      <bpmn:startEvent id="test-start" name="Tests start">
+        <bpmn:outgoing>test-start-before-mission-test</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-test" name="Before the agents test">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>test-start-before-mission-test</bpmn:incoming>
+        <bpmn:incoming>fix-zone-before-mission-test</bpmn:incoming>
+        <bpmn:outgoing>before-mission-test-test-zone</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:adHocSubProcess id="test-zone" name="Test the module">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="no-agent-scripts"/>
+            <tf:rule ref="no-agent-push"/>
+            <tf:rule ref="push-agent-branch-private"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-mission-test-test-zone</bpmn:incoming>
+        <bpmn:outgoing>test-zone-test-end</bpmn:outgoing>
+        <bpmn:serviceTask id="test-criteria" name="Test the module against each acceptance criterion">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="claude-code" attempts="3" timeout="PT2H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:boundaryEvent id="tests-failed" name="The tests fail" attachedToRef="test-zone">
+        <bpmn:outgoing>tests-failed-before-mission-fix</bpmn:outgoing>
+        <bpmn:errorEventDefinition id="tests-failed.event"/>
+      </bpmn:boundaryEvent>
+      <bpmn:userTask id="before-mission-fix" name="Before the agents fix what the tests found">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>tests-failed-before-mission-fix</bpmn:incoming>
+        <bpmn:outgoing>before-mission-fix-fix-zone</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:adHocSubProcess id="fix-zone" name="Fix what the tests found">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="no-agent-push"/>
+            <tf:rule ref="no-agent-gh"/>
+            <tf:rule ref="push-agent-branch-private"/>
+            <tf:rule ref="floor-irreversible"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-mission-fix-fix-zone</bpmn:incoming>
+        <bpmn:outgoing>fix-zone-before-mission-test</bpmn:outgoing>
+        <bpmn:serviceTask id="fix-tests" name="Fix what the tests found">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="claude-code" attempts="3" timeout="PT4H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:endEvent id="test-end" name="Module tested">
+        <bpmn:incoming>test-zone-test-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="test-start-before-mission-test" sourceRef="test-start" targetRef="before-mission-test"/>
+      <bpmn:sequenceFlow id="before-mission-test-test-zone" sourceRef="before-mission-test" targetRef="test-zone"/>
+      <bpmn:sequenceFlow id="test-zone-test-end" sourceRef="test-zone" targetRef="test-end"/>
+      <bpmn:sequenceFlow id="tests-failed-before-mission-fix" sourceRef="tests-failed" targetRef="before-mission-fix"/>
+      <bpmn:sequenceFlow id="before-mission-fix-fix-zone" sourceRef="before-mission-fix" targetRef="fix-zone"/>
+      <bpmn:sequenceFlow id="fix-zone-before-mission-test" sourceRef="fix-zone" targetRef="before-mission-test"/>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="review" name="Review">
+      <bpmn:incoming>test-review</bpmn:incoming>
+      <bpmn:outgoing>review-accept</bpmn:outgoing>
+      <bpmn:startEvent id="review-start" name="Review starts">
+        <bpmn:outgoing>review-start-review-code</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="review-code" name="Review the code">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:human who="project-lead" kind="approval" meaning="review" question="Does the change do what the specification says, the way the base tool does things?"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>review-start-review-code</bpmn:incoming>
+        <bpmn:incoming>remarks-zone-review-code</bpmn:incoming>
+        <bpmn:outgoing>review-code-review-approved</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:exclusiveGateway id="review-approved" name="Is the review approved?" default="review-approved-before-mission-remarks">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead"/>
+        </bpmn:extensionElements>
+        <bpmn:incoming>review-code-review-approved</bpmn:incoming>
+        <bpmn:outgoing>review-approved-before-apply</bpmn:outgoing>
+        <bpmn:outgoing>review-approved-before-mission-remarks</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:userTask id="before-mission-remarks" name="Before the agents apply the review's remarks">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>review-approved-before-mission-remarks</bpmn:incoming>
+        <bpmn:outgoing>before-mission-remarks-remarks-zone</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:adHocSubProcess id="remarks-zone" name="Apply the review's remarks">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="no-agent-push"/>
+            <tf:rule ref="no-agent-gh"/>
+            <tf:rule ref="push-agent-branch-private"/>
+            <tf:rule ref="floor-irreversible"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-mission-remarks-remarks-zone</bpmn:incoming>
+        <bpmn:outgoing>remarks-zone-review-code</bpmn:outgoing>
+        <bpmn:serviceTask id="apply-remarks" name="Apply the review's remarks">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="claude-code" attempts="3" timeout="PT4H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:userTask id="before-apply" name="Before applying the changes">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-apply">
+            <tf:human who="project-lead" kind="checklist" meaning="approval" question="Can the module's changes be applied to the base tool?">
+              <tf:item text="The tests pass with the environment sheet's command."/>
+              <tf:item text="The review is approved."/>
+              <tf:item text="No protected branch was touched."/>
+              <tf:item text="The module's documentation is up to date."/>
+              <tf:item text="Every change to the data can be undone."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>review-approved-before-apply</bpmn:incoming>
+        <bpmn:outgoing>before-apply-review-end</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:endEvent id="review-end" name="Changes applied">
+        <bpmn:incoming>before-apply-review-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="review-start-review-code" sourceRef="review-start" targetRef="review-code"/>
+      <bpmn:sequenceFlow id="review-code-review-approved" sourceRef="review-code" targetRef="review-approved"/>
+      <bpmn:sequenceFlow id="review-approved-before-apply" name="Yes" sourceRef="review-approved" targetRef="before-apply">
+        <bpmn:extensionElements>
+          <tf:condition step="review-code" outcome="approved"/>
+        </bpmn:extensionElements>
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="https://taskforce-project.fr/schema/process/1#condition">The review is approved</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="review-approved-before-mission-remarks" name="Otherwise" sourceRef="review-approved" targetRef="before-mission-remarks"/>
+      <bpmn:sequenceFlow id="before-mission-remarks-remarks-zone" sourceRef="before-mission-remarks" targetRef="remarks-zone"/>
+      <bpmn:sequenceFlow id="remarks-zone-review-code" sourceRef="remarks-zone" targetRef="review-code"/>
+      <bpmn:sequenceFlow id="before-apply-review-end" sourceRef="before-apply" targetRef="review-end"/>
+    </bpmn:subProcess>
+    <bpmn:subProcess id="accept" name="Accept">
+      <bpmn:incoming>review-accept</bpmn:incoming>
+      <bpmn:outgoing>accept-accepted</bpmn:outgoing>
+      <bpmn:startEvent id="accept-start" name="Acceptance starts">
+        <bpmn:outgoing>accept-start-before-mission-notes</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="before-mission-notes" name="Before the agents write the release notes">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-mission">
+            <tf:human who="project-lead" kind="checklist" meaning="responsibility" question="Is everything ready for the agents?" prefill="last-answer">
+              <tf:item text="The base tool's documentation is imported, with its version."/>
+              <tf:item text="The environment sheet is validated: install, build, test and run."/>
+              <tf:item text="The approved scope is written in the project."/>
+              <tf:item text="The rules that apply to the module are written."/>
+              <tf:item text="The agents work on a branch of their own, never on a protected branch."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>accept-start-before-mission-notes</bpmn:incoming>
+        <bpmn:outgoing>before-mission-notes-accept-split</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:parallelGateway id="accept-split">
+        <bpmn:incoming>before-mission-notes-accept-split</bpmn:incoming>
+        <bpmn:outgoing>accept-split-acceptance-report</bpmn:outgoing>
+        <bpmn:outgoing>accept-split-notes-zone</bpmn:outgoing>
+      </bpmn:parallelGateway>
+      <bpmn:intermediateCatchEvent id="acceptance-report" name="Wait for the acceptance report">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:wait from="project-lead"/>
+            <tf:document name="Acceptance report"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>accept-split-acceptance-report</bpmn:incoming>
+        <bpmn:outgoing>acceptance-report-accept-join</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="acceptance-report.event" messageRef="acceptance-report.message"/>
+      </bpmn:intermediateCatchEvent>
+      <bpmn:adHocSubProcess id="notes-zone" name="Prepare the release notes">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:rule ref="read-files"/>
+            <tf:rule ref="search-knowledge"/>
+            <tf:rule ref="create-note"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>accept-split-notes-zone</bpmn:incoming>
+        <bpmn:outgoing>notes-zone-accept-join</bpmn:outgoing>
+        <bpmn:serviceTask id="write-notes" name="Write the release notes from the applied changes">
+          <bpmn:extensionElements>
+            <tf:step answeredBy="project-lead">
+              <tf:agent provider="cortex" attempts="3" timeout="PT1H"/>
+            </tf:step>
+          </bpmn:extensionElements>
+        </bpmn:serviceTask>
+      </bpmn:adHocSubProcess>
+      <bpmn:parallelGateway id="accept-join">
+        <bpmn:incoming>acceptance-report-accept-join</bpmn:incoming>
+        <bpmn:incoming>notes-zone-accept-join</bpmn:incoming>
+        <bpmn:outgoing>accept-join-sign-acceptance</bpmn:outgoing>
+      </bpmn:parallelGateway>
+      <bpmn:userTask id="sign-acceptance" name="Sign the acceptance">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="role:owner">
+            <tf:human who="role:owner" kind="approval" meaning="approval" question="Is the module accepted, as the acceptance report says?"/>
+            <tf:document name="Acceptance report"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>accept-join-sign-acceptance</bpmn:incoming>
+        <bpmn:outgoing>sign-acceptance-accept-end</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:endEvent id="accept-end" name="Acceptance decided">
+        <bpmn:incoming>sign-acceptance-accept-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="accept-start-before-mission-notes" sourceRef="accept-start" targetRef="before-mission-notes"/>
+      <bpmn:sequenceFlow id="before-mission-notes-accept-split" sourceRef="before-mission-notes" targetRef="accept-split"/>
+      <bpmn:sequenceFlow id="accept-split-acceptance-report" sourceRef="accept-split" targetRef="acceptance-report"/>
+      <bpmn:sequenceFlow id="accept-split-notes-zone" sourceRef="accept-split" targetRef="notes-zone"/>
+      <bpmn:sequenceFlow id="acceptance-report-accept-join" sourceRef="acceptance-report" targetRef="accept-join"/>
+      <bpmn:sequenceFlow id="notes-zone-accept-join" sourceRef="notes-zone" targetRef="accept-join"/>
+      <bpmn:sequenceFlow id="accept-join-sign-acceptance" sourceRef="accept-join" targetRef="sign-acceptance"/>
+      <bpmn:sequenceFlow id="sign-acceptance-accept-end" sourceRef="sign-acceptance" targetRef="accept-end"/>
+    </bpmn:subProcess>
+    <bpmn:exclusiveGateway id="accepted" name="Is the module accepted?" default="accepted-build">
+      <bpmn:extensionElements>
+        <tf:step answeredBy="role:owner"/>
+      </bpmn:extensionElements>
+      <bpmn:incoming>accept-accepted</bpmn:incoming>
+      <bpmn:outgoing>accepted-deliver</bpmn:outgoing>
+      <bpmn:outgoing>accepted-build</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:subProcess id="deliver" name="Deliver">
+      <bpmn:incoming>accepted-deliver</bpmn:incoming>
+      <bpmn:outgoing>deliver-delivered</bpmn:outgoing>
+      <bpmn:startEvent id="deliver-start" name="Delivery starts">
+        <bpmn:outgoing>deliver-start-before-delivery</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:userTask id="before-delivery" name="Before delivering">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="pause-point" lockRef="before-delivery">
+            <tf:human who="project-lead" kind="checklist" meaning="approval" question="Can the module go to the client?">
+              <tf:item text="The acceptance is signed."/>
+              <tf:item text="The release notes are written."/>
+              <tf:item text="The version number follows the base tool's numbering."/>
+              <tf:item text="The way back to the previous version is written."/>
+              <tf:item text="The client knows when the module arrives."/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>deliver-start-before-delivery</bpmn:incoming>
+        <bpmn:outgoing>before-delivery-deliver-module</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:userTask id="deliver-module" name="Deliver the module">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead" lock="floor">
+            <tf:human who="project-lead" kind="input" question="Which version went to the client, and when?">
+              <tf:field id="version" label="Version delivered" type="text"/>
+              <tf:field id="delivered-on" label="Delivered on" type="date"/>
+            </tf:human>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>before-delivery-deliver-module</bpmn:incoming>
+        <bpmn:outgoing>deliver-module-watch</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:intermediateCatchEvent id="watch" name="Watch the module in use">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead"/>
+        </bpmn:extensionElements>
+        <bpmn:incoming>deliver-module-watch</bpmn:incoming>
+        <bpmn:outgoing>watch-close-integration</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="watch.event">
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P7D</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:intermediateCatchEvent>
+      <bpmn:userTask id="close-integration" name="Close the integration">
+        <bpmn:extensionElements>
+          <tf:step answeredBy="project-lead">
+            <tf:human who="project-lead" kind="approval" meaning="approval" question="Did the module run without a problem since it was delivered?"/>
+          </tf:step>
+        </bpmn:extensionElements>
+        <bpmn:incoming>watch-close-integration</bpmn:incoming>
+        <bpmn:outgoing>close-integration-deliver-end</bpmn:outgoing>
+      </bpmn:userTask>
+      <bpmn:endEvent id="deliver-end" name="Integration closed">
+        <bpmn:incoming>close-integration-deliver-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="deliver-start-before-delivery" sourceRef="deliver-start" targetRef="before-delivery"/>
+      <bpmn:sequenceFlow id="before-delivery-deliver-module" sourceRef="before-delivery" targetRef="deliver-module"/>
+      <bpmn:sequenceFlow id="deliver-module-watch" sourceRef="deliver-module" targetRef="watch"/>
+      <bpmn:sequenceFlow id="watch-close-integration" sourceRef="watch" targetRef="close-integration"/>
+      <bpmn:sequenceFlow id="close-integration-deliver-end" sourceRef="close-integration" targetRef="deliver-end"/>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="delivered" name="Module delivered">
+      <bpmn:incoming>deliver-delivered</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="requested-frame" sourceRef="requested" targetRef="frame"/>
+    <bpmn:sequenceFlow id="frame-go-ahead" sourceRef="frame" targetRef="go-ahead"/>
+    <bpmn:sequenceFlow id="go-ahead-specify" name="Yes" sourceRef="go-ahead" targetRef="specify">
+      <bpmn:extensionElements>
+        <tf:condition step="approve-scope" outcome="approved"/>
+      </bpmn:extensionElements>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="https://taskforce-project.fr/schema/process/1#condition">The scope is approved</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="go-ahead-stopped" name="Otherwise" sourceRef="go-ahead" targetRef="stopped"/>
+    <bpmn:sequenceFlow id="specify-break-down" sourceRef="specify" targetRef="break-down"/>
+    <bpmn:sequenceFlow id="break-down-build" sourceRef="break-down" targetRef="build"/>
+    <bpmn:sequenceFlow id="build-test" sourceRef="build" targetRef="test"/>
+    <bpmn:sequenceFlow id="test-review" sourceRef="test" targetRef="review"/>
+    <bpmn:sequenceFlow id="review-accept" sourceRef="review" targetRef="accept"/>
+    <bpmn:sequenceFlow id="accept-accepted" sourceRef="accept" targetRef="accepted"/>
+    <bpmn:sequenceFlow id="accepted-deliver" name="Yes" sourceRef="accepted" targetRef="deliver">
+      <bpmn:extensionElements>
+        <tf:condition step="sign-acceptance" outcome="approved"/>
+      </bpmn:extensionElements>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" language="https://taskforce-project.fr/schema/process/1#condition">The acceptance is signed</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="accepted-build" name="Otherwise" sourceRef="accepted" targetRef="build"/>
+    <bpmn:sequenceFlow id="deliver-delivered" sourceRef="deliver" targetRef="delivered"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="integrate-a-module.diagram">
+    <bpmndi:BPMNPlane id="integrate-a-module.plane" bpmnElement="integrate-a-module">
+      <bpmndi:BPMNShape id="requested.di" bpmnElement="requested">
+        <dc:Bounds x="160" y="335" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="frame.di" bpmnElement="frame" isExpanded="true">
+        <dc:Bounds x="256" y="278" width="512" height="150"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="frame-start.di" bpmnElement="frame-start">
+        <dc:Bounds x="286" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="write-scope.di" bpmnElement="write-scope">
+        <dc:Bounds x="382" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="approve-scope.di" bpmnElement="approve-scope">
+        <dc:Bounds x="542" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="frame-end.di" bpmnElement="frame-end">
+        <dc:Bounds x="702" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="frame-start-write-scope.di" bpmnElement="frame-start-write-scope">
+        <di:waypoint x="322" y="358"/>
+        <di:waypoint x="382" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="write-scope-approve-scope.di" bpmnElement="write-scope-approve-scope">
+        <di:waypoint x="482" y="358"/>
+        <di:waypoint x="542" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="approve-scope-frame-end.di" bpmnElement="approve-scope-frame-end">
+        <di:waypoint x="642" y="358"/>
+        <di:waypoint x="702" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="go-ahead.di" bpmnElement="go-ahead" isMarkerVisible="true">
+        <dc:Bounds x="828" y="328" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="stopped.di" bpmnElement="stopped">
+        <dc:Bounds x="1331" y="483" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="specify.di" bpmnElement="specify" isExpanded="true">
+        <dc:Bounds x="938" y="188" width="822" height="255"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="specify-start.di" bpmnElement="specify-start">
+        <dc:Bounds x="968" y="280" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission.di" bpmnElement="before-mission">
+        <dc:Bounds x="1064" y="258" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="spec-zone.di" bpmnElement="spec-zone" isExpanded="true">
+        <dc:Bounds x="1224" y="228" width="140" height="140"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="draft-spec.di" bpmnElement="draft-spec">
+        <dc:Bounds x="1244" y="268" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="review-spec.di" bpmnElement="review-spec">
+        <dc:Bounds x="1424" y="258" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="spec-approved.di" bpmnElement="spec-approved" isMarkerVisible="true">
+        <dc:Bounds x="1584" y="273" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="specify-end.di" bpmnElement="specify-end">
+        <dc:Bounds x="1694" y="280" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="specify-start-before-mission.di" bpmnElement="specify-start-before-mission">
+        <di:waypoint x="1004" y="298"/>
+        <di:waypoint x="1064" y="298"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-spec-zone.di" bpmnElement="before-mission-spec-zone">
+        <di:waypoint x="1164" y="298"/>
+        <di:waypoint x="1224" y="298"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="spec-zone-review-spec.di" bpmnElement="spec-zone-review-spec">
+        <di:waypoint x="1364" y="298"/>
+        <di:waypoint x="1424" y="298"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="review-spec-spec-approved.di" bpmnElement="review-spec-spec-approved">
+        <di:waypoint x="1524" y="298"/>
+        <di:waypoint x="1584" y="298"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="spec-approved-specify-end.di" bpmnElement="spec-approved-specify-end">
+        <di:waypoint x="1634" y="298"/>
+        <di:waypoint x="1694" y="298"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="spec-approved-before-mission.di" bpmnElement="spec-approved-before-mission">
+        <di:waypoint x="1609" y="323"/>
+        <di:waypoint x="1609" y="398"/>
+        <di:waypoint x="1049" y="398"/>
+        <di:waypoint x="1049" y="298"/>
+        <di:waypoint x="1064" y="298"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="break-down.di" bpmnElement="break-down" isExpanded="true">
+        <dc:Bounds x="1820" y="248" width="712" height="210"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="break-down-start.di" bpmnElement="break-down-start">
+        <dc:Bounds x="1850" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-breakdown.di" bpmnElement="before-mission-breakdown">
+        <dc:Bounds x="1946" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="breakdown-zone.di" bpmnElement="breakdown-zone" isExpanded="true">
+        <dc:Bounds x="2106" y="288" width="140" height="140"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="split-into-issues.di" bpmnElement="split-into-issues">
+        <dc:Bounds x="2126" y="328" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="approve-breakdown.di" bpmnElement="approve-breakdown">
+        <dc:Bounds x="2306" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="break-down-end.di" bpmnElement="break-down-end">
+        <dc:Bounds x="2466" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="break-down-start-before-mission-breakdown.di" bpmnElement="break-down-start-before-mission-breakdown">
+        <di:waypoint x="1886" y="358"/>
+        <di:waypoint x="1946" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-breakdown-breakdown-zone.di" bpmnElement="before-mission-breakdown-breakdown-zone">
+        <di:waypoint x="2046" y="358"/>
+        <di:waypoint x="2106" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="breakdown-zone-approve-breakdown.di" bpmnElement="breakdown-zone-approve-breakdown">
+        <di:waypoint x="2246" y="358"/>
+        <di:waypoint x="2306" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="approve-breakdown-break-down-end.di" bpmnElement="approve-breakdown-break-down-end">
+        <di:waypoint x="2406" y="358"/>
+        <di:waypoint x="2466" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="build.di" bpmnElement="build" isExpanded="true">
+        <dc:Bounds x="2592" y="100" width="669" height="507"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="build-start.di" bpmnElement="build-start">
+        <dc:Bounds x="2622" y="292" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-build.di" bpmnElement="before-mission-build">
+        <dc:Bounds x="2718" y="270" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="build-zone.di" bpmnElement="build-zone" isExpanded="true">
+        <dc:Bounds x="2878" y="140" width="193" height="340"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="write-code.di" bpmnElement="write-code">
+        <dc:Bounds x="2924" y="180" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="write-tests.di" bpmnElement="write-tests">
+        <dc:Bounds x="2924" y="280" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="update-docs.di" bpmnElement="update-docs">
+        <dc:Bounds x="2924" y="380" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="build-failed.di" bpmnElement="build-failed">
+        <dc:Bounds x="3008" y="462" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="build-late.di" bpmnElement="build-late">
+        <dc:Bounds x="2898" y="462" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="unblock-build.di" bpmnElement="unblock-build">
+        <dc:Bounds x="3131" y="308" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="build-end.di" bpmnElement="build-end">
+        <dc:Bounds x="3163" y="232" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="build-start-before-mission-build.di" bpmnElement="build-start-before-mission-build">
+        <di:waypoint x="2658" y="310"/>
+        <di:waypoint x="2718" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-build-build-zone.di" bpmnElement="before-mission-build-build-zone">
+        <di:waypoint x="2818" y="310"/>
+        <di:waypoint x="2878" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="build-zone-build-end.di" bpmnElement="build-zone-build-end">
+        <di:waypoint x="3071" y="310"/>
+        <di:waypoint x="3101" y="310"/>
+        <di:waypoint x="3101" y="250"/>
+        <di:waypoint x="3163" y="250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="build-failed-unblock-build.di" bpmnElement="build-failed-unblock-build">
+        <di:waypoint x="3026" y="498"/>
+        <di:waypoint x="3026" y="532"/>
+        <di:waypoint x="3181" y="532"/>
+        <di:waypoint x="3181" y="388"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="build-late-unblock-build.di" bpmnElement="build-late-unblock-build">
+        <di:waypoint x="2916" y="498"/>
+        <di:waypoint x="2916" y="547"/>
+        <di:waypoint x="3181" y="547"/>
+        <di:waypoint x="3181" y="388"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="unblock-build-before-mission-build.di" bpmnElement="unblock-build-before-mission-build">
+        <di:waypoint x="3181" y="388"/>
+        <di:waypoint x="3181" y="562"/>
+        <di:waypoint x="2703" y="562"/>
+        <di:waypoint x="2703" y="310"/>
+        <di:waypoint x="2718" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="test.di" bpmnElement="test" isExpanded="true">
+        <dc:Bounds x="3321" y="192" width="816" height="323"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="test-start.di" bpmnElement="test-start">
+        <dc:Bounds x="3351" y="292" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-test.di" bpmnElement="before-mission-test">
+        <dc:Bounds x="3447" y="270" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="test-zone.di" bpmnElement="test-zone" isExpanded="true">
+        <dc:Bounds x="3607" y="240" width="140" height="140"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="test-criteria.di" bpmnElement="test-criteria">
+        <dc:Bounds x="3627" y="280" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="tests-failed.di" bpmnElement="tests-failed">
+        <dc:Bounds x="3684" y="362" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-fix.di" bpmnElement="before-mission-fix">
+        <dc:Bounds x="3807" y="308" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fix-zone.di" bpmnElement="fix-zone" isExpanded="true">
+        <dc:Bounds x="3967" y="240" width="140" height="140"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="fix-tests.di" bpmnElement="fix-tests">
+        <dc:Bounds x="3987" y="280" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="test-end.di" bpmnElement="test-end">
+        <dc:Bounds x="3839" y="232" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="test-start-before-mission-test.di" bpmnElement="test-start-before-mission-test">
+        <di:waypoint x="3387" y="310"/>
+        <di:waypoint x="3447" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-test-test-zone.di" bpmnElement="before-mission-test-test-zone">
+        <di:waypoint x="3547" y="310"/>
+        <di:waypoint x="3607" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="test-zone-test-end.di" bpmnElement="test-zone-test-end">
+        <di:waypoint x="3747" y="310"/>
+        <di:waypoint x="3777" y="310"/>
+        <di:waypoint x="3777" y="250"/>
+        <di:waypoint x="3839" y="250"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="tests-failed-before-mission-fix.di" bpmnElement="tests-failed-before-mission-fix">
+        <di:waypoint x="3702" y="398"/>
+        <di:waypoint x="3702" y="432"/>
+        <di:waypoint x="3857" y="432"/>
+        <di:waypoint x="3857" y="388"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-fix-fix-zone.di" bpmnElement="before-mission-fix-fix-zone">
+        <di:waypoint x="3907" y="348"/>
+        <di:waypoint x="3937" y="348"/>
+        <di:waypoint x="3937" y="310"/>
+        <di:waypoint x="3967" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="fix-zone-before-mission-test.di" bpmnElement="fix-zone-before-mission-test">
+        <di:waypoint x="4037" y="380"/>
+        <di:waypoint x="4037" y="470"/>
+        <di:waypoint x="3432" y="470"/>
+        <di:waypoint x="3432" y="310"/>
+        <di:waypoint x="3447" y="310"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="review.di" bpmnElement="review" isExpanded="true">
+        <dc:Bounds x="4197" y="188" width="726" height="331"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="review-start.di" bpmnElement="review-start">
+        <dc:Bounds x="4227" y="318" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="review-code.di" bpmnElement="review-code">
+        <dc:Bounds x="4323" y="296" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="review-approved.di" bpmnElement="review-approved" isMarkerVisible="true">
+        <dc:Bounds x="4483" y="311" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-remarks.di" bpmnElement="before-mission-remarks">
+        <dc:Bounds x="4593" y="356" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="remarks-zone.di" bpmnElement="remarks-zone" isExpanded="true">
+        <dc:Bounds x="4753" y="304" width="140" height="140"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="apply-remarks.di" bpmnElement="apply-remarks">
+        <dc:Bounds x="4773" y="344" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-apply.di" bpmnElement="before-apply">
+        <dc:Bounds x="4593" y="236" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="review-end.di" bpmnElement="review-end">
+        <dc:Bounds x="4805" y="228" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="review-start-review-code.di" bpmnElement="review-start-review-code">
+        <di:waypoint x="4263" y="336"/>
+        <di:waypoint x="4323" y="336"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="review-code-review-approved.di" bpmnElement="review-code-review-approved">
+        <di:waypoint x="4423" y="336"/>
+        <di:waypoint x="4483" y="336"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="review-approved-before-apply.di" bpmnElement="review-approved-before-apply">
+        <di:waypoint x="4533" y="336"/>
+        <di:waypoint x="4563" y="336"/>
+        <di:waypoint x="4563" y="276"/>
+        <di:waypoint x="4593" y="276"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="review-approved-before-mission-remarks.di" bpmnElement="review-approved-before-mission-remarks">
+        <di:waypoint x="4533" y="336"/>
+        <di:waypoint x="4563" y="336"/>
+        <di:waypoint x="4563" y="396"/>
+        <di:waypoint x="4593" y="396"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-remarks-remarks-zone.di" bpmnElement="before-mission-remarks-remarks-zone">
+        <di:waypoint x="4693" y="396"/>
+        <di:waypoint x="4723" y="396"/>
+        <di:waypoint x="4723" y="374"/>
+        <di:waypoint x="4753" y="374"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="remarks-zone-review-code.di" bpmnElement="remarks-zone-review-code">
+        <di:waypoint x="4823" y="444"/>
+        <di:waypoint x="4823" y="474"/>
+        <di:waypoint x="4308" y="474"/>
+        <di:waypoint x="4308" y="336"/>
+        <di:waypoint x="4323" y="336"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-apply-review-end.di" bpmnElement="before-apply-review-end">
+        <di:waypoint x="4693" y="276"/>
+        <di:waypoint x="4723" y="276"/>
+        <di:waypoint x="4723" y="246"/>
+        <di:waypoint x="4805" y="246"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="accept.di" bpmnElement="accept" isExpanded="true">
+        <dc:Bounds x="4983" y="210" width="932" height="286"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="accept-start.di" bpmnElement="accept-start">
+        <dc:Bounds x="5013" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-mission-notes.di" bpmnElement="before-mission-notes">
+        <dc:Bounds x="5109" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="accept-split.di" bpmnElement="accept-split">
+        <dc:Bounds x="5269" y="333" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="acceptance-report.di" bpmnElement="acceptance-report">
+        <dc:Bounds x="5431" y="250" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="notes-zone.di" bpmnElement="notes-zone" isExpanded="true">
+        <dc:Bounds x="5379" y="326" width="140" height="140"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="write-notes.di" bpmnElement="write-notes">
+        <dc:Bounds x="5399" y="366" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="accept-join.di" bpmnElement="accept-join">
+        <dc:Bounds x="5579" y="333" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="sign-acceptance.di" bpmnElement="sign-acceptance">
+        <dc:Bounds x="5689" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="accept-end.di" bpmnElement="accept-end">
+        <dc:Bounds x="5849" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="accept-start-before-mission-notes.di" bpmnElement="accept-start-before-mission-notes">
+        <di:waypoint x="5049" y="358"/>
+        <di:waypoint x="5109" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-mission-notes-accept-split.di" bpmnElement="before-mission-notes-accept-split">
+        <di:waypoint x="5209" y="358"/>
+        <di:waypoint x="5269" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="accept-split-acceptance-report.di" bpmnElement="accept-split-acceptance-report">
+        <di:waypoint x="5319" y="358"/>
+        <di:waypoint x="5349" y="358"/>
+        <di:waypoint x="5349" y="268"/>
+        <di:waypoint x="5431" y="268"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="accept-split-notes-zone.di" bpmnElement="accept-split-notes-zone">
+        <di:waypoint x="5319" y="358"/>
+        <di:waypoint x="5349" y="358"/>
+        <di:waypoint x="5349" y="396"/>
+        <di:waypoint x="5379" y="396"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="acceptance-report-accept-join.di" bpmnElement="acceptance-report-accept-join">
+        <di:waypoint x="5467" y="268"/>
+        <di:waypoint x="5549" y="268"/>
+        <di:waypoint x="5549" y="358"/>
+        <di:waypoint x="5579" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="notes-zone-accept-join.di" bpmnElement="notes-zone-accept-join">
+        <di:waypoint x="5519" y="396"/>
+        <di:waypoint x="5549" y="396"/>
+        <di:waypoint x="5549" y="358"/>
+        <di:waypoint x="5579" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="accept-join-sign-acceptance.di" bpmnElement="accept-join-sign-acceptance">
+        <di:waypoint x="5629" y="358"/>
+        <di:waypoint x="5689" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="sign-acceptance-accept-end.di" bpmnElement="sign-acceptance-accept-end">
+        <di:waypoint x="5789" y="358"/>
+        <di:waypoint x="5849" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="accepted.di" bpmnElement="accepted" isMarkerVisible="true">
+        <dc:Bounds x="5975" y="328" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="deliver.di" bpmnElement="deliver" isExpanded="true">
+        <dc:Bounds x="6085" y="278" width="768" height="150"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="deliver-start.di" bpmnElement="deliver-start">
+        <dc:Bounds x="6115" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="before-delivery.di" bpmnElement="before-delivery">
+        <dc:Bounds x="6211" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="deliver-module.di" bpmnElement="deliver-module">
+        <dc:Bounds x="6371" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="watch.di" bpmnElement="watch">
+        <dc:Bounds x="6531" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="close-integration.di" bpmnElement="close-integration">
+        <dc:Bounds x="6627" y="318" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="deliver-end.di" bpmnElement="deliver-end">
+        <dc:Bounds x="6787" y="340" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="deliver-start-before-delivery.di" bpmnElement="deliver-start-before-delivery">
+        <di:waypoint x="6151" y="358"/>
+        <di:waypoint x="6211" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="before-delivery-deliver-module.di" bpmnElement="before-delivery-deliver-module">
+        <di:waypoint x="6311" y="358"/>
+        <di:waypoint x="6371" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="deliver-module-watch.di" bpmnElement="deliver-module-watch">
+        <di:waypoint x="6471" y="358"/>
+        <di:waypoint x="6531" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="watch-close-integration.di" bpmnElement="watch-close-integration">
+        <di:waypoint x="6567" y="358"/>
+        <di:waypoint x="6627" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="close-integration-deliver-end.di" bpmnElement="close-integration-deliver-end">
+        <di:waypoint x="6727" y="358"/>
+        <di:waypoint x="6787" y="358"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="delivered.di" bpmnElement="delivered">
+        <dc:Bounds x="6913" y="335" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="requested-frame.di" bpmnElement="requested-frame">
+        <di:waypoint x="196" y="353"/>
+        <di:waypoint x="256" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="frame-go-ahead.di" bpmnElement="frame-go-ahead">
+        <di:waypoint x="768" y="353"/>
+        <di:waypoint x="828" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="go-ahead-specify.di" bpmnElement="go-ahead-specify">
+        <di:waypoint x="878" y="353"/>
+        <di:waypoint x="908" y="353"/>
+        <di:waypoint x="908" y="315"/>
+        <di:waypoint x="938" y="315"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="go-ahead-stopped.di" bpmnElement="go-ahead-stopped">
+        <di:waypoint x="878" y="353"/>
+        <di:waypoint x="908" y="353"/>
+        <di:waypoint x="908" y="501"/>
+        <di:waypoint x="1331" y="501"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="specify-break-down.di" bpmnElement="specify-break-down">
+        <di:waypoint x="1760" y="315"/>
+        <di:waypoint x="1790" y="315"/>
+        <di:waypoint x="1790" y="353"/>
+        <di:waypoint x="1820" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="break-down-build.di" bpmnElement="break-down-build">
+        <di:waypoint x="2532" y="353"/>
+        <di:waypoint x="2592" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="build-test.di" bpmnElement="build-test">
+        <di:waypoint x="3261" y="353"/>
+        <di:waypoint x="3321" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="test-review.di" bpmnElement="test-review">
+        <di:waypoint x="4137" y="353"/>
+        <di:waypoint x="4197" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="review-accept.di" bpmnElement="review-accept">
+        <di:waypoint x="4923" y="353"/>
+        <di:waypoint x="4983" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="accept-accepted.di" bpmnElement="accept-accepted">
+        <di:waypoint x="5915" y="353"/>
+        <di:waypoint x="5975" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="accepted-deliver.di" bpmnElement="accepted-deliver">
+        <di:waypoint x="6025" y="353"/>
+        <di:waypoint x="6085" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="accepted-build.di" bpmnElement="accepted-build">
+        <di:waypoint x="6000" y="378"/>
+        <di:waypoint x="6000" y="637"/>
+        <di:waypoint x="2577" y="637"/>
+        <di:waypoint x="2577" y="353"/>
+        <di:waypoint x="2592" y="353"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="deliver-delivered.di" bpmnElement="deliver-delivered">
+        <di:waypoint x="6853" y="353"/>
+        <di:waypoint x="6913" y="353"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
