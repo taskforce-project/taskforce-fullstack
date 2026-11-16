@@ -115,13 +115,14 @@ export default function ProjectLayout({ children }: { readonly children: React.R
       <div className="flex shrink-0 items-end gap-3 border-b border-border">
         <div className="min-w-0 flex-1">
           {/* Tab nav - bande scrollable avec chevrons (l'onglet Settings restait hors écran, QA3) */}
-          <ScrollableTabs>
+          <ScrollableTabs activeKey={pathname}>
             {PROJECT_TABS.map(({ key, icon: Icon, pathSuffix }) => {
               const active = isTabActive(pathSuffix)
               return (
                 <Link
                   key={key}
                   href={basePath + pathSuffix}
+                  aria-current={active ? "page" : undefined}
                   className={cn(
                     "flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors duration-150 border-b-2 whitespace-nowrap motion-reduce:transition-none",
                     active
