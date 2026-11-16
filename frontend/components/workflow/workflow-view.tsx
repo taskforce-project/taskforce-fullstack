@@ -333,7 +333,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   if (load === "loading" || !model) {
     return (
       <div ref={rootRef} className="relative flex h-full min-h-0 flex-col border border-border">
-        {load === "error" ? <LoadFailed t={t} retry={retry} /> : <BoardSkeleton density={density} />}
+        {load === "error" ? <LoadFailed t={t} retry={retry} /> : <BoardSkeleton density={density} label={t.loading} />}
       </div>
     )
   }
@@ -520,9 +520,11 @@ function nodeViewOf(
 }
 
 /** Le chargement : des colonnes en squelette, sans roue qui tourne (§10). */
-function BoardSkeleton({ density }: Readonly<{ density: Density }>) {
+function BoardSkeleton({ density, label }: Readonly<{ density: Density; label: string }>) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3" aria-busy="true">
+    // Un lecteur d'écran entend « Loading the workflow » ; les formes grises ne lui disent rien.
+    <div role="status" aria-busy="true" className="flex min-h-0 flex-1 flex-col gap-3">
+      <span className="sr-only">{label}</span>
       <Skeleton className="h-14 w-full rounded-none" />
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
         {Array.from({ length: 4 }).map((_, column) => (

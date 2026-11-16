@@ -282,6 +282,13 @@ describe("le workflow d'un projet", () => {
     await waitFor(() => expect(card("Release")).toHaveAccessibleName("Release, Working"))
   })
 
+  it("pendant la lecture, le squelette se dit à un lecteur d'écran", () => {
+    vi.mocked(listIssuesPage).mockImplementation(() => new Promise(() => {}))
+    vi.mocked(listStatuses).mockResolvedValue(STATUSES)
+    render(<WorkflowView slug="acme" projectId={3} />)
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the workflow")
+  })
+
   it("un projet sans travail le dit, et propose d'en créer ; un échec dit quoi faire", async () => {
     serve({ issues: [] })
     const { unmount } = render(<WorkflowView slug="acme" projectId={3} />)
