@@ -436,6 +436,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             labels={{ blocks: t.inspector.blocks, blockedBy: t.inspector.blockedBy }}
             limit={allLinks ? MAX_ALL_EDGES : MAX_EDGES}
             revision={columns}
+            focus={allLinks ? selectedKey : null}
             moreLabel={allLinks ? (count) => fillText(t.links.more, { count }) : undefined}
           />
         )}

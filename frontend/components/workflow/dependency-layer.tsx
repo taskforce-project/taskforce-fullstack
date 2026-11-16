@@ -18,6 +18,8 @@ export interface DrawnEdge {
   readonly key: string
   readonly d: string
   readonly side: DependencyEdge["side"]
+  /** Un lien de la carte choisie, quand tous les liens se montrent : plein ; les autres s'estompent. */
+  readonly strong: boolean
 }
 
 /** La gouttière entre deux colonnes : la moitié de l'écart entre leurs cartes (12 px de marge, un trait, 12 px de marge). */
@@ -56,7 +58,7 @@ export function edgePath(
   return guttered(from.left, fy, x - GUTTER, to.left - 2, ty)
 }
 
-export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, moreLabel, revision }: Readonly<{
+export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, moreLabel, revision, focus = null }: Readonly<{
   /** Le plateau des colonnes : le calque se pose sur lui, et suit son défilement et celui de chaque colonne. */
   boardRef: RefObject<HTMLElement | null>
   edges: readonly DependencyEdge[]
@@ -70,6 +72,8 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
    * nouvelle remesure les cartes, et les courbes ne restent jamais là où les cartes étaient.
    */
   revision?: unknown
+  /** La carte choisie, quand tous les liens se montrent : ses liens restent pleins, les autres s'estompent. */
+  focus?: string | null
 }>) {
   const [drawn, setDrawn] = useState<readonly DrawnEdge[]>([])
   const [beyond, setBeyond] = useState(0)
@@ -111,7 +115,10 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
       }
       // Les plus proches du centre de ce qui se voit d'abord, la limite au plus.
       seen.sort((a, b) => a.distance - b.distance)
-      setDrawn(seen.slice(0, limit).map(({ edge, from, to }) => ({ key: `${edge.from}>${edge.to}`, d: edgePath(from, to), side: edge.side })))
+      setDrawn(seen.slice(0, limit).map(({ edge, from, to }) => ({
+        key: `${edge.from}>${edge.to}`, d: edgePath(from, to), side: edge.side,
+        strong: focus === null || edge.from === focus || edge.to === focus,
+      })))
       setBeyond(Math.max(0, seen.length - limit))
     }
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure) }
@@ -128,7 +135,7 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
       mutations?.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [boardRef, edges, limit, revision])
+  }, [boardRef, edges, limit, revision, focus])
 
   if (drawn.length === 0) return null
   return (
@@ -146,7 +153,7 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
         </marker>
       </defs>
       {drawn.map((edge) => (
-        <g key={edge.key}>
+        <g key={edge.key} data-strong={edge.strong} className={edge.strong ? undefined : "opacity-25"}>
           <title>{edge.side === "blocks" ? labels.blocks : labels.blockedBy}</title>
           <path d={edge.d} className="fill-none stroke-primary" strokeWidth={2} markerEnd="url(#workflow-arrow)" />
         </g>

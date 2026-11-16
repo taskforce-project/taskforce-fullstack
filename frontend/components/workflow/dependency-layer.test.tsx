@@ -37,6 +37,25 @@ describe("Show all links", () => {
   })
 })
 
+describe("la carte choisie parmi tous les liens", () => {
+  it("garde ses liens pleins, et estompe les autres", async () => {
+    const board = { current: null as HTMLDivElement | null }
+    const edges: DependencyEdge[] = [
+      { from: "issue-1", to: "issue-2", side: "blocks" },
+      { from: "issue-3", to: "issue-4", side: "blocks" },
+    ]
+    const { container } = render(
+      <div ref={(element) => { board.current = element }}>
+        {["issue-1", "issue-2", "issue-3", "issue-4"].map((key) => <div key={key} data-node-key={key} />)}
+        <DependencyLayer boardRef={board} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} limit={200} focus="issue-2" />
+      </div>,
+    )
+    await waitFor(() => expect(container.querySelectorAll("g[data-strong]")).toHaveLength(2))
+    expect(container.querySelector("g[data-strong='true']")?.getAttribute("class")).toBeNull()
+    expect(container.querySelector("g[data-strong='false']")?.getAttribute("class")).toContain("opacity-25")
+  })
+})
+
 describe("les liens suivent les cartes", () => {
   it("remesure quand la mise en page change sans défilement (densité, filtre, ce qui se déplie)", async () => {
     // Les cartes sont où la table le dit ; la table change, puis la mise en page aussi.
