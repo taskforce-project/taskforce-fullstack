@@ -273,11 +273,14 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     return () => hideIssue(selectedIssueId)
   }, [projectId, selectedIssueId, issueOpen, showIssue, hideIssue])
 
-  // Un nœud qui passe à « Needs you » s'annonce poliment, et rien d'autre (§10).
+  // Un nœud qui passe à « Needs you » s'annonce poliment, et rien d'autre (§10). La comparaison part de la première lecture
+  // complète, missions comprises : la carte se construit d'abord sans elles, et chaque ouverture de la vue annonçait alors
+  // tout ce qui attendait déjà la personne (R161, N7).
   const [announce, setAnnounce] = useState("")
   const needing = useRef<ReadonlySet<string> | null>(null)
+  const complete = load === "ready" && runs !== undefined
   useEffect(() => {
-    if (!model) return
+    if (!model || !complete) return
     const current = new Set([...model.byKey.values()].filter((node) => node.state === "needsYou").map((node) => node.key))
     const before = needing.current
     needing.current = current
@@ -285,7 +288,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     const arrived = [...current].find((key) => !before.has(key))
     const node = arrived ? model.byKey.get(arrived) : undefined
     if (node) setAnnounce(fillText(t.announce, { title: node.issue.title }))
-  }, [model, t.announce])
+  }, [model, complete, t.announce])
 
   const chooseDensity = useCallback((next: Density) => {
     setDensity(person, next)

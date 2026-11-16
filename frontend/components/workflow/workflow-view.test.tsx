@@ -305,6 +305,33 @@ describe("le workflow d'un projet", () => {
     await waitFor(() => expect(card("Release")).toHaveAccessibleName("Release, Working"))
   })
 
+  it("« needs you » ne s'annonce qu'après la première lecture complète : rien à l'ouverture, puis chaque arrivée (R161, N7)", async () => {
+    const later = { expiresAt: "2099-11-13T10:30:00" }
+    serve({
+      issues: [issue(2, { title: "Release", status: DOING }), issue(3, { title: "Docs", status: DOING })],
+      runs: [projectRun(deliveryRun(1, 2), [approval(9, later)])],
+    })
+    // Les missions arrivent après les issues : la carte se construit d'abord sans elles.
+    const pageOf = vi.mocked(listProjectRuns).getMockImplementation() as typeof listProjectRuns
+    vi.mocked(listProjectRuns).mockImplementation(async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      return pageOf(...args)
+    })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Release")).toHaveAccessibleName("Release, Needs you"))
+    const said = document.querySelector("p[aria-live='polite']")
+    expect(said?.textContent).toBe("")
+
+    // Une demande qui arrive ensuite, par le direct, s'annonce.
+    act(() => {
+      const read = useDeliveryStore.getState().projectRuns[3]
+      useDeliveryStore.setState({
+        projectRuns: { 3: { ...read, rows: [...read.rows, projectRun(deliveryRun(2, 3), [approval(10, later)])] } },
+      })
+    })
+    await waitFor(() => expect(said?.textContent).toBe("Docs needs you."))
+  })
+
   it("pendant la lecture, le squelette se dit à un lecteur d'écran", () => {
     vi.mocked(listIssuesPage).mockImplementation(() => new Promise(() => {}))
     vi.mocked(listStatuses).mockResolvedValue(STATUSES)
