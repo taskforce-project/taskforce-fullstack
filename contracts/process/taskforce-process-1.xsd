@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The tf: extension of TaskForce's processes, version 1 (ADR-027, point 5): what BPMN 2.0 doesn't carry. It travels in
+  the extensionElements of the BPMN elements of the subset; a modeler that ignores it keeps the process readable, and
+  TaskForce reads it back on import. See README.md in this folder.
+-->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns="https://taskforce-project.fr/schema/process/1"
+            targetNamespace="https://taskforce-project.fr/schema/process/1"
+            elementFormDefault="qualified"
+            attributeFormDefault="unqualified">
+
+  <!-- On the process: the format of the model, and the default workflow it derives from. -->
+  <xsd:element name="process">
+    <xsd:complexType>
+      <xsd:attribute name="format" type="xsd:string" use="required"/>
+      <xsd:attribute name="derivedFrom" type="tKey"/>
+    </xsd:complexType>
+  </xsd:element>
+
+  <!-- On every step: who answers for it, its lock and the source of the lock, the issue it carries, its settings. -->
+  <xsd:element name="step">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="agent" type="tAgent" minOccurs="0"/>
+        <xsd:element name="human" type="tHuman" minOccurs="0"/>
+        <xsd:element name="wait" type="tWait" minOccurs="0"/>
+        <xsd:element name="rule" type="tRule" minOccurs="0" maxOccurs="unbounded"/>
+        <xsd:element name="document" type="tDocument" minOccurs="0" maxOccurs="unbounded"/>
+      </xsd:sequence>
+      <xsd:attribute name="answeredBy" type="tPerson"/>
+      <xsd:attribute name="lock" type="tLockSource"/>
+      <xsd:attribute name="lockRef" type="xsd:string"/>
+      <xsd:attribute name="issue" type="tIssue"/>
+    </xsd:complexType>
+  </xsd:element>
+
+  <!-- On a path out of a decision: what code judges. The condition in words is the path's conditionExpression. -->
+  <xsd:element name="condition">
+    <xsd:complexType>
+      <xsd:attribute name="step" type="xsd:string" use="required"/>
+      <xsd:attribute name="outcome" type="tOutcome" use="required"/>
+    </xsd:complexType>
+  </xsd:element>
+
+  <xsd:complexType name="tAgent">
+    <xsd:sequence>
+      <xsd:element name="tool" minOccurs="0" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:attribute name="name" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="provider" type="xsd:string" use="required"/>
+    <xsd:attribute name="model" type="xsd:string"/>
+    <xsd:attribute name="attempts">
+      <xsd:simpleType>
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1"/>
+          <xsd:maxInclusive value="3"/>
+        </xsd:restriction>
+      </xsd:simpleType>
+    </xsd:attribute>
+    <xsd:attribute name="timeout" type="xsd:duration"/>
+  </xsd:complexType>
+
+  <xsd:complexType name="tHuman">
+    <xsd:sequence>
+      <xsd:element name="item" minOccurs="0" maxOccurs="9">
+        <xsd:complexType>
+          <xsd:attribute name="text" type="xsd:string" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="field" minOccurs="0" maxOccurs="unbounded">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="choice" minOccurs="0" maxOccurs="unbounded">
+              <xsd:complexType>
+                <xsd:attribute name="value" type="xsd:string" use="required"/>
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+          <xsd:attribute name="id" type="xsd:string" use="required"/>
+          <xsd:attribute name="label" type="xsd:string" use="required"/>
+          <xsd:attribute name="type" type="tFieldType" use="required"/>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="who" type="tPerson" use="required"/>
+    <xsd:attribute name="kind" type="tHumanKind" use="required"/>
+    <xsd:attribute name="meaning" type="tMeaning"/>
+    <xsd:attribute name="question" type="xsd:string"/>
+    <!-- A checklist that opens with its last answer in the same run: of the same pause point, or of the same step. -->
+    <xsd:attribute name="prefill" type="tPrefill"/>
+  </xsd:complexType>
+
+  <!-- What a wait expects is its BPMN message; who provides it is here. -->
+  <xsd:complexType name="tWait">
+    <xsd:attribute name="from" type="tPerson" use="required"/>
+  </xsd:complexType>
+
+  <xsd:complexType name="tRule">
+    <xsd:attribute name="ref" use="required">
+      <xsd:simpleType>
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="[a-z0-9][a-z0-9\-]{1,79}"/>
+        </xsd:restriction>
+      </xsd:simpleType>
+    </xsd:attribute>
+    <xsd:attribute name="version" type="xsd:positiveInteger"/>
+  </xsd:complexType>
+
+  <xsd:complexType name="tDocument">
+    <xsd:attribute name="name" type="xsd:string" use="required"/>
+  </xsd:complexType>
+
+  <xsd:simpleType name="tKey">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="[a-z][a-z0-9\-]{0,79}"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tPerson">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="person:[0-9]{1,18}|role:(owner|admin)|project-lead"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tIssue">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="[A-Za-z][A-Za-z0-9]{0,19}-[0-9]{1,9}"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tLockSource">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="floor"/>
+      <xsd:enumeration value="rule"/>
+      <xsd:enumeration value="author"/>
+      <xsd:enumeration value="pause-point"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tHumanKind">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="approval"/>
+      <xsd:enumeration value="input"/>
+      <xsd:enumeration value="checklist"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tMeaning">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="review"/>
+      <xsd:enumeration value="approval"/>
+      <xsd:enumeration value="responsibility"/>
+      <xsd:enumeration value="authorship"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tFieldType">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="text"/>
+      <xsd:enumeration value="number"/>
+      <xsd:enumeration value="date"/>
+      <xsd:enumeration value="choice"/>
+      <xsd:enumeration value="person"/>
+      <xsd:enumeration value="document"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tPrefill">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="last-answer"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="tOutcome">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="approved"/>
+      <xsd:enumeration value="refused"/>
+      <xsd:enumeration value="succeeded"/>
+      <xsd:enumeration value="failed"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+</xsd:schema>
