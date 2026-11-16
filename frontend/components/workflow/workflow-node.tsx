@@ -112,7 +112,8 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
         className="absolute inset-0 z-0 cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
       <div className="pointer-events-none relative z-10 flex h-5 min-w-0 items-center gap-2">
-        <StateMark state={state} word={word} still={markStill(node.reason)} />
+        {/* La marque se survole : elle dit le mot de son état (le reste de la carte laisse passer le clic). */}
+        <StateMark state={state} word={word} still={markStill(node.reason)} className="pointer-events-auto" />
         <button
           type="button"
           tabIndex={-1}
@@ -158,7 +159,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
       {showFoot && (
         <div className="pointer-events-none relative z-10 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1 pl-6 text-xs text-muted-foreground">
           {governance.rules > 0 && (
-            <span className="flex items-center gap-1 whitespace-nowrap" title={governance.ruleReasons.join(" ")}>
+            <span data-rules className="pointer-events-auto flex items-center gap-1 whitespace-nowrap" title={governance.ruleReasons.join(" ")}>
               <Lock aria-hidden="true" className="size-3 shrink-0" />
               {countWords(governance.rules, t.gov.rulesOne, t.gov.rulesMany)}
             </span>
@@ -232,7 +233,7 @@ export const SummaryNodeCard = memo(function SummaryNodeCard({ view, selected, f
         onKeyDown={(event) => keyOpens(event, () => handlers.onOpen(node.key))}
         className="absolute inset-0 z-0 cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
-      <StateMark state={node.state} word={word} still={markStill(node.reason)} className="pointer-events-none relative z-10 mt-0.5" />
+      <StateMark state={node.state} word={word} still={markStill(node.reason)} className="pointer-events-auto relative z-10 mt-0.5" />
       {/* Le titre sur deux lignes : la lecture du dirigeant ne coupe plus à dix caractères. */}
       <span data-summary-title className="pointer-events-none relative z-10 line-clamp-2 min-w-0 flex-1 text-xs leading-4 text-foreground">{node.issue.title}</span>
       <span className="pointer-events-none relative z-10 max-w-[56px] shrink-0 truncate text-[11px] leading-4 text-muted-foreground">{who}</span>

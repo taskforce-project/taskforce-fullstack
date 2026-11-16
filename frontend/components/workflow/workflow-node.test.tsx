@@ -49,6 +49,16 @@ describe("WorkflowNodeCard", () => {
     expect(screen.queryByText(/feat\/export/)).toBeNull()
   })
 
+  it("on hover, its mark says the word of its state and its lock says the rule", () => {
+    render(<WorkflowNodeCard view={viewOf()} density="plan" selected={false} focusable dimmed={false} t={t} handlers={handlers()} />)
+    const mark = screen.getByRole("img", { name: "Needs you" })
+    expect(mark).toHaveAttribute("title", "Needs you")
+    expect(mark.className).toContain("pointer-events-auto")
+    const rules = document.querySelector<HTMLElement>("[data-rules]")
+    expect(rules).toHaveAttribute("title", "Deploys need a look")
+    expect(rules?.className).toContain("pointer-events-auto")
+  })
+
   it("a click chooses it; Enter, a double click and its title open it; its one button acts", () => {
     const on = handlers()
     render(<WorkflowNodeCard view={viewOf()} density="detail" selected focusable={false} dimmed t={t} handlers={on} />)
