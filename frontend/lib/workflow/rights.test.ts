@@ -4,14 +4,16 @@ import type { ProjectMember } from "@/lib/api/project-service"
 import { canWriteProject } from "@/lib/workflow/rights"
 
 const member = (userId: number, role: ProjectMember["role"]) => ({ userId, role } as ProjectMember)
+// La liste des membres de l'espace, lue : la personne 7 n'y est qu'un membre.
+const READ = [{ userId: 7, role: "MEMBER" as const }, { userId: 1, role: "OWNER" as const }]
 
 /** Le droit d'écrire dans un projet, la règle du serveur sur ce que la fenêtre sait (R159, L6). */
 describe("canWriteProject", () => {
   it("a read-only member can't write; a lead or a member can", () => {
     const project = { isPublic: true, members: [member(7, "VIEWER"), member(8, "MEMBER"), member(9, "LEAD")] }
-    expect(canWriteProject(project, "7", [])).toBe(false)
-    expect(canWriteProject(project, 8, [])).toBe(true)
-    expect(canWriteProject(project, "9", [])).toBe(true)
+    expect(canWriteProject(project, "7", READ)).toBe(false)
+    expect(canWriteProject(project, 8, READ)).toBe(true)
+    expect(canWriteProject(project, "9", READ)).toBe(true)
   })
 
   it("a workspace owner or admin writes, even listed as read-only", () => {
@@ -22,8 +24,13 @@ describe("canWriteProject", () => {
   })
 
   it("outside the members: a public project yes, a private one no", () => {
-    expect(canWriteProject({ isPublic: true, members: [member(8, "LEAD")] }, "7", [])).toBe(true)
-    expect(canWriteProject({ isPublic: false, members: [member(8, "LEAD")] }, "7", [])).toBe(false)
+    expect(canWriteProject({ isPublic: true, members: [member(8, "LEAD")] }, "7", READ)).toBe(true)
+    expect(canWriteProject({ isPublic: false, members: [member(8, "LEAD")] }, "7", READ)).toBe(false)
+  })
+
+  it("while the workspace's members aren't read, the gesture stays offered: the person may be its owner or an admin (R159, N4)", () => {
+    expect(canWriteProject({ isPublic: false, members: [member(8, "LEAD")] }, "7", [])).toBe(true)
+    expect(canWriteProject({ isPublic: true, members: [member(7, "VIEWER")] }, "7", [])).toBe(true)
   })
 
   it("without the project or its members, the gesture stays offered: the server judges", () => {

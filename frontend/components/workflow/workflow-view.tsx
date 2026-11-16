@@ -116,7 +116,13 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId))
   const projectStart = project?.createdAt ?? null
   const workspaceMembers = useWorkspaceStore((s) => s.members)
+  const fetchMembers = useWorkspaceStore((s) => s.fetchMembers)
   const canWrite = canWriteProject(project, me, workspaceMembers)
+  // Les membres de l'espace disent qui en est propriétaire ou administrateur, qui écrit partout : la vue les lit si personne
+  // ne l'a fait (ailleurs, seul Ctrl+K les lisait, et jamais sur le bureau) (R159, N4).
+  useEffect(() => {
+    if (useWorkspaceStore.getState().members.length === 0) void fetchMembers()
+  }, [fetchMembers])
   const densities = useWorkflowViewStore((s) => s.densities)
   const setDensity = useWorkflowViewStore((s) => s.setDensity)
   const inspectorWidth = useWorkflowViewStore((s) => s.inspectorWidths[person] ?? INSPECTOR_DEFAULT)

@@ -71,6 +71,7 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { useProjectStore } from "@/lib/store/project-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkflowViewStore } from "@/lib/store/workflow-view-store"
+import { useWorkspaceStore } from "@/lib/store/workspace-store"
 import {
   approval, bigProject, deliveryRun, DOING, DONE, issue, projectRun, relation, STATUSES,
 } from "@/lib/workflow/__tests__/fixtures"
@@ -340,6 +341,15 @@ describe("le workflow d'un projet", () => {
       })
     })
     await waitFor(() => expect(said?.textContent).toBe("Docs needs you."))
+  })
+
+  it("lit les membres de l'espace quand personne ne l'a fait : ses administrateurs écrivent partout (R159, N4)", async () => {
+    const fetchMembers = vi.fn(async () => [])
+    useWorkspaceStore.setState({ members: [], fetchMembers })
+    serve({ issues: [issue(1, { title: "Write the spec" })] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    expect(fetchMembers).toHaveBeenCalledTimes(1)
   })
 
   it("pendant la lecture, le squelette se dit à un lecteur d'écran", () => {
