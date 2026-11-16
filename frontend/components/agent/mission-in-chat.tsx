@@ -38,9 +38,9 @@ export function MissionInChat({ slug, target }: Readonly<{ slug: string; target:
           {label}
         </PaneLink>
       )}
-      {/* Le nœud de l'issue, comme le workflow le montre, et de quoi l'y ouvrir (séance n°25, §9) ; sa phrase est celle de
-          la mission, dite juste dessous. */}
-      <NodeInChat slug={slug} target={target} withSentence={false} />
+      {/* Le nœud de l'issue, comme le workflow le montre, et de quoi l'y ouvrir (séance n°25, §9) ; sa phrase et sa demande
+          sont celles de la mission, dites juste dessous, une seule fois. */}
+      <NodeInChat slug={slug} target={target} withSentence={false} withDecision={false} />
       <DelegateAgentControl workspaceSlug={slug} projectId={target.projectId} issueId={target.issueId}
         goal={key ? `${target.title} (${key})` : target.title} />
     </div>

@@ -53,6 +53,8 @@ describe("MissionInChat : la mission d'une issue, dans la conversation", () => {
     expect(screen.getByText("Waiting for you: 1 request")).toBeInTheDocument();
     expect(screen.getByText("Understand: Wants to open nodejs.org")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refuse" })).toBeInTheDocument();
+    // La demande ne s'offre qu'une fois : la carte du nœud ne redit pas « Decide » (R161, M3).
+    expect(screen.queryByRole("button", { name: "Decide" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Allow for this mission" }));
 
@@ -120,8 +122,8 @@ describe("MissionInChat : la mission d'une issue, dans la conversation", () => {
     render(<MissionInChat slug="acme" target={TARGET} />);
 
     expect(screen.getByRole("group", { name: "Fix the footer links, Needs you" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Decide" }));
-    expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/3/workflow?node=issue-28", { scroll: false });
+    // La demande se décide sur la carte de la mission, juste dessous : le nœud n'offre que de s'ouvrir dans le workflow.
+    expect(screen.queryByRole("button", { name: "Decide" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Open in Workflow" }));
     expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/3/workflow?node=issue-28", { scroll: false });
   });

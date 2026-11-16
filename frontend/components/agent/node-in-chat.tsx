@@ -45,11 +45,16 @@ function rowOf(run: DeliveryRun, activity: DeliveryRunActivity | undefined, text
  * stores que la vue : elle change quand la vue change. Décider ouvre le workflow sur le nœud, où la règle se voit sur la
  * décision ; Cortex n'ouvre ni ne déplace jamais l'écran seul : la personne clique.
  */
-export function NodeInChat({ slug, target, withSentence = true }: Readonly<{
+export function NodeInChat({ slug, target, withSentence = true, withDecision = true }: Readonly<{
   slug: string
   target: AssistantTarget
   /** La phrase du nœud ; la carte de la mission, juste dessous, la dit déjà quand elle l'accompagne. */
   withSentence?: boolean
+  /**
+   * « Decide » sur le nœud ; la carte de la mission, juste dessous, porte déjà la demande avec ses boutons : une demande ne
+   * s'offre qu'une fois, dans les mots de la mission.
+   */
+  withDecision?: boolean
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
   const sequence = usePreferencesStore((s) => s.t.missionSequence)
@@ -109,7 +114,7 @@ export function NodeInChat({ slug, target, withSentence = true }: Readonly<{
         >
           {t.openInWorkflow}
         </button>
-        {node.reason.kind === "approval" && (
+        {withDecision && node.reason.kind === "approval" && (
           <ChatButton onClick={() => openWorkflow(target.projectId, nodeId)}>{t.action.decide}</ChatButton>
         )}
         {node.reason.kind === "review" && (
