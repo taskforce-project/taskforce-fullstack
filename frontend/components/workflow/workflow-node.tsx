@@ -21,6 +21,12 @@ export interface NodeAgent {
 }
 
 /** Ce qu'une carte montre, calculé une fois par nœud par la vue (les cartes ne lisent pas les stores). */
+/** Le nom d'un agent et son modèle, une fois : un nom qui porte déjà son modèle (« Cortex · qwen3:8b ») ne le répète pas. */
+export function agentLabel(agent: Pick<NodeAgent, "name" | "model">): string {
+  const model = agent.model?.trim()
+  return model && !agent.name.includes(model) ? `${agent.name} · ${model}` : agent.name
+}
+
 export interface NodeView {
   readonly node: WorkflowNode
   readonly sentence: string | null
@@ -128,7 +134,8 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
       {(assignee || agent) && (
         <div className="pointer-events-none relative z-10 flex h-4 min-w-0 items-center gap-1.5 pl-6 text-xs text-muted-foreground">
           {assignee && (
-            <span className="flex min-w-0 items-center gap-1">
+            // La personne d'abord, entière : c'est le nom de l'agent qui se coupe s'il manque de place.
+            <span data-assignee className="flex max-w-[60%] shrink-0 items-center gap-1">
               <UserAvatar
                 email={assignee.email}
                 name={assignee.displayName ?? assignee.email}
@@ -143,7 +150,7 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
           {agent && (
             <span className="flex min-w-0 items-center gap-1">
               {agent.logoKey && <BrandLogo slug={agent.logoKey} name={agent.name} className="size-4 shrink-0" />}
-              <span className="truncate">{agent.model ? `${agent.name} · ${agent.model}` : agent.name}</span>
+              <span className="truncate">{agentLabel(agent)}</span>
             </span>
           )}
         </div>

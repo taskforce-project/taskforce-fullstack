@@ -25,7 +25,7 @@ import { issueKey, nextStage, type WorkflowModel, type WorkflowNode } from "@/li
 import { markStill, pendingOf } from "@/lib/workflow/node-state"
 import { countWords, momentWords, nodeSentence } from "@/lib/workflow/sentence"
 import type { WorkflowState } from "@/lib/workflow/states"
-import type { NodeAgent } from "@/components/workflow/workflow-node"
+import { agentLabel, type NodeAgent } from "@/components/workflow/workflow-node"
 import { MAX_EDGES } from "@/lib/workflow/view"
 
 export type InspectorTab = "details" | "activity" | "evidence"
@@ -301,7 +301,7 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
 
       <dl className="flex flex-col gap-3">
         <Row label={i.answersFor}>{node.issue.assignee ? (node.issue.assignee.displayName ?? node.issue.assignee.email) : i.nobody}</Row>
-        <Row label={i.doneBy}>{agent ? (agent.model ? `${agent.name} · ${agent.model}` : agent.name) : i.noAgent}</Row>
+        <Row label={i.doneBy}>{agent ? agentLabel(agent) : i.noAgent}</Row>
         <Row label={i.waitsFor}>{waits ?? i.nothingWaits}</Row>
         <Row label={i.next}>{next ? next.name : i.lastStage}</Row>
         {upstream.length > 0 && (

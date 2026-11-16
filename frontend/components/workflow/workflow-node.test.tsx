@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 
 import { StateMark } from "./state-mark"
-import { SummaryNodeCard, WorkflowNodeCard, type NodeView } from "./workflow-node"
+import { SummaryNodeCard, WorkflowNodeCard, agentLabel, type NodeView } from "./workflow-node"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { buildWorkflow } from "@/lib/workflow/model"
 import { approval, deliveryRun, DOING, issue, ME, projectRun, STATUSES } from "@/lib/workflow/__tests__/fixtures"
@@ -113,6 +113,18 @@ describe("SummaryNodeCard", () => {
     const late = { ...view, node: { ...view.node, state: "notStarted" as const, overdue: true } }
     render(<SummaryNodeCard view={late} selected={false} focusable dimmed={false} t={t} handlers={handlers()} />)
     expect(screen.getByRole("button", { name: /^Ship the export, Overdue/ })).toBeInTheDocument()
+  })
+})
+
+describe("l'agent d'une carte", () => {
+  it("se dit une fois avec son modèle, et la personne passe avant lui", () => {
+    expect(agentLabel({ name: "Cortex · qwen3:8b", model: "qwen3:8b" })).toBe("Cortex · qwen3:8b")
+    expect(agentLabel({ name: "TaskForce agent", model: "qwen3:8b" })).toBe("TaskForce agent · qwen3:8b")
+    expect(agentLabel({ name: "Claude Code", model: null })).toBe("Claude Code")
+    render(<WorkflowNodeCard view={viewOf({ agent: { name: "Cortex · qwen3:8b", logoKey: null, model: "qwen3:8b" } })} density="plan"
+      selected={false} focusable dimmed={false} t={t} handlers={handlers()} />)
+    expect(screen.getByText("Cortex · qwen3:8b")).toBeInTheDocument()
+    expect(document.querySelector("[data-assignee]")?.className).toContain("shrink-0")
   })
 })
 
