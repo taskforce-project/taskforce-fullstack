@@ -402,6 +402,24 @@ class ProcessServiceTest {
             "“Draft the specification” follows a rule that doesn't apply to this project: other-process-only.");
     }
 
+    @Test
+    @DisplayName("ce qui change le code se lit dans le paquet du projet : une règle de la couche du projet qui demande de "
+        + "pousser oblige les notes de version à passer le point d'avant d'appliquer")
+    void the_code_rules_come_from_the_bundle() {
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(HarnessRuleSet.builder().workspace(ws)
+            .version(1).scope(RuleScope.PROJECT).project(project).rules(List.of(Map.of("id", "ask-before-push",
+                "effect", "ask", "when", Map.of("action", "git.push")))).build()));
+        ObjectNode notes = derived();
+        ((ArrayNode) ProcessValidatorTest.step(notes, "notes-zone").get("rules")).addObject().put("ref", "ask-before-push");
+        ObjectNode more = derived();
+        ProcessValidatorTest.buildMore(more);
+
+        assertThat(service.check("acme", PROJECT, model(notes), MEMBER).problems())
+            .extracting(ProcessResponse.Problem::code).containsExactly("changeWithoutPausePoint");
+        assertThat(service.check("acme", PROJECT, model(more), MEMBER).problems())
+            .extracting(ProcessResponse.Problem::code).containsExactly("changeWithoutPausePoint");
+    }
+
     /** Un processus de {@code levels} phases emboîtées, construit sans récursion. */
     static ProcessModel nested(int levels) {
         ProcessModel.Step inner = null;

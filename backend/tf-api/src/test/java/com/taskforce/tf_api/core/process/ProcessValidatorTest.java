@@ -132,6 +132,29 @@ public class ProcessValidatorTest {
         flows(container).add(newFlow(via.path("id").asText() + "-next", via.path("id").asText(), to));
     }
 
+    /**
+     * Une phase « Build more » entre la revue et la recette (le cas de la relecture de #538) : un point d'avant une
+     * mission, puis une zone qui pousse le code, après le point d'avant d'appliquer.
+     */
+    public static void buildMore(ObjectNode root) {
+        ObjectNode stage = JSON.createObjectNode().put("id", "build-more").put("type", "stage").put("name", "Build more");
+        steps(stage).add(JSON.createObjectNode().put("id", "build-more-start").put("type", "start"));
+        ObjectNode point = step(root, "before-mission-build").deepCopy();
+        point.put("id", "before-mission-more").put("name", "Before the agents build more");
+        steps(stage).add(point);
+        ObjectNode zone = step(root, "build-zone").deepCopy();
+        zone.put("id", "more-zone").put("name", "Build more of the module");
+        zone.get("steps").forEach(s -> ((ObjectNode) s).put("id", "more-" + s.get("id").asText()));
+        steps(stage).add(zone);
+        steps(stage).add(JSON.createObjectNode().put("id", "build-more-end").put("type", "end"));
+        flows(stage).add(newFlow("build-more-start-point", "build-more-start", "before-mission-more"));
+        flows(stage).add(newFlow("build-more-point-zone", "before-mission-more", "more-zone"));
+        flows(stage).add(newFlow("build-more-zone-end", "more-zone", "build-more-end"));
+        steps(root).add(stage);
+        flow(root, "review-accept").put("to", "build-more");
+        flows(root).add(newFlow("build-more-accept", "build-more", "accept"));
+    }
+
     /** Une décision devant le point d'avant de livrer, dont le chemin « signée » va droit à la livraison. */
     static void signedBypass(ObjectNode root) {
         ObjectNode deliver = step(root, "deliver");
@@ -242,6 +265,14 @@ public class ProcessValidatorTest {
                 r -> flow(r, "tests-failed-before-mission-fix").put("to", "fix-zone")),
             refusal("missionWithoutPausePoint", "une spécification refusée que l'agent reprend sans le point",
                 r -> flow(r, "spec-approved-before-mission").put("to", "spec-zone")),
+            // Le travail qui change le code passe le point d'avant d'appliquer avant la livraison (la Présidence, N3).
+            refusal("changeWithoutPausePoint", "une phase « Build more » entre la revue et la recette, qui pousse le "
+                + "code après le point d'avant d'appliquer", ProcessValidatorTest::buildMore),
+            refusal("changeWithoutPausePoint", "une zone dont une étape d'agent ouvre une demande de fusion, après le "
+                + "point d'avant d'appliquer", r -> {
+                    ObjectNode agent = step(r, "write-notes");
+                    agent.putArray("rules").addObject().put("ref", "open-pull-request");
+                }),
             // Un point de pause ne se contourne pas (R159, H1).
             refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant les agents, qui mène à leur zone",
                 r -> deadline(r, "specify", "before-mission", "spec-zone")),
@@ -621,6 +652,27 @@ public class ProcessValidatorTest {
             .satisfies(p -> {
                 assertThat(p.stepId()).isEqualTo("before-delivery");
                 assertThat(p.message()).isEqualTo("“Before delivering” is required by a pause point: it can't be removed.");
+            });
+    }
+
+    @Test
+    @DisplayName("ce qui change le code se lit dans les règles : les notes de version passent sans le point d'avant "
+        + "d'appliquer, une règle de l'espace qui pousse le code les y oblige")
+    void what_changes_the_code_comes_from_the_rules() {
+        ObjectNode process = e20();
+        ((ArrayNode) step(process, "notes-zone").get("rules")).addObject().put("ref", "ask-before-push");
+
+        assertThat(check(e20())).isEmpty();
+        assertThat(check(process)).isEmpty();
+        assertThat(ProcessValidator.check(model(process),
+            new Context(List.of(), Map.of(), null, null, Set.of("ask-before-push"))))
+            .singleElement().satisfies(p -> {
+                assertThat(p.code()).isEqualTo("changeWithoutPausePoint");
+                assertThat(p.stepId()).isEqualTo("notes-zone");
+                assertThat(p.message()).isEqualTo("The changes of “Prepare the release notes” can reach “Before "
+                    + "delivering” without anyone checking the list before the changes are applied: the work of an agent "
+                    + "that changes the code passes it on every way to the delivery. Put that pause point after “Prepare "
+                    + "the release notes”.");
             });
     }
 

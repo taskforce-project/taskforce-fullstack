@@ -135,17 +135,39 @@ public final class ProcessValidator {
      * @param defaults   les workflows par défaut, par clé : celui d'où le processus dérive est aussi une base
      * @param knownRules les règles que l'espace connaît pour ce travail ; null : non vérifié
      * @param members    les personnes de l'espace ; null : non vérifié
+     * @param codeRules  les règles qui laissent un agent changer le code (pousser, ouvrir une demande de fusion, écrire
+     *                   des fichiers qu'on applique) ; null : celles de la table de TaskForce
      */
     public record Context(List<ProcessModel> bases, Map<String, ProcessModel> defaults, Set<String> knownRules,
-                          Set<Long> members) {
+                          Set<Long> members, Set<String> codeRules) {
 
         public static final Context NONE = new Context(List.of(), Map.of(), null, null);
 
         public Context {
             bases = bases == null ? List.of() : List.copyOf(bases);
             defaults = defaults == null ? Map.of() : Map.copyOf(defaults);
+            codeRules = codeRules == null ? TASKFORCE_CODE_RULES : Set.copyOf(codeRules);
+        }
+
+        public Context(List<ProcessModel> bases, Map<String, ProcessModel> defaults, Set<String> knownRules,
+                       Set<Long> members) {
+            this(bases, defaults, knownRules, members, null);
         }
     }
+
+    /**
+     * Ce qu'une règle laisse faire à un agent qui change le code (décision de la Présidence, N3) : écrire des fichiers
+     * qu'on applique, les confier, les pousser, ouvrir une demande de fusion. Lire, écrire une note, une issue, n'en est
+     * pas.
+     */
+    public static final Set<String> CODE_ACTIONS = Set.of("file.write", "git.commit", "git.push", "pr.open");
+
+    /**
+     * Les règles de la table de TaskForce qui permettent ou demandent une de ces actions ; un test vérifie que ce sont
+     * celles de {@code contracts/rules/default.rules.json}. Le service les lit du paquet des règles du projet.
+     */
+    public static final Set<String> TASKFORCE_CODE_RULES = Set.of("write-sandbox-files", "commit-locally",
+        "push-agent-branch-private", "push-public-repo", "open-pull-request", "open-pull-request-public");
 
     public static List<Problem> check(ProcessModel model, Context context) {
         return check(model, context, List.of());
@@ -1305,6 +1327,21 @@ public final class ProcessValidator {
                     "The pause point before the changes are applied comes before any agent works: put it after their "
                         + "work.");
             }
+            // Le travail d'un agent qui change le code passe par le point d'avant d'appliquer sur tout chemin vers celui
+            // d'avant de livrer (décision de la Présidence, N3) ; celui qui ne fait que lire, ou écrire des notes, non.
+            Set<String> applyPoints = new HashSet<>();
+            points.get(BEFORE_APPLY).forEach(s -> applyPoints.add(s.id()));
+            for (Step zone : zones) {
+                if (!changesCode(zone)) {
+                    continue;
+                }
+                Set<String> after = graph.reachableFrom(zone.id(), applyPoints);
+                points.get(BEFORE_DELIVERY).stream().filter(d -> after.contains(d.id())).findFirst().ifPresent(d ->
+                    add("changeWithoutPausePoint", zone.id(), zone.name(), "The changes of “" + zone.label() + "” can "
+                        + "reach “" + d.label() + "” without anyone checking the list before the changes are applied: "
+                        + "the work of an agent that changes the code passes it on every way to the delivery. Put that "
+                        + "pause point after “" + zone.label() + "”."));
+            }
             // Comme celui d'avant une mission : chaque chemin vers le point d'avant de livrer passe par celui d'avant
             // d'appliquer, et chaque chemin du travail d'un agent à une fin du processus passe par celui d'avant de
             // livrer. Une fin qui arrête tout n'abandonne que si seules des décisions y mènent (abandons).
@@ -1344,6 +1381,13 @@ public final class ProcessValidator {
                     break;
                 }
             }
+        }
+
+        /** Vrai pour une zone dont une règle, la sienne ou celle d'une de ses étapes, laisse l'agent changer le code. */
+        private boolean changesCode(Step zone) {
+            List<RuleRef> rules = new ArrayList<>(zone.rules() == null ? List.of() : zone.rules());
+            zone.stepsOrEmpty().forEach(s -> rules.addAll(s.rules() == null ? List.of() : s.rules()));
+            return rules.stream().anyMatch(r -> r.ref() != null && context.codeRules().contains(r.ref()));
         }
 
         /**

@@ -308,17 +308,26 @@ public class ProcessService {
     /**
      * Ce que le vérificateur sait de l'endroit où le processus entre : la version en vigueur de sa clé, les workflows
      * par défaut, les règles qui s'appliquent au travail du projet sous ce processus (le paquet de ce travail, et le
-     * socle ; jamais les couches d'un autre projet ou d'un autre processus), et les personnes de l'espace.
+     * socle ; jamais les couches d'un autre projet ou d'un autre processus), celles d'entre elles qui laissent un agent
+     * changer le code, et les personnes de l'espace.
      */
     private ProcessValidator.Context context(Access access, String key, ProcessModel current) {
         Set<String> known = new HashSet<>();
+        Set<String> code = new HashSet<>();
         RulesBundle bundle = rules.bundleFor(access.workspace(), new Work(access.project().getId(), key, null));
-        bundle.rules().forEach(r -> known.add(r.id()));
+        bundle.rules().forEach(r -> {
+            known.add(r.id());
+            // Une règle qui permet ou demande d'écrire, de confier, de pousser du code ou d'ouvrir une demande de fusion.
+            if (r.when() != null && ProcessValidator.CODE_ACTIONS.contains(r.when().action())
+                && (RulesEngine.ALLOW.equals(r.effect()) || RulesEngine.ASK.equals(r.effect()))) {
+                code.add(r.id());
+            }
+        });
         RulesFloor.RULES.forEach(r -> known.add(r.id()));
         Set<Long> members = workspaceMembers.findByWorkspaceId(access.workspace().getId()).stream()
             .map(m -> m.getUser().getId()).collect(Collectors.toSet());
         return new ProcessValidator.Context(current == null ? List.of() : List.of(current), defaults.byKey(), known,
-            members);
+            members, code);
     }
 
     // ------------------------------------------------------------------------------------------------- vues

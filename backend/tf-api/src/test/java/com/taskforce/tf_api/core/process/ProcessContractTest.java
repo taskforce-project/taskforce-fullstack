@@ -111,6 +111,24 @@ class ProcessContractTest {
     }
 
     @Test
+    @DisplayName("les règles qui changent le code, que le vérificateur connaît d'avance, sont celles de la table de "
+        + "TaskForce")
+    void the_code_rules_are_the_table_s() throws IOException {
+        Set<String> table = new TreeSet<>();
+        for (com.fasterxml.jackson.databind.JsonNode rule : new com.fasterxml.jackson.databind.ObjectMapper()
+            .readTree(contracts().resolve("rules/default.rules.json").toFile()).get("rules")) {
+            String effect = rule.path("effect").asText();
+            if (("allow".equals(effect) || "ask".equals(effect))
+                && ProcessValidator.CODE_ACTIONS.contains(rule.path("when").path("action").asText())) {
+                table.add(rule.get("id").asText());
+            }
+        }
+
+        assertThat(table).isNotEmpty();
+        assertThat(ProcessValidator.TASKFORCE_CODE_RULES).containsExactlyInAnyOrderElementsOf(table);
+    }
+
+    @Test
     @DisplayName("le schéma de tf: que le serveur suit à l'import est celui du contrat")
     void the_server_reads_the_contract_schema() throws IOException {
         try (var in = getClass().getResourceAsStream("/process/taskforce-process-1.xsd")) {
