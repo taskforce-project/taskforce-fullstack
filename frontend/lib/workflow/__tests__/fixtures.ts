@@ -77,7 +77,8 @@ export function approval(id: number, patch: Partial<DeliveryRunApproval> = {}): 
     summary: "npm run build",
     status: "PENDING",
     createdAt: "2026-11-13T10:00:00",
-    expiresAt: "2026-11-13T10:30:00",
+    // Loin devant : la vue lit l'heure réelle, et une demande échue ne compte plus sur son nœud (R159, N6).
+    expiresAt: "2099-11-13T10:30:00",
     decidedAt: null,
     decidedBy: null,
     canDecide: true,

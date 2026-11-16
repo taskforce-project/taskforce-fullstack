@@ -75,6 +75,8 @@ export interface WorkflowInput {
   readonly me: string | number | null | undefined
   /** Aujourd'hui, `AAAA-MM-JJ` à l'heure de la personne : une date passée se compare à lui. */
   readonly today: string
+  /** Maintenant (la minute de la vue) : une demande échue ne compte plus sur son nœud (R159, N6). */
+  readonly now?: Date
 }
 
 const createdAt = (row: ProjectRun): number => (row.run.createdAt ? parseServerDate(row.run.createdAt).getTime() : 0)
@@ -117,7 +119,7 @@ function pushOnce(map: Map<number, IssueSummary[]>, issueId: number, other: Issu
 }
 
 export function buildWorkflow(input: WorkflowInput): WorkflowModel {
-  const { statuses, issues, runs, relations, documents, me, today } = input
+  const { statuses, issues, runs, relations, documents, me, today, now = null } = input
   const byId = new Map<number, Issue>()
   for (const issue of issues) byId.set(issue.id, issue)
 
@@ -162,7 +164,7 @@ export function buildWorkflow(input: WorkflowInput): WorkflowModel {
     const theirBlockers = blockedBy.get(issue.id) ?? []
     const unfinished = theirBlockers.filter((blocker) => !isFinished(categoryOf(blocker)))
     const { state, reason } = nodeStateOf({
-      category: issue.status.category, run, retried: retried.has(issue.id), blockers: unfinished, me,
+      category: issue.status.category, run, retried: retried.has(issue.id), blockers: unfinished, me, now,
     })
     const key = issueKey(issue.id)
     const parent = issue.parent ? byId.get(issue.parent.id) : undefined

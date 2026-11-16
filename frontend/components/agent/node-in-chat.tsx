@@ -81,12 +81,12 @@ export function NodeInChat({ slug, target, withSentence = true, withDecision = t
     // La ligne du projet porte ce que la personne peut décider ; sinon, la mission de l'issue et sa chronologie lue.
     const row = projectRow && (!run || projectRow.run.id >= run.id) ? projectRow : run ? rowOf(run, activity, sequence, isMine(run, me)) : null
     // Sans l'issue, sa colonne ne se devine pas : la mission seule dit où elle en est.
-    const { state, reason } = nodeStateOf({ category: issue?.status.category ?? null, run: row, blockers, me })
+    const { state, reason } = nodeStateOf({ category: issue?.status.category ?? null, run: row, blockers, me, now: new Date(now) })
     const sentenceNode: SentenceNode = { reason, run: row, overdue: false, issue: issue ?? NO_ISSUE }
     // Ni l'issue ni une mission : « Not started » ne serait qu'une supposition. La carte ne dit alors aucun état (R159, N3).
     const known = issue !== null || row !== null || state !== "notStarted"
     return { state, reason, row, sentenceNode, known }
-  }, [projectRow, run, activity, sequence, issue, blockers, me])
+  }, [projectRow, run, activity, sequence, issue, blockers, me, now])
 
   const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence, rules }, { me, now: new Date(now) })
   const word = node.known ? t.state[node.state] : null

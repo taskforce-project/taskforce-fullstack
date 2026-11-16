@@ -19,6 +19,18 @@ describe("l'état d'un nœud", () => {
     expect(nodeStateOf({ category: "COMPLETED", run, blockers: [], me: ME })).toEqual({ state: "needsYou", reason: { kind: "review" } })
   })
 
+  it("une demande échue ne compte plus : ni Needs you, ni Waiting ; la mission reste au travail (R159, N6)", () => {
+    const run = projectRun(deliveryRun(1, 11), [approval(6, { canDecide: true, expiresAt: "2026-11-13T10:30:00" })])
+    const before = new Date("2026-11-13T10:29:00Z")
+    const after = new Date("2026-11-13T10:31:00Z")
+    expect(nodeStateOf({ category: "STARTED", run, blockers: [], me: ME, now: before }).state).toBe("needsYou")
+    expect(nodeStateOf({ category: "STARTED", run, blockers: [], me: ME, now: after }))
+      .toEqual({ state: "working", reason: { kind: "mission", retried: false } })
+    expect(pendingOf(run, after)).toEqual([])
+    // Sans heure, rien n'échoit : la mission relue le dira.
+    expect(pendingOf(run)).toHaveLength(1)
+  })
+
   it("Waiting : le même résultat, pour une autre personne", () => {
     const run = projectRun(deliveryRun(1, 11, { status: "DONE" }))
     expect(nodeStateOf({ category: "STARTED", run, blockers: [], me: "8" }).reason).toEqual({ kind: "reviewOther" })

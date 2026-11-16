@@ -289,7 +289,7 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
     ? fillText(i.whatMission, { stage, agent: agent.name })
     : parent ? fillText(i.whatSubIssue, { parent: parent.identifier, stage }) : fillText(i.whatIssue, { stage })
   const next = nextStage(model, node.stageId)
-  const pending = pendingOf(node.run)
+  const pending = pendingOf(node.run, now)
   // Ce qui attend, et qui : la phrase du nœud quand il attend quelqu'un ou quelque chose.
   const waits = WAITS.has(node.state)
     ? nodeSentence(node, { workflow: t, sequence, rules }, { me, now })

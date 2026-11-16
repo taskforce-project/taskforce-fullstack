@@ -165,7 +165,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const model: WorkflowModel | null = useMemo(() => {
     if (!issues) return null
     return buildWorkflow({
-      statuses, issues, runs: runs ?? [], relations: relations ?? [], documents, me, today: todayKey(now),
+      statuses, issues, runs: runs ?? [], relations: relations ?? [], documents, me, today: todayKey(now), now,
     })
   }, [statuses, issues, runs, relations, documents, me, now])
 
@@ -568,7 +568,7 @@ function nodeViewOf(
   return {
     node,
     sentence,
-    governance: governanceOf(node),
+    governance: governanceOf(node, now),
     action: nodeAction(node, me),
     agent,
     detail: detail || null,

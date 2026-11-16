@@ -352,6 +352,15 @@ describe("le workflow d'un projet", () => {
     expect(fetchMembers).toHaveBeenCalledTimes(1)
   })
 
+  it("une demande échue ne s'offre plus : ni « Needs you », ni son compteur, ni « Decide » (R159, N6)", async () => {
+    const expired = approval(9, { expiresAt: "2026-01-01T00:00:00" })
+    serve({ issues: [issue(2, { title: "Release", status: DOING })], runs: [projectRun(deliveryRun(1, 2), [expired])] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Release")).toHaveAccessibleName("Release, Working"))
+    expect(screen.queryByRole("button", { name: "Decide" })).toBeNull()
+    expect(screen.queryByRole("button", { name: /^Needs you/ })).toBeNull()
+  })
+
   it("pendant la lecture, le squelette se dit à un lecteur d'écran", () => {
     vi.mocked(listIssuesPage).mockImplementation(() => new Promise(() => {}))
     vi.mocked(listStatuses).mockResolvedValue(STATUSES)

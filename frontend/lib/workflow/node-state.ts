@@ -1,5 +1,6 @@
 import type { DeliveryRunApproval, ProjectRun } from "@/lib/api/delivery-service"
 import type { IssueStatusCategory, IssueSummary } from "@/lib/api/issue-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 import { awaitsJudgment, isMine } from "@/lib/window/missions"
 import type { WorkflowState } from "@/lib/workflow/states"
 
@@ -57,6 +58,8 @@ export interface NodeFacts {
   readonly blockers: readonly IssueSummary[]
   /** La personne qui regarde (son id, en chaîne ou en nombre). */
   readonly me: string | number | null | undefined
+  /** Maintenant (la minute de la vue) : une demande dont l'échéance est passée ne compte plus. Sans lui, rien n'échoit. */
+  readonly now?: Date | null
 }
 
 /** La marque d'un nœud ne tourne que pour une mission au travail : une issue tenue par une personne garde une marque fixe. */
@@ -66,16 +69,24 @@ export const markStill = (reason: NodeReason): boolean => reason.kind === "perso
 export const isFinished = (category: IssueStatusCategory | null | undefined): boolean =>
   category === "COMPLETED" || category === "CANCELLED"
 
-/** Les demandes encore ouvertes d'une mission en cours ; aucune pour une mission qui ne tourne pas. */
-export function pendingOf(run: ProjectRun | null): DeliveryRunApproval[] {
+/**
+ * Une demande échue : sans réponse à temps, elle vaut refus. Tant que la mission n'est pas relue, le nœud la gardait :
+ * « Needs you », le compteur de l'en-tête, f et « Decide » (R159, N6).
+ */
+export function expiredAt(approval: Pick<DeliveryRunApproval, "expiresAt">, now: Date | null): boolean {
+  return now !== null && !!approval.expiresAt && parseServerDate(approval.expiresAt).getTime() <= now.getTime()
+}
+
+/** Les demandes encore ouvertes d'une mission en cours, sans celles qui ont échu ; aucune pour une mission qui ne tourne pas. */
+export function pendingOf(run: ProjectRun | null, now: Date | null = null): DeliveryRunApproval[] {
   if (!run || run.run.status !== "RUNNING") return []
-  return run.approvals.filter((approval) => approval.status === "PENDING")
+  return run.approvals.filter((approval) => approval.status === "PENDING" && !expiredAt(approval, now))
 }
 
 export function nodeStateOf(facts: NodeFacts): NodeState {
   const { category, run, blockers, me } = facts
   const mission = run?.run ?? null
-  const pending = pendingOf(run)
+  const pending = pendingOf(run, facts.now ?? null)
   const active = mission !== null && (mission.status === "RUNNING" || mission.status === "QUEUED")
   const stopped = mission?.status === "FAILED" && mission.outcome === "STOPPED"
 

@@ -187,8 +187,8 @@ export interface Governance {
   readonly documents: number
 }
 
-export function governanceOf(node: WorkflowNode): Governance {
-  const pending = pendingOf(node.run)
+export function governanceOf(node: WorkflowNode, now: Date | null = null): Governance {
+  const pending = pendingOf(node.run, now)
   const rules = new Map<string, string>()
   for (const approval of pending) {
     if (approval.rule) rules.set(approval.rule, approval.reason?.trim() || approval.rule)
