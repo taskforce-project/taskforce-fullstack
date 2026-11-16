@@ -13,7 +13,7 @@ The code: `backend/tf-api/src/main/java/com/taskforce/tf_api/core/process` (`Pro
 | File | What it is | Proved by |
 | --- | --- | --- |
 | `integrate-a-module.bpmn` | The first default workflow, of software delivery ("integrate a module", E20), as TaskForce exports it. Open it in any BPMN modeler. | `ProcessContractTest`: it is the export of the model, valid for the BPMN 2.0 XSD and for `taskforce-process-1.xsd` |
-| `round-trip/*.bpmn` | The same file as a modeler rewrites it: bpmn-moddle, the model library of bpmn.io under Camunda's modelers, and Camunda's Web Modeler (8.10) itself | `integrate-a-module.bpmn-moddle.bpmn` is written by `frontend/lib/process/bpmn-moddle.test.ts` from today's export; `integrate-a-module.camunda-web-modeler.bpmn` was opened in Camunda's Web Modeler and downloaded unchanged on 15/11/2026, from the export of that day, kept as `round-trip/sources/integrate-a-module.camunda-web-modeler.bpmn` (before the pause point before every mission); `ProcessContractTest` imports each one and finds the fingerprint of the export it was made from |
+| `round-trip/*.bpmn` | The same file as a modeler rewrites it: bpmn-moddle, the model library of bpmn.io under Camunda's modelers, and Camunda's Web Modeler (8.10) itself | `integrate-a-module.bpmn-moddle.bpmn` is written by `frontend/lib/process/bpmn-moddle.test.ts` from today's export; `integrate-a-module.camunda-web-modeler.bpmn` was opened in Camunda's Web Modeler and downloaded unchanged on 15/11/2026, from the export of that day, kept as `round-trip/sources/integrate-a-module.camunda-web-modeler.bpmn` (before the pause point before every mission and the lock on the delivery); `ProcessContractTest` imports each one and finds the fingerprint of the export it was made from |
 | `taskforce-process-1.xsd` | The XML Schema of the `tf:` extension; the import follows it, from a copy in the server (`backend/tf-api/src/main/resources/process/`) | the same contract test validates the export against it, and checks that the server's copy is this one |
 
 The default workflow itself lives with the backend, as a model:
@@ -53,7 +53,7 @@ the export of "integrate a module" uses each of these elements, and no other one
 | BPMN 2.0 element | In TaskForce's model |
 | --- | --- |
 | `definitions`, one `process` | the process: its key is the process `id`, its name the process `name` |
-| `documentation` | the description of the process or of a step |
+| `documentation` | the description of the process or of a step (anywhere else, refused) |
 | `extensionElements` | where the `tf:` extension travels |
 | `startEvent`, with no trigger | `start` |
 | `endEvent`; with `terminateEventDefinition`, at the top level only | `end`; `end` that stops the whole process |
@@ -82,7 +82,8 @@ Each element of the subset has a list of the attributes and children it may carr
 meaning; anything else is refused with its reason, never dropped in silence: a setting such as
 `completionQuantity="2"`, an ad hoc `ordering="Sequential"`, an `operationRef` or an `errorRef`, a zone's
 `completionCondition`, a task's `rendering`, data inputs and outputs on an event, an unknown element in a gateway, a
-message's own settings, a description with markup inside it or a second description. A condition is in words: a
+message's own settings, a description with markup inside it or a second description, a description where TaskForce
+keeps none (on a path, a condition, a duration, an event's definition or a message). A condition is in words: a
 `conditionExpression` in another language (`javascript`, XPath, FEEL...) is refused, and so is one that names no
 language when `tf:condition` says what code judges (another engine's expression would otherwise become the words people
 read). The `tf:` elements must be where they belong (`tf:process` on the process, `tf:step` on a step, `tf:condition`
@@ -90,8 +91,9 @@ on a path), once, and follow `taskforce-process-1.xsd` (the server keeps a copy,
 with this one); the refusal says the schema's error (an attribute missing or not the extension's, an element in the
 wrong place), and a value the schema refuses still reaches the model, where the validator says it in a sentence. A
 refusal cuts what it takes from the file: a value at 80 characters, a name at 200. Notes drawn on a diagram
-(text annotations, associations, groups) and the settings of another tool, in `extensionElements` or in attributes of
-its own namespace (`camunda:class`...), are left out, and the import says so: TaskForce never runs them.
+(text annotations, associations, groups), the description of the file itself (outside its process) and the settings of
+another tool, in `extensionElements` or in attributes of its own namespace (`camunda:class`...), are left out, and the
+import says so: TaskForce never runs them.
 
 The reader takes no DTD and no external entity, reads 1,000,000 characters at most, and stops at 64 levels of elements
 (a process needs about ten), with a sentence each time.
@@ -121,23 +123,30 @@ who answers for it, an agent step outside an agent zone or with no rules (its ow
 version it replaces or of its default workflow that is missing or no longer locked, a missing or bypassed pause point,
 a decision path judged on words alone, a wait that doesn't say what it waits for, a step that leads to no end.
 
-A locked step stays what it is and where it is. Its type and its lock stay; a locked human task keeps its kind, who
-does it, what signing it means, its opening on the last answer and every line of its checklist (lines can be added);
-and every step it came before on every path in its base, it still comes before (`lockedStepMoved`): a checklist can't
-move after the step it guards.
+A locked step stays what it is and where it is. Its type, its lock, its name and who answers for it stay; a locked human
+task keeps its kind, who does it, its question, what signing it means, its opening on the last answer and every line of
+its checklist (lines can be added: every locked line is still checked, and what an added line says, no code judges); a
+locked zone or agent step keeps every rule it follows (rules can be added), and an agent step its agent; and every step
+it came before on every path in its base, it still comes before (`lockedStepMoved`): a checklist can't move after the
+step it guards. The step the checklist before delivering guards, "Deliver the module", is itself locked by TaskForce's
+floor in the default workflow: a process derived from it can't remove it, nor replace it with a delivery in front of
+the checklist.
 
 The pause points of TF-J2-10 can't be skipped. As soon as agents work in the process, the three are there. The point
 before a mission comes before every agent mission, not only the first (the President's decision of 15/11/2026): no
 agent zone starts without passing one, neither from the start nor after any agent's work, its own included when it
 starts again (`missionWithoutPausePoint`); the checklist opens with its last answer in the run. The point before
 applying comes after some agent's work, and the point before delivering is never reached without passing it; every
-agent zone whose rules let it change the code (write files that are applied, commit, push, open a pull request) passes
-the point before applying on every way to the point before delivering (`changeWithoutPausePoint`, the President's
-decision on N3), while a zone that only reads or writes notes, like the release notes, doesn't have to; no
-agent's work reaches an end of the process without passing the point before delivering (an end that stops everything
-is an abandonment only when every path into it comes straight from a decision, like "Integration stopped"; any other
-end delivers), and the refusal names the last step before the end on the way around. A pause point has no deadline,
-and is on none of the paths a split runs in parallel.
+agent zone that can change the code or the company's tools passes the point before applying on every way to the point
+before delivering (`changeWithoutPausePoint`, the President's decision on N3). A zone can change them as soon as one of
+its agents isn't Cortex (TaskForce's rules table lets any other agent write files, commit, push a `tf/**` branch and
+open a pull request, whatever rules the zone lists), or when a rule it or one of its steps lists allows or asks writing
+files that are applied, committing, pushing, opening a pull request or writing in the company's tools (`mcp.write`); a
+zone of Cortex that only reads or writes notes, like the release notes, doesn't have to. No agent's work reaches an
+end of the process without passing the point before delivering (an end that stops everything is an abandonment only
+when no agent's work can reach it, like "Integration stopped"; any other end delivers, and a decision in front of it
+changes nothing), and the refusal names the last step before the end on the way around. A pause point has no
+deadline, and is on none of the paths a split runs in parallel.
 
 A process always finishes. A parallel split is in no loop of its container; the paths it starts all meet again at one
 join, each by one path of its own, or each ends on its own, without crossing and without receiving anything from
