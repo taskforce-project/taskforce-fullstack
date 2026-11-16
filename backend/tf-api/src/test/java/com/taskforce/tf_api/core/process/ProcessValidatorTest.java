@@ -132,6 +132,19 @@ public class ProcessValidatorTest {
         flows(container).add(newFlow(via.path("id").asText() + "-next", via.path("id").asText(), to));
     }
 
+    /** Une décision devant le point d'avant de livrer, dont le chemin « signée » va droit à la livraison. */
+    static void signedBypass(ObjectNode root) {
+        ObjectNode deliver = step(root, "deliver");
+        steps(deliver).add(JSON.createObjectNode().put("id", "signed").put("type", "decision")
+            .put("name", "Is the acceptance signed?").put("answeredBy", "project-lead"));
+        flow(deliver, "deliver-start-before-delivery").put("to", "signed");
+        ObjectNode straight = newFlow("signed-deliver-module", "signed", "deliver-module");
+        straight.putObject("condition").put("text", "The acceptance is signed").put("step", "sign-acceptance")
+            .put("outcome", "approved");
+        flows(deliver).add(straight);
+        flows(deliver).add(newFlow("signed-before-delivery", "signed", "before-delivery").put("otherwise", true));
+    }
+
     /** Une échéance d'un jour sur l'étape {@code on} de la phase {@code stage}, qui mène à {@code to}. */
     static void deadline(ObjectNode root, String stage, String on, String to) {
         ObjectNode container = step(root, stage);
@@ -237,16 +250,26 @@ public class ProcessValidatorTest {
             refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant de livrer, qui mène à la livraison",
                 r -> deadline(r, "deliver", "before-delivery", "deliver-module")),
             refusal("pausePointMisplaced", "une décision devant le point d'avant de livrer, dont un chemin va droit à la "
-                + "livraison", r -> {
-                    ObjectNode deliver = step(r, "deliver");
-                    steps(deliver).add(JSON.createObjectNode().put("id", "signed").put("type", "decision")
-                        .put("name", "Is the acceptance signed?").put("answeredBy", "project-lead"));
-                    flow(deliver, "deliver-start-before-delivery").put("to", "signed");
-                    ObjectNode straight = newFlow("signed-deliver-module", "signed", "deliver-module");
-                    straight.putObject("condition").put("text", "The acceptance is signed")
-                        .put("step", "sign-acceptance").put("outcome", "approved");
-                    flows(deliver).add(straight);
-                    flows(deliver).add(newFlow("signed-before-delivery", "signed", "before-delivery").put("otherwise", true));
+                + "livraison", ProcessValidatorTest::signedBypass),
+            // Une fin qui arrête tout livre aussi, sauf quand seules des décisions y mènent (R159, N2 et N4).
+            refusal("pausePointMisplaced", "la fin livrée qui arrête tout, et une décision autour du point d'avant de "
+                + "livrer", r -> {
+                    step(r, "delivered").put("terminate", true);
+                    signedBypass(r);
+                }),
+            refusal("pausePointMisplaced", "une nouvelle phase qui livre le module et finit sur une fin qui arrête tout",
+                r -> {
+                    ObjectNode ship = JSON.createObjectNode().put("id", "ship").put("type", "stage").put("name", "Ship");
+                    steps(ship).add(JSON.createObjectNode().put("id", "ship-start").put("type", "start"));
+                    steps(ship).add(human("ship-module", "Ship the module"));
+                    steps(ship).add(JSON.createObjectNode().put("id", "ship-end").put("type", "end"));
+                    flows(ship).add(newFlow("ship-start-ship-module", "ship-start", "ship-module"));
+                    flows(ship).add(newFlow("ship-module-ship-end", "ship-module", "ship-end"));
+                    steps(r).add(ship);
+                    steps(r).add(JSON.createObjectNode().put("id", "shipped").put("type", "end")
+                        .put("name", "Module shipped").put("terminate", true));
+                    flow(r, "accepted-deliver").put("to", "ship");
+                    flows(r).add(newFlow("ship-shipped", "ship", "shipped"));
                 }),
             refusal("pausePointMisplaced", "une échéance de la livraison qui mène droit à la fin", r -> {
                 steps(r).add(JSON.createObjectNode().put("id", "deliver-late").put("type", "deadline")
@@ -611,6 +634,21 @@ public class ProcessValidatorTest {
             new Context(List.of(ProcessFixtures.integrateAModule()), Map.of(), null, null));
 
         assertRefused(problems, "lockedStepUnlocked");
+    }
+
+    @Test
+    @DisplayName("une fin qui arrête tout ne passe pas le point d'avant de livrer, dans un processus dérivé du défaut "
+        + "aussi ; « Integration stopped », où ne mène qu'une décision, reste un abandon")
+    void a_terminating_end_delivers_too() {
+        ObjectNode derived = e20();
+        derived.put("key", "integrate-billing").put("derivedFrom", "integrate-a-module");
+        step(derived, "delivered").put("terminate", true);
+        signedBypass(derived);
+        Context context = new Context(List.of(), Map.of("integrate-a-module", ProcessFixtures.integrateAModule()),
+            null, null);
+
+        assertRefused(ProcessValidator.check(model(derived), context), "pausePointMisplaced");
+        assertThat(check(e20())).isEmpty();
     }
 
     @Test

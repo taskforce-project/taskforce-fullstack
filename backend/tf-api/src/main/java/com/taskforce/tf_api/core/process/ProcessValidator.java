@@ -1306,7 +1306,7 @@ public final class ProcessValidator {
             }
             // Comme celui d'avant une mission : chaque chemin vers le point d'avant de livrer passe par celui d'avant
             // d'appliquer, et chaque chemin du travail d'un agent à une fin du processus passe par celui d'avant de
-            // livrer. Une fin qui arrête tout ne livre rien : elle abandonne.
+            // livrer. Une fin qui arrête tout n'abandonne que si seules des décisions y mènent (abandons).
             Set<String> apply = new HashSet<>();
             points.get(BEFORE_APPLY).forEach(s -> apply.add(s.id()));
             Set<String> beforeApply = graph.reachableAvoiding(apply);
@@ -1320,7 +1320,7 @@ public final class ProcessValidator {
             Set<String> delivery = new HashSet<>();
             points.get(BEFORE_DELIVERY).forEach(s -> delivery.add(s.id()));
             Set<String> ends = new LinkedHashSet<>();
-            model.stepsOrEmpty().stream().filter(s -> END.equals(s.type()) && !Boolean.TRUE.equals(s.terminate()))
+            model.stepsOrEmpty().stream().filter(s -> END.equals(s.type()) && !abandons(s))
                 .forEach(s -> ends.add(s.id()));
             for (Step zone : zones) {
                 Set<String> after = graph.reachableFrom(zone.id(), delivery);
@@ -1333,6 +1333,22 @@ public final class ProcessValidator {
                     break;
                 }
             }
+        }
+
+        /**
+         * Une fin qui arrête tout n'est un abandon que si seules des décisions y mènent, tout droit, comme « Integration
+         * stopped » ; une autre livre aussi, même si elle arrête tout.
+         */
+        private boolean abandons(Step end) {
+            if (!Boolean.TRUE.equals(end.terminate())) {
+                return false;
+            }
+            List<Flow> into = model.flowsOrEmpty().stream().filter(f -> end.id() != null && end.id().equals(f.to()))
+                .toList();
+            return !into.isEmpty() && into.stream().allMatch(f -> {
+                Step from = byId.get(f.from());
+                return from != null && DECISION.equals(from.type());
+            });
         }
 
         /**
