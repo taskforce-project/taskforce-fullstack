@@ -606,7 +606,6 @@ export const CONSTANTS_EN = {
       signed: "Signed: the request waits for the other people",
       refused: "Refused",
       failed: "Couldn't record your decision: the request may have expired. Look at where the mission is now.",
-      someone: "the people your rules name",
     },
     gesture: {
       open: "Open",

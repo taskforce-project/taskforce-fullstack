@@ -5,6 +5,7 @@ import type { UserSummary } from "@/lib/api/issue-service"
 import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { requestWant } from "@/lib/delivery/mission-sequence"
 import { fillText } from "@/lib/delivery/result-card"
+import { allOf, type RulesTexts } from "@/lib/rules/rule-words"
 import { isMine } from "@/lib/window/missions"
 import { parseServerDate } from "@/lib/utils/server-date"
 import type { WorkflowNode } from "@/lib/workflow/model"
@@ -22,6 +23,8 @@ type SequenceTexts = (typeof CONSTANTS_EN)["missionSequence"]
 export interface SentenceTexts {
   readonly workflow: WorkflowTexts
   readonly sequence: SequenceTexts
+  /** Les mots des règles : les rôles qu'une règle nomme pour accorder (« an admin »). */
+  readonly rules: RulesTexts
 }
 
 /** Ce que la phrase lit autour du nœud : la personne qui regarde, et l'heure. */
@@ -61,14 +64,14 @@ export function firstName(person: Pick<UserSummary, "displayName" | "email"> | n
   return person.email ? person.email.split("@")[0] : null
 }
 
-/** Qui une demande attend, en mots : les personnes que la règle nomme, sinon la personne qui a délégué. */
-function waitedFor(approvals: readonly DeliveryRunApproval[], delegator: string | null | undefined, t: WorkflowTexts): string {
-  const named = approvals.flatMap((approval) => (approval.waitingFor ?? []).flat())
-    .filter((who) => !who.startsWith("role:") && who !== "project-lead")
-  const unique = [...new Set(named)]
-  if (unique.length > 0) return unique.join(", ")
-  if (approvals.some((approval) => (approval.waitingFor ?? []).length > 0)) return t.decide.someone
-  return delegator?.trim() || t.now.theDelegator
+/**
+ * Qui une demande attend, en mots : les personnes et les rôles que la règle nomme (« Alex Chen, and an admin »), chaque
+ * liste une fois, sinon la personne qui a délégué.
+ */
+function waitedFor(approvals: readonly DeliveryRunApproval[], delegator: string | null | undefined, t: SentenceTexts): string {
+  const sets = approvals.flatMap((approval) => approval.waitingFor ?? [])
+  if (sets.length > 0) return allOf([...new Map(sets.map((set) => [set.join("|"), set] as const)).values()], t.rules)
+  return delegator?.trim() || t.workflow.now.theDelegator
 }
 
 /** Ce que la phrase lit d'un nœud : sa raison, sa mission, sa date, et de son issue ce qu'elle en dit. */
@@ -91,7 +94,7 @@ export function nodeSentence(node: SentenceNode, t: SentenceTexts, context: Sent
     case "reviewOther":
       return fillText(w.now.reviewBy, { who: run?.startedByName?.trim() || w.now.theDelegator })
     case "waitingApproval":
-      return fillText(w.now.waitingFor, { who: waitedFor(reason.approvals, run?.startedByName, w) })
+      return fillText(w.now.waitingFor, { who: waitedFor(reason.approvals, run?.startedByName, t) })
     case "queued":
       // Le runner de la personne qui a délégué prend la mission : « your runner » pour elle, son nom pour les autres.
       return run && !isMine(run, context.me) && run.startedByName?.trim()

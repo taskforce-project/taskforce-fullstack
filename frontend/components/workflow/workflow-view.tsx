@@ -90,6 +90,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
   const sequence = usePreferencesStore((s) => s.t.missionSequence)
+  const rules = usePreferencesStore((s) => s.t.rules)
   const me = useUserStore((s) => s.user?.id ?? null)
   const person = me !== null ? String(me) : "anonymous"
   const search = useSearchParams()
@@ -158,7 +159,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const selectedKey = selected?.key ?? null
 
   // Ce que chaque carte montre, calculé une fois par nœud et gardé tant que le nœud ne change pas.
-  const texts: SentenceTexts = useMemo(() => ({ workflow: t, sequence }), [t, sequence])
+  const texts: SentenceTexts = useMemo(() => ({ workflow: t, sequence, rules }), [t, sequence, rules])
   const agentOf = useCallback((key: string): DeliveryProvider | undefined => providers.find((p) => p.key === key), [providers])
   const views = useMemo(() => {
     const out = new Map<string, NodeView>()

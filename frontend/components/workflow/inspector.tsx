@@ -252,6 +252,7 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
   const sequence = usePreferencesStore((s) => s.t.missionSequence)
+  const rules = usePreferencesStore((s) => s.t.rules)
   const [raw, setRaw] = useState(false)
   const i = t.inspector
   const run = node.run?.run ?? null
@@ -263,7 +264,7 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
   const next = nextStage(model, node.stageId)
   const pending = pendingOf(node.run)
   // Ce qui attend, et qui : la phrase du nœud quand il attend quelqu'un ou quelque chose.
-  const waits = WAITS.has(node.state) ? nodeSentence(node, { workflow: t, sequence }, { me, now }) : null
+  const waits = WAITS.has(node.state) ? nodeSentence(node, { workflow: t, sequence, rules }, { me, now }) : null
   // Les liens vers le haut d'abord, puis vers le bas : cinquante en tout au plus, le reste dit en nombre.
   const upstream = node.blockedBy.slice(0, MAX_EDGES)
   const downstream = node.blocks.slice(0, Math.max(0, MAX_EDGES - upstream.length))

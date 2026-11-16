@@ -9,7 +9,7 @@ import {
   approval, deliveryRun, DOING, DONE, issue, ME, projectRun, relation, STATUSES,
 } from "@/lib/workflow/__tests__/fixtures"
 
-const texts = { workflow: CONSTANTS_EN.workflow, sequence: CONSTANTS_EN.missionSequence }
+const texts = { workflow: CONSTANTS_EN.workflow, sequence: CONSTANTS_EN.missionSequence, rules: CONSTANTS_EN.rules }
 const now = new Date(2026, 10, 13, 15, 0)
 const context = { me: ME, now }
 
@@ -30,9 +30,10 @@ describe("la phrase d'un nœud", () => {
   it("une demande pour d'autres : qui elle attend", () => {
     const named = approval(4, { canDecide: false, waitingFor: [["Alex Chen"], ["role:admin"]] })
     const node = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1), [named])] })
-    expect(nodeSentence(node, texts, context)).toBe("Waiting for Alex Chen.")
+    expect(nodeSentence(node, texts, context)).toBe("Waiting for Alex Chen, and an admin.")
     const byRole = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1), [approval(4, { canDecide: false, waitingFor: [["role:admin"]] })])] })
-    expect(nodeSentence(byRole, texts, context)).toBe("Waiting for the people your rules name.")
+    // Le rôle en mots (R161, M7), jamais « the people your rules name ».
+    expect(nodeSentence(byRole, texts, context)).toBe("Waiting for an admin.")
     const plain = nodeOf({ ...base, issues: [issue(1, { status: DOING })], runs: [projectRun(deliveryRun(1, 1, { startedByName: "Sam" }), [approval(4, { canDecide: false })])] })
     expect(nodeSentence(plain, texts, context)).toBe("Waiting for Sam.")
     expect(nodeAction(plain, ME)).toBeNull()

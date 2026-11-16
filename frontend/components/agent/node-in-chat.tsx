@@ -58,6 +58,7 @@ export function NodeInChat({ slug, target, withSentence = true, withDecision = t
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
   const sequence = usePreferencesStore((s) => s.t.missionSequence)
+  const rules = usePreferencesStore((s) => s.t.rules)
   const me = useUserStore((s) => s.user?.id ?? null)
   const now = useNow(60_000)
   const { openWorkflow, openIssue } = usePaneNavigation()
@@ -85,7 +86,7 @@ export function NodeInChat({ slug, target, withSentence = true, withDecision = t
     return { state, reason, row, sentenceNode }
   }, [projectRow, run, activity, sequence, issue, blockers, me])
 
-  const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence }, { me, now: new Date(now) })
+  const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence, rules }, { me, now: new Date(now) })
   const word = t.state[node.state]
   const nodeId = issueKey(target.issueId)
   const mission = node.row?.run ?? null
