@@ -425,6 +425,8 @@ describe("la vue dans un volet étroit", () => {
     expect(useWorkflowViewStore.getState().controlsInView).toBe(true)
     expect(screen.getByRole("radiogroup", { name: "How much to show" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /^Filter/ })).toBeInTheDocument()
+    // L'objectif au-dessus des outils, sur toute la largeur, et non coupé à côté d'eux.
+    expect(document.querySelector("[data-objective-header]")?.className).toContain("flex-col")
   })
 
   it("une vue de 528 px dans une fenêtre large devient la liste par étape : l'étroit se décide sur la vue", async () => {

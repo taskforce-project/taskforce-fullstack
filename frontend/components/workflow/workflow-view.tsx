@@ -399,7 +399,9 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         filter={filter}
         onFilter={chooseFilter}
         now={now}
-        narrow={narrow}
+        // Quand l'en-tête porte les outils de la vue (un volet de moins de 900 px), l'objectif passe au-dessus d'eux, sur
+        // toute la largeur : sur une ligne, à 820 px, il se coupait à dix lettres.
+        narrow={narrow || compact}
         t={t}
         controls={(
           <>
