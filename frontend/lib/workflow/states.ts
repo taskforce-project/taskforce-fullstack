@@ -35,6 +35,13 @@ export const ATTENTION: readonly WorkflowState[] = ["needsYou", "failed", "missi
 export const FILTERS = ["needs-you", "blocked", "missing", "failed"] as const
 export type WorkflowFilter = (typeof FILTERS)[number]
 
+/**
+ * Ce que la vue offre aujourd'hui : Missing vient avec les processus (W5), rien ne le produit encore. Le filtre et la légende
+ * ne l'offrent pas, pour ne pas montrer ce qui ne marche pas ; l'adresse le garde, et son compteur se montre s'il a un nombre.
+ */
+export const OFFERED_FILTERS: readonly WorkflowFilter[] = FILTERS.filter((filter) => filter !== "missing")
+export const LEGEND_STATES: readonly WorkflowState[] = WORKFLOW_STATES.filter((state) => state !== "missing")
+
 export const FILTER_STATE: Readonly<Record<WorkflowFilter, WorkflowState>> = {
   "needs-you": "needsYou",
   blocked: "blocked",

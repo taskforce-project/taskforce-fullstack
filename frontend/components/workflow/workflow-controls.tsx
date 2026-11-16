@@ -13,7 +13,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useWorkflowViewStore } from "@/lib/store/workflow-view-store"
 import { cn } from "@/lib/utils"
-import { DENSITIES, FILTERS, FILTER_STATE, WORKFLOW_STATES, type Density, type WorkflowFilter } from "@/lib/workflow/states"
+import { DENSITIES, FILTER_STATE, LEGEND_STATES, OFFERED_FILTERS, type Density, type WorkflowFilter } from "@/lib/workflow/states"
 
 /**
  * Le direct, en un point et un mot (séance n°25, §10) : « Live » (point vert), « Reconnecting… » (point jaune),
@@ -78,7 +78,7 @@ export function FilterMenu({ value, onChange }: Readonly<{ value: WorkflowFilter
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        {FILTERS.map((filter) => (
+        {OFFERED_FILTERS.map((filter) => (
           <DropdownMenuItem key={filter} onSelect={() => onChange(filter)} className="gap-2">
             <StateMark state={FILTER_STATE[filter]} word={t.state[FILTER_STATE[filter]]} />
             <span className="flex-1">{t.filter[filter === "needs-you" ? "needsYou" : filter]}</span>
@@ -108,7 +108,7 @@ export function LegendDialog() {
           <DialogDescription className="sr-only">{t.legend}</DialogDescription>
         </DialogHeader>
         <ul className="flex flex-col divide-y divide-border">
-          {WORKFLOW_STATES.map((state) => (
+          {LEGEND_STATES.map((state) => (
             <li key={state} className="flex items-start gap-3 py-2">
               <StateMark state={state} word={t.state[state]} className="mt-0.5" />
               <span className="w-24 shrink-0 text-sm font-medium text-foreground">{t.state[state]}</span>

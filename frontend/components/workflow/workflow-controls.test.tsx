@@ -69,6 +69,8 @@ describe("the workflow's title line", () => {
     const onChange = vi.fn()
     const { rerender } = render(<FilterMenu value={null} onChange={onChange} />)
     await userEvent.click(screen.getByRole("button", { name: "Filter" }))
+    // Missing vient avec les processus (W5) : le filtre ne l'offre pas encore (R161, L5).
+    expect(screen.queryByRole("menuitem", { name: /Missing/ })).toBeNull()
     await userEvent.click(screen.getByRole("menuitem", { name: /Blocked/ }))
     expect(onChange).toHaveBeenCalledWith("blocked")
     rerender(<FilterMenu value="blocked" onChange={onChange} />)
@@ -77,11 +79,13 @@ describe("the workflow's title line", () => {
     expect(onChange).toHaveBeenLastCalledWith(null)
   })
 
-  it("the legend shows the ten states, each with its mark, its word and its meaning", () => {
+  it("the legend shows the states the view produces today, each with its mark, its word and its meaning", () => {
     useWorkflowViewStore.setState({ legendOpen: true })
     render(<LegendDialog />)
     const dialog = screen.getByRole("dialog", { name: "Legend" })
-    expect(dialog.querySelectorAll("li")).toHaveLength(10)
+    // Neuf des dix : Missing vient avec les processus (W5), et ne s'offre pas encore.
+    expect(dialog.querySelectorAll("li")).toHaveLength(9)
+    expect(screen.queryByText("A document or an answer is expected from someone.")).toBeNull()
     expect(screen.getByText("Waits for you: a request to decide, or a result to review.")).toBeInTheDocument()
     expect(screen.getAllByRole("img").map((mark) => mark.getAttribute("aria-label"))).toContain("Stopped")
   })
