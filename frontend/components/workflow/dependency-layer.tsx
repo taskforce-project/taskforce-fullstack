@@ -39,7 +39,7 @@ export function edgePath(
   return `M ${x} ${fy} C ${x - 28} ${fy}, ${x - 28} ${ty}, ${x - 2} ${ty}`
 }
 
-export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, moreLabel }: Readonly<{
+export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, moreLabel, revision }: Readonly<{
   /** Le plateau des colonnes : le calque se pose sur lui, et suit son défilement et celui de chaque colonne. */
   boardRef: RefObject<HTMLElement | null>
   edges: readonly DependencyEdge[]
@@ -48,6 +48,11 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
   limit?: number
   /** La ligne des arêtes au-delà de la limite ; sans elle, rien ne se dit (l'inspecteur le dit pour un nœud choisi). */
   moreLabel?: (count: number) => string
+  /**
+   * Ce qui change la mise en page sans défilement (la densité, le filtre, ce qui se déplie, les données) : chaque valeur
+   * nouvelle remesure les cartes, et les courbes ne restent jamais là où les cartes étaient.
+   */
+  revision?: unknown
 }>) {
   const [drawn, setDrawn] = useState<readonly DrawnEdge[]>([])
   const [beyond, setBeyond] = useState(0)
@@ -97,12 +102,16 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
     board.addEventListener("scroll", schedule, { capture: true, passive: true })
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule)
     observer?.observe(board)
+    // Une carte qui naît, part ou change de contenu (une densité, une ligne de plus) déplace les autres : on remesure.
+    const mutations = typeof MutationObserver === "undefined" ? null : new MutationObserver(schedule)
+    mutations?.observe(board, { childList: true, subtree: true })
     return () => {
       board.removeEventListener("scroll", schedule, { capture: true })
       observer?.disconnect()
+      mutations?.disconnect()
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [boardRef, edges, limit])
+  }, [boardRef, edges, limit, revision])
 
   if (drawn.length === 0) return null
   return (

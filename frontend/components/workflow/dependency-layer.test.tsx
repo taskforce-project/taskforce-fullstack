@@ -37,6 +37,40 @@ describe("Show all links", () => {
   })
 })
 
+describe("les liens suivent les cartes", () => {
+  it("remesure quand la mise en page change sans défilement (densité, filtre, ce qui se déplie)", async () => {
+    // Les cartes sont où la table le dit ; la table change, puis la mise en page aussi.
+    const at: Record<string, { left: number; top: number }> = { "issue-1": { left: 0, top: 0 }, "issue-2": { left: 300, top: 0 } }
+    const card = (key: string) => (element: HTMLDivElement | null) => {
+      if (element) element.getBoundingClientRect = () => {
+        const { left, top } = at[key]
+        return { left, top, right: left + 200, bottom: top + 80, width: 200, height: 80, x: left, y: top, toJSON: () => ({}) } as DOMRect
+      }
+    }
+    const board = { current: null as HTMLDivElement | null }
+    // Les arêtes ne changent pas (le nœud choisi est le même) : seule la mise en page bouge.
+    const edges: DependencyEdge[] = [{ from: "issue-1", to: "issue-2", side: "blocks" }]
+    function Moving({ revision }: Readonly<{ revision: number }>) {
+      return (
+        <div ref={(element) => {
+          board.current = element
+          if (element) element.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1000, bottom: 800, width: 1000, height: 800, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+        }}>
+          <div data-node-key="issue-1" ref={card("issue-1")} />
+          <div data-node-key="issue-2" ref={card("issue-2")} />
+          <DependencyLayer boardRef={board} edges={edges} labels={{ blocks: "Blocks", blockedBy: "Blocked by" }} revision={revision} />
+        </div>
+      )
+    }
+    const { container, rerender } = render(<Moving revision={1} />)
+    await waitFor(() => expect(container.querySelector("path.stroke-primary")).not.toBeNull())
+    const before = container.querySelector("path.stroke-primary")?.getAttribute("d")
+    at["issue-2"] = { left: 300, top: 400 }
+    rerender(<Moving revision={2} />)
+    await waitFor(() => expect(container.querySelector("path.stroke-primary")?.getAttribute("d")).not.toBe(before))
+  })
+})
+
 describe("edgePath", () => {
   it("goes from side to side, left to right or right to left, and around the left inside a column", () => {
     expect(edgePath(box(0, 0), box(300, 100))).toMatch(/^M 240 40 C .* 298 140$/)
