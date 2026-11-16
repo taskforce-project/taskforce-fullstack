@@ -171,11 +171,14 @@ describe("the objective's words and line", () => {
     expect(screen.getByRole("img", { name: "0 of 0 done." })).toBeInTheDocument()
   })
 
-  it("draws today the full height of the header, « Today » on hover, and the share done on 4 px", () => {
+  it("draws today in the band under the header's words, « Today » on hover, and the share done on 4 px", () => {
     header(set)
     const today = document.querySelector<HTMLElement>("[data-today]")
     expect(today).toHaveAttribute("title", "Today")
-    expect(today?.className).toContain("inset-y-0")
+    // Une bande du bas, sous les mots : jamais un trait sur toute la hauteur, qui barrait le texte (R161, N3).
+    expect(today?.className).toContain("bottom-0")
+    expect(today?.className).toContain("h-2.5")
+    expect(today?.className).not.toContain("inset-y-0")
     expect(document.querySelector("[data-progress]")?.className).toContain("h-1")
   })
 

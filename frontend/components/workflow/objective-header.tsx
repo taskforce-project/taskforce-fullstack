@@ -35,8 +35,8 @@ const COUNTERS: readonly { filter: WorkflowFilter; key: keyof WorkflowCounts; in
  * L'en-tête de l'objectif (séance n°25, §3), la première lecture du dirigeant : le but en une ligne, la date visée, ce qui
  * est fait sur le total et le nombre de critères (un clic les montre) ; à droite, des compteurs qui sont des filtres
  * (Needs you, Blocked, Missing, Failed ; un compteur à zéro disparaît) ; en bas, la part faite sur quatre pixels, et un trait
- * d'un pixel pour aujourd'hui sur toute la hauteur de l'en-tête, entre le début du projet et la date visée (« Today » au
- * survol) : l'avance ou le retard se lit à la forme, la part faite d'un côté du trait, jamais à un pourcentage (R56). Sans
+ * d'un pixel pour aujourd'hui dans la bande du bas de l'en-tête, sous ses mots, entre le début du projet et la date visée
+ * (« Today » au survol) : l'avance ou le retard se lit à la forme, la part faite d'un côté du trait, jamais à un pourcentage (R56). Sans
  * objectif, il le dit et propose de l'écrire, à qui le peut.
  */
 export function ObjectiveHeader({
@@ -80,12 +80,12 @@ export function ObjectiveHeader({
 
   return (
     <div className={cn("relative flex shrink-0 gap-x-4 gap-y-2 border-b border-border bg-paper-soft px-4 pb-2.5 pt-2", narrow ? "flex-col" : "min-h-14 items-center")}>
-      {/* Aujourd'hui, sur toute la hauteur : derrière les mots, et « Today » au survol d'une marge de quelques pixels. */}
+      {/* Aujourd'hui, dans la bande du bas, sous les mots (il ne barre aucun texte) ; « Today » au survol. */}
       {mark !== null && (
         <span
           data-today
           title={o.today}
-          className="absolute inset-y-0 z-0 flex w-2 -translate-x-1/2 justify-center"
+          className="absolute bottom-0 z-0 flex h-2.5 w-2 -translate-x-1/2 justify-center"
           style={{ left: `${Math.round(mark * 1000) / 10}%` }}
         >
           <span aria-hidden="true" className="h-full w-px bg-foreground/50" />
