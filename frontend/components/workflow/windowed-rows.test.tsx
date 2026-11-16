@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import { act, fireEvent, render } from "@testing-library/react"
 import { useRef } from "react"
 
