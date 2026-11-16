@@ -77,6 +77,12 @@ describe("ObjectiveHeader", () => {
     expect(screen.queryByText(/%/)).toBeNull()
   })
 
+  it("the criteria open in a named dialog", async () => {
+    header(set)
+    fireEvent.click(screen.getByRole("button", { name: "2 success criteria" }))
+    expect(await screen.findByRole("dialog", { name: "How you'll know it's done" })).toBeInTheDocument()
+  })
+
   it("a counter that is on turns off", () => {
     const onFilter = vi.fn()
     header(set, onFilter, "needs-you")

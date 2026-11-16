@@ -140,7 +140,7 @@ export function ObjectiveHeader({
                     {criteria.length === 1 ? o.criteriaOne : fillText(o.criteriaMany, { count: criteria.length })}
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-80 p-3 text-sm">
+                <PopoverContent align="start" aria-label={o.criteriaLabel} className="w-80 p-3 text-sm">
                   <p className="mb-2 text-xs font-medium text-muted-foreground">{o.criteriaLabel}</p>
                   <ol className="flex list-decimal flex-col gap-1.5 pl-4">
                     {criteria.map((criterion, i) => <li key={i} className="text-foreground">{criterion}</li>)}

@@ -111,9 +111,9 @@ export function Inspector({
   }
 
   return (
-    <aside
-      role="complementary"
-      aria-label={t.inspector.region}
+    <section
+      aria-label={fillText(t.inspector.region, { title: node.issue.title })}
+      data-inspector
       data-mode={mode}
       style={mode === "full" ? undefined : { width }}
       className={cn(
@@ -201,7 +201,7 @@ export function Inspector({
           </TabsContent>
         </div>
       </Tabs>
-    </aside>
+    </section>
   )
 }
 

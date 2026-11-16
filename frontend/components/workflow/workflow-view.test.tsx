@@ -167,12 +167,12 @@ describe("le workflow d'un projet", () => {
 
     fireEvent.click(card("Write the spec"))
     expect(globalThis.location.search).toBe("?node=issue-1")
-    const inspector = await screen.findByRole("complementary", { name: "About the chosen node" })
+    const inspector = await screen.findByRole("region", { name: /, in detail$/ })
     expect(within(inspector).getByText("An issue in Todo.")).toBeInTheDocument()
     expect(card("Write the spec")).toHaveAttribute("aria-pressed", "true")
 
     fireEvent.keyDown(document, { key: "Escape" })
-    expect(screen.queryByRole("complementary")).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: /, in detail$/ })).not.toBeInTheDocument()
     expect(globalThis.location.search).toBe("?node=issue-1")
     fireEvent.keyDown(document, { key: "Escape" })
     expect(globalThis.location.search).toBe("")
@@ -245,14 +245,14 @@ describe("le workflow d'un projet", () => {
     render(<WorkflowView slug="acme" projectId={3} />)
     await waitFor(() => expect(card("Build")).toBeInTheDocument())
     fireEvent.click(card("Build"))
-    const inspector = await screen.findByRole("complementary")
+    const inspector = await screen.findByRole("region", { name: /, in detail$/ })
     expect(within(inspector).queryByText("Blocked by")).not.toBeInTheDocument()
 
     // Le topic du projet annonce le lien posé depuis la fiche d'une issue du tableau.
     act(() => useIssueStore.getState().upsertRelationLocal(3, relation(1, a, b)))
-    await waitFor(() => expect(within(screen.getByRole("complementary")).getByText("Blocked by")).toBeInTheDocument())
+    await waitFor(() => expect(within(screen.getByRole("region", { name: /, in detail$/ })).getByText("Blocked by")).toBeInTheDocument())
     expect(card("Build")).toHaveAccessibleName("Build, Blocked")
-    expect(within(screen.getByRole("complementary")).getByRole("button", { name: /WEB-1/ })).toBeInTheDocument()
+    expect(within(screen.getByRole("region", { name: /, in detail$/ })).getByRole("button", { name: /WEB-1/ })).toBeInTheDocument()
   })
 
   it("décider depuis le nœud : la règle sur la décision, puis la route qui existe, avec la raison (critère 3)", async () => {
@@ -339,7 +339,7 @@ describe("la vue dans un volet étroit", () => {
     render(<WorkflowView slug="acme" projectId={3} />)
     await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
     fireEvent.click(card("Write the spec"))
-    await waitFor(() => expect(screen.getByRole("complementary")).toHaveAttribute("data-mode", mode))
+    await waitFor(() => expect(screen.getByRole("region", { name: /, in detail$/ })).toHaveAttribute("data-mode", mode))
   })
 })
 
@@ -369,7 +369,7 @@ describe("un grand projet", () => {
     act(() => { target.click() })
     await waitFor(() => expect(document.querySelector(`[data-node-focus="${key}"]`)).toHaveAttribute("aria-pressed", "true"))
     const selection = performance.now() - before
-    expect(screen.getByRole("complementary")).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: /, in detail$/ })).toBeInTheDocument()
 
     // Les mesures du lot : bornes larges ici (une machine de CI chargée), mesures réelles dans le rapport.
     console.info(`[workflow] 2000 issues: first render ${Math.round(firstRender)} ms, ${rendered} cards rendered, select ${Math.round(selection)} ms`)

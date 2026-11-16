@@ -59,6 +59,7 @@ export const StageColumn = memo(function StageColumn({
   const scrollRef = useRef<HTMLDivElement>(null)
   const total = stage.nodes.length
   const name = stage.status.name
+  const label = total === 1 ? fillText(t.stageOne, { name }) : fillText(t.stage, { name, count: total })
 
   const renderRow = (row: ColumnRow): ReactNode => {
     switch (row.type) {
@@ -104,7 +105,7 @@ export const StageColumn = memo(function StageColumn({
 
   if (stacked) {
     return (
-      <section aria-label={fillText(t.stage, { name, count: total })} data-stage={stage.status.id} className="flex flex-col">
+      <section aria-label={label} data-stage={stage.status.id} className="flex flex-col">
         <div className="sticky top-0 z-10 bg-background">{header}</div>
         <div className="pb-4">
           <WindowedRows
@@ -122,7 +123,7 @@ export const StageColumn = memo(function StageColumn({
 
   return (
     <section
-      aria-label={fillText(t.stage, { name, count: total })}
+      aria-label={label}
       data-stage={stage.status.id}
       // En Summary, les colonnes se partagent la largeur libre, 160 px au moins ; Plan et Detail gardent leur largeur.
       style={density === "summary" ? { flex: `1 1 ${COLUMN_WIDTH.summary}px`, minWidth: COLUMN_WIDTH.summary } : { width: COLUMN_WIDTH[density] }}

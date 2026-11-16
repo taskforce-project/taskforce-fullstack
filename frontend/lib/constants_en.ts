@@ -375,6 +375,7 @@ export const CONSTANTS_EN = {
       teams: "Teams",
       settings: "Settings",
       newIssue: "New Issue",
+      moreActions: "More actions on this project",
       emptyBoard: "No issues yet. Add one to a column, or write what you want done in the bar below.",
       addIssue: "Add issue",
       workflow: "Workflow",
@@ -528,7 +529,7 @@ export const CONSTANTS_EN = {
       testsFailed: "tests failed",
     },
     inspector: {
-      region: "About the chosen node",
+      region: "{title}, in detail",
       earlier: "An earlier mission of this issue.",
       earlierAt: "An earlier mission of this issue, started {time}.",
       details: "Details",
@@ -645,7 +646,8 @@ export const CONSTANTS_EN = {
       cause: "Check your connection, then try again.",
       retry: "Try again",
     },
-    stage: "Stage {name}: {count} nodes",
+    stage: "{name}, {count} issues",
+    stageOne: "{name}, 1 issue",
     overdue: "Overdue",
     who: {
       you: "You",

@@ -55,7 +55,9 @@ describe("Inspector", () => {
     })
     const { gestures, props } = setup(model, "issue-2")
 
-    const region = screen.getByRole("complementary", { name: "About the chosen node" })
+    // Une région nommée par son issue, et non un repère complémentaire niché dans le volet (R161, M10).
+    const region = screen.getByRole("region", { name: /, in detail$/ })
+    expect(screen.queryByRole("complementary")).toBeNull()
     expect(within(region).getByRole("heading", { name: "Release" })).toBeInTheDocument()
     expect(within(region).getByText("An issue in In Progress, with a mission by Claude Code.")).toBeInTheDocument()
     expect(within(region).getByRole("region", { name: "Let Claude Code build the project?" })).toBeInTheDocument()

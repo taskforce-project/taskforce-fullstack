@@ -31,7 +31,7 @@ describe("StageColumn", () => {
         density="plan" views={views} selectedKey={null} focusKey="issue-1" related={null} revealKey={null} t={t} handlers={handlers}
         onShowDone={onShowDone} onShowAll={vi.fn()} onOpenParent={vi.fn()} />,
     )
-    expect(screen.getByRole("region", { name: "Stage Done: 8 nodes" })).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "Done, 8 issues" })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Done" })).toBeInTheDocument()
     expect(screen.getByText("8")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Show 3 done" }))
