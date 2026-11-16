@@ -272,6 +272,27 @@ public class ProcessValidatorTest {
         flows(container).add(newFlow(on + "-late-" + to, on + "-late", to));
     }
 
+    /** Le processus d'E20 dérivé du défaut, sous une autre clé : ses étapes verrouillées viennent du défaut. */
+    static ObjectNode derived() {
+        ObjectNode root = e20();
+        root.put("key", "integrate-billing").put("derivedFrom", "integrate-a-module");
+        return root;
+    }
+
+    /** Ce que sait la vérification d'un processus dérivé : le défaut d'où il vient. */
+    static Context fromTheDefault() {
+        return new Context(List.of(), Map.of("integrate-a-module", ProcessFixtures.integrateAModule()), null, null);
+    }
+
+    /** La livraison retirée de la phase « Deliver » : le point d'avant de livrer mène droit à la surveillance. */
+    static void withoutDelivery(ObjectNode root) {
+        ObjectNode deliver = step(root, "deliver");
+        remove(steps(deliver), "deliver-module");
+        remove(flows(deliver), "before-delivery-deliver-module");
+        remove(flows(deliver), "deliver-module-watch");
+        flows(deliver).add(newFlow("before-delivery-watch", "before-delivery", "watch"));
+    }
+
     static void assertRefused(List<Problem> problems, String code) {
         assertThat(problems).extracting(Problem::code).contains(code);
         for (Problem p : problems) {
@@ -851,6 +872,30 @@ public class ProcessValidatorTest {
             assertThat(p.message()).isEqualTo("“Before delivering” is required by a pause point before “Deliver the "
                 + "module”: a locked step keeps its place, and what came after it still comes after it.");
         });
+    }
+
+    @Test
+    @DisplayName("la livraison du défaut est verrouillée par TaskForce : elle ne se remplace ni par une nouvelle devant "
+        + "le point d'avant de livrer, ni par une étape qui livre avant lui (R159, troisième passe, M1)")
+    void the_delivery_of_the_default_stays() {
+        // A6b : la livraison retirée, et une nouvelle « Deliver the module » juste devant le point d'avant de livrer.
+        ObjectNode replaced = derived();
+        ObjectNode early = step(replaced, "deliver-module").deepCopy();
+        early.put("id", "deliver-early").remove("lock");
+        withoutDelivery(replaced);
+        insert(replaced, "deliver", "deliver-start-before-delivery", early);
+        // A6a : une nouvelle étape qui livre, devant la liste (à la fin de la recette), la livraison retirée.
+        ObjectNode ahead = derived();
+        withoutDelivery(ahead);
+        insert(ahead, "accept", "sign-acceptance-accept-end", human("ship-module", "Ship the module"));
+
+        assertThat(ProcessValidator.check(model(derived()), fromTheDefault())).isEmpty();
+        assertThat(List.of(replaced, ahead)).allSatisfy(attack ->
+            assertThat(ProcessValidator.check(model(attack), fromTheDefault())).singleElement().satisfies(p -> {
+                assertThat(p.code()).isEqualTo("lockedStepMissing");
+                assertThat(p.stepId()).isEqualTo("deliver-module");
+                assertThat(p.message()).isEqualTo("“Deliver the module” is required by TaskForce: it can't be removed.");
+            }));
     }
 
     @Test

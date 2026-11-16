@@ -566,7 +566,7 @@
       </bpmn:userTask>
       <bpmn:userTask id="deliver-module" name="Deliver the module">
         <bpmn:extensionElements>
-          <tf:step answeredBy="project-lead">
+          <tf:step answeredBy="project-lead" lock="floor">
             <tf:human who="project-lead" kind="input" question="Which version went to the client, and when?">
               <tf:field id="version" label="Version delivered" type="text"/>
               <tf:field id="delivered-on" label="Delivered on" type="date"/>

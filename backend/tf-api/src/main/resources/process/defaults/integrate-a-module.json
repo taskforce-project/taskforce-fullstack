@@ -389,6 +389,7 @@
         },
         {
           "id": "deliver-module", "type": "human", "name": "Deliver the module", "answeredBy": "project-lead",
+          "lock": { "by": "floor" },
           "human": {
             "who": "project-lead", "question": "Which version went to the client, and when?", "kind": "input",
             "fields": [
