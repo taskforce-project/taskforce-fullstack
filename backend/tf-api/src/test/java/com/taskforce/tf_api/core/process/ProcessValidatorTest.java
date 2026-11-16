@@ -705,10 +705,23 @@ public class ProcessValidatorTest {
 
         assertThat(check(process)).singleElement().satisfies(p -> {
             assertThat(p.code()).isEqualTo("pausePointMisplaced");
-            assertThat(p.stepId()).isEqualTo("spec-zone");
-            assertThat(p.message()).isEqualTo("The work of “Draft the specification” can reach “Module delivered” "
-                + "without the pause point before the work is delivered: every path from an agent's work to the end "
-                + "goes through it.");
+            assertThat(p.stepId()).isEqualTo("deliver-late");
+            assertThat(p.message()).isEqualTo("“A week without delivery” leads the work of “Draft the specification” to "
+                + "“Module delivered” without the pause point before the work is delivered: every path from an agent's "
+                + "work to the end goes through it.");
+        });
+    }
+
+    @Test
+    @DisplayName("un chemin qui contourne le point d'avant de livrer se dit sur sa dernière étape avant la fin, pas sur la "
+        + "première zone d'agent")
+    void a_way_around_the_delivery_point_is_said_where_it_ends() {
+        ObjectNode process = e20();
+        signedBypass(process);
+
+        assertThat(check(process)).singleElement().satisfies(p -> {
+            assertThat(p.code()).isEqualTo("pausePointMisplaced");
+            assertThat(p.stepId()).isEqualTo("close-integration");
         });
     }
 

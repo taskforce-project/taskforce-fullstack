@@ -1326,10 +1326,20 @@ public final class ProcessValidator {
                 Set<String> after = graph.reachableFrom(zone.id(), delivery);
                 String end = ends.stream().filter(after::contains).findFirst().orElse(null);
                 if (end != null) {
-                    // Le chemin qui contourne le point se dit une fois, depuis le premier travail d'agent qui y mène.
-                    add("pausePointMisplaced", zone.id(), zone.name(), "The work of “" + zone.label() + "” can reach “"
-                        + label(end) + "” without the pause point before the work is delivered: every path from an "
-                        + "agent's work to the end goes through it.");
+                    // Le chemin qui contourne le point se dit une fois, sur la dernière étape avant la fin de ce chemin,
+                    // là où il faut le reprendre : depuis le premier travail d'agent qui y mène.
+                    Step at = zone;
+                    List<String> path = graph.path(zone.id(), end, delivery);
+                    for (int i = path.size() - 2; i >= 0; i--) {
+                        Step step = byId.get(path.get(i));
+                        if (step != null && (step.workStep() || step.boundary())) {
+                            at = step;
+                            break;
+                        }
+                    }
+                    add("pausePointMisplaced", at.id(), at.name(), "“" + at.label() + "” leads the work of “"
+                        + zone.label() + "” to “" + label(end) + "” without the pause point before the work is delivered: "
+                        + "every path from an agent's work to the end goes through it.");
                     break;
                 }
             }
@@ -1557,6 +1567,31 @@ public final class ProcessValidator {
         boolean reaches(String from, String to) {
             Set<String> next = edges.getOrDefault(from, Set.of());
             return walk(next, edges).contains(to);
+        }
+
+        /** Un plus court chemin de {@code from} à {@code to} sans passer par {@code avoided}, ses deux bouts compris ; vide sinon. */
+        List<String> path(String from, String to, Set<String> avoided) {
+            Map<String, String> parent = new HashMap<>();
+            Deque<String> todo = new ArrayDeque<>();
+            parent.put(from, null);
+            todo.add(from);
+            while (!todo.isEmpty()) {
+                String node = todo.poll();
+                if (node.equals(to)) {
+                    List<String> out = new ArrayList<>();
+                    for (String n = to; n != null; n = parent.get(n)) {
+                        out.add(0, n);
+                    }
+                    return out;
+                }
+                for (String next : edges.getOrDefault(node, Set.of())) {
+                    if (!avoided.contains(next) && !parent.containsKey(next)) {
+                        parent.put(next, node);
+                        todo.add(next);
+                    }
+                }
+            }
+            return List.of();
         }
 
         /** Ce que {@code id} précède sur tout chemin depuis le début : ce qu'on ne rejoint plus sans passer par lui. */
