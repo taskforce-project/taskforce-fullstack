@@ -8,6 +8,8 @@ vi.mock("@/lib/api/project-service", async (importOriginal) => ({
   clearProjectObjective: vi.fn(),
 }))
 
+import { toast } from "sonner"
+
 import { ObjectiveHeader, todayMark } from "./objective-header"
 import { objectivePayload } from "./objective-dialog"
 import { clearProjectObjective, setProjectObjective, type ProjectObjective } from "@/lib/api/project-service"
@@ -99,7 +101,13 @@ describe("ObjectiveHeader", () => {
     const dialog = await screen.findByRole("dialog", { name: "What is this project for?" })
     expect(dialog.className).toContain("sm:max-w-[560px]")
     const save = screen.getByRole("button", { name: "Save the objective" })
-    expect(save).toBeDisabled()
+    // « Save » ne grise pas sans raison : il dit ce qui manque, d'abord le but, puis un critère (R161, M11).
+    fireEvent.click(save)
+    expect(await screen.findByText("Write the objective in one sentence.")).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText("Objective, in one sentence"), { target: { value: "Ship" } })
+    fireEvent.click(save)
+    expect(await screen.findByText("Add at least one criterion.")).toBeInTheDocument()
+    expect(setProjectObjective).not.toHaveBeenCalled()
 
     fireEvent.change(screen.getByLabelText("Objective, in one sentence"), { target: { value: "  Ship the export  " } })
     fireEvent.change(screen.getByLabelText("Target date"), { target: { value: "2026-12-19" } })
@@ -131,6 +139,15 @@ describe("ObjectiveHeader", () => {
     fireEvent.click(screen.getByRole("button", { name: "Change the objective" }))
     fireEvent.click(await screen.findByRole("button", { name: "Remove the objective" }))
     await waitFor(() => expect(clearProjectObjective).toHaveBeenCalledWith("acme", 3))
+    // « Undo » dans le message remet l'objectif tel qu'il était.
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Objective removed", expect.objectContaining({ action: expect.anything() })))
+    const options = vi.mocked(toast.success).mock.calls.at(-1)?.[1] as { action: { label: string; onClick: () => void } }
+    expect(options.action.label).toBe("Undo")
+    vi.mocked(setProjectObjective).mockResolvedValue(set)
+    options.action.onClick()
+    await waitFor(() => expect(setProjectObjective).toHaveBeenCalledWith("acme", 3, {
+      goal: set.goal, targetDate: set.targetDate, criteria: set.criteria,
+    }))
   })
 })
 

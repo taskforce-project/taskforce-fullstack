@@ -27,6 +27,15 @@ export function objectivePayload(goal: string, targetDate: string, criteria: rea
   return { goal: text, targetDate: targetDate || null, criteria: kept }
 }
 
+/** Ce qui manque pour enregistrer, en mots ; null quand rien ne manque (les longueurs, les champs les bornent). */
+export function objectiveMissing(
+  goal: string, criteria: readonly string[], t: { needGoal: string; needCriterion: string },
+): string | null {
+  if (!goal.trim()) return t.needGoal
+  if (!criteria.some((c) => c.trim())) return t.needCriterion
+  return null
+}
+
 /**
  * « Add an objective » (séance n°25, §3) : un dialogue de 560 px, d'une colonne, les libellés au-dessus des champs, une
  * action principale en bas à droite. Le but en une phrase, la date visée, de un à cinq critères ; rien n'est inventé ni
@@ -68,7 +77,12 @@ function ObjectiveForm({ slug, projectId, objective, onDone }: Readonly<{
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!payload || busy) return
+    if (busy) return
+    // « Save » ne grise pas sans raison : il dit ce qui manque.
+    if (!payload) {
+      setFailed(objectiveMissing(goal, criteria, t) ?? t.failed)
+      return
+    }
     setBusy("save")
     setFailed(null)
     const saved = await saveObjective(slug, projectId, payload)
@@ -83,11 +97,17 @@ function ObjectiveForm({ slug, projectId, objective, onDone }: Readonly<{
 
   async function remove() {
     if (busy) return
+    // Ce qui était posé, pour le remettre si la personne se ravise.
+    const previous = objective?.goal
+      ? { goal: objective.goal, targetDate: objective.targetDate ?? null, criteria: [...objective.criteria] }
+      : null
     setBusy("remove")
     const ok = await clearObjective(slug, projectId)
     setBusy(null)
     if (ok) {
-      toast.success(t.removed)
+      toast.success(t.removed, previous ? {
+        action: { label: t.undo, onClick: () => void saveObjective(slug, projectId, previous) },
+      } : undefined)
       onDone()
     } else {
       setFailed(t.removeFailed)
@@ -175,7 +195,7 @@ function ObjectiveForm({ slug, projectId, objective, onDone }: Readonly<{
             {busy === "remove" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : t.remove}
           </Button>
         )}
-        <Button type="submit" disabled={!payload || busy !== null}>
+        <Button type="submit" disabled={busy !== null}>
           {busy === "save" ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : t.save}
         </Button>
       </DialogFooter>
