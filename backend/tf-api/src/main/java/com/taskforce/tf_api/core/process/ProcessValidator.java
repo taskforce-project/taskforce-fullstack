@@ -136,7 +136,7 @@ public final class ProcessValidator {
      * @param knownRules les règles que l'espace connaît pour ce travail ; null : non vérifié
      * @param members    les personnes de l'espace ; null : non vérifié
      * @param codeRules  les règles qui laissent un agent changer le code (pousser, ouvrir une demande de fusion, écrire
-     *                   des fichiers qu'on applique) ; null : celles de la table de TaskForce
+     *                   des fichiers qu'on applique) ou les outils de l'entreprise ; null : celles de la table de TaskForce
      */
     public record Context(List<ProcessModel> bases, Map<String, ProcessModel> defaults, Set<String> knownRules,
                           Set<Long> members, Set<String> codeRules) {
@@ -157,17 +157,20 @@ public final class ProcessValidator {
 
     /**
      * Ce qu'une règle laisse faire à un agent qui change le code (décision de la Présidence, N3) : écrire des fichiers
-     * qu'on applique, les confier, les pousser, ouvrir une demande de fusion. Lire, écrire une note, une issue, n'en est
-     * pas.
+     * qu'on applique, les confier, les pousser, ouvrir une demande de fusion ; et écrire dans les outils de l'entreprise
+     * (R159, troisième passe, H2), même quand une personne l'accorde à chaque fois. Lire, écrire une note, une issue,
+     * n'en est pas.
      */
-    public static final Set<String> CODE_ACTIONS = Set.of("file.write", "git.commit", "git.push", "pr.open");
+    public static final Set<String> CODE_ACTIONS = Set.of("file.write", "git.commit", "git.push", "pr.open",
+        "mcp.write");
 
     /**
      * Les règles de la table de TaskForce qui permettent ou demandent une de ces actions ; un test vérifie que ce sont
      * celles de {@code contracts/rules/default.rules.json}. Le service les lit du paquet des règles du projet.
      */
     public static final Set<String> TASKFORCE_CODE_RULES = Set.of("write-sandbox-files", "commit-locally",
-        "push-agent-branch-private", "push-public-repo", "open-pull-request", "open-pull-request-public");
+        "push-agent-branch-private", "push-public-repo", "open-pull-request", "open-pull-request-public",
+        "write-company-tools");
 
     public static List<Problem> check(ProcessModel model, Context context) {
         return check(model, context, List.of());
@@ -1339,8 +1342,8 @@ public final class ProcessValidator {
                 points.get(BEFORE_DELIVERY).stream().filter(d -> after.contains(d.id())).findFirst().ifPresent(d ->
                     add("changeWithoutPausePoint", zone.id(), zone.name(), "The changes of “" + zone.label() + "” can "
                         + "reach “" + d.label() + "” without anyone checking the list before the changes are applied: "
-                        + "the work of an agent that changes the code passes it on every way to the delivery. Put that "
-                        + "pause point after “" + zone.label() + "”."));
+                        + "the work of an agent that changes the code or the company's tools passes it on every way to "
+                        + "the delivery. Put that pause point after “" + zone.label() + "”."));
             }
             // Comme celui d'avant une mission : chaque chemin vers le point d'avant de livrer passe par celui d'avant
             // d'appliquer, et chaque chemin du travail d'un agent à une fin du processus passe par celui d'avant de
@@ -1390,7 +1393,7 @@ public final class ProcessValidator {
          * Vrai pour une zone dont le travail peut changer le code : un agent autre que Cortex, que rien ne tient aux
          * règles que la zone cite (la table de TaskForce laisse tout agent écrire des fichiers, les confier, pousser une
          * branche tf/** et ouvrir une demande de fusion ; R159, troisième passe, H2), ou une règle, la sienne ou celle
-         * d'une de ses étapes, qui le permet.
+         * d'une de ses étapes, qui le permet ou le demande, ou qui écrit dans les outils de l'entreprise.
          */
         private boolean changesCode(Step zone) {
             if (zone.stepsOrEmpty().stream().anyMatch(s -> AGENT.equals(s.type())

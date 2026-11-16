@@ -309,7 +309,7 @@ public class ProcessService {
      * Ce que le vérificateur sait de l'endroit où le processus entre : la version en vigueur de sa clé, les workflows
      * par défaut, les règles qui s'appliquent au travail du projet sous ce processus (le paquet de ce travail, et le
      * socle ; jamais les couches d'un autre projet ou d'un autre processus), celles d'entre elles qui laissent un agent
-     * changer le code, et les personnes de l'espace.
+     * changer le code ou les outils de l'entreprise, et les personnes de l'espace.
      */
     private ProcessValidator.Context context(Access access, String key, ProcessModel current) {
         Set<String> known = new HashSet<>();
@@ -317,7 +317,8 @@ public class ProcessService {
         RulesBundle bundle = rules.bundleFor(access.workspace(), new Work(access.project().getId(), key, null));
         bundle.rules().forEach(r -> {
             known.add(r.id());
-            // Une règle qui permet ou demande d'écrire, de confier, de pousser du code ou d'ouvrir une demande de fusion.
+            // Une règle qui permet ou demande d'écrire, de confier, de pousser du code, d'ouvrir une demande de fusion ou
+            // d'écrire dans les outils de l'entreprise (une demande aussi : une personne l'accorde, la liste reste due).
             if (r.when() != null && ProcessValidator.CODE_ACTIONS.contains(r.when().action())
                 && (RulesEngine.ALLOW.equals(r.effect()) || RulesEngine.ASK.equals(r.effect()))) {
                 code.add(r.id());

@@ -380,6 +380,9 @@ public class ProcessValidatorTest {
                 r -> polish(r, "claude-code", "run-reads")),
             refusal("changeWithoutPausePoint", "le même, sa zone ne citant que write-company-tools",
                 r -> polish(r, "claude-code", "write-company-tools")),
+            refusal("changeWithoutPausePoint", "Cortex qui écrit dans les outils de l'entreprise, à demander à chaque "
+                + "fois (write-company-tools), après le point d'avant d'appliquer",
+                r -> polish(r, "cortex", "write-company-tools")),
             // Un point de pause ne se contourne pas (R159, H1).
             refusal("pausePointDeadline", "une échéance d'un jour sur le point d'avant les agents, qui mène à leur zone",
                 r -> deadline(r, "specify", "before-mission", "spec-zone")),
@@ -785,8 +788,8 @@ public class ProcessValidatorTest {
                 assertThat(p.stepId()).isEqualTo("notes-zone");
                 assertThat(p.message()).isEqualTo("The changes of “Prepare the release notes” can reach “Before "
                     + "delivering” without anyone checking the list before the changes are applied: the work of an agent "
-                    + "that changes the code passes it on every way to the delivery. Put that pause point after “Prepare "
-                    + "the release notes”.");
+                    + "that changes the code or the company's tools passes it on every way to the delivery. Put that "
+                    + "pause point after “Prepare the release notes”.");
             });
     }
 

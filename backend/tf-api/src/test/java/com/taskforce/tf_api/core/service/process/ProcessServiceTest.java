@@ -420,6 +420,22 @@ class ProcessServiceTest {
             .extracting(ProcessResponse.Problem::code).containsExactly("changeWithoutPausePoint");
     }
 
+    @Test
+    @DisplayName("écrire dans les outils de l'entreprise est un changement : une règle de la couche du projet qui le "
+        + "demande oblige les notes de version à passer le point d'avant d'appliquer")
+    void a_write_in_the_company_tools_is_a_change() {
+        when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of(HarnessRuleSet.builder().workspace(ws)
+            .version(1).scope(RuleScope.PROJECT).project(project).rules(List.of(Map.of("id", "ask-before-tools-write",
+                "effect", "ask", "when", Map.of("action", "mcp.write")))).build()));
+        ObjectNode notes = derived();
+        ((ArrayNode) ProcessValidatorTest.step(notes, "notes-zone").get("rules")).addObject()
+            .put("ref", "ask-before-tools-write");
+
+        assertThat(service.check("acme", PROJECT, model(derived()), MEMBER).problems()).isEmpty();
+        assertThat(service.check("acme", PROJECT, model(notes), MEMBER).problems())
+            .extracting(ProcessResponse.Problem::code).containsExactly("changeWithoutPausePoint");
+    }
+
     /** Un processus de {@code levels} phases emboîtées, construit sans récursion. */
     static ProcessModel nested(int levels) {
         ProcessModel.Step inner = null;
