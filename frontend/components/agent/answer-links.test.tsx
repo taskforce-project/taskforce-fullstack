@@ -42,6 +42,9 @@ describe("les liens des réponses", () => {
     expect(screen.getByRole("link", { name: "OPS-35" }).closest("strong")).not.toBeNull()
     expect(screen.getByRole("link", { name: "WEB-28" })).toHaveAttribute("href", "/acme/projects/3?issue=28")
     expect(screen.getByRole("link", { name: "OPS-40" })).toHaveAttribute("href", "/acme/projects/4?issue=40")
+    // L'encre des liens : lisible sur les deux fonds (4.5:1 au moins), ce que `text-primary` ne tenait pas en sombre (R161, N11).
+    expect(screen.getByRole("link", { name: "WEB-28" }).className).toContain("text-ink-blue")
+    expect(screen.getByRole("link", { name: "WEB-28" }).className).not.toContain("text-primary")
   })
 
   it("opens the issue in the pane, without leaving the conversation", () => {

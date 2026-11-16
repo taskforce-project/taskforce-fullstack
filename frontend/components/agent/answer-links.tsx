@@ -15,7 +15,8 @@ import { hrefWith, workflowProjectOf } from "@/lib/window/address"
 import { linkIndex, splitLinks, type AnswerLink } from "@/lib/window/answer-links"
 import { boardPath, issuePath, workflowPath } from "@/lib/window/pane"
 
-const LINK = "font-medium text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
+// L'encre bleue des liens : `text-primary` ne tenait que 4.17:1 sur le fond sombre, sous le 4.5:1 d'un texte (R161, N11).
+const LINK = "font-medium text-ink-blue underline decoration-ink-blue/30 underline-offset-2 hover:decoration-ink-blue"
 
 const NO_CALLS: readonly AssistantToolCall[] = []
 
