@@ -15506,6 +15506,9 @@
             "items": {
               "$ref": "#/components/schemas/ProcessField"
             }
+          },
+          "prefill": {
+            "type": "string"
           }
         }
       },

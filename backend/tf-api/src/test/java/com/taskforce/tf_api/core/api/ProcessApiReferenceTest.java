@@ -38,6 +38,15 @@ class ProcessApiReferenceTest {
     }
 
     @Test
+    @DisplayName("une tâche humaine dit si sa liste s'ouvre sur sa dernière réponse")
+    void a_human_task_says_its_prefill() throws IOException {
+        JsonNode prefill = spec().path("components").path("schemas").path("ProcessHumanTask").path("properties")
+            .path("prefill");
+
+        assertThat(prefill.path("type").asText()).isEqualTo("string");
+    }
+
+    @Test
     @DisplayName("les téléchargements BPMN disent leur type, application/xml")
     void the_bpmn_downloads_say_their_type() throws IOException {
         JsonNode paths = spec().path("paths");
