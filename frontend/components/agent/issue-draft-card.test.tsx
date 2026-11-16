@@ -16,7 +16,9 @@ vi.mock("@/lib/api/issue-service", () => ({ listStatuses: vi.fn() }));
 vi.mock("@/lib/api/label-service", () => ({ listLabels: vi.fn() }));
 vi.mock("@/lib/api/cycle-service", () => ({ listCycles: vi.fn() }));
 const nav = vi.hoisted(() => ({ push: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: nav.push, back: vi.fn() }), useParams: () => ({ workspace: "acme" }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: nav.push, back: vi.fn() }), useParams: () => ({ workspace: "acme" }), usePathname: () => "/acme",
+}));
 vi.mock("@/lib/api/project-service", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/project-service")>()),
   listProjectMembers: vi.fn(),

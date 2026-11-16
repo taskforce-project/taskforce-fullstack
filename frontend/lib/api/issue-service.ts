@@ -86,6 +86,8 @@ export interface Issue {
   startDate: string | null;
   dueDate: string | null;
   completedAt: string | null;
+  /** Sa place dans sa colonne du tableau ; le workflow garde cet ordre entre deux nœuds du même état. */
+  position?: number | null;
   storyPoints: number | null;
   labels: IssueLabel[];
   commentCount: number;
@@ -227,6 +229,11 @@ export interface IssueRelation {
   relationType: IssueRelationType;
   issue: IssueSummary;
   relatedIssue: IssueSummary;
+  /**
+   * L'issue lue est la cible du lien tel qu'il a été posé : `relationType` se lit alors depuis l'autre issue (« A BLOCKS B »
+   * lu depuis B), et la fiche le dit dans l'autre sens (« Blocked by A »). Absent d'un serveur plus ancien.
+   */
+  fromTarget?: boolean;
   createdBy: UserSummary;
   createdAt: string;
 }
@@ -281,6 +288,32 @@ export interface UpdateIssueStatusPayload {
 
 export async function listIssues(slug: string, projectId: number): Promise<Issue[]> {
   const res = await apiClient.get<{ data: Issue[] }>(ISSUE_ROUTES.LIST(slug, projectId));
+  return res.data.data;
+}
+
+/** Une page des issues d'un projet, sous-issues comprises, sans les archivées : épinglées d'abord, puis les plus récentes. */
+export interface IssuesPage {
+  content: Issue[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+/** La taille d'une page d'issues, au plus, comme le serveur la borne. */
+export const ISSUES_PAGE_MAX = 100;
+
+/**
+ * Une page des issues d'un projet (le workflow les lit toutes, page par page, jamais en un seul appel : séance n°25).
+ * Lu en arrière-plan : jamais de toast, l'appelant dit l'échec.
+ */
+export async function listIssuesPage(slug: string, projectId: number, page: number, size = ISSUES_PAGE_MAX): Promise<IssuesPage> {
+  const res = await apiClient.get<{ data: IssuesPage }>(ISSUE_ROUTES.PAGED(slug, projectId), {
+    params: { page, size }, silentError: true,
+  });
   return res.data.data;
 }
 

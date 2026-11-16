@@ -259,13 +259,26 @@ public class MissionEvidenceService {
         return (s / 3600) + " h " + ((s % 3600) / 60) + " min";
     }
 
-    /** Le contenu d'un événement en une ligne : ses champs, dans l'ordre où ils sont rangés. */
-    private static String describe(JsonNode data) {
+    /**
+     * Le contenu d'un événement en une ligne : ses champs, dans l'ordre où ils sont rangés, coupés à 300 caractères. La
+     * raison d'une décision passe d'abord, entière (elle est bornée à 500 caractères à l'entrée) : la coupe ne la mange
+     * jamais.
+     */
+    static String describe(JsonNode data) {
+        String reason = data.hasNonNull("reason") ? "reason: " + text(data.get("reason")) : null;
         Map<String, String> fields = new LinkedHashMap<>();
-        data.properties().forEach(entry -> fields.put(entry.getKey(), entry.getValue().isTextual() ? entry.getValue().asText() : entry.getValue().toString()));
+        data.properties().forEach(entry -> {
+            if (!"reason".equals(entry.getKey())) fields.put(entry.getKey(), text(entry.getValue()));
+        });
         StringBuilder out = new StringBuilder();
         fields.forEach((key, value) -> out.append(out.isEmpty() ? "" : ", ").append(key).append(": ").append(value));
-        return out.length() > 300 ? out.substring(0, 297) + "..." : out.toString();
+        String rest = out.length() > 300 ? out.substring(0, 297) + "..." : out.toString();
+        if (reason == null) return rest;
+        return rest.isEmpty() ? reason : reason + ", " + rest;
+    }
+
+    private static String text(JsonNode value) {
+        return value.isTextual() ? value.asText() : value.toString();
     }
 
     private static String cell(String text) {

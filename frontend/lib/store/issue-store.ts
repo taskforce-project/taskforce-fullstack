@@ -41,7 +41,25 @@ import {
   deleteComment as deleteCommentApi,
   listActivity,
   listProjectRelations,
+  listIssuesPage,
+  ISSUES_PAGE_MAX,
 } from "../api/issue-service";
+import { listAttachmentCounts } from "../api/attachment-service";
+
+/** Les pages d'issues lues en même temps, au plus, quand le workflow lit toutes celles d'un projet. */
+export const WORKFLOW_PAGE_CONCURRENCY = 4;
+
+/** Les issues du workflow d'un projet, sous-issues comprises (séance n°25, W1). */
+export interface WorkflowIssues {
+  projectId: number;
+  issues: Issue[];
+}
+
+/** Le nombre de documents de chaque issue d'un projet. */
+export interface DocumentCounts {
+  projectId: number;
+  counts: Record<number, number>;
+}
 
 // ---------------------------------------------------------------------------
 // State
@@ -64,6 +82,16 @@ interface IssueState {
    * tient les siens à jour. Une réponse en retard d'un projet quitté ne range que les liens de ce projet-là.
    */
   projectRelations: Record<number, ProjectIssueRelations>;
+  /**
+   * Toutes les issues du projet ouvert dans le workflow (séance n°25, W1), sous-issues comprises, sans les archivées : lues
+   * page par page, jamais en un seul appel, puis tenues à jour comme `issues` (le temps réel et les gestes). `null` tant
+   * qu'elles ne sont pas lues. `issues`, celles du tableau, ne portent que le premier niveau.
+   */
+  workflowIssues: WorkflowIssues | null;
+  /** Le nombre de documents (pièces jointes) de chaque issue du projet du workflow. */
+  documentCounts: DocumentCounts | null;
+  /** L'activité de chaque issue lue pour l'inspecteur du workflow, à part de celle de la fiche ouverte (`activity`). */
+  issueActivity: Record<number, IssueActivity[]>;
 
   // Issues
   fetchIssues: (slug: string, projectId: number) => Promise<Issue[]>;
@@ -91,6 +119,17 @@ interface IssueState {
   upsertRelationLocal: (projectId: number, relation: ProjectIssueRelation) => void;
   /** Un lien retiré (événement temps réel STOMP) ; rien pour un autre projet. */
   removeRelationLocal: (projectId: number, relationId: number) => void;
+
+  // Le workflow (séance n°25, W1)
+  /**
+   * Lit toutes les issues du projet pour le workflow : la première page, puis les autres, quatre à la fois ; elles ne se
+   * posent qu'une fois toutes lues (rien ne saute à l'écran). `null` en cas d'échec, où celles d'avant restent.
+   */
+  fetchWorkflowIssues: (slug: string, projectId: number) => Promise<Issue[] | null>;
+  /** Lit le nombre de documents de chaque issue du projet ; `null` en cas d'échec, où celui d'avant reste. */
+  fetchDocumentCounts: (slug: string, projectId: number) => Promise<Record<number, number> | null>;
+  /** Lit l'activité d'une issue pour l'inspecteur ; `null` en cas d'échec, où celle d'avant reste. */
+  fetchIssueActivity: (slug: string, projectId: number, issueId: number) => Promise<IssueActivity[] | null>;
 
   // Statuts & types
   fetchStatuses: (slug: string, projectId: number) => Promise<IssueStatus[]>;
@@ -146,6 +185,52 @@ function linksWithout(links: ProjectIssueRelations, issueId: number): ProjectIss
 }
 
 // ---------------------------------------------------------------------------
+// Les issues du workflow : ce qu'une issue qui change ou disparaît leur fait
+// ---------------------------------------------------------------------------
+
+/**
+ * Les issues du workflow après qu'une issue a changé : remplacée à sa place, ajoutée à la fin si elle est nouvelle dans ce
+ * projet, retirée si elle est archivée ; rien pour une issue d'un autre projet.
+ */
+function workflowWith(current: WorkflowIssues | null, issue: Issue): WorkflowIssues | null {
+  if (!current || current.projectId !== issue.projectId) return current;
+  const index = current.issues.findIndex((i) => i.id === issue.id);
+  if (issue.archived) return index < 0 ? current : { ...current, issues: current.issues.filter((i) => i.id !== issue.id) };
+  if (index < 0) return { ...current, issues: [...current.issues, issue] };
+  const issues = [...current.issues];
+  issues[index] = issue;
+  return { ...current, issues };
+}
+
+/** Les issues du workflow sans une issue supprimée. */
+function workflowWithout(current: WorkflowIssues | null, issueId: number): WorkflowIssues | null {
+  if (!current || !current.issues.some((i) => i.id === issueId)) return current;
+  return { ...current, issues: current.issues.filter((i) => i.id !== issueId) };
+}
+
+/**
+ * Le projet de la dernière lecture des issues du workflow, et celui de la dernière lecture de ses documents. Une réponse
+ * en retard d'un projet quitté (la personne est passée du projet 3 au projet 5) ne se pose pas : elle remettrait le
+ * projet ouvert sur son squelette, ou lui donnerait les documents d'un autre. Vider le store les oublie.
+ */
+let workflowIssuesFor: number | null = null;
+let documentCountsFor: number | null = null;
+
+/** Lance `task` sur chaque élément, `limit` à la fois ; rend les résultats dans l'ordre des éléments. */
+async function pooled<T, R>(items: readonly T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await task(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -160,11 +245,61 @@ export const useIssueStore = create<IssueState>((set, get) => ({
   error: null,
   loadedProjectId: null,
   projectRelations: {},
+  workflowIssues: null,
+  documentCounts: null,
+  issueActivity: {},
 
-  clearIssues: () => set({
-    issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null,
-    projectRelations: {},
-  }),
+  clearIssues: () => {
+    workflowIssuesFor = null;
+    documentCountsFor = null;
+    set({
+      issues: [], activeIssue: null, statuses: [], types: [], comments: [], activity: [], error: null, loadedProjectId: null,
+      projectRelations: {}, workflowIssues: null, documentCounts: null, issueActivity: {},
+    });
+  },
+
+  fetchWorkflowIssues: async (slug, projectId) => {
+    workflowIssuesFor = projectId;
+    try {
+      const first = await listIssuesPage(slug, projectId, 0, ISSUES_PAGE_MAX);
+      const rest = Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) => i + 1);
+      const pages = await pooled(rest, WORKFLOW_PAGE_CONCURRENCY, (page) => listIssuesPage(slug, projectId, page, ISSUES_PAGE_MAX));
+      // Une issue a pu glisser d'une page à l'autre pendant la lecture (une création, une épingle) : une fois chacune.
+      const byId = new Map<number, Issue>();
+      for (const page of [first, ...pages]) for (const issue of page.content) byId.set(issue.id, issue);
+      const issues = [...byId.values()].filter((issue) => !issue.archived);
+      // Un autre projet a été demandé depuis : cette lecture ne se pose pas.
+      if (workflowIssuesFor !== projectId) return null;
+      set({ workflowIssues: { projectId, issues } });
+      return issues;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchDocumentCounts: async (slug, projectId) => {
+    documentCountsFor = projectId;
+    try {
+      const rows = await listAttachmentCounts(slug, projectId);
+      const counts: Record<number, number> = {};
+      for (const row of rows) counts[row.issueId] = row.count;
+      if (documentCountsFor !== projectId) return null;
+      set({ documentCounts: { projectId, counts } });
+      return counts;
+    } catch {
+      return null;
+    }
+  },
+
+  fetchIssueActivity: async (slug, projectId, issueId) => {
+    try {
+      const entries = await listActivity(slug, projectId, issueId);
+      set((state) => ({ issueActivity: { ...state.issueActivity, [issueId]: entries } }));
+      return entries;
+    } catch {
+      return null;
+    }
+  },
 
   setActiveIssue: (issue) => set({ activeIssue: issue }),
 
@@ -208,6 +343,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
         issues: state.issues.some((i) => i.id === issue.id)
           ? state.issues.map((i) => (i.id === issue.id ? issue : i))
           : [issue, ...state.issues],
+        workflowIssues: workflowWith(state.workflowIssues, issue),
       }));
       return issue;
     } catch (err) {
@@ -223,6 +359,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({
         issues: state.issues.map((i) => (i.id === updated.id ? updated : i)),
         activeIssue: state.activeIssue?.id === updated.id ? updated : state.activeIssue,
+        workflowIssues: workflowWith(state.workflowIssues, updated),
       }));
       return updated;
     } catch {
@@ -240,6 +377,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({
         issues: state.issues.filter((i) => i.id !== issueId),
         activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
+        workflowIssues: workflowWithout(state.workflowIssues, issueId),
       }));
       return true;
     } catch (err) {
@@ -261,20 +399,24 @@ export const useIssueStore = create<IssueState>((set, get) => ({
     }
     const issue = issues[index];
     const wasActive = get().activeIssue?.id === issueId;
+    // Celle du workflow, qu'elle y soit lue sous une autre forme (une sous-issue) ou pas du tout.
+    const inWorkflow = get().workflowIssues?.issues.find((i) => i.id === issueId) ?? null;
 
     // Ré-insère l'issue à sa place (idempotent : ne double pas si déjà présente).
     const restore = () =>
       set((state) => {
-        if (state.issues.some((i) => i.id === issueId)) return {};
+        const workflowIssues = inWorkflow ? workflowWith(state.workflowIssues, inWorkflow) : state.workflowIssues;
+        if (state.issues.some((i) => i.id === issueId)) return { workflowIssues };
         const arr = [...state.issues];
         arr.splice(Math.min(index, arr.length), 0, issue);
-        return { issues: arr };
+        return { issues: arr, workflowIssues };
       });
 
     // 1) Retrait optimiste immédiat.
     set((state) => ({
       issues: state.issues.filter((i) => i.id !== issueId),
       activeIssue: wasActive ? null : state.activeIssue,
+      workflowIssues: workflowWithout(state.workflowIssues, issueId),
     }));
 
     // 2) Le vrai DELETE ne part qu'à l'expiration de la fenêtre. Minuteur porté par le store (module
@@ -314,6 +456,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
           ? state.issues.filter((i) => i.id !== issueId)
           : state.issues.map((i) => (i.id === updated.id ? updated : i)),
         activeIssue: state.activeIssue?.id === updated.id ? updated : state.activeIssue,
+        workflowIssues: archived ? workflowWithout(state.workflowIssues, issueId) : workflowWith(state.workflowIssues, updated),
       }));
       return updated;
     } catch (err) {
@@ -329,6 +472,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       set((state) => ({
         issues: state.issues.map((i) => (i.id === updated.id ? updated : i)),
         activeIssue: state.activeIssue?.id === updated.id ? updated : state.activeIssue,
+        workflowIssues: workflowWith(state.workflowIssues, updated),
       }));
       return updated;
     } catch (err) {
@@ -348,6 +492,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
           : [issue, ...state.issues],
         activeIssue: state.activeIssue?.id === issue.id ? issue : state.activeIssue,
         ...(links ? { projectRelations: { ...state.projectRelations, [issue.projectId]: linksWithIssue(links, issue) } } : {}),
+        workflowIssues: workflowWith(state.workflowIssues, issue),
       };
     }),
 
@@ -362,6 +507,7 @@ export const useIssueStore = create<IssueState>((set, get) => ({
       return {
         issues: state.issues.filter((i) => i.id !== issueId),
         activeIssue: state.activeIssue?.id === issueId ? null : state.activeIssue,
+        workflowIssues: workflowWithout(state.workflowIssues, issueId),
         ...(touched.length > 0 ? { projectRelations } : {}),
       };
     }),

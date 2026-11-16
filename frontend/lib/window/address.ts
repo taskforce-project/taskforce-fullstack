@@ -35,8 +35,8 @@ const ID = /^\d+$/
 
 const idOf = (value: string | null | undefined): number | null => (value && ID.test(value) ? Number(value) : null)
 
-/** Les écrans d'un projet où son issue s'ouvre par-dessus : le tableau, la liste, le backlog. */
-const PROJECT_HOSTS = new Set(["", "list", "backlog"])
+/** Les écrans d'un projet où son issue s'ouvre par-dessus : le tableau, la liste, le backlog, le workflow. */
+const PROJECT_HOSTS = new Set(["", "list", "backlog", "workflow"])
 /** Les écrans de l'espace qui listent des issues de plusieurs projets : l'issue s'y ouvre par-dessus, son projet en requête. */
 const WORKSPACE_HOSTS = new Set(["inbox", "my-work"])
 
@@ -60,6 +60,25 @@ export function hrefWith(
   return query ? `${pathname}?${query}` : pathname
 }
 
+/**
+ * Change la requête de l'adresse sans recharger ni pousser d'entrée dans l'historique (le workflow, séance n°25 : choisir
+ * un nœud, une densité ou un filtre remplace l'adresse ; ouvrir un objet en pousse une nouvelle). Next.js suit
+ * `history.replaceState` : `useSearchParams()` se met à jour, sans aller-retour au serveur. L'état passé est nul : celui
+ * de Next.js porte la marque de ses propres appels, et il ignorerait alors l'adresse (il recopie lui-même son état).
+ */
+export function replaceQuery(changes: Readonly<Record<string, string | null>>): void {
+  if (globalThis.location === undefined) return
+  const href = hrefWith(globalThis.location.pathname, globalThis.location.search, changes)
+  if (href === `${globalThis.location.pathname}${globalThis.location.search}`) return
+  globalThis.history.replaceState(null, "", href)
+}
+
+/** Le projet dont le workflow est le volet (`/{slug}/projects/{id}/workflow`), sinon null. */
+export function workflowProjectOf(pathname: string | null | undefined): number | null {
+  const segments = (pathname ?? "").split("/").filter(Boolean)
+  return segments[1] === "projects" && segments[3] === "workflow" && segments.length === 4 ? idOf(segments[2]) : null
+}
+
 /** Un autre écran, avec la conversation de la fenêtre : rien d'autre de l'écran d'avant ne le suit. */
 export function withConversation(pathname: string, search: SearchLike | string | null | undefined): string {
   return hrefWith(pathname, null, { c: paramsOf(search).get("c") })
@@ -78,7 +97,7 @@ export function issueOf(pathname: string | null | undefined, search: SearchLike 
   return ISSUE_KEY.test(key) ? { projectId, issueId: null, key } : null
 }
 
-/** Le segment d'un écran de projet après son id (« list », « backlog »), « » pour le tableau ; null hors d'un projet. */
+/** Le segment d'un écran de projet après son id (« list », « backlog », « workflow »), « » pour le tableau ; null hors d'un projet. */
 function projectScreen(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean)
   if (segments[1] !== "projects" || !ID.test(segments[2] ?? "") || segments.length > 4) return null
@@ -87,8 +106,8 @@ function projectScreen(pathname: string): string | null {
 
 /**
  * Où s'ouvre une issue : par-dessus l'écran du volet quand il liste les issues de son projet (le tableau, la liste, le
- * backlog) ou celles de l'espace (Waiting for you, My work) ; ailleurs (une réponse de Cortex, la zone de droite, le
- * tableau de bord), par-dessus le tableau de son projet. La conversation suit.
+ * backlog, le workflow) ou celles de l'espace (Waiting for you, My work) ; ailleurs (une réponse de Cortex, la zone de
+ * droite, le tableau de bord), par-dessus le tableau de son projet. La conversation suit.
  */
 export function issueHref(pathname: string, search: SearchLike | string | null | undefined, slug: string, issue: IssueRef): string {
   const value = issue.issueId != null ? String(issue.issueId) : (issue.key ?? "")
@@ -108,7 +127,7 @@ export function closeIssueHref(pathname: string, search: SearchLike | string | n
   return hrefWith(pathname, search, { issue: null, project: null })
 }
 
-/** Ce que l'issue recouvre, pour son fil d'Ariane : `board`, `list` ou `backlog` d'un projet, sinon la section du volet. */
+/** Ce que l'issue recouvre, pour son fil d'Ariane : `board`, `list`, `backlog` ou `workflow` d'un projet, sinon la section du volet. */
 export function screenUnder(pathname: string | null | undefined): string {
   const screen = projectScreen(pathname ?? "")
   if (screen === "") return "board"

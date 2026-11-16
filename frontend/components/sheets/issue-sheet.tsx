@@ -38,6 +38,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useSettingsStore } from "@/lib/store/settings-store"
 import { useScreenStore } from "@/lib/store/screen-store"
 import { agentName, describeActivity } from "@/lib/issue-activity"
+import { RELATION_LABELS, relationLabel } from "@/lib/issue-relations"
 import { useIssueRealtime } from "@/lib/hooks/use-issue-realtime"
 import { agentAtWork } from "@/lib/delivery/agent-at-work"
 import { IssueAiSpecPanel } from "@/components/issues/issue-ai-spec"
@@ -1021,12 +1022,6 @@ function WorklogTab({
 }
 
 // ─── Relations entre issues (PROD-2.2) ─────────────────────────────────────────
-const RELATION_LABELS: Record<IssueRelationType, string> = {
-  BLOCKS: "Blocks",
-  BLOCKED_BY: "Blocked by",
-  DUPLICATE: "Duplicate of",
-  RELATES_TO: "Relates to",
-}
 
 function RelationsTab({
   issueId, projectId, workspaceSlug,
@@ -1083,7 +1078,7 @@ function RelationsTab({
       )}
       {relations.map((r) => (
         <div key={r.id} className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5">
-          <Badge variant="outline" className="text-[9px] shrink-0">{RELATION_LABELS[r.relationType]}</Badge>
+          <Badge variant="outline" className="text-[9px] shrink-0">{relationLabel(r)}</Badge>
           <span className="w-16 shrink-0 truncate font-mono text-[10px] text-muted-foreground">{r.relatedIssue.identifier}</span>
           <span className="flex-1 truncate text-xs text-foreground">{r.relatedIssue.title}</span>
           <button

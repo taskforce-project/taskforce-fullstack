@@ -7,6 +7,7 @@ const { push, setTheme } = vi.hoisted(() => ({ push: vi.fn(), setTheme: vi.fn() 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, back: vi.fn() }),
   useParams: () => ({ workspace: "acme" }),
+  usePathname: () => globalThis.location.pathname,
 }))
 vi.mock("next-themes", () => ({ useTheme: () => ({ setTheme }) }))
 vi.mock("@/lib/api/issue-service", () => ({
@@ -193,6 +194,27 @@ describe("CommandPalette", () => {
 
     await userEvent.click(screen.getByText("Summary of OPS-35"))
     expect(openConversation).toHaveBeenCalledWith("acme", 12)
+  })
+
+  // Le workflow d'un projet (séance n°25) : il suit son tableau quand on le cherche, et s'ouvre sur son adresse.
+  it("opens a project's workflow, found by its name, with the conversation kept", async () => {
+    render(<CommandPalette open onOpenChange={vi.fn()} />)
+    expect(screen.queryByText("Open the workflow of Operations")).toBeNull()
+    await userEvent.type(field(), "Oper")
+
+    await userEvent.click(await screen.findByText("Open the workflow of Operations"))
+    expect(push).toHaveBeenCalledWith("/acme/projects/3/workflow?c=12", { scroll: false })
+  })
+
+  it("offers the workflow of the project in the pane at first look, and says its keys at the foot when it is the pane", () => {
+    window.history.replaceState(null, "", "/acme/projects/3/workflow?c=12")
+    render(<CommandPalette open onOpenChange={vi.fn()} />)
+
+    expect(screen.getByText("Open the workflow of Operations")).toBeInTheDocument()
+    expect(screen.getByText("attention")).toBeInTheDocument()
+    expect(screen.getByText("density")).toBeInTheDocument()
+    expect(screen.getByText("legend")).toBeInTheDocument()
+    expect(screen.getByText("all links")).toBeInTheDocument()
   })
 
   it("asks Cortex by filling the composer: nothing leaves without sending (R76)", async () => {

@@ -29,7 +29,11 @@ describe("approvalWords", () => {
 
   it("says that TaskForce itself asks, before an exit", () => {
     expect(approvalWords({ tool: "git push", askedBy: "runner", action: "git.push", reason: null }, t).title)
-      .toBe("TaskForce wants to push the branch");
+      .toBe("TaskForce wants to send the branch to the repository");
+  });
+
+  it("names a push with the words of the mission's sequence: the chat and the workflow say it the same way (R161, M3)", () => {
+    expect(t.actions["git.push"].want).toBe(CONSTANTS_EN.missionSequence.gestures.pushed.want);
   });
 
   it.each([

@@ -303,6 +303,8 @@ export interface DeliveryRunApproval {
   separate?: boolean;
   /** Qui a déjà accordé, quand il en faut plusieurs. */
   signedBy?: string[];
+  /** L'heure de chaque signature, dans l'ordre de `signedBy` (UTC sans fuseau, à lire avec `parseServerDate`). */
+  signedAt?: (string | null)[];
   /**
    * La décision lie : une règle de l'entreprise, une règle qui porte des obligations (qui accorde, des signatures, un
    * seuil), ou le socle. L'accord n'y vaut qu'une fois : l'écran n'offre pas « pour cette mission ».
@@ -398,13 +400,18 @@ export async function getRunActivity(slug: string, runId: number, after: number)
   return res.data.data;
 }
 
-/** Autorise ou refuse une action demandée par l'agent. */
+/**
+ * Autorise ou refuse une action demandée par l'agent. `reason` : pourquoi, en une ligne, si la personne le dit ; il entre au
+ * dossier de preuve avec la décision (le workflow, séance n°25).
+ */
 export async function decideApproval(
-  slug: string, runId: number, approvalId: number, allow: boolean, forMission = false,
+  slug: string, runId: number, approvalId: number, allow: boolean, forMission = false, reason?: string | null,
 ): Promise<void> {
+  const why = reason?.trim();
   await apiClient.post(DELIVERY_ROUTES.DECIDE(slug, runId, approvalId), {
     decision: allow ? "ALLOW" : "DENY",
     ...(allow && forMission ? { scope: "MISSION" } : {}),
+    ...(why ? { reason: why } : {}),
   });
 }
 

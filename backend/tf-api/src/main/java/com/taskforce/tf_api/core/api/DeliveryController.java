@@ -221,7 +221,8 @@ public class DeliveryController {
 
     /**
      * POST /api/workspaces/{slug}/delivery/runs/{runId}/approvals/{approvalId} : autorise ou refuse une action de
-     * l'agent. Seule la personne qui a délégué répond : l'action s'exécute sur sa machine.
+     * l'agent. Seule la personne qui a délégué répond : l'action s'exécute sur sa machine. Elle peut dire pourquoi
+     * ({@code reason}, facultatif) : la raison entre au dossier de preuve avec la décision.
      */
     @PostMapping("/runs/{runId}/approvals/{approvalId}")
     public ResponseEntity<ApiResponse<Void>> decide(
@@ -232,7 +233,8 @@ public class DeliveryController {
         @Valid @RequestBody ApprovalDecisionRequest request
     ) {
         boolean allow = "ALLOW".equals(request.decision());
-        String scope = activityService.decide(slug, runId, approvalId, allow, request.forMission(), resolveUserId(jwt));
+        String scope = activityService.decide(slug, runId, approvalId, allow, request.forMission(), request.reason(),
+            resolveUserId(jwt));
         return ResponseEntity.ok(ApiResponse.success(decisionMessage(allow, scope), null));
     }
 

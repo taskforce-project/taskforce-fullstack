@@ -16,6 +16,9 @@ vi.mock('../api/project-service', () => ({
   setProjectTestCommand: vi.fn(),
   unsetProjectRepo: vi.fn(),
   importProjectBundle: vi.fn(),
+  getProjectObjective: vi.fn(),
+  setProjectObjective: vi.fn(),
+  clearProjectObjective: vi.fn(),
 }));
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -395,5 +398,109 @@ describe('project-store', () => {
     } as ReturnType<typeof useProjectStore.getState>;
 
     expect(selectArchivedProjects(state).map((p) => p.id)).toEqual([3]);
+  });
+});
+
+// L objectif du projet (le workflow, séance n°25, W1) : lu, posé, retiré ; le serveur dit qui le peut.
+describe('project-store : l’objectif d’un projet', () => {
+  const objective = { goal: 'Ship the export', targetDate: '2026-12-19', criteria: ['CSV opens in Excel'], updatedBy: 'Pierre', updatedAt: '2026-11-13T10:00:00', canEdit: true };
+  const refused = Object.assign(new Error('403'), { isAxiosError: true, response: { status: 403, data: { message: 'Only the project lead can change its objective.' } } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useProjectStore.setState({ objectives: {}, objectiveError: null });
+  });
+
+  it('lit l’objectif, et garde celui d’avant en cas d’échec', async () => {
+    vi.mocked(svc.getProjectObjective).mockResolvedValue(objective);
+    await act(async () => { await useProjectStore.getState().fetchObjective('acme', 3); });
+    expect(useProjectStore.getState().objectives[3]).toEqual(objective);
+    vi.mocked(svc.getProjectObjective).mockRejectedValue(new Error('down'));
+    let read: unknown = {};
+    await act(async () => { read = await useProjectStore.getState().fetchObjective('acme', 3); });
+    expect(read).toBeNull();
+    expect(useProjectStore.getState().objectives[3]).toEqual(objective);
+    // L'échec se garde, pour que l'en-tête le dise ; une lecture réussie l'efface.
+    expect(useProjectStore.getState().objectiveReadFailed[3]).toBe(true);
+    vi.mocked(svc.getProjectObjective).mockResolvedValue(objective);
+    await act(async () => { await useProjectStore.getState().fetchObjective('acme', 3); });
+    expect(useProjectStore.getState().objectiveReadFailed[3]).toBe(false);
+  });
+
+  it('pose l’objectif ; un refus du serveur garde sa raison', async () => {
+    vi.mocked(svc.setProjectObjective).mockResolvedValue(objective);
+    const payload = { goal: 'Ship the export', targetDate: '2026-12-19', criteria: ['CSV opens in Excel'] };
+    let saved: unknown = null;
+    await act(async () => { saved = await useProjectStore.getState().saveObjective('acme', 3, payload); });
+    expect(saved).toEqual(objective);
+    expect(svc.setProjectObjective).toHaveBeenCalledWith('acme', 3, payload);
+
+    vi.mocked(svc.setProjectObjective).mockRejectedValue(refused);
+    await act(async () => { saved = await useProjectStore.getState().saveObjective('acme', 3, payload); });
+    expect(saved).toBeNull();
+    expect(useProjectStore.getState().objectiveError).toBe('Only the project lead can change its objective.');
+    vi.mocked(svc.setProjectObjective).mockRejectedValue(new Error('network'));
+    await act(async () => { await useProjectStore.getState().saveObjective('acme', 3, payload); });
+    expect(useProjectStore.getState().objectiveError).toBeNull();
+  });
+
+  it('retire l’objectif', async () => {
+    vi.mocked(svc.clearProjectObjective).mockResolvedValue({ ...objective, goal: null, targetDate: null, criteria: [] });
+    let ok = false;
+    await act(async () => { ok = await useProjectStore.getState().clearObjective('acme', 3); });
+    expect(ok).toBe(true);
+    expect(useProjectStore.getState().objectives[3]?.goal).toBeNull();
+    vi.mocked(svc.clearProjectObjective).mockRejectedValue(new Error('down'));
+    await act(async () => { ok = await useProjectStore.getState().clearObjective('acme', 3); });
+    expect(ok).toBe(false);
+  });
+});
+
+/**
+ * Ce que chaque action laisse tel quel (R159, L11) : les autres projets et le projet actif quand ce n'est pas le sien ; et un
+ * échec sans message (une valeur qui n'est pas une erreur) se dit dans les mots de l'action.
+ */
+describe('project-store : une action ne touche qu’à son projet', () => {
+  const target = () => makeProject({ id: 5, name: 'target' });
+  const other = () => makeProject({ id: 6, name: 'other' });
+  const store = () => useProjectStore.getState();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    act(() => {
+      useProjectStore.setState({ projects: [target(), other()], activeProject: other(), isLoading: false, error: null });
+    });
+  });
+
+  it.each([
+    ['updateProject', () => vi.mocked(svc.updateProject).mockResolvedValue(makeProject({ id: 5, name: 'new' })), () => store().updateProject('acme', 5, { name: 'new' })],
+    ['archiveProject', () => vi.mocked(svc.archiveProject).mockResolvedValue(makeProject({ id: 5, status: 'ARCHIVED' })), () => store().archiveProject('acme', 5)],
+    ['toggleFavorite', () => vi.mocked(svc.favoriteProject).mockResolvedValue(makeProject({ id: 5, isFavorite: true })), () => store().toggleFavorite('acme', 5, true)],
+    ['linkRepo', () => vi.mocked(svc.setProjectRepo).mockResolvedValue({ projectId: 5, repoProvider: 'github', repoFullName: 'me/new' }), () => store().linkRepo('acme', 5, { mode: 'CREATE', repoName: 'new' })],
+    ['unlinkRepo', () => vi.mocked(svc.unsetProjectRepo).mockResolvedValue({ projectId: 5, repoProvider: null, repoFullName: null }), () => store().unlinkRepo('acme', 5)],
+    ['setTestCommand', () => vi.mocked(svc.setProjectTestCommand).mockResolvedValue('npm test'), () => store().setTestCommand('acme', 5, 'npm test')],
+    ['deleteProject', () => vi.mocked(svc.deleteProject).mockResolvedValue(undefined), () => store().deleteProject('acme', 5)],
+  ] as const)('%s leaves the other project, and the active one, as they were', async (_name, arrange, run) => {
+    arrange();
+    await act(async () => { await run(); });
+    expect(store().projects.find((p) => p.id === 6)).toEqual(other());
+    expect(store().activeProject).toEqual(other());
+    expect(store().error).toBeNull();
+  });
+
+  it.each([
+    ['fetchProjects', () => vi.mocked(svc.listProjects).mockRejectedValue('offline'), () => store().fetchProjects('acme'), "Couldn't load the projects"],
+    ['createProject', () => vi.mocked(svc.createProject).mockRejectedValue('offline'), () => store().createProject('acme', { name: 'X', identifier: 'X' }), "Couldn't create the project"],
+    ['updateProject', () => vi.mocked(svc.updateProject).mockRejectedValue('offline'), () => store().updateProject('acme', 5, { name: 'new' }), "Couldn't update the project"],
+    ['archiveProject', () => vi.mocked(svc.archiveProject).mockRejectedValue('offline'), () => store().archiveProject('acme', 5), "Couldn't archive the project"],
+    ['toggleFavorite', () => vi.mocked(svc.favoriteProject).mockRejectedValue('offline'), () => store().toggleFavorite('acme', 5, true), "Couldn't update the favorites"],
+    ['deleteProject', () => vi.mocked(svc.deleteProject).mockRejectedValue('offline'), () => store().deleteProject('acme', 5), "Couldn't delete the project"],
+  ] as const)('%s says its own words when the failure has no message', async (_name, arrange, run, words) => {
+    arrange();
+    await act(async () => { await run(); });
+    expect(store().error).toBe(words);
+    // Un favori refusé revient à ce qu'il était, et l'autre projet n'a pas bougé.
+    expect(store().projects.find((p) => p.id === 5)?.isFavorite ?? false).toBe(false);
+    expect(store().projects.find((p) => p.id === 6) ?? other()).toEqual(other());
   });
 });

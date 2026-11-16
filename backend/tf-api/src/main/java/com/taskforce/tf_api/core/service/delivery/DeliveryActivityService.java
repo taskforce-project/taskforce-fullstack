@@ -435,14 +435,17 @@ public class DeliveryActivityService {
     private DeliveryRunActivityResponse.Approval approvalView(DeliveryRun run, DeliveryRunApproval a, Long userId) {
         Long workspaceId = run.getIssue().getProject().getWorkspace().getId();
         RulesEngine.Obligations require = a.obligations();
-        List<String> signedBy = RuleApprovers.ordinary(require) ? List.of()
+        List<DeliveryRunApprovalSignature> allowed = RuleApprovers.ordinary(require) ? List.of()
             : signatureRepository.findByApprovalIdOrderBySignedAtAsc(a.getId()).stream()
-                .filter(DeliveryRunApprovalSignature::isAllow).map(s -> displayName(s.getUser())).toList();
+                .filter(DeliveryRunApprovalSignature::isAllow).toList();
+        // Qui a signé, et quand : chaque signature garde son heure, celle de la décision finale n'est que la dernière.
+        List<String> signedBy = allowed.stream().map(s -> displayName(s.getUser())).toList();
+        List<LocalDateTime> signedAt = allowed.stream().map(DeliveryRunApprovalSignature::getSignedAt).toList();
         return new DeliveryRunActivityResponse.Approval(a.getId(), a.getTool(), a.getSummary(), a.getStatus().name(),
             a.getCreatedAt(), a.getExpiresAt(), a.getDecidedAt(), displayName(a.getDecidedBy()),
             canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
             approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
-            require != null && require.separate(), signedBy, a.isBinding());
+            require != null && require.separate(), signedBy, a.isBinding(), signedAt);
     }
 
     /** Le dossier de preuve du run, en JSON ou en Markdown, si le projet est visible ; vide pour un run de la v1. */
@@ -459,16 +462,26 @@ public class DeliveryActivityService {
         decide(slug, runId, approvalId, allow, false, userId);
     }
 
+    /** Autorise ou refuse une action de l'agent, sans dire pourquoi. */
+    @Transactional
+    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
+        return decide(slug, runId, approvalId, allow, forMission, null, userId);
+    }
+
     /**
      * Autorise ou refuse une action de l'agent. Réservé à la personne qui a délégué, tant que la demande attend. Un accord
      * {@code forMission} vaut pour le reste de la mission (R46) : le runner ne redemande plus ce que la même règle demande.
      * Une décision qui lie (une couche de l'entreprise, des obligations, le socle) ne s'accorde qu'une fois.
      *
+     * @param reason pourquoi, en une ligne, si la personne le dit : il entre au dossier de preuve avec la décision (ou la
+     *     signature), sans les espaces qui l'entourent ; vide, il n'y entre pas. Il ne change rien d'autre à la décision.
      * @return la portée enregistrée ({@link #SCOPE_ONCE} ou {@link #SCOPE_MISSION}), ou nul quand seule la signature est
      *     enregistrée et que la demande attend encore les autres personnes que la règle désigne
      */
     @Transactional
-    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, Long userId) {
+    public String decide(String slug, Long runId, Long approvalId, boolean allow, boolean forMission, String reason,
+                         Long userId) {
+        String why = blankToNull(reason);
         DeliveryRun run = scopedRun(slug, runId);
         Project project = run.getIssue().getProject();
         visibilityGuard.assertCanView(project, userId);
@@ -510,6 +523,7 @@ public class DeliveryActivityService {
                 Map<String, Object> signed = approvalData(approval);
                 signed.put("decision", "SIGNED");
                 signed.put("signatures", allowed.size());
+                if (why != null) signed.put("reason", why);
                 evidenceService.append(run, "human.decision", personActor(run, userId), signed);
                 // Une signature de plus : la demande attend encore, mais qui a signé et qui peut encore signer ont changé.
                 feed.approval(run, approval);
@@ -530,6 +544,7 @@ public class DeliveryActivityService {
         Map<String, Object> decided = approvalData(approval);
         decided.put("decision", approval.getStatus().name());
         decided.put("scope", approval.getScope());
+        if (why != null) decided.put("reason", why);
         evidenceService.append(run, "human.decision", personActor(run, userId), decided);
         feed.approval(run, approval);
         log.info("Run {} : validation {} {} par {}", runId, approvalId, approval.getStatus(), userId);

@@ -207,6 +207,23 @@ class IssueServiceRelationsTest {
     }
 
     @Test
+    @DisplayName("lu depuis sa cible, un lien le dit : la fiche le dit dans l'autre sens (« Blocked by », pas « Blocks »)")
+    void a_link_read_from_its_target_says_so() {
+        when(relationRepository.findByIssueId(11L)).thenReturn(List.of(relation(5L, design, build, IssueRelationType.BLOCKS)));
+        when(relationRepository.findByIssueId(12L)).thenReturn(List.of(relation(5L, design, build, IssueRelationType.BLOCKS)));
+
+        var fromSource = service.listRelations("acme", 3L, 11L, 1L).get(0);
+        var fromTarget = service.listRelations("acme", 3L, 12L, 1L).get(0);
+
+        assertThat(fromSource.isFromTarget()).isFalse();
+        assertThat(fromSource.getRelatedIssue().getId()).isEqualTo(12L);
+        assertThat(fromTarget.isFromTarget()).isTrue();
+        assertThat(fromTarget.getRelatedIssue().getId()).isEqualTo(11L);
+        // Le lien reste tel qu'il a été posé : seul l'écran le retourne.
+        assertThat(fromTarget.getRelationType()).isEqualTo(IssueRelationType.BLOCKS);
+    }
+
+    @Test
     @DisplayName("hors transaction, le lien s'annonce tout de suite")
     void outside_a_transaction_the_link_is_announced_at_once() {
         TransactionSynchronizationManager.clearSynchronization();

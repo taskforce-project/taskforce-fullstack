@@ -351,8 +351,16 @@ describe('delivery-store', () => {
     let ok = false;
     await act(async () => { ok = await useDeliveryStore.getState().decideApproval('acme', 100, 9, true); });
     expect(ok).toBe(true);
-    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true, false);
+    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, true, false, null);
     expect(useDeliveryStore.getState().activity[100]?.approvals[0]?.status).toBe('ALLOWED');
+  });
+
+  // Le workflow décide depuis un nœud (séance n°25) : la raison facultative part avec la décision, au dossier.
+  it('decideApproval sends the reason of the decision when the person gives one', async () => {
+    vi.mocked(svc.decideApproval).mockResolvedValue(undefined);
+    vi.mocked(svc.getRunActivity).mockResolvedValue({ events: [], approvals: [] });
+    await act(async () => { await useDeliveryStore.getState().decideApproval('acme', 100, 9, false, false, 'Not on Friday'); });
+    expect(svc.decideApproval).toHaveBeenCalledWith('acme', 100, 9, false, false, 'Not on Friday');
   });
 
   it.each([[true, undefined], [false, new Error('404')]] as const)('downloadEvidence -> %s', async (expected, failure) => {
@@ -568,6 +576,63 @@ describe('delivery-store : les missions d’un projet (R166)', () => {
     expect(ids()).toEqual([9, 8, 7]);
     expect(rows).toHaveLength(3);
     expect(useDeliveryStore.getState().projectRuns[PROJECT]).toMatchObject({ page: 1, last: true });
+  });
+
+  // Le workflow lit toutes les missions du projet (séance n°25) : 300 missions en 6 pages de 50, jamais en un appel.
+  it('fetchAllProjectRuns lit toutes les pages, par 50, trois à la fois, et les pose une fois toutes lues', async () => {
+    const all = Array.from({ length: 120 }, (_, i) => row(i + 1, `2026-11-${String(1 + (i % 12)).padStart(2, '0')}T10:00:00`));
+    vi.mocked(svc.listProjectRuns).mockImplementation(async (_slug, _project, pageNumber = 0, size = 20) => page(
+      all.slice(pageNumber * size, (pageNumber + 1) * size),
+      { pageNumber, pageSize: size, totalElements: all.length, totalPages: Math.ceil(all.length / size), last: (pageNumber + 1) * size >= all.length },
+    ));
+
+    let rows: ProjectRun[] | null = null;
+    await act(async () => { rows = await useDeliveryStore.getState().fetchAllProjectRuns('acme', PROJECT); });
+
+    expect(svc.listProjectRuns).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(svc.listProjectRuns).mock.calls.map((call) => call[2])).toEqual([0, 1, 2]);
+    expect(vi.mocked(svc.listProjectRuns).mock.calls.every((call) => call[3] === 50)).toBe(true);
+    expect(rows).toHaveLength(120);
+    expect(useDeliveryStore.getState().projectRuns[PROJECT]).toMatchObject({ page: 2, last: true, total: 120 });
+  });
+
+  it('fetchAllProjectRuns garde une ligne relue pendant sa lecture, plus récente, et une mission créée entre-temps', async () => {
+    useDeliveryStore.setState({ projectRuns: { [PROJECT]: { rows: [row(9, '2026-11-13T10:00:00')], page: 0, last: true, total: 1 } } });
+    let release: (value: ProjectRunsPage) => void = () => {};
+    vi.mocked(svc.listProjectRuns).mockImplementation(() => new Promise<ProjectRunsPage>((resolve) => { release = resolve; }));
+    let rows: ProjectRun[] | null = null;
+    await act(async () => {
+      const reading = useDeliveryStore.getState().fetchAllProjectRuns('acme', PROJECT);
+      // Pendant la lecture des pages, un événement fait relire la mission 9 (elle a fini) et en fait connaître une nouvelle.
+      vi.mocked(svc.getProjectRun).mockResolvedValueOnce(row(9, '2026-11-13T10:00:00', { run: makeRun({ id: 9, issueId: 90, createdAt: '2026-11-13T10:00:00', status: 'DONE' }) }));
+      await useDeliveryStore.getState().fetchProjectRun('acme', PROJECT, 9);
+      vi.mocked(svc.getProjectRun).mockResolvedValueOnce(row(12, '2026-11-13T12:00:00'));
+      await useDeliveryStore.getState().fetchProjectRun('acme', PROJECT, 12);
+      // La page arrive ensuite, avec la mission 9 encore au travail, et sans la nouvelle.
+      release(page([row(9, '2026-11-13T10:00:00'), row(8, '2026-11-13T09:00:00')]));
+      rows = await reading;
+    });
+    expect(ids()).toEqual([12, 9, 8]);
+    expect(useDeliveryStore.getState().projectRuns[PROJECT]?.rows.find((r) => r.run.id === 9)?.run.status).toBe('DONE');
+    expect(rows).toHaveLength(3);
+  });
+
+  it('fetchAllProjectRuns borne les pages lues, garde une mission une fois, et rend null en cas d’échec', async () => {
+    const twice = row(5, '2026-11-05T10:00:00');
+    vi.mocked(svc.listProjectRuns).mockImplementation(async (_slug, _project, pageNumber = 0) => page(
+      pageNumber === 0 ? [row(6, '2026-11-06T10:00:00'), twice] : [twice, row(4, '2026-11-04T10:00:00')],
+      { pageNumber, totalElements: 5000, totalPages: 100, last: false },
+    ));
+    await act(async () => { await useDeliveryStore.getState().fetchAllProjectRuns('acme', PROJECT); });
+    expect(svc.listProjectRuns).toHaveBeenCalledTimes(40);
+    expect(ids()?.filter((id) => id === 5)).toHaveLength(1);
+    expect(useDeliveryStore.getState().projectRuns[PROJECT]?.last).toBe(false);
+
+    vi.mocked(svc.listProjectRuns).mockRejectedValue(new Error('down'));
+    let rows: ProjectRun[] | null = [];
+    await act(async () => { rows = await useDeliveryStore.getState().fetchAllProjectRuns('acme', PROJECT); });
+    expect(rows).toBeNull();
+    expect(ids()).toEqual([6, 5, 4]);
   });
 
   it('fetchProjectRuns rend null en cas d’échec, et les lignes d’avant restent', async () => {

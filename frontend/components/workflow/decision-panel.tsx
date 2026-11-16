@@ -1,0 +1,118 @@
+"use client"
+
+import { useState } from "react"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import type { DeliveryRun, DeliveryRunApproval } from "@/lib/api/delivery-service"
+import { requestWant } from "@/lib/delivery/mission-sequence"
+import { fillText } from "@/lib/delivery/result-card"
+import { allOf, obligationWords } from "@/lib/rules/rule-words"
+import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { useUserStore } from "@/lib/store/user-store"
+import { parseServerDate } from "@/lib/utils/server-date"
+import { momentWords } from "@/lib/workflow/sentence"
+
+/** La raison d'une décision, au plus, comme le serveur la borne. */
+export const REASON_MAX = 500
+
+/**
+ * Décider (séance n°25, §6.1), là où l'on voit, la règle sur la décision : « Let {agent} {what}? », la règle et sa phrase, les
+ * signatures qu'elle demande, l'échéance et ce qui suit, la signification de la signature, une raison facultative, puis
+ * « Refuse » et « Approve » en bas à droite ; « This can't be undone. » quand l'accord engage. Jamais un « Approve » nu. La
+ * décision passe par la route qui existe, déjà jugée par les règles et entrée au dossier ; la raison y entre avec elle. Un
+ * accord donné ici vaut une fois. Pour qui ne peut pas décider : qui l'on attend (les personnes ou les rôles que la règle
+ * nomme, en mots), puis les autres obligations chacune sur sa ligne, sans bouton. Une demande échue ne se
+ * décide plus : elle le dit, sans bouton, en attendant que la mission relue la montre close.
+ */
+export function DecisionPanel({ slug, projectId, run, approval, now, agent = null }: Readonly<{
+  slug: string
+  projectId: number
+  run: DeliveryRun
+  approval: DeliveryRunApproval
+  now: Date
+  /** Le nom de l'agent de la mission, quand on le connaît (« Claude Code ») ; sinon le mot des cartes de mission. */
+  agent?: string | null
+}>) {
+  const t = usePreferencesStore((s) => s.t.workflow.decide)
+  const sequence = usePreferencesStore((s) => s.t.missionSequence)
+  const rulesText = usePreferencesStore((s) => s.t.rules)
+  const missions = usePreferencesStore((s) => s.t.missions)
+  const person = useUserStore((s) => s.user?.displayName?.trim() || s.user?.email || "")
+  const decide = useDeliveryStore((s) => s.decideApproval)
+  const fetchProjectRun = useDeliveryStore((s) => s.fetchProjectRun)
+  const [why, setWhy] = useState("")
+  const [busy, setBusy] = useState<"allow" | "deny" | null>(null)
+
+  const what = requestWant(approval, run, sequence)
+  const reason = approval.reason?.trim()
+  const obligations = obligationWords(approval, rulesText)
+  const fieldId = `decide-why-${approval.id}`
+  // Qui demande, comme la carte de la mission le dit : TaskForce lui-même, ou l'agent.
+  const asker = approval.askedBy === "runner" ? missions.taskforce : (agent?.trim() || missions.agent)
+  const title = fillText(t.title, { agent: asker, what })
+  const expired = approval.expiresAt !== null && parseServerDate(approval.expiresAt).getTime() <= now.getTime()
+
+  if (expired && approval.expiresAt) {
+    return <p className="text-sm text-muted-foreground">{fillText(t.expired, { time: momentWords(approval.expiresAt, now) })}</p>
+  }
+
+  if (!approval.canDecide) {
+    // Qui l'on attend, seulement : les personnes ou les rôles que la règle nomme (« an admin »), sinon qui a délégué.
+    const sets = approval.waitingFor ?? []
+    const who = sets.length > 0 ? allOf(sets, rulesText) : (run.startedByName?.trim() || t.delegator)
+    const others = obligationWords({ ...approval, waitingFor: [] }, rulesText)
+    return (
+      <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+        <p>{fillText(t.notYours, { who })}</p>
+        {others.map((line) => <p key={line}>{line}</p>)}
+      </div>
+    )
+  }
+
+  async function onDecide(allow: boolean) {
+    setBusy(allow ? "allow" : "deny")
+    const ok = await decide(slug, run.id, approval.id, allow, false, why)
+    setBusy(null)
+    if (ok) {
+      const multi = allow && (approval.signatures ?? 1) > 1
+      toast.success(allow ? (multi ? t.signed : t.approved) : t.refused)
+    } else {
+      toast.error(t.failed)
+    }
+    // La ligne de la mission se relit tout de suite, décision prise ou refusée (échue, tranchée ailleurs) : le nœud dit
+    // où elle en est sans attendre le topic.
+    void fetchProjectRun(slug, projectId, run.id)
+  }
+
+  return (
+    <section aria-label={title} className="flex flex-col gap-3 border border-border bg-card p-3">
+      <h4 className="text-base font-[550] leading-snug text-foreground">{title}</h4>
+      <div className="flex flex-col gap-1 text-[13px] leading-5 text-foreground">
+        <p>{reason ? fillText(t.rule, { sentence: reason }) : t.noRule}</p>
+        {obligations.map((line) => <p key={line} className="text-muted-foreground">{line}</p>)}
+        {approval.expiresAt && (
+          <p className="text-muted-foreground">{fillText(t.expires, { time: momentWords(approval.expiresAt, now), then: t.then })}</p>
+        )}
+        <p className="text-muted-foreground">{fillText(t.signingAs, { name: person, meaning: t.meaning.approval })}</p>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={fieldId} className="text-xs">{t.why}</Label>
+        <Input id={fieldId} value={why} maxLength={REASON_MAX} onChange={(event) => setWhy(event.target.value)} className="h-8 text-sm" />
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {approval.binding && <p className="mr-auto text-xs text-muted-foreground">{t.final}</p>}
+        <Button variant="outline" size="sm" disabled={busy !== null} onClick={() => void onDecide(false)}>
+          {busy === "deny" ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : t.refuse}
+        </Button>
+        <Button size="sm" disabled={busy !== null} onClick={() => void onDecide(true)}>
+          {busy === "allow" ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : t.approve}
+        </Button>
+      </div>
+    </section>
+  )
+}

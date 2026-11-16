@@ -140,3 +140,38 @@ describe("TitleLine", () => {
     expect(desktop.onNavigate).toHaveBeenCalled()
   })
 })
+
+// Le workflow du projet en vue (séance n°25, W1) : « Workflow » à côté de « Board », sauf s'il est déjà le volet.
+describe("TitleLine : le workflow du projet en vue", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    widthOf(1440)
+    useProjectStore.setState({ projects: [{ id: 3, name: "Website" } as Project] })
+    useCortexStore.setState({ conversationId: null, conversations: [] })
+    useDeliveryStore.setState({ workspaceRuns: [] })
+  })
+  afterEach(() => {
+    nav.pathname = "/acme"
+  })
+
+  it("opens the workflow of the project in the pane, beside its board", () => {
+    nav.pathname = "/acme/projects/3/list"
+    globalThis.history.replaceState(null, "", "/acme/projects/3/list?c=9")
+    renderLine()
+    const button = screen.getByRole("button", { name: "Workflow" })
+    expect(button).toHaveAttribute("title", "Open the workflow of Website")
+    fireEvent.click(button)
+    expect(nav.push).toHaveBeenCalledWith("/acme/projects/3/workflow?c=9", { scroll: false })
+  })
+
+  it("offers no workflow button when the workflow is already the pane, nor without a project in view", () => {
+    nav.pathname = "/acme/projects/3/workflow"
+    const { unmount } = renderLine()
+    expect(screen.queryByRole("button", { name: "Workflow" })).toBeNull()
+    expect(screen.getByRole("button", { name: "Board" })).toBeInTheDocument()
+    unmount()
+    nav.pathname = "/acme"
+    renderLine()
+    expect(screen.queryByRole("button", { name: "Workflow" })).toBeNull()
+  })
+})
