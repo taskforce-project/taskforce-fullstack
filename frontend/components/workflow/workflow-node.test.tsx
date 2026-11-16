@@ -59,6 +59,17 @@ describe("WorkflowNodeCard", () => {
     expect(rules?.className).toContain("pointer-events-auto")
   })
 
+  it("its mark and its lock, which take the pointer for their word, choose the card like the rest of it (R159, N2)", () => {
+    const on = handlers()
+    render(<WorkflowNodeCard view={viewOf()} density="plan" selected={false} focusable dimmed={false} t={t} handlers={on} />)
+    fireEvent.click(screen.getByRole("img", { name: "Needs you" }))
+    expect(on.onSelect).toHaveBeenCalledWith("issue-1")
+    fireEvent.click(document.querySelector("[data-rules]") as HTMLElement)
+    expect(on.onSelect).toHaveBeenCalledTimes(2)
+    fireEvent.doubleClick(screen.getByRole("img", { name: "Needs you" }))
+    expect(on.onOpen).toHaveBeenCalledWith("issue-1")
+  })
+
   it("a click chooses it; Enter, a double click and its title open it; its one button acts", () => {
     const on = handlers()
     render(<WorkflowNodeCard view={viewOf()} density="detail" selected focusable={false} dimmed t={t} handlers={on} />)
@@ -99,6 +110,9 @@ describe("SummaryNodeCard", () => {
     const card = screen.getByRole("button", { name: "Ship the export, Needs you, You" })
     fireEvent.click(card)
     expect(on.onSelect).toHaveBeenCalledWith("issue-1")
+    // Sa marque aussi (R159, N2).
+    fireEvent.click(screen.getByRole("img", { name: "Needs you" }))
+    expect(on.onSelect).toHaveBeenCalledTimes(2)
     fireEvent.keyDown(card, { key: "Enter" })
     expect(on.onOpen).toHaveBeenCalledWith("issue-1")
     // Le titre tient sur deux lignes, sur toute la largeur de sa colonne (R161, H5).

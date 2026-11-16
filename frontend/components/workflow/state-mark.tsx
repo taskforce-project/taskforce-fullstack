@@ -44,7 +44,7 @@ export const SENTENCE_INK: Readonly<Partial<Record<WorkflowState, string>>> = {
   missing: "text-foreground",
 }
 
-export function StateMark({ state, word, size = 16, showWord = false, still = false, className }: Readonly<{
+export function StateMark({ state, word, size = 16, showWord = false, still = false, className, onClick, onDoubleClick }: Readonly<{
   state: WorkflowState
   /** Le mot de l'état, dans la langue de l'écran. */
   word: string
@@ -54,6 +54,9 @@ export function StateMark({ state, word, size = 16, showWord = false, still = fa
   /** La marque ne bouge pas : une issue en cours tenue par une personne, sans mission au travail. */
   still?: boolean
   className?: string
+  /** Sur une carte, la marque prend le pointeur pour son mot : son clic est celui de la carte (R159, N2). */
+  onClick?: () => void
+  onDoubleClick?: () => void
 }>) {
   const { icon: Icon, tone } = MARKS[state]
   const mark = (
@@ -66,14 +69,15 @@ export function StateMark({ state, word, size = 16, showWord = false, still = fa
   )
   if (showWord) {
     return (
-      <span data-state={state} className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
+      <span data-state={state} onClick={onClick} onDoubleClick={onDoubleClick} className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
         {mark}
         <span className="truncate">{word}</span>
       </span>
     )
   }
   return (
-    <span role="img" aria-label={word} title={word} data-state={state} className={cn("inline-flex shrink-0", className)}>
+    <span role="img" aria-label={word} title={word} data-state={state} onClick={onClick} onDoubleClick={onDoubleClick}
+      className={cn("inline-flex shrink-0", className)}>
       {mark}
     </span>
   )
