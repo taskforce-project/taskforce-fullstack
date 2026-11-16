@@ -91,8 +91,15 @@ describe("Inspector", () => {
     fireEvent.click(screen.getByRole("button", { name: "Hand to Claude Code" }))
     expect(fresh.gestures.handTo).toHaveBeenCalledWith(fresh.node, agent)
     // En feuille, un retour ramène aux colonnes.
+    expect(screen.getByRole("region", { name: /, in detail$/ }).className).not.toContain("fixed")
     fireEvent.click(screen.getByRole("button", { name: "Back to the workflow" }))
     expect(fresh.props.onClose).toHaveBeenCalled()
+  })
+
+  it("on a narrow screen, the sheet covers the whole screen", () => {
+    const model = buildWorkflow({ statuses: STATUSES, issues: [issue(2)], relations: [], documents: {}, me: ME, today: "2026-11-13", runs: [] })
+    setup(model, "issue-2", "full")
+    expect(screen.getByRole("region", { name: /, in detail$/ }).className).toContain("fixed inset-0")
   })
 
   it("without an agent ready for the project, says what to do instead of hiding the gesture", () => {

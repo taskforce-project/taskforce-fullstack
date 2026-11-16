@@ -120,7 +120,8 @@ export function Inspector({
         "flex min-h-0 flex-col bg-background",
         mode === "side" && "relative h-full shrink-0 border-l border-border",
         mode === "sheet" && "absolute inset-y-0 right-0 z-30 max-w-full border-l border-border shadow-xl",
-        mode === "full" && "absolute inset-0 z-30",
+        // L'écran étroit : une feuille sur tout l'écran, en-tête et onglets du projet compris.
+        mode === "full" && "fixed inset-0 z-50",
       )}
     >
       {mode === "side" && (
