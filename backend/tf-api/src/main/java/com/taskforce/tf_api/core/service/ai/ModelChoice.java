@@ -19,9 +19,13 @@ import java.util.regex.Pattern;
  */
 public final class ModelChoice {
 
-    /** Modèles locaux essayés dans l'ordre : rapides, ils gèrent les outils. */
-    static final List<String> CHAT_PREFERENCES =
-        List.of("qwen3:8b", "qwen2.5:7b-instruct", "qwen3:4b", "llama3.1:8b", "mistral-nemo", "gemma3:4b");
+    /**
+     * Modèles locaux essayés dans l'ordre : rapides, ils gèrent les outils. Ceux de la Présidence d'abord (16/11/2026 :
+     * qwen3.5:9b, puis mimo-v2.6:9b, qui ont remplacé qwen3:8b et qwen2.5:7b-instruct), puis les anciens, qu'une autre
+     * machine peut encore avoir.
+     */
+    static final List<String> CHAT_PREFERENCES = List.of("qwen3.5:9b", "mimo-v2.6:9b", "qwen3:8b", "qwen2.5:7b-instruct",
+        "qwen3:4b", "llama3.1:8b", "mistral-nemo", "gemma3:4b");
     static final List<String> ANTHROPIC_CHAT_PREFERENCES =
         List.of("claude-opus-5-5", "claude-sonnet-5-5", "claude-opus-5", "claude-sonnet-5");
     static final List<String> ANTHROPIC_FAST_PREFERENCES = List.of("claude-haiku-5-5", "claude-haiku-4-5");
