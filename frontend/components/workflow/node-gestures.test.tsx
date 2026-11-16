@@ -57,7 +57,7 @@ describe("useNodeGestures", () => {
 
     expect(updateIssue).toHaveBeenCalledWith("acme", 3, 1, { statusId: DOING.id })
     const [message, options] = toast.success.mock.calls[0]
-    expect(message).toBe("Moved to In Progress.")
+    expect(message).toBe("Moved to In Progress")
     expect(options.duration).toBe(5000)
     await act(async () => { options.action.onClick() })
     expect(updateIssue).toHaveBeenLastCalledWith("acme", 3, 1, { statusId: TODO.id })
@@ -107,7 +107,7 @@ describe("useNodeGestures", () => {
     act(() => result.current.ask(nodeOf([])))
     expect(useCortexStore.getState().attachments).toEqual([{ kind: "issue", projectId: 3, issueId: 1, label: "WEB-1", title: "Release" }])
     expect(useCortexStore.getState().open).toBe(true)
-    expect(toast).toHaveBeenCalledWith("WEB-1 is in the composer: write your question to Cortex.")
+    expect(toast).toHaveBeenCalledWith("WEB-1 is attached to your message: write your question to Cortex.")
   })
 })
 

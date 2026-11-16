@@ -96,6 +96,19 @@ describe("Inspector", () => {
     expect(fresh.props.onClose).toHaveBeenCalled()
   })
 
+  it("a blocked node says so by its « Blocked by » list, never « Waiting for: Blocked by 1 issue. »", () => {
+    const blocker = issue(5, { title: "Schema" })
+    const blocked = issue(6, { title: "Export" })
+    const model = buildWorkflow({
+      statuses: STATUSES, issues: [blocker, blocked], relations: [relation(1, blocker, blocked)], documents: {}, me: ME, today: "2026-11-13",
+      runs: [],
+    })
+    setup(model, "issue-6")
+    expect(screen.getByText("Blocked by")).toBeInTheDocument()
+    expect(screen.getByText(`${blocker.identifier} to be finished`)).toBeInTheDocument()
+    expect(screen.queryByText(/^Blocked by 1 issue/)).toBeNull()
+  })
+
   it("on a narrow screen, the sheet covers the whole screen", () => {
     const model = buildWorkflow({ statuses: STATUSES, issues: [issue(2)], relations: [], documents: {}, me: ME, today: "2026-11-13", runs: [] })
     setup(model, "issue-2", "full")
@@ -159,7 +172,9 @@ describe("Inspector", () => {
     expect(screen.getByText("Pushes need a look")).toBeInTheDocument()
     expect(screen.getByText("Rules version 12")).toBeInTheDocument()
     expect(screen.getByText("Tests passed: 12 of 12")).toBeInTheDocument()
-    expect(screen.getByText("Proof: 2 events, sealed")).toBeInTheDocument()
+    // Le libellé de la ligne dit « Proof » : la valeur ne le répète pas (R161, L5).
+    expect(screen.getByText("2 events, sealed")).toBeInTheDocument()
+    expect(screen.queryByText(/^Proof: /)).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /export\.ts/ }))
     expect(onOpenMission).toHaveBeenCalledWith(1)
     fireEvent.click(screen.getByRole("button", { name: "Download the record" }))
