@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, type KeyboardEvent, type MouseEvent } from "react"
-import { Lock, Paperclip } from "lucide-react"
+import { Lock, Paperclip, Waypoints } from "lucide-react"
 
 import { SENTENCE_INK, STATE_BAR, StateMark } from "@/components/workflow/state-mark"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -37,6 +37,8 @@ export interface NodeView {
   readonly detail: string | null
   /** Qui doit agir, pour la carte d'une ligne de Summary. */
   readonly who: string
+  /** Le nombre de liens de la carte, sur la liste étroite avec « Show all links » : les courbes n'y tiennent pas. */
+  readonly links?: number
 }
 
 export interface NodeHandlers {
@@ -80,13 +82,14 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
   /** L'écran étroit : la carte prend toute la largeur. */
   stretch?: boolean
 }>) {
-  const { node, sentence, governance, action, agent, detail } = view
+  const { node, sentence, governance, action, agent, detail, links } = view
   const { issue, state } = node
   const word = t.state[state]
   const assignee = issue.assignee
   const sentenceId = `${node.key}-now`
   const bar = STATE_BAR[state]
-  const showFoot = governance.rules > 0 || governance.signed !== null || governance.documents > 0 || action !== null
+  const showLinks = links !== undefined && links > 0
+  const showFoot = governance.rules > 0 || governance.signed !== null || governance.documents > 0 || action !== null || showLinks
 
   return (
     <div
@@ -178,6 +181,12 @@ export const WorkflowNodeCard = memo(function WorkflowNodeCard({
             <span className="flex items-center gap-1 whitespace-nowrap">
               <Paperclip aria-hidden="true" className="size-3 shrink-0" />
               {countWords(governance.documents, t.gov.documentsOne, t.gov.documentsMany)}
+            </span>
+          )}
+          {showLinks && (
+            <span data-links className="flex items-center gap-1 whitespace-nowrap">
+              <Waypoints aria-hidden="true" className="size-3 shrink-0" />
+              {countWords(links, t.links.countOne, t.links.countMany)}
             </span>
           )}
           {action && (

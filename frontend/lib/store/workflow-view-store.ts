@@ -23,6 +23,8 @@ interface WorkflowViewState {
   densities: Record<string, Density>
   /** La largeur de l'inspecteur, par personne. */
   inspectorWidths: Record<string, number>
+  /** « Show all links », par personne : toutes les dépendances entre les cartes à l'écran (décision du CEO, 16/11/2026). */
+  allLinks: Record<string, boolean>
   /** La légende est ouverte (« ... », puis « Legend », ou la touche `?`). */
   legendOpen: boolean
   /** L'état du direct du workflow ouvert, et l'heure de sa dernière lecture : la ligne du titre le dit. */
@@ -35,6 +37,7 @@ interface WorkflowViewState {
 
   setDensity: (person: string, density: Density) => void
   setInspectorWidth: (person: string, width: number) => void
+  setAllLinks: (person: string, on: boolean) => void
   setLegendOpen: (open: boolean) => void
   setLive: (live: WorkflowViewState["live"]) => void
   setControlsInView: (inView: boolean) => void
@@ -45,12 +48,14 @@ export const useWorkflowViewStore = create<WorkflowViewState>()(
     (set) => ({
       densities: {},
       inspectorWidths: {},
+      allLinks: {},
       legendOpen: false,
       live: null,
       controlsInView: false,
 
       setDensity: (person, density) => set((s) => (s.densities[person] === density ? s : { densities: { ...s.densities, [person]: density } })),
       setInspectorWidth: (person, width) => set((s) => ({ inspectorWidths: { ...s.inspectorWidths, [person]: clampInspector(width) } })),
+      setAllLinks: (person, on) => set((s) => (s.allLinks[person] === on ? s : { allLinks: { ...s.allLinks, [person]: on } })),
       setLegendOpen: (open) => set({ legendOpen: open }),
       setLive: (live) => set((s) => {
         const was = s.live
@@ -62,7 +67,7 @@ export const useWorkflowViewStore = create<WorkflowViewState>()(
     {
       name: "tf-workflow-view",
       storage: createJSONStorage(() => localStorage),
-      partialize: (s) => ({ densities: s.densities, inspectorWidths: s.inspectorWidths }),
+      partialize: (s) => ({ densities: s.densities, inspectorWidths: s.inspectorWidths, allLinks: s.allLinks }),
     },
   ),
 )

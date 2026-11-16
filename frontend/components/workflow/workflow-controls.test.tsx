@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
   },
 }))
 
-import { DensitySwitch, FilterMenu, LegendDialog, LiveIndicator } from "./workflow-controls"
+import { DensitySwitch, FilterMenu, LegendDialog, LinksSwitch, LiveIndicator } from "./workflow-controls"
 import { WorkflowTitleControls } from "./workflow-title-controls"
 import type { AuthUser } from "@/lib/auth"
 import { useUserStore } from "@/lib/store/user-store"
@@ -79,6 +79,17 @@ describe("the workflow's title line", () => {
     expect(onChange).toHaveBeenLastCalledWith(null)
   })
 
+  it("Show all links is a switch, off by default", () => {
+    const onChange = vi.fn()
+    const { rerender } = render(<LinksSwitch value={false} onChange={onChange} />)
+    const button = screen.getByRole("button", { name: "Show all links" })
+    expect(button).toHaveAttribute("aria-pressed", "false")
+    fireEvent.click(button)
+    expect(onChange).toHaveBeenCalledWith(true)
+    rerender(<LinksSwitch value onChange={onChange} />)
+    expect(screen.getByRole("button", { name: "Show all links" })).toHaveAttribute("aria-pressed", "true")
+  })
+
   it("the legend shows the states the view produces today, each with its mark, its word and its meaning", () => {
     useWorkflowViewStore.setState({ legendOpen: true })
     render(<LegendDialog />)
@@ -86,6 +97,9 @@ describe("the workflow's title line", () => {
     // Neuf des dix : Missing vient avec les processus (W5), et ne s'offre pas encore.
     expect(dialog.querySelectorAll("li")).toHaveLength(9)
     expect(screen.queryByText("A document or an answer is expected from someone.")).toBeNull()
+    // Les liens, et « Show all links » avec sa touche (décision du CEO, 16/11/2026).
+    expect(screen.getByText("Links")).toBeInTheDocument()
+    expect(screen.getByText(/Show all links \(L\) draws every link between the cards on screen, 200 at most/)).toBeInTheDocument()
     expect(screen.getByText("Waits for you: a request to decide, or a result to review.")).toBeInTheDocument()
     expect(screen.getAllByRole("img").map((mark) => mark.getAttribute("aria-label"))).toContain("Stopped")
   })

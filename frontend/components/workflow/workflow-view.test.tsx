@@ -122,7 +122,7 @@ beforeEach(() => {
   useIssueStore.getState().clearIssues()
   useDeliveryStore.setState({ projectRuns: {}, activity: {}, projectProviders: {}, runs: {}, evidence: {}, missionChanges: {} })
   useProjectStore.setState({ projects: [{ id: 3, name: "Website", createdAt: "2026-11-01T09:00:00" } as never], objectives: {} })
-  useWorkflowViewStore.setState({ densities: {}, inspectorWidths: {}, legendOpen: false, live: null })
+  useWorkflowViewStore.setState({ densities: {}, inspectorWidths: {}, allLinks: {}, legendOpen: false, live: null })
 })
 
 afterEach(() => {
@@ -225,6 +225,29 @@ describe("le workflow d'un projet", () => {
     // La colonne gardée dit combien le filtre en garde, sur son total (R161, L4).
     expect(screen.getByRole("region", { name: "In Progress, 1 of 1 issues" })).toBeInTheDocument()
     expect(screen.getByText("1 of 1")).toBeInTheDocument()
+  })
+
+  it("Show all links : éteint par défaut ; L l'allume pour la personne, et la liste étroite compte les liens de chaque carte", async () => {
+    Object.defineProperty(globalThis.window, "matchMedia", {
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false, media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+        addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+      })),
+    })
+    const a = issue(1, { title: "Write the spec" })
+    const b = issue(2, { title: "Build it" })
+    serve({ issues: [a, b], relations: [relation(1, a, b)] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    expect(screen.queryByText("1 link")).toBeNull()
+
+    act(() => { fireEvent.keyDown(document, { key: "l" }) })
+    expect(useWorkflowViewStore.getState().allLinks["7"]).toBe(true)
+    await waitFor(() => expect(screen.getAllByText("1 link")).toHaveLength(2))
+    act(() => { fireEvent.keyDown(document, { key: "l" }) })
+    expect(useWorkflowViewStore.getState().allLinks["7"]).toBe(false)
+    await waitFor(() => expect(screen.queryByText("1 link")).toBeNull())
   })
 
   it("un compteur de l'en-tête est un filtre, un seul à la fois", async () => {

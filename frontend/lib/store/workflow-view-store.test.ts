@@ -17,6 +17,19 @@ describe("workflow-view-store", () => {
     expect(useWorkflowViewStore.getState().densities).toEqual({ 7: "summary", 8: "detail" })
   })
 
+  it("retient « Show all links » pour chaque personne, éteint par défaut, et le garde d'une visite à l'autre", () => {
+    expect(useWorkflowViewStore.getState().allLinks["7"]).toBeUndefined()
+    useWorkflowViewStore.getState().setAllLinks("7", true)
+    useWorkflowViewStore.getState().setAllLinks("8", false)
+    expect(useWorkflowViewStore.getState().allLinks).toEqual({ "7": true, "8": false })
+    const before = useWorkflowViewStore.getState().allLinks
+    useWorkflowViewStore.getState().setAllLinks("7", true)
+    expect(useWorkflowViewStore.getState().allLinks).toBe(before)
+    // Gardé d'une visite à l'autre, comme la densité : il est dans ce que le store persiste.
+    const kept = useWorkflowViewStore.persist.getOptions().partialize?.(useWorkflowViewStore.getState()) as { allLinks?: unknown }
+    expect(kept.allLinks).toEqual({ "7": true, "8": false })
+  })
+
   it("retient la largeur de l'inspecteur de chaque personne, de 320 à 560 px", () => {
     useWorkflowViewStore.getState().setInspectorWidth("7", 900)
     useWorkflowViewStore.getState().setInspectorWidth("8", 100)

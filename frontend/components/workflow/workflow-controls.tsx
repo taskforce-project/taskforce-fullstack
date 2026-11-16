@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from "date-fns"
-import { Check, ListFilter } from "lucide-react"
+import { Check, ListFilter, Waypoints } from "lucide-react"
 
 import { StateMark } from "@/components/workflow/state-mark"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -55,6 +55,26 @@ export function DensitySwitch({ value, onChange }: Readonly<{ value: Density; on
         </button>
       ))}
     </div>
+  )
+}
+
+/** « Show all links » (L) : un interrupteur, éteint par défaut ; allumé, toutes les dépendances entre les cartes à l'écran. */
+export function LinksSwitch({ value, onChange }: Readonly<{ value: boolean; onChange: (on: boolean) => void }>) {
+  const t = usePreferencesStore((s) => s.t.workflow.links)
+  return (
+    <button
+      type="button"
+      aria-pressed={value}
+      onClick={() => onChange(!value)}
+      title={value ? t.on : t.off}
+      className={cn(
+        "flex h-7 shrink-0 items-center gap-1.5 border border-border px-2 text-xs transition-colors duration-150 motion-reduce:transition-none",
+        value ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      <Waypoints className="size-3.5" aria-hidden="true" />
+      {t.show}
+    </button>
   )
 }
 
@@ -116,6 +136,12 @@ export function LegendDialog() {
             </li>
           ))}
         </ul>
+        {/* Les liens : ce que dessine le calque, et l'interrupteur « Show all links » avec sa touche. */}
+        <div className="flex items-start gap-3 border-t border-border pt-3">
+          <Waypoints className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="w-24 shrink-0 text-sm font-medium text-foreground">{t.links.legendTitle}</span>
+          <span className="text-sm text-muted-foreground">{t.links.legend}</span>
+        </div>
       </DialogContent>
     </Dialog>
   )

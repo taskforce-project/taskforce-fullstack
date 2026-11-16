@@ -673,9 +673,21 @@ export const CONSTANTS_EN = {
       moveTo: "move to",
       density: "density",
       legend: "legend",
+      links: "all links",
     },
     announce: "{title} needs you.",
     loading: "Loading the workflow",
+    // "Show all links" (decision of the CEO, 16/11/2026): every link between the cards on screen, as a blueprint.
+    links: {
+      show: "Show all links",
+      more: "and {count} more links",
+      countOne: "1 link",
+      countMany: "{count} links",
+      legendTitle: "Links",
+      legend: "A line goes from an issue to the one it blocks. The chosen card shows its own links; Show all links (L) draws every link between the cards on screen, 200 at most, the nearest first.",
+      on: "All links shown",
+      off: "Only the chosen card's links",
+    },
   },
 
   // An analysis is followed by its status alone, in Missions on the right (R122), since the AI Workflows panels left.

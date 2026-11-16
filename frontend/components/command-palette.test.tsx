@@ -214,6 +214,7 @@ describe("CommandPalette", () => {
     expect(screen.getByText("attention")).toBeInTheDocument()
     expect(screen.getByText("density")).toBeInTheDocument()
     expect(screen.getByText("legend")).toBeInTheDocument()
+    expect(screen.getByText("all links")).toBeInTheDocument()
   })
 
   it("asks Cortex by filling the composer: nothing leaves without sending (R76)", async () => {

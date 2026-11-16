@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation"
 
-import { DensitySwitch, FilterMenu, LiveIndicator } from "@/components/workflow/workflow-controls"
+import { DensitySwitch, FilterMenu, LinksSwitch, LiveIndicator } from "@/components/workflow/workflow-controls"
 import { useMinWidth } from "@/hooks/use-min-width"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkflowViewStore } from "@/lib/store/workflow-view-store"
@@ -26,6 +26,8 @@ export function WorkflowTitleControls({ projectId, inHeader = false, densities }
   const live = useWorkflowViewStore((s) => (s.live?.projectId === projectId ? s.live : null))
   const remembered = useWorkflowViewStore((s) => s.densities[person])
   const setDensity = useWorkflowViewStore((s) => s.setDensity)
+  const allLinks = useWorkflowViewStore((s) => s.allLinks[person] === true)
+  const setAllLinks = useWorkflowViewStore((s) => s.setAllLinks)
   const wide = useMinWidth(768)
   const moved = useWorkflowViewStore((s) => s.controlsInView)
   const view = search.get("view")
@@ -46,6 +48,7 @@ export function WorkflowTitleControls({ projectId, inHeader = false, densities }
           }}
         />
       )}
+      <LinksSwitch value={allLinks} onChange={(on) => setAllLinks(person, on)} />
       <FilterMenu value={filter} onChange={(next) => replaceQuery({ filter: next })} />
     </div>
   )

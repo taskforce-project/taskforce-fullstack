@@ -4,7 +4,7 @@ import { fillText } from "@/lib/delivery/result-card"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 import { buildWorkflow, type WorkflowModel } from "@/lib/workflow/model"
 import {
-  CHILDREN_SHOWN, columnRows, dependenciesOf, DONE_SHOWN, isException, MAX_EDGES, MORE_AFTER, neighborNode, nextAttention,
+  CHILDREN_SHOWN, MAX_ALL_EDGES, allDependencies, columnRows, dependenciesOf, DONE_SHOWN, isException, MAX_EDGES, MORE_AFTER, neighborNode, nextAttention,
   relatedKeys, stageCountLine, stepNode, visibleOrder, type ColumnOptions,
 } from "@/lib/workflow/view"
 import { COLUMN_WIDTH, DENSITIES, isDensity, isFilter, STATE_RANK, TERMINAL, WORKFLOW_STATES } from "@/lib/workflow/states"
@@ -18,6 +18,20 @@ const options: ColumnOptions = { density: "plan", filter: null, showDone: false,
 const keysOf = (rows: ReturnType<typeof columnRows>) => rows.map((row) => (row.type === "node" ? row.key : `${row.type}:${row.hidden}`))
 
 /** Ce qu'une colonne montre (séance n°25, §3, §4.2, §10), et le clavier qui s'y déplace. */
+describe("Show all links", () => {
+  it("toutes les dépendances de la carte, une arête par lien, de ce qui bloque vers ce qui est bloqué", () => {
+    const a = issue(1)
+    const b = issue(2)
+    const c = issue(3)
+    const model = buildWorkflow({ ...base, issues: [a, b, c], relations: [relation(1, a, b), relation(2, a, c), relation(3, a, b, "BLOCKS")] })
+    expect(allDependencies(model)).toEqual([
+      { from: "issue-1", to: "issue-2", side: "blocks" },
+      { from: "issue-1", to: "issue-3", side: "blocks" },
+    ])
+    expect(MAX_ALL_EDGES).toBe(200)
+  })
+})
+
 describe("les lignes d'une colonne", () => {
   it("au-delà de cinq cartes faites, « Show {count} done » ; le nœud choisi ne se replie jamais", () => {
     const model = buildWorkflow({ ...base, issues: Array.from({ length: 8 }, (_, i) => issue(i + 1, { status: DONE })) })

@@ -355,6 +355,7 @@ export function CommandPalette({ open, onOpenChange }: Readonly<{ open: boolean;
           <span className="flex items-center gap-1.5"><Key>.</Key>{workflowText.keys.ask}</span>
           <span className="flex items-center gap-1.5"><Key>M</Key>{workflowText.keys.moveTo}</span>
           <span className="flex items-center gap-1.5"><Key>1</Key><Key>2</Key><Key>3</Key>{workflowText.keys.density}</span>
+          <span className="flex items-center gap-1.5"><Key>L</Key>{workflowText.keys.links}</span>
           <span className="flex items-center gap-1.5"><Key>?</Key>{workflowText.keys.legend}</span>
         </div>
       )}

@@ -164,6 +164,28 @@ export const MAX_EDGES = 50
  * Les dépendances du nœud choisi seulement (§4.8) : en amont ce qui le bloque, en aval ce qu'il bloque, cinquante arêtes
  * au plus ; au-delà, combien restent (« and {count} more »). Jamais toutes les arêtes de la carte.
  */
+/** « Show all links » : 200 arêtes au plus, les plus proches de ce qui se voit d'abord (décision du CEO, 16/11/2026). */
+export const MAX_ALL_EDGES = 200
+
+/**
+ * Toutes les dépendances de la carte, une arête par lien, de ce qui bloque vers ce qui est bloqué : ce que « Show all links »
+ * dessine entre les cartes à l'écran (le calque ne garde que celles dont les deux cartes se voient).
+ */
+export function allDependencies(model: WorkflowModel): DependencyEdge[] {
+  const seen = new Set<string>()
+  const edges: DependencyEdge[] = []
+  for (const node of model.byKey.values()) {
+    for (const other of node.blocks) {
+      const to = issueKey(other.id)
+      const key = `${node.key}>${to}`
+      if (seen.has(key) || !model.byKey.has(to)) continue
+      seen.add(key)
+      edges.push({ from: node.key, to, side: "blocks" })
+    }
+  }
+  return edges
+}
+
 export function dependenciesOf(node: WorkflowNode | null): { edges: DependencyEdge[]; more: number } {
   if (!node) return { edges: [], more: 0 }
   const all: DependencyEdge[] = [

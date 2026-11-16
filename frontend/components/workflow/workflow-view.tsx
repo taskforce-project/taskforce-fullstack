@@ -36,7 +36,8 @@ import {
 } from "@/lib/workflow/sentence"
 import { COLUMN_WIDTH, FILTER_STATE, isDensity, isFilter, type Density, type WorkflowFilter } from "@/lib/workflow/states"
 import {
-  columnRows, dependenciesOf, neighborNode, nextAttention, relatedKeys, stepNode, visibleOrder, type ColumnRow,
+  MAX_ALL_EDGES, MAX_EDGES, allDependencies, columnRows, dependenciesOf, neighborNode, nextAttention, relatedKeys, stepNode,
+  visibleOrder, type ColumnRow,
 } from "@/lib/workflow/view"
 
 /** Sous cette largeur de volet, l'inspecteur passe en feuille par-dessus les colonnes (§3). */
@@ -118,6 +119,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const setDensity = useWorkflowViewStore((s) => s.setDensity)
   const inspectorWidth = useWorkflowViewStore((s) => s.inspectorWidths[person] ?? INSPECTOR_DEFAULT)
   const setInspectorWidth = useWorkflowViewStore((s) => s.setInspectorWidth)
+  const allLinks = useWorkflowViewStore((s) => s.allLinks[person] === true)
+  const setAllLinks = useWorkflowViewStore((s) => s.setAllLinks)
   const setLegendOpen = useWorkflowViewStore((s) => s.setLegendOpen)
   const showIssue = useScreenStore((s) => s.showIssue)
   const hideIssue = useScreenStore((s) => s.hideIssue)
@@ -174,10 +177,14 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     if (!model) return out
     const assigneeOf = (issueId: number) => model.byKey.get(issueKey(issueId))?.issue.assignee ?? null
     for (const node of model.byKey.values()) {
-      out.set(node.key, nodeViewOf(node, texts, me, now, agentOf, assigneeOf))
+      const view = nodeViewOf(node, texts, me, now, agentOf, assigneeOf)
+      // Sur la liste étroite, « Show all links » se lit en un compte sur chaque carte, au lieu des courbes.
+      out.set(node.key, allLinks && narrow ? { ...view, links: node.blocks.length + node.blockedBy.length } : view)
     }
     return out
-  }, [model, texts, me, now, agentOf])
+  }, [model, texts, me, now, agentOf, allLinks, narrow])
+  // « Show all links » : toutes les dépendances de la carte ; le calque garde celles dont les deux cartes se voient.
+  const everyEdge = useMemo(() => (model && allLinks ? allDependencies(model) : []), [model, allLinks])
 
   // Ce qui est déplié, colonne par colonne, et les parents ouverts.
   const [expanded, setExpanded] = useState<Readonly<Record<number, { done?: boolean; all?: boolean }>>>({})
@@ -293,6 +300,9 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         case "?":
           event.preventDefault()
           return setLegendOpen(true)
+        case "l": case "L":
+          event.preventDefault()
+          return setAllLinks(person, !allLinks)
         case "Escape":
           if (inspectorOpen && selected) {
             event.preventDefault()
@@ -323,7 +333,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [model, issueOpen, order, columns, selected, selectedKey, inspectorOpen, setInspectorOpen, narrow, select, open, gestures,
-    chooseDensity, setLegendOpen])
+    chooseDensity, setLegendOpen, allLinks, setAllLinks, person])
 
   const dependencies = useMemo(() => dependenciesOf(selected), [selected])
   const related = useMemo(() => (selected ? relatedKeys(selected) : null), [selected])
@@ -417,7 +427,13 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
           </div>
         )}
         {!narrow && !empty && (
-          <DependencyLayer boardRef={boardRef} edges={dependencies.edges} labels={{ blocks: t.inspector.blocks, blockedBy: t.inspector.blockedBy }} />
+          <DependencyLayer
+            boardRef={boardRef}
+            edges={allLinks ? everyEdge : dependencies.edges}
+            labels={{ blocks: t.inspector.blocks, blockedBy: t.inspector.blockedBy }}
+            limit={allLinks ? MAX_ALL_EDGES : MAX_EDGES}
+            moreLabel={allLinks ? (count) => fillText(t.links.more, { count }) : undefined}
+          />
         )}
         {showInspector && selected && (
           <Inspector

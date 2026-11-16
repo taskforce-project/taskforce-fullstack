@@ -8,6 +8,35 @@ import type { DependencyEdge } from "@/lib/workflow/view"
 const box = (left: number, top: number) => ({ left, right: left + 240, top, bottom: top + 80 })
 
 /** Les dépendances du nœud choisi (séance n°25, §4.8) : des courbes, de ce qui bloque vers ce qui est bloqué. */
+describe("Show all links", () => {
+  it("draws at most its limit, the nearest first, and says how many more", async () => {
+    const board = { current: null as HTMLDivElement | null }
+    function Board() {
+      return (
+        <div ref={(element) => { board.current = element }} style={{ position: "relative" }}>
+          {["issue-1", "issue-2", "issue-3", "issue-4"].map((key) => <div key={key} data-node-key={key} />)}
+          <DependencyLayer
+            boardRef={board}
+            edges={[
+              { from: "issue-1", to: "issue-2", side: "blocks" },
+              { from: "issue-2", to: "issue-3", side: "blocks" },
+              { from: "issue-3", to: "issue-4", side: "blocks" },
+              { from: "issue-4", to: "issue-9", side: "blocks" },
+            ]}
+            labels={{ blocks: "Blocks", blockedBy: "Blocked by" }}
+            limit={2}
+            moreLabel={(count) => `and ${count} more links`}
+          />
+        </div>
+      )
+    }
+    const { container } = render(<Board />)
+    // issue-9 n'est pas à l'écran : sur trois arêtes visibles, deux se dessinent, la troisième se dit.
+    await waitFor(() => expect(container.querySelectorAll("path.stroke-primary")).toHaveLength(2))
+    expect(screen.getByText("and 1 more links")).toBeInTheDocument()
+  })
+})
+
 describe("edgePath", () => {
   it("goes from side to side, left to right or right to left, and around the left inside a column", () => {
     expect(edgePath(box(0, 0), box(300, 100))).toMatch(/^M 240 40 C .* 298 140$/)
