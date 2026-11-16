@@ -107,6 +107,19 @@ class RuleValidatorTest {
         assertThat(codes(rule(when, "ask", Map.of("quorum", 2)))).containsExactly("badPattern");
     }
 
+    @ParameterizedTest(name = "{0} : {1}")
+    @CsvSource({
+        "person:999999999999999999,  notAMember",   // dix-huit chiffres : cherché parmi les personnes de l'espace
+        "person:1000000000000000000, badApprover",  // dix-neuf chiffres : refusé, même quand le nombre tiendrait
+        "person:9223372036854775808, badApprover",  // au-delà du plus grand identifiant : refusé sans être lu
+    })
+    @DisplayName("le numéro d'une personne a dix-huit chiffres au plus : au-delà, elle est inconnue, jamais une erreur")
+    void aPersonNumberFitsAnIdentifier(String ref, String code) {
+        Map<String, Object> rule = rule(Map.of("action", "issue.delete"), "ask", Map.of("approvers", List.of(ref)));
+
+        assertThat(RuleValidator.check(rule, MEMBERS)).containsExactly(new RuleValidator.Problem(code, ref));
+    }
+
     @Test
     @DisplayName("les obligations ne vont qu'avec une règle qui demande")
     void requireOnlyWhenAsking() {
