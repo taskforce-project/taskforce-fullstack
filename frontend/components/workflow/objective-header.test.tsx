@@ -47,6 +47,8 @@ describe("ObjectiveHeader", () => {
     unmount()
     header({ ...none, canEdit: false })
     expect(screen.queryByRole("button", { name: "Add an objective" })).toBeNull()
+    // Qui ne peut pas l'écrire apprend qui le peut (R161, L6).
+    expect(screen.getByText("Only the project's lead or a workspace admin can change its objective.")).toBeInTheDocument()
   })
 
   it("a read that failed says so and offers to read again, never « no objective yet »", () => {
@@ -158,6 +160,15 @@ describe("the objective's words and line", () => {
     expect(objectivePayload("Goal", "", ["a", "b", "c", "d", "e", "f"])).toBeNull()
     expect(objectivePayload("Goal", "", ["x".repeat(201)])).toBeNull()
     expect(objectivePayload(" Goal ", "", [" a "])).toEqual({ goal: "Goal", targetDate: null, criteria: ["a"] })
+  })
+
+  it("an empty project says no « 0 of 0 done », and the line speaks of today only when it draws it", () => {
+    render(
+      <ObjectiveHeader slug="acme" projectId={3} objective={{ ...set, targetDate: null }} projectStart="2026-11-01T09:00:00" counts={counts}
+        done={0} total={0} filter={null} onFilter={vi.fn()} now={now} narrow={false} t={t} />,
+    )
+    expect(screen.queryByText("0 of 0 done")).toBeNull()
+    expect(screen.getByRole("img", { name: "0 of 0 done." })).toBeInTheDocument()
   })
 
   it("draws today the full height of the header, « Today » on hover, and the share done on 4 px", () => {

@@ -424,6 +424,7 @@ export const CONSTANTS_EN = {
       criteriaOne: "1 success criterion",
       criteriaMany: "{count} success criteria",
       progress: "{done} of {total} done. The line marks today, between the start of the project and its target date.",
+      progressPlain: "{done} of {total} done.",
       dialogTitle: "What is this project for?",
       dialogDescription: "Everyone who opens the workflow reads it first.",
       goalLabel: "Objective, in one sentence",

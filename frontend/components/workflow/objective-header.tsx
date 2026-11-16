@@ -69,11 +69,13 @@ export function ObjectiveHeader({
   const criteria = objective?.criteria ?? []
   const share = total > 0 ? done / total : 0
   const mark = goal ? todayMark(projectStart, objective?.targetDate, now) : null
-  const progressLabel = fillText(o.progress, { done, total })
+  // La ligne ne parle du trait d'aujourd'hui que quand il est tracé (une date visée devant le début du projet).
+  const progressLabel = fillText(mark !== null ? o.progress : o.progressPlain, { done, total })
 
   const meta = [
     goal ? (objective?.targetDate ? fillText(o.target, { date: dayWords(objective.targetDate, now).replace(/^on /, "") }) : o.noTarget) : null,
-    fillText(o.done, { done, total }),
+    // Un projet sans issue ne dit pas « 0 of 0 done ».
+    total > 0 ? fillText(o.done, { done, total }) : null,
   ].filter((part): part is string => part !== null)
 
   return (
@@ -117,10 +119,13 @@ export function ObjectiveHeader({
         ) : (
           <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm text-foreground">
             <span>{o.none}</span>
-            {canEdit && (
+            {canEdit ? (
               <button type="button" onClick={() => setEditing(true)} className="text-ink-blue underline-offset-2 hover:underline">
                 {o.add}
               </button>
+            ) : objective && (
+              // Qui ne peut pas l'écrire apprend qui le peut.
+              <span className="text-muted-foreground">{o.notAllowed}</span>
             )}
           </p>
         )}
