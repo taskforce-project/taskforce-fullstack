@@ -1416,9 +1416,9 @@ public final class ProcessValidator {
 
         /**
          * Les étapes verrouillées ne s'en vont jamais (ADR-027, séance n°25) : celles de la version en vigueur, et celles
-         * du workflow par défaut dont le processus dérive, restent là, verrouillées par la même source, et à leur place :
-         * ce qu'elles précédaient sur tout chemin, elles le précèdent encore (quand la forme du processus permet de le
-         * lire).
+         * du workflow par défaut dont le processus dérive, restent là, verrouillées par la même source, sous leur nom et
+         * avec qui en répond, et à leur place : ce qu'elles précédaient sur tout chemin, elles le précèdent encore (quand
+         * la forme du processus permet de le lire).
          */
         private void locked(Graph graph) {
             List<ProcessModel> bases = new ArrayList<>(context.bases());
@@ -1447,10 +1447,16 @@ public final class ProcessValidator {
                         || !Objects.equals(kept.lock(), required.lock())) {
                         add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
                             + "required by " + source + ": it stays what it is, and locked.");
+                    } else if (!Objects.equals(kept.name(), required.name())
+                        || !Objects.equals(kept.answeredBy(), required.answeredBy())) {
+                        // Une liste renommée « Optional formality », ou confiée à un autre (R159, troisième passe, L1).
+                        add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
+                            + "required by " + source + ": it keeps its name and who answers for it.");
                     } else if (!keepsItsTask(required.human(), kept.human())) {
                         add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
-                            + "required by " + source + ": it keeps its kind, who does it, what signing it means, its "
-                            + "opening on the last answer and every line of its checklist. Lines can be added.");
+                            + "required by " + source + ": it keeps its kind, who does it, its question, what signing it "
+                            + "means, its opening on the last answer and every line of its checklist. Lines can be "
+                            + "added.");
                     } else if (graph != null) {
                         if (before == null) {
                             before = Graph.of(base);
@@ -1467,8 +1473,8 @@ public final class ProcessValidator {
         }
 
         /**
-         * Une tâche humaine verrouillée reste la même : sa sorte, qui la fait, ce que signer veut dire, son ouverture sur
-         * la dernière réponse, et chaque ligne de sa liste ; des lignes peuvent s'ajouter.
+         * Une tâche humaine verrouillée reste la même : sa sorte, qui la fait, sa question, ce que signer veut dire, son
+         * ouverture sur la dernière réponse, et chaque ligne de sa liste ; des lignes peuvent s'ajouter.
          */
         private static boolean keepsItsTask(HumanTask was, HumanTask now) {
             if (was == null) {
@@ -1478,7 +1484,7 @@ public final class ProcessValidator {
                 return false;
             }
             return Objects.equals(was.kind(), now.kind()) && Objects.equals(was.who(), now.who())
-                && Objects.equals(was.meaning(), now.meaning())
+                && Objects.equals(was.question(), now.question()) && Objects.equals(was.meaning(), now.meaning())
                 && (was.prefill() == null || was.prefill().equals(now.prefill()))
                 && (was.checklist() == null || (now.checklist() != null && now.checklist().containsAll(was.checklist())));
         }

@@ -854,6 +854,33 @@ public class ProcessValidatorTest {
     }
 
     @Test
+    @DisplayName("une liste verrouillée garde aussi son nom, qui en répond et sa question ; une ligne ajoutée passe, chaque "
+        + "ligne verrouillée restant à cocher (R159, troisième passe, L1)")
+    void a_locked_checklist_keeps_its_name_its_owner_and_its_question() {
+        ObjectNode renamed = derived();
+        step(renamed, "before-delivery").put("name", "Optional formality");
+        ObjectNode owner = derived();
+        step(owner, "before-delivery").put("answeredBy", "role:admin");
+        ObjectNode question = derived();
+        ((ObjectNode) step(question, "before-delivery").get("human")).put("question", "Anything to add?");
+        ObjectNode line = derived();
+        ((ArrayNode) step(line, "before-delivery").get("human").get("checklist"))
+            .add("If the client is in a hurry, the lines above don't apply.");
+
+        assertThat(List.of(renamed, owner, question)).allSatisfy(attack ->
+            assertThat(ProcessValidator.check(model(attack), fromTheDefault())).singleElement().satisfies(p -> {
+                assertThat(p.code()).isEqualTo("lockedStepUnlocked");
+                assertThat(p.stepId()).isEqualTo("before-delivery");
+            }));
+        assertThat(ProcessValidator.check(model(renamed), fromTheDefault())).singleElement()
+            .extracting(Problem::message).isEqualTo("“Before delivering” is required by a pause point: it keeps its name "
+                + "and who answers for it.");
+        // Des lignes s'ajoutent (la troisième passe le garde) : chaque ligne verrouillée reste là, à cocher, et ce que
+        // signer veut dire ne change pas ; ce qu'une ligne ajoutée dit, aucun code ne le juge.
+        assertThat(ProcessValidator.check(model(line), fromTheDefault())).isEmpty();
+    }
+
+    @Test
     @DisplayName("une étape verrouillée garde sa place : la liste d'avant de livrer ne passe pas après la livraison")
     void a_locked_step_keeps_its_place() {
         ObjectNode next = e20();
