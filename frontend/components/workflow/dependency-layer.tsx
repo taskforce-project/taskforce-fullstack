@@ -5,9 +5,10 @@ import { useEffect, useState, type RefObject } from "react"
 import { MAX_EDGES, type DependencyEdge } from "@/lib/workflow/view"
 
 /**
- * Les dépendances du nœud choisi (séance n°25, §4.8), sur un calque SVG au-dessus des colonnes : des courbes de 2 px en
- * `--primary` et une pointe de 6 px, de ce qui bloque vers ce qui est bloqué ; au survol d'une arête, « Blocks » ou
- * « Blocked by ». Seulement pour la sélection, cinquante arêtes au plus : jamais la pelote. Une arête dont une carte n'est
+ * Les dépendances du nœud choisi (séance n°25, §4.8), sur un calque SVG sous les colonnes : des lignes de 2 px en
+ * `--primary` et une pointe de 6 px, de ce qui bloque vers ce qui est bloqué. Sous les cartes, opaques, une ligne ne passe
+ * jamais sur un texte ni sur un bouton : elle sort d'une carte par son côté, court dans la gouttière entre les colonnes, et
+ * entre dans l'autre carte par son côté. Seulement pour la sélection, cinquante arêtes au plus : jamais la pelote. Une arête dont une carte n'est
  * pas à l'écran (repliée, hors de la fenêtre de sa colonne) ne se dessine pas ; l'inspecteur la liste. Avec « Show all
  * links » (décision du CEO, 16/11/2026), toutes les arêtes entre les cartes à l'écran, `limit` au plus, les plus proches
  * du centre de ce qui se voit d'abord ; au-delà, une ligne dit combien il en reste (`moreLabel`).
@@ -19,24 +20,40 @@ export interface DrawnEdge {
   readonly side: DependencyEdge["side"]
 }
 
-/** La courbe d'une arête, d'un rectangle à l'autre (coordonnées du calque) : de côté à côté, ou par la gauche dans une colonne. */
+/** La gouttière entre deux colonnes : la moitié de l'écart entre leurs cartes (12 px de marge, un trait, 12 px de marge). */
+export const GUTTER = 12
+
+/** Le rayon des coins d'une ligne. */
+const CORNER = 6
+
+/**
+ * Une ligne à angles droits arrondis : du point de départ à la gouttière (`gx`), le long de la gouttière, puis jusqu'au
+ * côté de la carte d'arrivée.
+ */
+function guttered(sx: number, sy: number, gx: number, ex: number, ey: number): string {
+  if (Math.abs(sy - ey) < 1) return `M ${sx} ${sy} H ${ex}`
+  const r = Math.min(CORNER, Math.abs(ey - sy) / 2, Math.abs(gx - sx), Math.abs(ex - gx))
+  const out = Math.sign(gx - sx)
+  const down = Math.sign(ey - sy)
+  const back = Math.sign(ex - gx)
+  return `M ${sx} ${sy} H ${gx - out * r} Q ${gx} ${sy} ${gx} ${sy + down * r} V ${ey - down * r} Q ${gx} ${ey} ${gx + back * r} ${ey} H ${ex}`
+}
+
+/**
+ * La ligne d'une arête, d'un rectangle à l'autre (coordonnées du calque). Vers une colonne à droite : du côté droit de la
+ * carte de départ à la gouttière qui précède la colonne d'arrivée, puis dans la carte par son côté gauche ; vers la gauche,
+ * l'inverse ; dans la même colonne, par la gouttière de gauche, entrée par le côté gauche.
+ */
 export function edgePath(
   from: { left: number; right: number; top: number; bottom: number },
   to: { left: number; right: number; top: number; bottom: number },
 ): string {
   const fy = (from.top + from.bottom) / 2
   const ty = (to.top + to.bottom) / 2
-  if (to.left >= from.right) {
-    const dx = Math.max(32, (to.left - from.right) / 2)
-    return `M ${from.right} ${fy} C ${from.right + dx} ${fy}, ${to.left - dx} ${ty}, ${to.left - 2} ${ty}`
-  }
-  if (from.left >= to.right) {
-    const dx = Math.max(32, (from.left - to.right) / 2)
-    return `M ${from.left} ${fy} C ${from.left - dx} ${fy}, ${to.right + dx} ${ty}, ${to.right + 2} ${ty}`
-  }
-  // Dans la même colonne : la courbe passe par la gauche des cartes.
+  if (to.left >= from.right) return guttered(from.right, fy, to.left - GUTTER, to.left - 2, ty)
+  if (from.left >= to.right) return guttered(from.left, fy, to.right + GUTTER, to.right + 2, ty)
   const x = Math.min(from.left, to.left)
-  return `M ${x} ${fy} C ${x - 28} ${fy}, ${x - 28} ${ty}, ${x - 2} ${ty}`
+  return guttered(from.left, fy, x - GUTTER, to.left - 2, ty)
 }
 
 export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, moreLabel, revision }: Readonly<{
@@ -121,16 +138,16 @@ export function DependencyLayer({ boardRef, edges, labels, limit = MAX_EDGES, mo
         {moreLabel(beyond)}
       </p>
     )}
-    <svg aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 size-full overflow-visible">
+    {/* Sous les colonnes (le plateau est au-dessus, z-10) : les cartes, opaques, cachent ce qui passe dessous. */}
+    <svg aria-hidden="true" data-links-layer className="pointer-events-none absolute inset-0 z-0 size-full overflow-visible">
       <defs>
         <marker id="workflow-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
           <path d="M 0 0 L 6 3 L 0 6 z" className="fill-primary" />
         </marker>
       </defs>
       {drawn.map((edge) => (
-        <g key={edge.key} className="pointer-events-auto">
+        <g key={edge.key}>
           <title>{edge.side === "blocks" ? labels.blocks : labels.blockedBy}</title>
-          <path d={edge.d} className="fill-none stroke-transparent" strokeWidth={10} />
           <path d={edge.d} className="fill-none stroke-primary" strokeWidth={2} markerEnd="url(#workflow-arrow)" />
         </g>
       ))}

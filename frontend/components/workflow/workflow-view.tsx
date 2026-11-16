@@ -406,7 +406,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             ))}
           </div>
         ) : (
-          <div ref={boardRef} className="relative flex min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
+          // Le plateau passe au-dessus du calque des liens (z-0) : les cartes cachent les lignes qui passent dessous.
+          <div ref={boardRef} className="relative z-10 flex min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
             {model.stages.map((stage, index) => hiddenByFilter(columns[index], filter) ? null : (
               <StageColumn
                 key={stage.status.id}

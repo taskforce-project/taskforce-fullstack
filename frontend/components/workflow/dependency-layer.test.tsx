@@ -72,10 +72,26 @@ describe("les liens suivent les cartes", () => {
 })
 
 describe("edgePath", () => {
-  it("goes from side to side, left to right or right to left, and around the left inside a column", () => {
-    expect(edgePath(box(0, 0), box(300, 100))).toMatch(/^M 240 40 C .* 298 140$/)
-    expect(edgePath(box(300, 0), box(0, 100))).toMatch(/^M 300 40 C .* 242 140$/)
-    expect(edgePath(box(0, 0), box(0, 200))).toBe("M 0 40 C -28 40, -28 240, -2 240")
+  it("leaves a card by its side, runs in the gutter between the columns, and enters the other card by its side", () => {
+    // Vers la droite : du côté droit de la carte de départ à la gouttière (12 px avant la colonne), dans la carte par la gauche.
+    expect(edgePath(box(0, 0), box(300, 100))).toBe("M 240 40 H 282 Q 288 40 288 46 V 134 Q 288 140 294 140 H 298")
+    // Vers la gauche : du côté gauche à la gouttière qui suit la colonne d'arrivée, dans la carte par la droite.
+    expect(edgePath(box(300, 0), box(0, 100))).toBe("M 300 40 H 258 Q 252 40 252 46 V 134 Q 252 140 246 140 H 242")
+    // Dans la même colonne : par la gouttière de gauche.
+    expect(edgePath(box(0, 0), box(0, 200))).toBe("M 0 40 H -6 Q -12 40 -12 46 V 234 Q -12 240 -6 240 H -2")
+    // À la même hauteur : une ligne droite, qui ne passe que sous les cartes du milieu.
+    expect(edgePath(box(0, 0), box(300, 0))).toBe("M 240 40 H 298")
+    // Aucun segment ne passe sur une carte : les segments verticaux restent dans les gouttières.
+    for (const d of [edgePath(box(0, 0), box(300, 100)), edgePath(box(300, 0), box(0, 100))]) {
+      const xs = [...d.matchAll(/V [-\d.]+/g)].length
+      expect(xs).toBe(1)
+    }
+  })
+
+  it("draws under the cards", async () => {
+    const { container } = render(<Board edges={[{ from: "issue-1", to: "issue-2", side: "blocks" }]} />)
+    await waitFor(() => expect(container.querySelector("[data-links-layer]")).not.toBeNull())
+    expect(container.querySelector("[data-links-layer]")?.getAttribute("class")).toContain("z-0")
   })
 })
 
