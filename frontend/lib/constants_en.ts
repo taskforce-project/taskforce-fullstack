@@ -655,6 +655,9 @@ export const CONSTANTS_EN = {
     stage: "{name}, {count} issues",
     stageOne: "{name}, 1 issue",
     stageFiltered: "{name}, {count} of {total} issues",
+    stageWithSub: "{name}, {count} issues and {sub} sub-issues",
+    subIssuesCount: "+{count} sub-issues",
+    subIssuesHint: "The board counts issues; the workflow also shows their sub-issues.",
     countFiltered: "{count} of {total}",
     overdue: "Overdue",
     who: {

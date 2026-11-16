@@ -74,6 +74,20 @@ describe("StageColumn", () => {
     expect(onOpenParent).toHaveBeenCalledWith("issue-1")
   })
 
+  it("counts its issues as the board does, and its sub-issues apart", () => {
+    const parentRef = { id: 1, sequenceNumber: 1, identifier: "WEB-1", title: "Issue 1", status: TODO }
+    const { model, views } = setup([issue(1), issue(2), issue(3, { parent: parentRef })])
+    const stage = model.stages.find((s) => s.status.id === TODO.id)
+    if (!stage) throw new Error("no stage")
+    render(
+      <StageColumn stage={stage} rows={[]} density="plan" views={views} selectedKey={null} focusKey={null} related={null}
+        revealKey={null} t={t} handlers={handlers} onShowDone={vi.fn()} onShowAll={vi.fn()} onOpenParent={vi.fn()} />,
+    )
+    expect(screen.getByRole("region", { name: "Todo, 2 issues and 1 sub-issues" })).toBeInTheDocument()
+    expect(screen.getByText("2")).toBeInTheDocument()
+    expect(screen.getByText("+1 sub-issues")).toHaveAttribute("title", "The board counts issues; the workflow also shows their sub-issues.")
+  })
+
   it("supposes a height for each row before it is measured", () => {
     const { model } = setup([issue(1)])
     const node = model.byKey.get("issue-1")

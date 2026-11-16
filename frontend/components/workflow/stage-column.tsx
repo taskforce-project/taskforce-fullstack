@@ -61,10 +61,14 @@ export const StageColumn = memo(function StageColumn({
   const scrollRef = useRef<HTMLDivElement>(null)
   const total = stage.nodes.length
   const name = stage.status.name
+  // Le compte du tableau : les issues du premier niveau ; les sous-issues, que la vue montre aussi, se disent à part.
+  const subIssues = stage.nodes.filter((node) => node.issue.parent).length
+  const issues = total - subIssues
   const filtered = matching !== undefined
   const label = filtered
     ? fillText(t.stageFiltered, { name, count: matching, total })
-    : total === 1 ? fillText(t.stageOne, { name }) : fillText(t.stage, { name, count: total })
+    : subIssues > 0 ? fillText(t.stageWithSub, { name, count: issues, sub: subIssues })
+      : total === 1 ? fillText(t.stageOne, { name }) : fillText(t.stage, { name, count: total })
 
   const renderRow = (row: ColumnRow): ReactNode => {
     switch (row.type) {
@@ -99,7 +103,10 @@ export const StageColumn = memo(function StageColumn({
   const header = (
     <div className={cn("flex h-9 shrink-0 items-center gap-2 bg-background", stacked ? "px-0" : "px-3")}>
       <h3 className="min-w-0 truncate text-sm font-[550] text-foreground" title={name}>{name}</h3>
-      <span className="shrink-0 font-mono text-xs text-subtle">{filtered ? fillText(t.countFiltered, { count: matching, total }) : total}</span>
+      <span className="shrink-0 font-mono text-xs text-subtle">{filtered ? fillText(t.countFiltered, { count: matching, total }) : issues}</span>
+      {!filtered && subIssues > 0 && (
+        <span className="shrink-0 text-[11px] text-subtle" title={t.subIssuesHint}>{fillText(t.subIssuesCount, { count: subIssues })}</span>
+      )}
     </div>
   )
   const countLine = density === "summary" && total > 0 ? (
