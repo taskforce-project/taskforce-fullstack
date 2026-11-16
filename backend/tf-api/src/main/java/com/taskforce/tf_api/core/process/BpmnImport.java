@@ -218,15 +218,26 @@ public final class BpmnImport {
         SHAPES.put("sequenceFlow", new Shape(Map.of("id", ANY, "name", ANY, "sourceRef", ANY, "targetRef", ANY),
             Set.of("documentation", "extensionElements", "conditionExpression"), false, "condition"));
         SHAPES.put("conditionExpression", new Shape(Map.of("id", ANY, "language", ANY, "evaluatesToTypeRef", ANY),
-            Set.of(), false, null));
+            Set.of("documentation"), false, null));
         SHAPES.put("timerEventDefinition", new Shape(Map.of("id", ANY), Set.of("documentation", "extensionElements",
             "timeDuration", "timeDate", "timeCycle"), false, null));
-        SHAPES.put("timeDuration", new Shape(Map.of("id", ANY, "evaluatesToTypeRef", ANY), Set.of(), false, null));
+        SHAPES.put("timeDuration", new Shape(Map.of("id", ANY, "evaluatesToTypeRef", ANY), Set.of("documentation"),
+            false, null));
         SHAPES.put("messageEventDefinition", new Shape(Map.of("id", ANY, "messageRef", ANY), BASE, false, null));
         SHAPES.put("errorEventDefinition", new Shape(Map.of("id", ANY), BASE, false, null));
         SHAPES.put("terminateEventDefinition", new Shape(Map.of("id", ANY), BASE, false, null));
         SHAPES.put("message", new Shape(Map.of("id", ANY, "name", ANY), BASE, false, null));
     }
+
+    /**
+     * Les éléments dont TaskForce ne garde pas la description (R159, troisième passe, L3) : seuls le processus et ses
+     * étapes en ont une. La leur est refusée en mots, jamais perdue en silence ; la valeur dit où elle était.
+     */
+    private static final Map<String, String> NO_DESCRIPTION = Map.of("sequenceFlow", "on a path",
+        "conditionExpression", "on a condition", "timeDuration", "on a duration",
+        "timerEventDefinition", "on the definition of its event", "messageEventDefinition", "on the definition of its "
+            + "event", "errorEventDefinition", "on the definition of its event", "terminateEventDefinition", "on the "
+            + "definition of its event", "message", "on a message");
 
     private static Map<String, Set<String>> with(Map<String, Set<String>> attributes, String name, Set<String> values) {
         Map<String, Set<String>> out = new HashMap<>(attributes);
@@ -289,7 +300,9 @@ public final class BpmnImport {
                         inspect(child, "message", attr(child, "id"), attr(child, "name"));
                         messages.put(child.getAttribute("id"), attr(child, "name"));
                     }
-                    case "error", "documentation", "extensionElements" -> { }
+                    case "error", "extensionElements" -> { }
+                    case "documentation" -> notes.add("The file's own description was left out: TaskForce keeps the "
+                        + "description of the process and of its steps.");
                     case "category", "import", "relationship" -> notes.add("Parts of the file that aren't the process "
                         + "were left out (" + child.getLocalName() + ").");
                     case "collaboration" -> foreign.add(new Foreign("collaboration", attr(child, "id"), null));
@@ -685,7 +698,11 @@ public final class BpmnImport {
                     }
                 }
             }
-            description(e, id, name);
+            if (!NO_DESCRIPTION.containsKey(kind)) {
+                description(e, id, name);
+            } else if (child(e, "documentation") != null) {
+                foreign.add(new Foreign("descriptionNotKept", id, name, NO_DESCRIPTION.get(kind)));
+            }
             extensions(e, shape.tf(), id, name);
         }
 

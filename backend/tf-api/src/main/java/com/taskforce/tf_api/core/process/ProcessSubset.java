@@ -118,6 +118,8 @@ public final class ProcessSubset {
             + "as its words. Export the process again from TaskForce.");
         REASONS.put("documentation", "“{name}” has a description TaskForce can't keep as it is ({detail}): a description "
             + "is one text, in words.");
+        REASONS.put("descriptionNotKept", "“{name}” has a description TaskForce doesn't keep ({detail}): only the process "
+            + "and its steps have one. Put what it says in the description of a step, or remove it.");
     }
 
     private ProcessSubset() {

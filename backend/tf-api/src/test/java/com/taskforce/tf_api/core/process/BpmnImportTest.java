@@ -166,7 +166,48 @@ class BpmnImportTest {
                 "“Ask” has a description TaskForce can't keep as it is (markup inside it)"),
             Arguments.of("documentation", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:documentation>One"
                 + "</bpmn:documentation><bpmn:documentation>Two</bpmn:documentation></bpmn:userTask>"),
-                "(several descriptions)"));
+                "(several descriptions)"),
+            // Une description que TaskForce ne garde pas se refuse en mots, jamais perdue (R159, troisième passe, L3).
+            Arguments.of("descriptionNotKept", file("<bpmn:sequenceFlow id=\"f\" name=\"Approved\" sourceRef=\"a\" "
+                + "targetRef=\"b\"><bpmn:documentation>Why we go on</bpmn:documentation></bpmn:sequenceFlow>"),
+                "“Approved” has a description TaskForce doesn't keep (on a path): only the process and its steps have "
+                    + "one."),
+            Arguments.of("descriptionNotKept", file("<bpmn:sequenceFlow id=\"f\" sourceRef=\"a\" targetRef=\"b\">"
+                + "<bpmn:conditionExpression><bpmn:documentation>Why</bpmn:documentation>It is approved"
+                + "</bpmn:conditionExpression></bpmn:sequenceFlow>"), "(on a condition)"),
+            Arguments.of("descriptionNotKept", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\">"
+                + "<bpmn:timerEventDefinition><bpmn:documentation>Two days</bpmn:documentation><bpmn:timeDuration>P2D"
+                + "</bpmn:timeDuration></bpmn:timerEventDefinition></bpmn:intermediateCatchEvent>"),
+                "“Wait” has a description TaskForce doesn't keep (on the definition of its event)"),
+            Arguments.of("descriptionNotKept", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\">"
+                + "<bpmn:timerEventDefinition><bpmn:timeDuration><bpmn:documentation>Two days</bpmn:documentation>P2D"
+                + "</bpmn:timeDuration></bpmn:timerEventDefinition></bpmn:intermediateCatchEvent>"), "(on a duration)"),
+            Arguments.of("descriptionNotKept", file("<bpmn:intermediateCatchEvent id=\"x\" name=\"Wait\">"
+                + "<bpmn:messageEventDefinition><bpmn:documentation>The report</bpmn:documentation>"
+                + "</bpmn:messageEventDefinition></bpmn:intermediateCatchEvent>"), "(on the definition of its event)"),
+            Arguments.of("descriptionNotKept", file("<bpmn:boundaryEvent id=\"x\" name=\"Fails\" attachedToRef=\"y\">"
+                + "<bpmn:errorEventDefinition><bpmn:documentation>When it breaks</bpmn:documentation>"
+                + "</bpmn:errorEventDefinition></bpmn:boundaryEvent>"), "(on the definition of its event)"),
+            Arguments.of("descriptionNotKept", file("<bpmn:endEvent id=\"x\" name=\"Stop\"><bpmn:terminateEventDefinition>"
+                + "<bpmn:documentation>All of it</bpmn:documentation></bpmn:terminateEventDefinition></bpmn:endEvent>"),
+                "(on the definition of its event)"),
+            Arguments.of("descriptionNotKept", file("<bpmn:message id=\"m\" name=\"The report\"><bpmn:documentation>From "
+                + "the client</bpmn:documentation></bpmn:message>", ""),
+                "“The report” has a description TaskForce doesn't keep (on a message)"));
+    }
+
+    @Test
+    @DisplayName("la description du fichier lui-même est laissée de côté, et l'import le dit (R159, troisième passe, L3)")
+    void the_file_s_own_description_is_said() {
+        String xml = BpmnExport.toXml(ProcessFixtures.integrateAModule())
+            .replaceFirst("(<bpmn:definitions[^>]*>)", "$1<bpmn:documentation>Exported for the client</bpmn:documentation>");
+
+        BpmnImport.Result read = BpmnImport.read(xml);
+
+        assertThat(read.foreign()).isEmpty();
+        assertThat(read.notes()).containsExactly("The file's own description was left out: TaskForce keeps the "
+            + "description of the process and of its steps.");
+        assertThat(ProcessFingerprint.of(read.model())).isEqualTo(ProcessFingerprint.of(ProcessFixtures.integrateAModule()));
     }
 
     @ParameterizedTest(name = "{0}")
