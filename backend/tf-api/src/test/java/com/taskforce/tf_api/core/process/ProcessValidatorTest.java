@@ -168,6 +168,71 @@ public class ProcessValidatorTest {
         flows(deliver).add(newFlow("signed-before-delivery", "signed", "before-delivery").put("otherwise", true));
     }
 
+    /** Une phase « Ship » qui livre le module sans liste avant elle : son début, « Ship the module », sa fin. */
+    static void ship(ObjectNode root) {
+        ObjectNode ship = JSON.createObjectNode().put("id", "ship").put("type", "stage").put("name", "Ship");
+        steps(ship).add(JSON.createObjectNode().put("id", "ship-start").put("type", "start"));
+        steps(ship).add(human("ship-module", "Ship the module"));
+        steps(ship).add(JSON.createObjectNode().put("id", "ship-end").put("type", "end"));
+        flows(ship).add(newFlow("ship-start-ship-module", "ship-start", "ship-module"));
+        flows(ship).add(newFlow("ship-module-ship-end", "ship-module", "ship-end"));
+        steps(root).add(ship);
+    }
+
+    /** Une fin du processus qui arrête tout. */
+    static void stop(ObjectNode root, String id, String name) {
+        steps(root).add(JSON.createObjectNode().put("id", id).put("type", "end").put("name", name).put("terminate", true));
+    }
+
+    /**
+     * Une décision du processus : quand l'accord {@code judged} est donné, le chemin vers {@code to} ; dans tous les
+     * autres cas, celui vers {@code otherwise}.
+     */
+    static void decide(ObjectNode root, String id, String name, String judged, String to, String otherwise) {
+        steps(root).add(JSON.createObjectNode().put("id", id).put("type", "decision").put("name", name)
+            .put("answeredBy", "project-lead"));
+        ObjectNode yes = newFlow(id + "-yes", id, to);
+        yes.putObject("condition").put("text", "It is approved").put("step", judged).put("outcome", "approved");
+        flows(root).add(yes);
+        flows(root).add(newFlow(id + "-no", id, otherwise).put("otherwise", true));
+    }
+
+    /**
+     * A1a de la troisième passe sur #538 : la recette mène à une phase « Ship » qui livre, puis à une décision dont un
+     * chemin va à une fin qui arrête tout, et l'autre à la livraison.
+     */
+    static void shipThenStop(ObjectNode root) {
+        ship(root);
+        stop(root, "shipped", "Module shipped");
+        flow(root, "accepted-deliver").put("to", "ship");
+        flows(root).add(newFlow("ship-live", "ship", "live"));
+        decide(root, "live", "Is the module live?", "ship-module", "shipped", "deliver");
+    }
+
+    /**
+     * A1b : une décision « Ship it now? » mène à la phase « Ship », puis à une décision dont les deux chemins vont à une
+     * fin qui arrête tout.
+     */
+    static void shipNowThenStop(ObjectNode root) {
+        ship(root);
+        stop(root, "shipped", "Module shipped");
+        flow(root, "accepted-deliver").put("to", "ship-now");
+        decide(root, "ship-now", "Ship it now?", "sign-acceptance", "ship", "deliver");
+        flows(root).add(newFlow("ship-done-in", "ship", "ship-done"));
+        decide(root, "ship-done", "Is the module shipped?", "ship-module", "shipped", "shipped");
+    }
+
+    /**
+     * A1c : la décision autour du point d'avant de livrer (H1a), et une décision devant la dernière fin, qui arrête
+     * tout.
+     */
+    static void stopAfterBypass(ObjectNode root) {
+        signedBypass(root);
+        step(root, "delivered").put("terminate", true);
+        flow(root, "deliver-delivered").put("to", "closed");
+        decide(root, "closed", "Is the integration closed?", "close-integration", "delivered", "delivered");
+    }
+
     /** Une échéance d'un jour sur l'étape {@code on} de la phase {@code stage}, qui mène à {@code to}. */
     static void deadline(ObjectNode root, String stage, String on, String to) {
         ObjectNode container = step(root, stage);
@@ -302,6 +367,13 @@ public class ProcessValidatorTest {
                     flow(r, "accepted-deliver").put("to", "ship");
                     flows(r).add(newFlow("ship-shipped", "ship", "shipped"));
                 }),
+            // Une décision devant une fin qui arrête tout n'en fait pas un abandon (R159, troisième passe, H1).
+            refusal("pausePointMisplaced", "A1a : une phase « Ship » qui livre, puis une décision vers une fin qui arrête "
+                + "tout ou vers la livraison", ProcessValidatorTest::shipThenStop),
+            refusal("pausePointMisplaced", "A1b : « Ship it now? » mène à « Ship », puis une décision dont les deux "
+                + "chemins vont à une fin qui arrête tout", ProcessValidatorTest::shipNowThenStop),
+            refusal("pausePointMisplaced", "A1c : la décision autour du point d'avant de livrer, et une décision devant "
+                + "la dernière fin, qui arrête tout", ProcessValidatorTest::stopAfterBypass),
             refusal("pausePointMisplaced", "une échéance de la livraison qui mène droit à la fin", r -> {
                 steps(r).add(JSON.createObjectNode().put("id", "deliver-late").put("type", "deadline")
                     .put("name", "A week without delivery").put("attachedTo", "deliver").put("duration", "P7D"));
@@ -744,6 +816,33 @@ public class ProcessValidatorTest {
             null, null);
 
         assertRefused(ProcessValidator.check(model(derived), context), "pausePointMisplaced");
+        assertThat(check(e20())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("une décision devant une fin qui arrête tout n'en fait pas un abandon, dans un processus dérivé du "
+        + "défaut aussi : seule une fin où ne mène aucun travail d'agent abandonne, comme « Integration stopped »")
+    void a_decision_does_not_make_an_abandonment() {
+        Context context = new Context(List.of(), Map.of("integrate-a-module", ProcessFixtures.integrateAModule()),
+            null, null);
+        List<Consumer<ObjectNode>> attacks = List.of(ProcessValidatorTest::shipThenStop,
+            ProcessValidatorTest::shipNowThenStop, ProcessValidatorTest::stopAfterBypass);
+        for (Consumer<ObjectNode> attack : attacks) {
+            ObjectNode derived = e20();
+            derived.put("key", "integrate-billing").put("derivedFrom", "integrate-a-module");
+            attack.accept(derived);
+
+            assertRefused(ProcessValidator.check(model(derived), context), "pausePointMisplaced");
+        }
+        ObjectNode process = e20();
+        shipThenStop(process);
+
+        assertThat(check(process)).singleElement().satisfies(p -> {
+            assertThat(p.stepId()).isEqualTo("live");
+            assertThat(p.message()).isEqualTo("“Is the module live?” leads the work of “Draft the specification” to "
+                + "“Module shipped” without the pause point before the work is delivered: every path from an agent's work "
+                + "to the end goes through it, even to an end that stops everything.");
+        });
         assertThat(check(e20())).isEmpty();
     }
 

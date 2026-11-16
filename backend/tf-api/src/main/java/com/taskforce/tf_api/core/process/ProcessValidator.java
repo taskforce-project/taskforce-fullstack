@@ -1344,7 +1344,7 @@ public final class ProcessValidator {
             }
             // Comme celui d'avant une mission : chaque chemin vers le point d'avant de livrer passe par celui d'avant
             // d'appliquer, et chaque chemin du travail d'un agent à une fin du processus passe par celui d'avant de
-            // livrer. Une fin qui arrête tout n'abandonne que si seules des décisions y mènent (abandons).
+            // livrer. Une fin qui arrête tout n'abandonne que si aucun travail d'agent n'y mène (abandons).
             Set<String> apply = new HashSet<>();
             points.get(BEFORE_APPLY).forEach(s -> apply.add(s.id()));
             Set<String> beforeApply = graph.reachableAvoiding(apply);
@@ -1358,7 +1358,7 @@ public final class ProcessValidator {
             Set<String> delivery = new HashSet<>();
             points.get(BEFORE_DELIVERY).forEach(s -> delivery.add(s.id()));
             Set<String> ends = new LinkedHashSet<>();
-            model.stepsOrEmpty().stream().filter(s -> END.equals(s.type()) && !abandons(s))
+            model.stepsOrEmpty().stream().filter(s -> END.equals(s.type()) && !abandons(s, graph, zones))
                 .forEach(s -> ends.add(s.id()));
             for (Step zone : zones) {
                 Set<String> after = graph.reachableFrom(zone.id(), delivery);
@@ -1375,9 +1375,12 @@ public final class ProcessValidator {
                             break;
                         }
                     }
+                    Step last = byId.get(end);
                     add("pausePointMisplaced", at.id(), at.name(), "“" + at.label() + "” leads the work of “"
                         + zone.label() + "” to “" + label(end) + "” without the pause point before the work is delivered: "
-                        + "every path from an agent's work to the end goes through it.");
+                        + "every path from an agent's work to the end goes through it"
+                        + (last != null && Boolean.TRUE.equals(last.terminate()) ? ", even to an end that stops "
+                            + "everything." : "."));
                     break;
                 }
             }
@@ -1391,19 +1394,12 @@ public final class ProcessValidator {
         }
 
         /**
-         * Une fin qui arrête tout n'est un abandon que si seules des décisions y mènent, tout droit, comme « Integration
-         * stopped » ; une autre livre aussi, même si elle arrête tout.
+         * Une fin qui arrête tout n'est un abandon que si aucune zone d'agent n'y mène, comme « Integration stopped »,
+         * qu'on ne rejoint qu'avant tout travail d'agent (R159, troisième passe, H1) ; une autre livre ce que les agents
+         * ont fait, même si elle arrête tout, et une décision devant elle n'y change rien.
          */
-        private boolean abandons(Step end) {
-            if (!Boolean.TRUE.equals(end.terminate())) {
-                return false;
-            }
-            List<Flow> into = model.flowsOrEmpty().stream().filter(f -> end.id() != null && end.id().equals(f.to()))
-                .toList();
-            return !into.isEmpty() && into.stream().allMatch(f -> {
-                Step from = byId.get(f.from());
-                return from != null && DECISION.equals(from.type());
-            });
+        private static boolean abandons(Step end, Graph graph, List<Step> zones) {
+            return Boolean.TRUE.equals(end.terminate()) && zones.stream().noneMatch(z -> graph.reaches(z.id(), end.id()));
         }
 
         /**
