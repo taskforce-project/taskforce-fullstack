@@ -1,19 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { renderHook } from "@testing-library/react"
+import { renderHook, waitFor } from "@testing-library/react"
 
 // --- Capture du client STOMP mocké ---
+interface ClientConfig {
+  brokerURL?: string
+  webSocketFactory?: () => unknown
+  onConnect?: () => void
+  onWebSocketClose?: () => void
+}
 let subscribedTopic: string | null = null
 let messageHandler: ((msg: { body: string }) => void) | null = null
 let deactivated = false
+// Chaque client créé, et si sa connexion aboutit (sinon, la socket native se ferme avant : le repli SockJS).
+let configs: ClientConfig[] = []
+let connects = true
+
+const SockJS = vi.hoisted(() => class {
+  constructor(readonly url: string) {}
+})
 
 vi.mock("@stomp/stompjs", () => {
   class Client {
     private onConnect?: () => void
-    constructor(cfg: { onConnect?: () => void }) {
+    constructor(cfg: ClientConfig) {
       this.onConnect = cfg.onConnect
+      configs.push(cfg)
     }
     activate() {
-      this.onConnect?.() // simule la connexion → déclenche subscribe()
+      if (connects) this.onConnect?.() // simule la connexion → déclenche subscribe()
     }
     subscribe(topic: string, cb: (msg: { body: string }) => void) {
       subscribedTopic = topic
@@ -26,7 +40,7 @@ vi.mock("@stomp/stompjs", () => {
   }
   return { Client }
 })
-vi.mock("sockjs-client", () => ({ default: class {} }))
+vi.mock("sockjs-client", () => ({ default: SockJS }))
 vi.mock("@/lib/hooks/use-stomp", () => ({
   buildRealtimeUrls: () => ({ wsUrl: "ws://x/ws", sockJsUrl: "http://x/ws-sockjs" }),
 }))
@@ -52,7 +66,25 @@ describe("useProjectRealtime", () => {
     subscribedTopic = null
     messageHandler = null
     deactivated = false
+    configs = []
+    connects = true
     vi.clearAllMocks()
+  })
+
+  it("passe par SockJS quand la socket native se ferme avant d'avoir jamais connecté, une fois seulement (R159, L11)", async () => {
+    connects = false
+    renderHook(() => useProjectRealtime(30))
+    expect(configs).toHaveLength(1)
+    expect(configs[0].brokerURL).toBe("ws://x/ws")
+    configs[0].onWebSocketClose?.()
+    await waitFor(() => expect(configs).toHaveLength(2))
+    expect(configs[1].brokerURL).toBeUndefined()
+    expect(configs[1].webSocketFactory?.()).toEqual(new SockJS("http://x/ws-sockjs"))
+    // Le repli n'a lieu qu'une fois : ni la socket native, ni SockJS ne relancent à leur tour.
+    configs[0].onWebSocketClose?.()
+    configs[1].onWebSocketClose?.()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(configs).toHaveLength(2)
   })
 
   it("ne s'abonne pas quand projectId est null", () => {
