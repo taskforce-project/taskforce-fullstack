@@ -69,9 +69,10 @@ describe("les lignes d'une colonne", () => {
   it("un parent et ses sous-issues restent ensemble : une sous-issue active garde son parent fini près d'elle", () => {
     const parentRef = { id: 1, sequenceNumber: 1, identifier: "WEB-1", title: "Issue 1", status: DONE }
     const issues = [issue(1, { status: DONE }), issue(2, { status: DONE, parent: parentRef }), issue(3, { status: DONE })]
-    const runs = [projectRun(deliveryRun(1, 2, { status: "FAILED", error: "Tests failed" }))]
+    // Une sous-issue au travail : dans une colonne finie, un échec ne la tient plus active, la colonne l'emporte (N8).
+    const runs = [projectRun(deliveryRun(1, 2, { status: "RUNNING" }))]
     const stage = buildWorkflow({ ...base, issues, runs }).stages[2]
-    expect(stage.nodes.map((node) => node.state)).toEqual(["done", "failed", "done"])
+    expect(stage.nodes.map((node) => node.state)).toEqual(["done", "working", "done"])
     expect(keysOf(columnRows(stage, options))).toEqual(["issue-1", "issue-2", "issue-3"])
   })
 

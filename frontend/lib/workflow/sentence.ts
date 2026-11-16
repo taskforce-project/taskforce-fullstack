@@ -123,10 +123,13 @@ export function nodeSentence(node: SentenceNode, t: SentenceTexts, context: Sent
     }
     case "stopped":
       return run && isMine(run, context.me) ? w.now.stoppedByYou : fillText(w.now.stoppedBy, { who: run?.startedByName?.trim() || w.now.theDelegator })
-    case "done":
-      return node.issue.completedAt ? fillText(w.now.done, { time: momentWords(node.issue.completedAt, context.now) }) : null
+    case "done": {
+      const done = node.issue.completedAt ? fillText(w.now.done, { time: momentWords(node.issue.completedAt, context.now) }) : null
+      // La colonne l'emporte ; l'échec de la dernière mission se dit à la suite (R161, N8).
+      return reason.lastFailed ? [done, w.now.lastFailed].filter(Boolean).join(" ") : done
+    }
     case "cancelled":
-      return null
+      return reason.lastFailed ? w.now.lastFailed : null
     case "notStarted":
       if (reason.refusal) return fillText(w.now.notStarted, { reason: reason.refusal })
       if (node.issue.dueDate) {

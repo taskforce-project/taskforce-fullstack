@@ -94,6 +94,16 @@ describe("la phrase d'un nœud", () => {
   it("fini, annulé, arrêté, pas commencé : leur mot suffit, ou leur date", () => {
     const done = nodeOf({ ...base, runs: [], issues: [issue(1, { status: DONE, completedAt: "2026-11-10T08:00:00" })] })
     expect(nodeSentence(done, texts, context)).toBe("Done on 10 Nov.")
+    // Fini malgré l'échec de sa dernière mission : la colonne l'emporte, l'échec se dit à la suite (R161, N8).
+    const failedRun = projectRun(deliveryRun(1, 1, { status: "FAILED", error: "Tests failed" }))
+    const doneAnyway = nodeOf({ ...base, runs: [failedRun], issues: [issue(1, { status: DONE, completedAt: "2026-11-10T08:00:00" })] })
+    expect(doneAnyway.state).toBe("done")
+    expect(nodeSentence(doneAnyway, texts, context)).toBe("Done on 10 Nov. Last mission failed.")
+    const undated = nodeOf({ ...base, runs: [failedRun], issues: [issue(1, { status: DONE })] })
+    expect(nodeSentence(undated, texts, context)).toBe("Last mission failed.")
+    const cancelled = nodeOf({ ...base, runs: [failedRun], issues: [issue(1, { status: STATUSES[3] })] })
+    expect(cancelled.state).toBe("skipped")
+    expect(nodeSentence(cancelled, texts, context)).toBe("Last mission failed.")
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1, { status: DONE })] }), texts, context)).toBeNull()
     expect(nodeSentence(nodeOf({ ...base, runs: [], issues: [issue(1, { status: STATUSES[3] })] }), texts, context)).toBeNull()
     const stopped = nodeOf({ ...base, issues: [issue(1)], runs: [projectRun(deliveryRun(1, 1, { status: "FAILED", outcome: "STOPPED" }))] })

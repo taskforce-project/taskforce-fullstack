@@ -47,10 +47,15 @@ describe("l'état d'un nœud", () => {
     expect(nodeStateOf({ category: "CANCELLED", run: null, blockers: [blocker], me: ME }).state).toBe("skipped")
   })
 
-  it("Failed passe avant la colonne (§4.5) : une issue passée à Done après l'échec de sa dernière mission reste Failed", () => {
+  it("dans une colonne finie, la colonne l'emporte sur l'échec de la dernière mission, qui reste dit (décision du 16/11, N8)", () => {
     const failed = projectRun(deliveryRun(1, 11, { status: "FAILED", error: "Tests failed" }))
     expect(nodeStateOf({ category: "COMPLETED", run: failed, blockers: [], me: ME }))
-      .toEqual({ state: "failed", reason: { kind: "failed", cause: "Tests failed" } })
+      .toEqual({ state: "done", reason: { kind: "done", lastFailed: true } })
+    expect(nodeStateOf({ category: "CANCELLED", run: failed, blockers: [], me: ME }))
+      .toEqual({ state: "skipped", reason: { kind: "cancelled", lastFailed: true } })
+    // Hors d'une colonne finie, l'échec est l'état ; une issue qu'on ne connaît pas (la conversation) aussi.
+    expect(nodeStateOf({ category: "STARTED", run: failed, blockers: [], me: ME }).state).toBe("failed")
+    expect(nodeStateOf({ category: null, run: failed, blockers: [], me: ME }).state).toBe("failed")
     // Un résultat qu'une autre personne revoit attend, même dans une colonne finie.
     const review = projectRun(deliveryRun(1, 11, { status: "DONE" }))
     expect(nodeStateOf({ category: "COMPLETED", run: review, blockers: [], me: "8" }).reason).toEqual({ kind: "reviewOther" })

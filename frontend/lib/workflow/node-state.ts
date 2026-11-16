@@ -9,9 +9,10 @@ import type { WorkflowState } from "@/lib/workflow/states"
  * s'applique l'emporte, dans l'ordre du tri de la spécification :
  * 1. Needs you : une demande que la personne qui regarde peut décider (`canDecide`, calculé par le serveur comme les règles
  *    le décident), ou un résultat prêt pour sa revue ;
- * 2. Failed : la dernière mission a échoué et n'a pas été relancée, quelle que soit la colonne (une issue passée à Done
- *    après l'échec de sa mission reste Failed) ; une mission refusée au départ par une règle (R38) ou arrêtée par une
- *    personne n'est pas une panne ;
+ * 2. Failed : la dernière mission a échoué et n'a pas été relancée ; une mission refusée au départ par une règle (R38) ou
+ *    arrêtée par une personne n'est pas une panne. Dans une colonne finie (terminée ou annulée), la colonne l'emporte :
+ *    l'issue est Done ou Skipped, l'échec se dit en seconde ligne (« Last mission failed. ») et ne compte pas parmi les
+ *    « Failed » (décision du 16/11, R161 N8) ;
  * 3. Missing n'existe qu'avec les processus (W5) : rien ne le produit ici ;
  * 4. Blocked : un lien « bloquée par » vers une issue qui n'est pas finie (une issue finie n'attend plus rien, sauf si une
  *    mission y travaille encore) ;
@@ -30,8 +31,9 @@ export type NodeReason =
   | { readonly kind: "waitingApproval"; readonly approvals: readonly DeliveryRunApproval[] }
   | { readonly kind: "queued" }
   | { readonly kind: "mission"; readonly retried: boolean }
-  | { readonly kind: "done" }
-  | { readonly kind: "cancelled" }
+  /** `lastFailed` : la dernière mission a échoué, mais la colonne dit l'issue finie ; la phrase le dit à la suite. */
+  | { readonly kind: "done"; readonly lastFailed?: boolean }
+  | { readonly kind: "cancelled"; readonly lastFailed?: boolean }
   | { readonly kind: "failed"; readonly cause: string | null }
   | { readonly kind: "reviewOther" }
   | { readonly kind: "stopped" }
@@ -81,9 +83,11 @@ export function nodeStateOf(facts: NodeFacts): NodeState {
   if (mine) return { state: "needsYou", reason: { kind: "approval", approval: mine } }
   if (mission && awaitsJudgment(mission) && isMine(mission, me)) return { state: "needsYou", reason: { kind: "review" } }
 
-  if (mission?.status === "FAILED" && !mission.refused && !stopped && mission.outcome !== "RETRIED") {
-    return { state: "failed", reason: { kind: "failed", cause: mission.error?.trim() || null } }
+  const failed = mission?.status === "FAILED" && !mission.refused && !stopped && mission.outcome !== "RETRIED"
+  if (failed && !isFinished(category)) {
+    return { state: "failed", reason: { kind: "failed", cause: mission?.error?.trim() || null } }
   }
+  const last = failed ? { lastFailed: true } : {}
 
   if (blockers.length > 0 && (active || !isFinished(category))) return { state: "blocked", reason: { kind: "blocked", blockers } }
 
@@ -102,8 +106,8 @@ export function nodeStateOf(facts: NodeFacts): NodeState {
       : { state: "done", reason: { kind: "done" } }
   }
 
-  if (category === "COMPLETED") return { state: "done", reason: { kind: "done" } }
-  if (category === "CANCELLED") return { state: "skipped", reason: { kind: "cancelled" } }
+  if (category === "COMPLETED") return { state: "done", reason: { kind: "done", ...last } }
+  if (category === "CANCELLED") return { state: "skipped", reason: { kind: "cancelled", ...last } }
   if (stopped) return { state: "stopped", reason: { kind: "stopped" } }
   if (category === "STARTED") return { state: "working", reason: { kind: "person" } }
   return {

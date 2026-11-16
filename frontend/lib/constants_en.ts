@@ -508,6 +508,7 @@ export const CONSTANTS_EN = {
       inProgressNobody: "In progress, with nobody on it.",
       notStarted: "Not started: {reason}",
       done: "Done {time}.",
+      lastFailed: "Last mission failed.",
       due: "Due {time}.",
       overdue: "Was due {time}.",
       stoppedByYou: "Stopped by you",
