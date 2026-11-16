@@ -40,7 +40,10 @@ import {
 
 /** Sous cette largeur de volet, l'inspecteur passe en feuille par-dessus les colonnes (§3). */
 export const SHEET_BELOW = 900
-/** Sous cette largeur de fenêtre, les colonnes deviennent une liste de sections (§10). */
+/**
+ * Sous cette largeur de la vue (le volet, et non la fenêtre : la conversation ouverte en prend une part), les colonnes
+ * deviennent une liste de sections (§10).
+ */
 export const NARROW_BELOW = 768
 
 const NO_DOCUMENTS: Readonly<Record<number, number>> = {}
@@ -123,7 +126,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
   const listRef = useRef<HTMLDivElement>(null)
   const paneWidth = useElementWidth(rootRef)
   const wideWindow = useMinWidth(NARROW_BELOW)
-  const narrow = !wideWindow
+  // La largeur de la vue décide, dès qu'elle est mesurée ; avant (le premier rendu, un test sans mise en page), la fenêtre.
+  const narrow = paneWidth > 0 ? paneWidth < NARROW_BELOW : !wideWindow
 
   // La minute en cours : les phrases (« Done today at 14:05 ») ne se recalculent qu'à la minute.
   const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60_000))
@@ -357,7 +361,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
           <p className="p-6 text-sm text-muted-foreground">{filter === "needs-you" ? t.empty.nothingNeedsYou : t.empty.nothingMatches}</p>
         ) : narrow ? (
           <div ref={listRef} data-workflow-list className="min-h-0 flex-1 overflow-y-auto px-4 pt-3">
-            {model.stages.map((stage, index) => (
+            {model.stages.map((stage, index) => hiddenByFilter(columns[index], filter) ? null : (
               <StageColumn
                 key={stage.status.id}
                 stage={stage}
@@ -380,7 +384,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
           </div>
         ) : (
           <div ref={boardRef} className="relative flex min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden">
-            {model.stages.map((stage, index) => (
+            {model.stages.map((stage, index) => hiddenByFilter(columns[index], filter) ? null : (
               <StageColumn
                 key={stage.status.id}
                 stage={stage}
@@ -434,6 +438,11 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
       <LegendDialog />
     </div>
   )
+}
+
+/** Sous un filtre, une colonne sans résultat ne se montre pas : « Needs you » ne montre que là où l'on vous attend. */
+function hiddenByFilter(rows: readonly ColumnRow[], filter: WorkflowFilter | null): boolean {
+  return filter !== null && !rows.some((row) => row.type === "node")
 }
 
 /** La carte qui prend le focus de sa colonne : le nœud choisi s'il y est, sinon le premier. */

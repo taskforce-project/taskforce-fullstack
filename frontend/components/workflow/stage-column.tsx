@@ -104,7 +104,7 @@ export const StageColumn = memo(function StageColumn({
 
   if (stacked) {
     return (
-      <section aria-label={fillText(t.stage, { name, count: total })} className="flex flex-col">
+      <section aria-label={fillText(t.stage, { name, count: total })} data-stage={stage.status.id} className="flex flex-col">
         <div className="sticky top-0 z-10 bg-background">{header}</div>
         <div className="pb-4">
           <WindowedRows

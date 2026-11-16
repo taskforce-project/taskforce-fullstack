@@ -212,6 +212,16 @@ describe("le workflow d'un projet", () => {
     field.remove()
   })
 
+  it("sous un filtre, seules les colonnes où il trouve quelque chose se montrent", async () => {
+    const runs = [projectRun(deliveryRun(1, 2), [approval(5)])]
+    serve({ issues: [issue(1, { title: "Write the spec" }), issue(2, { title: "Build it", status: DOING }), issue(3, { title: "Ship", status: DONE })], runs })
+    realReplace(null, "", "/acme/projects/3/workflow?filter=needs-you")
+    address.notify()
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Build it")).toBeInTheDocument())
+    expect(document.querySelectorAll("[data-stage]")).toHaveLength(1)
+  })
+
   it("un compteur de l'en-tête est un filtre, un seul à la fois", async () => {
     serve({
       issues: [issue(1, { title: "Calm" }), issue(2, { title: "Asks", status: DOING })],
@@ -284,26 +294,42 @@ describe("le workflow d'un projet", () => {
   })
 })
 
+/** Un ResizeObserver qui donne la même largeur à tout ce qu'il observe, tout de suite : un volet de cette largeur. */
+function paneOf(width: number): typeof ResizeObserver {
+  return class {
+    constructor(private readonly callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      this.callback([{ target, contentRect: { width, height: 0 } } as unknown as ResizeObserverEntry], this as unknown as ResizeObserver)
+    }
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
+
 /** La vue dans un volet de 592 px, la largeur par défaut de la fenêtre avec la conversation ouverte (R161, H2). */
 describe("la vue dans un volet étroit", () => {
   const RealObserver = globalThis.ResizeObserver
   afterEach(() => { globalThis.ResizeObserver = RealObserver })
 
-  it("mesure sa largeur dès le premier rendu, même pendant la lecture : l'inspecteur devient une feuille", async () => {
-    // Un ResizeObserver qui donne 592 px à tout ce qu'il observe, tout de suite.
-    globalThis.ResizeObserver = class {
-      constructor(private readonly callback: ResizeObserverCallback) {}
-      observe(target: Element) {
-        this.callback([{ target, contentRect: { width: 592 } } as unknown as ResizeObserverEntry], this as unknown as ResizeObserver)
-      }
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver
+  it("une vue de 528 px dans une fenêtre large devient la liste par étape : l'étroit se décide sur la vue", async () => {
+    globalThis.ResizeObserver = paneOf(528)
+    serve({ issues: [issue(1, { title: "Write the spec" }), issue(2, { title: "Build it", status: DOING })] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    expect(document.querySelector("[data-workflow-list]")).not.toBeNull()
+    expect(document.querySelector("[data-stage-scroll]")).toBeNull()
+  })
+
+  it.each([
+    [592, "full"],
+    [820, "sheet"],
+  ])("mesure sa largeur dès le premier rendu, même pendant la lecture : à %i px, l'inspecteur en %s", async (width, mode) => {
+    globalThis.ResizeObserver = paneOf(width)
     serve({ issues: [issue(1, { title: "Write the spec" })] })
     render(<WorkflowView slug="acme" projectId={3} />)
     await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
     fireEvent.click(card("Write the spec"))
-    await waitFor(() => expect(screen.getByRole("complementary")).toHaveAttribute("data-mode", "sheet"))
+    await waitFor(() => expect(screen.getByRole("complementary")).toHaveAttribute("data-mode", mode))
   })
 })
 
