@@ -83,11 +83,13 @@ export function NodeInChat({ slug, target, withSentence = true, withDecision = t
     // Sans l'issue, sa colonne ne se devine pas : la mission seule dit où elle en est.
     const { state, reason } = nodeStateOf({ category: issue?.status.category ?? null, run: row, blockers, me })
     const sentenceNode: SentenceNode = { reason, run: row, overdue: false, issue: issue ?? NO_ISSUE }
-    return { state, reason, row, sentenceNode }
+    // Ni l'issue ni une mission : « Not started » ne serait qu'une supposition. La carte ne dit alors aucun état (R159, N3).
+    const known = issue !== null || row !== null || state !== "notStarted"
+    return { state, reason, row, sentenceNode, known }
   }, [projectRow, run, activity, sequence, issue, blockers, me])
 
   const sentence = nodeSentence(node.sentenceNode, { workflow: t, sequence, rules }, { me, now: new Date(now) })
-  const word = t.state[node.state]
+  const word = node.known ? t.state[node.state] : null
   const nodeId = issueKey(target.issueId)
   const mission = node.row?.run ?? null
   const canRetry = node.state === "failed" && mission !== null && isMine(mission, me)
@@ -100,11 +102,11 @@ export function NodeInChat({ slug, target, withSentence = true, withDecision = t
   }
 
   return (
-    <div className="flex flex-col gap-1 border border-border bg-card px-3 py-2" role="group" aria-label={`${target.title}, ${word}`}>
+    <div className="flex flex-col gap-1 border border-border bg-card px-3 py-2" role="group" aria-label={word ? `${target.title}, ${word}` : target.title}>
       <div className="flex min-w-0 items-center gap-2">
-        <StateMark state={node.state} word={word} still={markStill(node.reason)} />
+        {word && <StateMark state={node.state} word={word} still={markStill(node.reason)} />}
         <span className="min-w-0 flex-1 truncate text-[13px] font-[450] text-foreground" title={target.title}>{target.title}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{word}</span>
+        {word && <span className="shrink-0 text-xs text-muted-foreground">{word}</span>}
       </div>
       {withSentence && sentence && <p className="line-clamp-2 pl-6 text-xs text-muted-foreground">{sentence}</p>}
       <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">

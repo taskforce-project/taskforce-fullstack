@@ -36,6 +36,14 @@ describe("NodeInChat", () => {
     expect(screen.getByRole("group", { name: "Release, Skipped" })).toBeInTheDocument()
   })
 
+  it("without its issue nor a mission, says no state: « Not started » would only be a guess (R159, N3)", () => {
+    render(<NodeInChat slug="acme" target={{ ...TARGET, runId: null }} />)
+    expect(screen.getByRole("group", { name: "Release" })).toBeInTheDocument()
+    expect(screen.queryByText("Not started")).toBeNull()
+    expect(screen.queryByRole("img")).toBeNull()
+    expect(screen.getByRole("button", { name: "Open in Workflow" })).toBeInTheDocument()
+  })
+
   it("reads its blockers from the project's links, as the map does: « Blocked », not « Not started »", () => {
     const blocker = issue(2, { projectId: 3, title: "Schema" })
     useIssueStore.setState({

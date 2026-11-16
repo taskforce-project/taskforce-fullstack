@@ -111,7 +111,8 @@ describe("MissionInChat : la mission d'une issue, dans la conversation", () => {
     render(<MissionInChat slug="acme" target={{ ...TARGET, runId: null }} />);
 
     expect(screen.getByRole("group", { name: "Mission of TF-28: Fix the footer links" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Fix the footer links, Not started" })).toBeInTheDocument();
+    // Sans l'issue lue, ni mission : aucun état supposé (R159, N3).
+    expect(screen.getByRole("group", { name: "Fix the footer links" })).toBeInTheDocument();
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Open in Workflow"]);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
