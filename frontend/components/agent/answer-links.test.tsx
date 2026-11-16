@@ -73,6 +73,8 @@ describe("les liens des réponses", () => {
 
     const node = screen.getByRole("link", { name: "OPS-35" })
     expect(node).toHaveAttribute("href", "/acme/projects/4/workflow?node=issue-35")
+    // Le survol dit ce que fait le lien : il choisit le nœud sur le workflow (R161, L9).
+    expect(node).toHaveAttribute("title", "Show OPS-35 on its workflow")
     fireEvent.click(node)
     expect(nav.push).toHaveBeenLastCalledWith("/acme/projects/4/workflow?c=9&node=issue-35", { scroll: false })
     expect(screen.getByRole("link", { name: "Operations" })).toHaveAttribute("href", "/acme/projects/4/workflow")

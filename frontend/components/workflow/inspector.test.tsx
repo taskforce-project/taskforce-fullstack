@@ -236,6 +236,8 @@ describe("Inspector", () => {
     )
     const link = document.querySelector<HTMLAnchorElement>("a[href='https://github.com/acme/web/pull/87']")
     expect(link?.className).toContain("text-ink-blue")
+    // La pull request en mots, et non son adresse (R161, L9).
+    expect(link).toHaveTextContent("Pull request #87")
     expect(link?.className).not.toContain("text-primary")
     unmount()
   })

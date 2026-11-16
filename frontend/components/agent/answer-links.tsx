@@ -48,7 +48,7 @@ function AnswerLinkView({ slug, link }: Readonly<{ slug: string; link: AnswerLin
       <PaneLink
         href={workflowPath(slug, link.projectId, node)}
         open={() => openWorkflow(link.projectId, node)}
-        title={link.kind === "issue" ? fillText(t.openIssue, { key: link.key }) : fillText(t.workflowOf, { project: link.text })}
+        title={link.kind === "issue" ? fillText(t.showOnWorkflow, { key: link.key }) : fillText(t.workflowOf, { project: link.text })}
         className={LINK}
       >
         {link.text}

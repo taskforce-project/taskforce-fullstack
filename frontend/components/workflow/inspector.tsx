@@ -207,6 +207,12 @@ export function Inspector({
   )
 }
 
+/** Une pull request en mots : « Pull request #87 », et non l'adresse ; une adresse d'une autre forme se montre telle quelle. */
+export function pullRequestLabel(url: string, words: string): string {
+  const number = /\/pull\/(\d+)(?:[/?#]|$)/.exec(url)?.[1]
+  return number ? fillText(words, { number }) : url.replace(/^https?:\/\//, "")
+}
+
 /** Une liste de liens (« Blocked by », « Blocks ») : des lignes de 36 px, chacune choisit son nœud. */
 function LinkList({ items, model, onSelect, more }: Readonly<{
   items: readonly { id: number; identifier: string; title: string }[]
@@ -508,7 +514,7 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
       {pr && (
         <Row label={t.pullRequest}>
           <a href={pr} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-ink-blue underline-offset-2 hover:underline">
-            {pr.replace(/^https:\/\/github\.com\//, "")}
+            {pullRequestLabel(pr, t.pullRequestNumber)}
             <ExternalLink className="size-3" aria-hidden="true" />
           </a>
         </Row>
