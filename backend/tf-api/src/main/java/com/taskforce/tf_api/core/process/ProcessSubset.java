@@ -111,8 +111,8 @@ public final class ProcessSubset {
         REASONS.put("setting", "“{name}” has a setting TaskForce's processes don't have: {detail}.");
         REASONS.put("conditionLanguage", "The condition of the path “{name}” is written for another engine ({detail}): "
             + "TaskForce's conditions are words, with the step and the result code judges. Write it that way.");
-        REASONS.put("tfSettings", "“{name}” carries TaskForce settings this version doesn't read ({detail}): they come "
-            + "from another version of TaskForce, or were changed by hand.");
+        REASONS.put("tfSettings", "“{name}” carries TaskForce settings that don't follow the tf: extension ({detail}): "
+            + "export the process again from TaskForce, or put them right.");
         REASONS.put("conditionNoLanguage", "The condition of the path “{name}” says what code judges, but not that its "
             + "words are TaskForce's: without TaskForce's condition language, another engine's expression would be read "
             + "as its words. Export the process again from TaskForce.");

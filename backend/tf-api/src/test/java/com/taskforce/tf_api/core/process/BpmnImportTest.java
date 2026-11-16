@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
@@ -94,10 +95,21 @@ class BpmnImportTest {
             // Ce qu'un élément du sous-ensemble porte en plus : refusé, jamais laissé de côté en silence (R159, M1).
             Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
                 + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\" color=\"red\"/>"
-                + "</bpmn:extensionElements></bpmn:userTask>"), "TaskForce settings this version doesn't read (tf:step)"),
+                + "</bpmn:extensionElements></bpmn:userTask>"),
+                "settings that don't follow the tf: extension (tf:step has an attribute the extension doesn't have, color)"),
             Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
                 + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\"><tf:script>rm</tf:script></tf:step>"
-                + "</bpmn:extensionElements></bpmn:userTask>"), "TaskForce settings this version doesn't read (tf:step)"),
+                + "</bpmn:extensionElements></bpmn:userTask>"),
+                "(tf:script comes in the wrong place, or the extension doesn't have it there)"),
+            // Le schéma dit son erreur (la relecture de #538).
+            Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\"><tf:human kind=\"approval\" "
+                + "question=\"Fine?\"/></tf:step></bpmn:extensionElements></bpmn:userTask>"),
+                "(tf:human misses its attribute who)"),
+            Arguments.of("tfSettings", file("<bpmn:serviceTask id=\"x\" name=\"Do\"><bpmn:extensionElements>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\"><tf:rule ref=\"read-files\"/>"
+                + "<tf:agent provider=\"cortex\"/></tf:step></bpmn:extensionElements></bpmn:serviceTask>"),
+                "(tf:agent comes in the wrong place, or the extension doesn't have it there)"),
             Arguments.of("tfSettings", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
                 + "<tf:run xmlns:tf=\"" + Bpmn.TF + "\"/></bpmn:extensionElements></bpmn:userTask>"),
                 "(tf:run, which doesn't go there)"),
@@ -167,6 +179,23 @@ class BpmnImportTest {
         List<Problem> problems = ProcessValidator.check(read.model(), Context.NONE, read.foreign());
         assertThat(problems).extracting(Problem::code).containsOnly("notInSubset");
         assertThat(problems).extracting(Problem::message).anySatisfy(m -> assertThat(m).contains(words).endsWith("."));
+    }
+
+    @Test
+    @DisplayName("l'erreur du schéma de tf: se dit de même sur une machine réglée en français")
+    void the_schema_error_reads_the_same_in_french() {
+        Locale before = Locale.getDefault();
+        Locale.setDefault(Locale.FRANCE);
+        try {
+            BpmnImport.Result read = BpmnImport.read(file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:extensionElements>"
+                + "<tf:step xmlns:tf=\"" + Bpmn.TF + "\" answeredBy=\"project-lead\" color=\"red\"><tf:human "
+                + "kind=\"approval\" question=\"Fine?\"/></tf:step></bpmn:extensionElements></bpmn:userTask>"));
+
+            assertThat(read.foreign()).extracting(ProcessValidator.Foreign::detail)
+                .containsExactly("tf:step has an attribute the extension doesn't have, color");
+        } finally {
+            Locale.setDefault(before);
+        }
     }
 
     @Test

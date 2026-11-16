@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
@@ -742,18 +744,76 @@ public final class BpmnImport {
                     foreign.add(new Foreign("tfSettings", id, name, tag + ", which doesn't go there"));
                 } else if (seen) {
                     foreign.add(new Foreign("tfSettings", id, name, tag + ", twice"));
-                } else if (!followsSchema(c)) {
-                    foreign.add(new Foreign("tfSettings", id, name, tag));
+                } else {
+                    String error = schemaError(c);
+                    if (error != null) {
+                        foreign.add(new Foreign("tfSettings", id, name, error));
+                    }
                 }
                 seen |= c.getLocalName().equals(expected);
             }
         }
 
         /**
-         * Vrai quand l'élément tf: suit le schéma de l'extension, ses valeurs mises à part : une valeur entre dans le
-         * modèle, où le vérificateur la dit en phrase.
+         * Ce qui fait qu'un élément tf: ne suit pas le schéma de l'extension, en mots (un attribut manque ou n'est pas de
+         * l'extension, un élément vient au mauvais endroit) ; null quand il le suit, ses valeurs mises à part : une
+         * valeur entre dans le modèle, où le vérificateur la dit en phrase.
          */
-        private boolean followsSchema(Element tf) {
+        private String schemaError(Element tf) {
+            for (String error : schemaErrors(tf)) {
+                if (VALUE_ERRORS.stream().noneMatch(error::startsWith)) {
+                    return describe(error);
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Un nom entre apostrophes dans l'erreur du schéma, après une espace : la langue de la machine change les mots de
+         * l'erreur (l'élément, n'est...), jamais son code ni la place de ces noms.
+         */
+        private static final Pattern QUOTED = Pattern.compile("(?:^|\\s)'([^'\\s]+)'");
+
+        /** Une erreur du schéma (son code d'abord, puis ses noms), dite pour une personne. */
+        static String describe(String error) {
+            List<String> quoted = new ArrayList<>();
+            Matcher m = QUOTED.matcher(error);
+            while (m.find()) {
+                quoted.add(m.group(1));
+            }
+            String first = quoted.isEmpty() ? "an element" : tfName(quoted.get(0));
+            if (error.startsWith("cvc-complex-type.4") && quoted.size() >= 2) {
+                return tfName(quoted.get(1)) + " misses its attribute " + quoted.get(0);
+            }
+            if (error.startsWith("cvc-complex-type.3.2.2") && quoted.size() >= 2) {
+                return tfName(quoted.get(1)) + " has an attribute the extension doesn't have, " + quoted.get(0);
+            }
+            if (error.startsWith("cvc-complex-type.2.4.b")) {
+                return first + " misses an element it needs inside it";
+            }
+            if (error.startsWith("cvc-complex-type.2.4")) {
+                return first + " comes in the wrong place, or the extension doesn't have it there";
+            }
+            if (error.startsWith("cvc-complex-type.2.1") || error.startsWith("cvc-complex-type.2.3")) {
+                return first + " holds text or elements it can't hold";
+            }
+            return "it doesn't follow the extension's schema";
+        }
+
+        /** {@code tf:human}, quelle que soit la façon dont l'erreur écrit le nom ({"espace":human}, tf:human). */
+        private static String tfName(String name) {
+            String local = name;
+            int quote = local.lastIndexOf("\":");
+            if (quote >= 0) {
+                local = local.substring(quote + 2);
+            } else if (local.indexOf(':') >= 0) {
+                local = local.substring(local.lastIndexOf(':') + 1);
+            }
+            local = local.replace("}", "").replace("{", "").strip();
+            return "tf:" + ProcessSubset.cut(local, ProcessSubset.MAX_PASTED);
+        }
+
+        private List<String> schemaErrors(Element tf) {
             List<String> errors = new ArrayList<>();
             tfValidator.setErrorHandler(new ErrorHandler() {
                 @Override
@@ -774,9 +834,9 @@ public final class BpmnImport {
             try {
                 tfValidator.validate(new DOMSource(tf));
             } catch (SAXException | IOException e) {
-                return false;
+                errors.add(Objects.toString(e.getMessage(), ""));
             }
-            return errors.stream().allMatch(m -> VALUE_ERRORS.stream().anyMatch(m::startsWith));
+            return errors;
         }
 
         private static final String DRAWING = "Notes drawn on the diagram were left out: TaskForce keeps the process, "
