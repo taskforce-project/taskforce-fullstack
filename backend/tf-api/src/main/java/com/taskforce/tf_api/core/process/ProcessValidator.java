@@ -201,8 +201,9 @@ public final class ProcessValidator {
 
         List<Problem> check(List<Foreign> foreign) {
             for (Foreign f : foreign) {
-                add("notInSubset", f.stepId(), f.name(), ProcessSubset.reason(f.element(), f.name() != null ? f.name()
-                    : f.stepId(), f.detail()));
+                // L'identifiant et le nom viennent du fichier : coupés, comme ce que la phrase reprend.
+                add("notInSubset", ProcessSubset.cut(f.stepId(), MAX_NAME), ProcessSubset.cut(f.name(), MAX_NAME),
+                    ProcessSubset.reason(f.element(), f.name() != null ? f.name() : f.stepId(), f.detail()));
             }
             // Un fichier qui sort du sous-ensemble se reprend d'abord là : le reste de ses refus en découlerait.
             if (!foreign.isEmpty()) {

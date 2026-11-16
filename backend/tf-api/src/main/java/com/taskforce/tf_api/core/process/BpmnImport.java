@@ -659,7 +659,8 @@ public final class BpmnImport {
                 String local = a.getLocalName() != null ? a.getLocalName() : a.getName();
                 Set<String> values = shape.attributes().get(local);
                 if (values == null || (!values.isEmpty() && !values.contains(a.getValue().strip()))) {
-                    foreign.add(new Foreign("setting", id, name, local + "=\"" + a.getValue() + "\""));
+                    foreign.add(new Foreign("setting", id, name, local + "=\""
+                        + ProcessSubset.cut(a.getValue(), ProcessSubset.MAX_PASTED) + "\""));
                 }
             }
             if (shape.children() != null) {

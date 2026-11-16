@@ -140,9 +140,30 @@ public final class ProcessSubset {
     public static String reason(String element, String name, String detail) {
         String sentence = REASONS.get(element);
         if (sentence == null) {
-            sentence = "“{name}” is a BPMN element TaskForce's processes don't have (" + element + ").";
+            sentence = "“{name}” is a BPMN element TaskForce's processes don't have (" + cut(element, MAX_PASTED) + ").";
         }
-        return sentence.replace("{name}", name == null || name.isBlank() ? element : name)
-            .replace("{detail}", detail == null ? element : detail);
+        // Ce qui vient du fichier se coupe : une phrase se lit, quelle que soit la taille de ce qu'on y a mis.
+        return sentence.replace("{name}", cut(name == null || name.isBlank() ? element : name, MAX_NAME))
+            .replace("{detail}", cut(detail == null ? element : detail, 2 * MAX_PASTED));
+    }
+
+    /**
+     * Ce qu'une raison reprend d'un fichier, au plus : une valeur, une langue, un nom d'élément ; un détail qui en
+     * contient un (un réglage et sa valeur) tient en deux fois plus.
+     */
+    public static final int MAX_PASTED = 80;
+    /** Le nom d'une étape dans une raison, au plus : celui qu'un modèle peut avoir. */
+    static final int MAX_NAME = 200;
+
+    /** Le texte, coupé à {@code max} caractères, trois points marquant la coupe. */
+    public static String cut(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value;
+        }
+        int end = max - 3;
+        if (Character.isHighSurrogate(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(0, end) + "...";
     }
 }

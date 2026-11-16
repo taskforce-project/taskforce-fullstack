@@ -170,6 +170,24 @@ class BpmnImportTest {
     }
 
     @Test
+    @DisplayName("un refus coupe ce qu'il reprend du fichier : une valeur à 80 caractères, un nom à 200")
+    void a_refusal_cuts_what_it_pastes() {
+        String value = "v".repeat(10_000);
+        String name = "n".repeat(10_000);
+        BpmnImport.Result read = BpmnImport.read(file("<bpmn:userTask id=\"x\" name=\"" + name + "\" "
+            + "completionQuantity=\"" + value + "\"/>"));
+
+        List<Problem> problems = ProcessValidator.check(read.model(), Context.NONE, read.foreign());
+
+        assertThat(problems).singleElement().satisfies(p -> {
+            assertThat(p.message()).hasSizeLessThan(400)
+                .startsWith("“" + "n".repeat(197) + "...”")
+                .contains("completionQuantity=\"" + "v".repeat(77) + "...\"");
+            assertThat(p.step()).hasSize(200);
+        });
+    }
+
+    @Test
     @DisplayName("un fichier avec une DTD est refusé : aucune entité externe n'est lue")
     void no_external_entity() {
         String xml = """
