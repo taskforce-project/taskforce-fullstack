@@ -24,7 +24,7 @@ function nodeOf(runs: ProjectRun[]): WorkflowNode {
 /** Les gestes d'un nœud (séance n°25, §6.2) : seulement ce qui marche, chacun par sa route. */
 describe("nodeCan", () => {
   it("stop a mission at work of one's own; try again one's failure; hand a not started issue to a ready agent; move always", () => {
-    expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1))]), ME, [agent])).toEqual({ stop: true, retry: false, handToAgent: false, move: true })
+    expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1))]), ME, [agent])).toEqual({ stop: true, retry: false, handToAgent: false, handable: false, move: true })
     expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1))]), "8", [agent]).stop).toBe(false)
     expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1, { providerKey: "github-copilot" }))]), ME, [agent]).stop).toBe(false)
     expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1, { status: "FAILED", error: "x" }))]), ME, [agent]).retry).toBe(true)

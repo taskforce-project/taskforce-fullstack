@@ -30,6 +30,8 @@ export interface NodeCan {
   readonly stop: boolean
   readonly retry: boolean
   readonly handToAgent: boolean
+  /** Le nœud pourrait aller à un agent (pas commencé ou arrêté, sans mission au travail, la personne écrit) : prêt ou non. */
+  readonly handable: boolean
   readonly move: boolean
 }
 
@@ -43,13 +45,15 @@ export function nodeCan(
   const run = node.run?.run ?? null
   const active = run !== null && (run.status === "RUNNING" || run.status === "QUEUED")
   const mine = run !== null && isMine(run, me)
+  const handable = canWrite && !active && (node.state === "notStarted" || node.state === "stopped")
   return {
     // Arrêter : une mission au travail, par la personne qui l'a déléguée (la route le vérifie aussi).
     stop: active && mine && run.providerKey !== CANNOT_STOP,
     // Relancer : un échec de sa mission, après avoir lu la cause.
     retry: node.state === "failed" && mine,
     // Confier : une issue pas commencée, sans mission en cours, quand un agent est prêt pour ce projet.
-    handToAgent: canWrite && !active && (node.state === "notStarted" || node.state === "stopped") && agents.some((a) => a.available && a.ready),
+    handToAgent: handable && agents.some((a) => a.available && a.ready),
+    handable,
     move: canWrite,
   }
 }

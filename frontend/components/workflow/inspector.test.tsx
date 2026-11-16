@@ -86,11 +86,25 @@ describe("Inspector", () => {
     failed.unmount()
 
     const fresh = setup(model, "issue-2", "sheet")
-    fireEvent.click(screen.getByRole("button", { name: "Claude Code" }))
+    fireEvent.click(screen.getByRole("button", { name: "Hand to Claude Code" }))
     expect(fresh.gestures.handTo).toHaveBeenCalledWith(fresh.node, agent)
     // En feuille, un retour ramène aux colonnes.
     fireEvent.click(screen.getByRole("button", { name: "Back to the workflow" }))
     expect(fresh.props.onClose).toHaveBeenCalled()
+  })
+
+  it("without an agent ready for the project, says what to do instead of hiding the gesture", () => {
+    const model = buildWorkflow({ statuses: STATUSES, issues: [issue(2)], relations: [], documents: {}, me: ME, today: "2026-11-13", runs: [] })
+    const node = model.byKey.get("issue-2")
+    if (!node) throw new Error("no node")
+    render(
+      <Inspector slug="acme" projectId={3} node={node} model={model} stages={STATUSES} agents={[{ ...agent, ready: false }]} agent={null}
+        me={ME} tab="details" mode="side" width={360} gestures={{ move: vi.fn(), stop: vi.fn(), retry: vi.fn(), handTo: vi.fn(), ask: vi.fn() }}
+        menuOpen={false} now={now} onTab={vi.fn()} onResize={vi.fn()} onClose={vi.fn()} onSelect={vi.fn()} onOpen={vi.fn()}
+        onOpenMission={vi.fn()} onMenuOpen={vi.fn()} />,
+    )
+    expect(screen.getByText("No agent is ready for this project yet: set one up in Settings.")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Hand to/ })).toBeNull()
   })
 
   it("Activity: the five steps of its mission, or the activity of the issue", async () => {

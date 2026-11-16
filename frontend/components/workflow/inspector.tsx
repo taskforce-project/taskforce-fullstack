@@ -320,14 +320,15 @@ function Details({ slug, projectId, node, model, agents, agent, me, onSelect, on
 
       {can.handToAgent && ready.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">{t.gesture.handToAgent}</span>
           {ready.map((a) => (
             <Button key={a.key} variant="outline" size="sm" className="h-7 text-xs" onClick={() => void gestures.handTo(node, a)}>
-              {a.displayName}
+              {fillText(t.gesture.handTo, { agent: a.displayName })}
             </Button>
           ))}
         </div>
       )}
+      {/* Sans agent prêt, le geste ne disparaît pas sans rien dire : la phrase dit quoi faire. */}
+      {can.handable && ready.length === 0 && <p className="text-xs text-muted-foreground">{t.gesture.noAgentReady}</p>}
 
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <button type="button" onClick={() => onOpen(node)} className="text-ink-blue underline-offset-2 hover:underline">{i.openIssue}</button>

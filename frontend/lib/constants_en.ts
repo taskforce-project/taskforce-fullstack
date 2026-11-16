@@ -622,6 +622,7 @@ export const CONSTANTS_EN = {
       retried: "A new try started",
       retryFailed: "Couldn't start a new try. Read why it failed, then try again.",
       handToAgent: "Hand to an agent",
+      handTo: "Hand to {agent}",
       handed: "Handed to {agent}",
       handFailed: "Couldn't hand it to the agent. Check the agent in Settings, then try again.",
       noAgentReady: "No agent is ready for this project yet: set one up in Settings.",
