@@ -618,7 +618,7 @@ export const CONSTANTS_EN = {
       menu: "Actions on {title}",
       stop: "Stop",
       stopTitle: "Stop this mission?",
-      stopBody: "The work done so far stays on its branch.",
+      stopBody: "The work done so far stays on its branch. This can't be undone: a stopped mission doesn't resume.",
       stopKeep: "Keep working",
       stopConfirm: "Stop the mission",
       stopped: "Mission stopped",

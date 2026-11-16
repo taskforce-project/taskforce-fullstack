@@ -22,6 +22,13 @@ function nodeOf(runs: ProjectRun[]): WorkflowNode {
 }
 
 /** Les gestes d'un nœud (séance n°25, §6.2) : seulement ce qui marche, chacun par sa route. */
+describe("la question avant d'arrêter", () => {
+  it("dit que l'arrêt ne se défait pas (R161, L8)", () => {
+    render(<StopDialog open onOpenChange={vi.fn()} onConfirm={vi.fn().mockResolvedValue(true)} />)
+    expect(screen.getByText(/This can't be undone: a stopped mission doesn't resume\.$/)).toBeInTheDocument()
+  })
+})
+
 describe("nodeCan", () => {
   it("stop a mission at work of one's own; try again one's failure; hand a not started issue to a ready agent; move always", () => {
     expect(nodeCan(nodeOf([projectRun(deliveryRun(1, 1))]), ME, [agent])).toEqual({ stop: true, retry: false, handToAgent: false, handable: false, move: true })
@@ -117,7 +124,7 @@ describe("StopDialog and NodeMenu", () => {
     const onOpenChange = vi.fn()
     render(<StopDialog open onOpenChange={onOpenChange} onConfirm={onConfirm} />)
     expect(screen.getByRole("alertdialog", { name: "Stop this mission?" }).className).toContain("sm:max-w-[420px]")
-    expect(screen.getByText("The work done so far stays on its branch.")).toBeInTheDocument()
+    expect(screen.getByText(/^The work done so far stays on its branch./)).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Stop the mission" }))
     await waitFor(() => expect(onConfirm).toHaveBeenCalled())
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
