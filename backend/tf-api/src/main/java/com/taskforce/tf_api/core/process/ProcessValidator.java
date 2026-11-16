@@ -1457,6 +1457,10 @@ public final class ProcessValidator {
                             + "required by " + source + ": it keeps its kind, who does it, its question, what signing it "
                             + "means, its opening on the last answer and every line of its checklist. Lines can be "
                             + "added.");
+                    } else if (!keepsItsWork(required, kept)) {
+                        add("lockedStepUnlocked", required.id(), required.name(), "“" + required.label() + "” is "
+                            + "required by " + source + ": it keeps " + (required.agent() != null ? "its agent and " : "")
+                            + "every rule it follows. Rules can be added.");
                     } else if (graph != null) {
                         if (before == null) {
                             before = Graph.of(base);
@@ -1487,6 +1491,27 @@ public final class ProcessValidator {
                 && Objects.equals(was.question(), now.question()) && Objects.equals(was.meaning(), now.meaning())
                 && (was.prefill() == null || was.prefill().equals(now.prefill()))
                 && (was.checklist() == null || (now.checklist() != null && now.checklist().containsAll(was.checklist())));
+        }
+
+        /**
+         * Une étape verrouillée, une zone ou une étape d'agent surtout, garde chaque règle qu'elle suit (des règles
+         * peuvent s'ajouter), et une étape d'agent son agent (R159, troisième passe, L2) : sans elles, une zone verrouillée
+         * ne serait plus que son nom.
+         */
+        private static boolean keepsItsWork(Step was, Step now) {
+            if (was.agent() != null && (now.agent() == null
+                || !Objects.equals(was.agent().provider(), now.agent().provider()))) {
+                return false;
+            }
+            return refs(now).containsAll(refs(was));
+        }
+
+        private static Set<String> refs(Step step) {
+            Set<String> out = new HashSet<>();
+            if (step.rules() != null) {
+                step.rules().stream().map(RuleRef::ref).filter(Objects::nonNull).forEach(out::add);
+            }
+            return out;
         }
 
         /**

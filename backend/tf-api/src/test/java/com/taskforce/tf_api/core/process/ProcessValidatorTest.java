@@ -881,6 +881,51 @@ public class ProcessValidatorTest {
     }
 
     @Test
+    @DisplayName("une zone verrouillée garde ses règles, une étape d'agent verrouillée son agent et les siennes ; des "
+        + "règles s'ajoutent (R159, troisième passe, L2)")
+    void a_locked_zone_keeps_its_rules_and_an_agent_step_its_agent() {
+        ObjectNode base = e20();
+        step(base, "build-zone").putObject("lock").put("by", "author");
+        ObjectNode code = step(base, "write-code");
+        code.putObject("lock").put("by", "author");
+        code.putArray("rules").addObject().put("ref", "no-agent-gh");
+        Context context = new Context(List.of(model(base)), Map.of(), null, null);
+        ObjectNode fewer = base.deepCopy();
+        ArrayNode rules = (ArrayNode) step(fewer, "build-zone").get("rules");
+        for (int i = 0; i < rules.size(); i++) {
+            if ("no-agent-push".equals(rules.get(i).path("ref").asText())) {
+                rules.remove(i);
+                break;
+            }
+        }
+        ObjectNode other = base.deepCopy();
+        ((ObjectNode) step(other, "write-code").get("agent")).put("provider", "cortex");
+        ObjectNode unruled = base.deepCopy();
+        step(unruled, "write-code").remove("rules");
+        ObjectNode more = base.deepCopy();
+        ((ArrayNode) step(more, "build-zone").get("rules")).addObject().put("ref", "no-agent-scripts");
+
+        assertThat(ProcessValidator.check(model(base.deepCopy()), context)).isEmpty();
+        assertThat(List.of(fewer, other, unruled)).allSatisfy(attack ->
+            assertThat(ProcessValidator.check(model(attack), context)).extracting(Problem::code)
+                .containsExactly("lockedStepUnlocked"));
+        assertThat(ProcessValidator.check(model(fewer), context)).singleElement().satisfies(p -> {
+            assertThat(p.code()).isEqualTo("lockedStepUnlocked");
+            assertThat(p.stepId()).isEqualTo("build-zone");
+            assertThat(p.message()).isEqualTo("“Build the module” is required by the workflow's author: it keeps every "
+                + "rule it follows. Rules can be added.");
+        });
+        assertThat(List.of(other, unruled)).allSatisfy(attack ->
+            assertThat(ProcessValidator.check(model(attack), context)).singleElement().satisfies(p -> {
+                assertThat(p.code()).isEqualTo("lockedStepUnlocked");
+                assertThat(p.stepId()).isEqualTo("write-code");
+                assertThat(p.message()).isEqualTo("“Write the module's code” is required by the workflow's author: it "
+                    + "keeps its agent and every rule it follows. Rules can be added.");
+            }));
+        assertThat(ProcessValidator.check(model(more), context)).isEmpty();
+    }
+
+    @Test
     @DisplayName("une étape verrouillée garde sa place : la liste d'avant de livrer ne passe pas après la livraison")
     void a_locked_step_keeps_its_place() {
         ObjectNode next = e20();
