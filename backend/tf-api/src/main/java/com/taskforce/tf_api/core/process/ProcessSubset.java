@@ -113,6 +113,11 @@ public final class ProcessSubset {
             + "TaskForce's conditions are words, with the step and the result code judges. Write it that way.");
         REASONS.put("tfSettings", "“{name}” carries TaskForce settings this version doesn't read ({detail}): they come "
             + "from another version of TaskForce, or were changed by hand.");
+        REASONS.put("conditionNoLanguage", "The condition of the path “{name}” says what code judges, but not that its "
+            + "words are TaskForce's: without TaskForce's condition language, another engine's expression would be read "
+            + "as its words. Export the process again from TaskForce.");
+        REASONS.put("documentation", "“{name}” has a description TaskForce can't keep as it is ({detail}): a description "
+            + "is one text, in words.");
     }
 
     private ProcessSubset() {

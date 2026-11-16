@@ -223,6 +223,7 @@ public final class BpmnImport {
         SHAPES.put("messageEventDefinition", new Shape(Map.of("id", ANY, "messageRef", ANY), BASE, false, null));
         SHAPES.put("errorEventDefinition", new Shape(Map.of("id", ANY), BASE, false, null));
         SHAPES.put("terminateEventDefinition", new Shape(Map.of("id", ANY), BASE, false, null));
+        SHAPES.put("message", new Shape(Map.of("id", ANY, "name", ANY), BASE, false, null));
     }
 
     private static Map<String, Set<String>> with(Map<String, Set<String>> attributes, String name, Set<String> values) {
@@ -282,7 +283,10 @@ public final class BpmnImport {
                 }
                 switch (child.getLocalName()) {
                     case "process" -> processes.add(child);
-                    case "message" -> messages.put(child.getAttribute("id"), attr(child, "name"));
+                    case "message" -> {
+                        inspect(child, "message", attr(child, "id"), attr(child, "name"));
+                        messages.put(child.getAttribute("id"), attr(child, "name"));
+                    }
                     case "error", "documentation", "extensionElements" -> { }
                     case "category", "import", "relationship" -> notes.add("Parts of the file that aren't the process "
                         + "were left out (" + child.getLocalName() + ").");
@@ -610,16 +614,20 @@ public final class BpmnImport {
             String label = attr(e, "name") != null ? attr(e, "name") : id;
             inspect(e, "sequenceFlow", id, label);
             Element expression = child(e, "conditionExpression");
+            Element tf = tf(e, "condition");
             if (expression != null) {
                 inspect(expression, "conditionExpression", id, label);
-                // Une condition est en mots (ADR-027, point 11) : la langue d'un autre moteur n'est pas la nôtre.
+                // Une condition est en mots (ADR-027, point 11) : la langue d'un autre moteur n'est pas la nôtre. Avec ce
+                // que du code juge (tf:condition), ses mots sont dans la langue des conditions de TaskForce, dite : sans
+                // elle, l'expression d'un autre moteur (${...}, =x = true) deviendrait les mots qu'on lit.
                 String language = attr(expression, "language") != null ? attr(expression, "language")
                     : expressionLanguage;
                 if (language != null && !Bpmn.CONDITION_LANGUAGE.equals(language.strip())) {
                     foreign.add(new Foreign("conditionLanguage", id, label, language.strip()));
+                } else if (language == null && tf != null) {
+                    foreign.add(new Foreign("conditionNoLanguage", id, label));
                 }
             }
-            Element tf = tf(e, "condition");
             Condition condition = expression == null && tf == null ? null
                 : new Condition(expression == null ? null : text(expression), tf == null ? null : attr(tf, "step"),
                     tf == null ? null : attr(tf, "outcome"));
@@ -674,7 +682,42 @@ public final class BpmnImport {
                     }
                 }
             }
+            description(e, id, name);
             extensions(e, shape.tf(), id, name);
+        }
+
+        /**
+         * La description d'un élément est un texte, un seul : pas de balise dedans (ce qu'on lirait en perdrait une
+         * partie), pas deux descriptions (la seconde serait perdue), rien d'autre que son identifiant et son format.
+         */
+        private void description(Element owner, String id, String name) {
+            List<Element> docs = new ArrayList<>();
+            for (Element c : children(owner)) {
+                if (Bpmn.MODEL.equals(c.getNamespaceURI()) && "documentation".equals(c.getLocalName())) {
+                    docs.add(c);
+                }
+            }
+            if (docs.size() > 1) {
+                foreign.add(new Foreign("documentation", id, name, "several descriptions"));
+            }
+            for (Element doc : docs) {
+                if (!children(doc).isEmpty()) {
+                    foreign.add(new Foreign("documentation", id, name, "markup inside it"));
+                }
+                NamedNodeMap attributes = doc.getAttributes();
+                for (int i = 0; i < attributes.getLength(); i++) {
+                    Attr a = (Attr) attributes.item(i);
+                    String local = a.getLocalName() != null ? a.getLocalName() : a.getName();
+                    String ns = a.getNamespaceURI();
+                    // Sa langue (xml:lang) ou un espace de noms ne change rien aux mots.
+                    boolean known = ns == null ? "id".equals(local) || "textFormat".equals(local)
+                        : XMLConstants.XMLNS_ATTRIBUTE_NS_URI.equals(ns) || XMLConstants.XML_NS_URI.equals(ns)
+                            || Bpmn.XSI.equals(ns);
+                    if (!known) {
+                        foreign.add(new Foreign("documentation", id, name, "a setting " + local));
+                    }
+                }
+            }
         }
 
         /**

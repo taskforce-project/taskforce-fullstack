@@ -139,7 +139,22 @@ class BpmnImportTest {
             Arguments.of("conditionLanguage", file("<bpmn:sequenceFlow id=\"f\" sourceRef=\"a\" targetRef=\"b\">"
                 + "<bpmn:conditionExpression>x &gt; 1</bpmn:conditionExpression></bpmn:sequenceFlow>")
                 .replace("id=\"d\"", "id=\"d\" expressionLanguage=\"http://www.w3.org/1999/XPath\""),
-                "is written for another engine (http://www.w3.org/1999/XPath)"));
+                "is written for another engine (http://www.w3.org/1999/XPath)"),
+            // Le reste de M1, à la relecture de #538.
+            Arguments.of("conditionNoLanguage", file("<bpmn:sequenceFlow id=\"f\" sourceRef=\"a\" targetRef=\"b\">"
+                + "<bpmn:extensionElements><tf:condition xmlns:tf=\"" + Bpmn.TF + "\" step=\"a\" outcome=\"approved\"/>"
+                + "</bpmn:extensionElements><bpmn:conditionExpression>${approved}</bpmn:conditionExpression>"
+                + "</bpmn:sequenceFlow>"), "another engine's expression would be read as its words"),
+            Arguments.of("setting", file("<bpmn:message id=\"m\" name=\"The report\" itemRef=\"item\"/>", ""),
+                "“The report” has a setting TaskForce's processes don't have: itemRef=\"item\""),
+            Arguments.of("foo", file("<bpmn:message id=\"m\" name=\"The report\"><bpmn:foo/></bpmn:message>", ""),
+                "(foo)"),
+            Arguments.of("documentation", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:documentation>Read "
+                + "<b xmlns=\"http://www.w3.org/1999/xhtml\">this</b> first</bpmn:documentation></bpmn:userTask>"),
+                "“Ask” has a description TaskForce can't keep as it is (markup inside it)"),
+            Arguments.of("documentation", file("<bpmn:userTask id=\"x\" name=\"Ask\"><bpmn:documentation>One"
+                + "</bpmn:documentation><bpmn:documentation>Two</bpmn:documentation></bpmn:userTask>"),
+                "(several descriptions)"));
     }
 
     @ParameterizedTest(name = "{0}")
