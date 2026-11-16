@@ -52,5 +52,8 @@ export const isDensity = (value: string | null | undefined): value is Density =>
 export const isFilter = (value: string | null | undefined): value is WorkflowFilter =>
   value === "needs-you" || value === "blocked" || value === "missing" || value === "failed"
 
-/** La largeur d'une colonne et d'une carte, par densité (§3, §4.3). */
+/**
+ * La largeur d'une colonne et d'une carte, par densité (§3, §4.3). En Summary, c'est un minimum : les colonnes se partagent
+ * la largeur libre de la vue (R161, H5).
+ */
 export const COLUMN_WIDTH: Readonly<Record<Density, number>> = { summary: 160, plan: 264, detail: 304 }

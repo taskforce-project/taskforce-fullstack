@@ -17,7 +17,7 @@ export const CARD_GAP = 8
 /** La hauteur supposée d'une ligne avant sa mesure : une carte de Plan, de Detail, de Summary, un bouton. */
 export function estimateRow(row: ColumnRow, density: Density): number {
   if (row.type !== "node") return 28
-  if (density === "summary") return 32
+  if (density === "summary") return 48
   return density === "detail" ? 112 : 92
 }
 
@@ -124,8 +124,9 @@ export const StageColumn = memo(function StageColumn({
     <section
       aria-label={fillText(t.stage, { name, count: total })}
       data-stage={stage.status.id}
-      style={{ width: COLUMN_WIDTH[density] }}
-      className="flex h-full min-h-0 shrink-0 flex-col border-r border-border last:border-r-0"
+      // En Summary, les colonnes se partagent la largeur libre, 160 px au moins ; Plan et Detail gardent leur largeur.
+      style={density === "summary" ? { flex: `1 1 ${COLUMN_WIDTH.summary}px`, minWidth: COLUMN_WIDTH.summary } : { width: COLUMN_WIDTH[density] }}
+      className={cn("flex h-full min-h-0 flex-col border-r border-border last:border-r-0", density !== "summary" && "shrink-0")}
     >
       {header}
       {countLine}

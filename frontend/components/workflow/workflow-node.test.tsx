@@ -91,6 +91,11 @@ describe("SummaryNodeCard", () => {
     expect(on.onSelect).toHaveBeenCalledWith("issue-1")
     fireEvent.keyDown(card, { key: "Enter" })
     expect(on.onOpen).toHaveBeenCalledWith("issue-1")
+    // Le titre tient sur deux lignes, sur toute la largeur de sa colonne (R161, H5).
+    const title = document.querySelector("[data-summary-title]")
+    expect(title?.className).toContain("line-clamp-2")
+    expect(title?.className).not.toContain("truncate")
+    expect(document.querySelector("[data-node-key]")?.className).toContain("w-full")
   })
 
   it("says « Overdue » for what passed its date", () => {

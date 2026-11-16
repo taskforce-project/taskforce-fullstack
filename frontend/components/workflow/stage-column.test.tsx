@@ -47,6 +47,10 @@ describe("StageColumn", () => {
         revealKey={null} t={t} handlers={handlers} onShowDone={vi.fn()} onShowAll={vi.fn()} onOpenParent={vi.fn()} />,
     )
     expect(screen.getByText("2 not started")).toBeInTheDocument()
+    // La colonne de Summary se partage la largeur libre, 160 px au moins (R161, H5).
+    const section = document.querySelector<HTMLElement>("[data-stage]") as HTMLElement
+    expect(section.style.flex).toBe("1 1 160px")
+    expect(section.style.minWidth).toBe("160px")
   })
 
   it("on a narrow screen, a section of the list, every card at full width", () => {
@@ -73,7 +77,7 @@ describe("StageColumn", () => {
     const node = model.byKey.get("issue-1")
     if (!node) throw new Error("no node")
     const row = { type: "node" as const, key: node.key, node }
-    expect([estimateRow(row, "summary"), estimateRow(row, "plan"), estimateRow(row, "detail")]).toEqual([32, 92, 112])
+    expect([estimateRow(row, "summary"), estimateRow(row, "plan"), estimateRow(row, "detail")]).toEqual([48, 92, 112])
     expect(estimateRow({ type: "done", key: "done", hidden: 2 }, "plan")).toBe(28)
   })
 })

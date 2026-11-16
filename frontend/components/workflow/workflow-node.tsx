@@ -213,7 +213,7 @@ export const SummaryNodeCard = memo(function SummaryNodeCard({ view, selected, f
       data-node-key={node.key}
       data-state={node.state}
       className={cn(
-        "relative flex h-8 w-[136px] items-center gap-1.5 border border-border bg-card pl-2 pr-1.5 transition-[opacity,background-color] duration-150 hover:bg-muted motion-reduce:transition-none",
+        "relative flex min-h-12 w-full items-start gap-1.5 border border-border bg-card py-1.5 pl-2 pr-1.5 transition-[opacity,background-color] duration-150 hover:bg-muted motion-reduce:transition-none",
         selected && "ring-2 ring-inset ring-ring",
         dimmed && "opacity-40",
       )}
@@ -232,9 +232,10 @@ export const SummaryNodeCard = memo(function SummaryNodeCard({ view, selected, f
         onKeyDown={(event) => keyOpens(event, () => handlers.onOpen(node.key))}
         className="absolute inset-0 z-0 cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
-      <StateMark state={node.state} word={word} still={markStill(node.reason)} className="pointer-events-none relative z-10" />
-      <span className="pointer-events-none relative z-10 min-w-0 flex-1 truncate text-xs text-foreground">{node.issue.title}</span>
-      <span className="pointer-events-none relative z-10 max-w-[44px] shrink-0 truncate text-[11px] text-muted-foreground">{who}</span>
+      <StateMark state={node.state} word={word} still={markStill(node.reason)} className="pointer-events-none relative z-10 mt-0.5" />
+      {/* Le titre sur deux lignes : la lecture du dirigeant ne coupe plus à dix caractères. */}
+      <span data-summary-title className="pointer-events-none relative z-10 line-clamp-2 min-w-0 flex-1 text-xs leading-4 text-foreground">{node.issue.title}</span>
+      <span className="pointer-events-none relative z-10 max-w-[56px] shrink-0 truncate text-[11px] leading-4 text-muted-foreground">{who}</span>
     </div>
   )
 })
