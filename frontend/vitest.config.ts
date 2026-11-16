@@ -17,6 +17,21 @@ function eachFile(dir: string): Record<string, typeof OWN_FILE> {
   );
 }
 
+/**
+ * Les fichiers de la vue du workflow hors de ses deux dossiers (R159, L11) : la carte d'un nœud dans la conversation, les
+ * crochets qui lisent et suivent le projet, les stores qu'elle tient. Chacun tient lui aussi les seuils à lui seul.
+ */
+const WORKFLOW_ELSEWHERE = [
+  "components/agent/node-in-chat.tsx",
+  "lib/hooks/use-project-live.ts",
+  "lib/hooks/use-project-realtime.ts",
+  "lib/hooks/use-waiting-live.ts",
+  "lib/hooks/use-workflow-data.ts",
+  "lib/issue-relations.ts",
+  "lib/store/project-store.ts",
+  "lib/store/workflow-view-store.ts",
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -60,6 +75,8 @@ export default defineConfig({
         "components/auth/**/*.{ts,tsx}",
         // La vue du workflow (séance n°25, W1) : ses composants portent sa logique d'écran (fenêtres, gestes, décision).
         "components/workflow/**/*.{ts,tsx}",
+        // Sa carte dans la conversation (R159, L11).
+        "components/agent/node-in-chat.tsx",
       ],
       // Objectifs de couverture.
       // Vitest 4 (18/10/2026) compte les branches et les instructions sur l'AST (`??`, `?.`,
@@ -76,6 +93,7 @@ export default defineConfig({
         // La vue du workflow : chaque fichier tient les seuils à lui seul (voir OWN_FILE).
         ...eachFile("components/workflow"),
         ...eachFile("lib/workflow"),
+        ...Object.fromEntries(WORKFLOW_ELSEWHERE.map((file) => [file, OWN_FILE])),
         // Services API - CRITIQUE
         'lib/api/auth-service.ts': {
           lines: 90,
