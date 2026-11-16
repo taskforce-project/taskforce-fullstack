@@ -27,6 +27,7 @@ import { useProjectStore } from "@/lib/store/project-store"
 import { useScreenStore } from "@/lib/store/screen-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { useWorkspaceStore } from "@/lib/store/workspace-store"
+import { cn } from "@/lib/utils"
 import { INSPECTOR_DEFAULT, useWorkflowViewStore } from "@/lib/store/workflow-view-store"
 import { replaceQuery } from "@/lib/window/address"
 import { buildWorkflow, issueKey, resolveNode, todayKey, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
@@ -374,7 +375,8 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
         controls={compact ? <WorkflowTitleControls projectId={projectId} inHeader densities={!narrow} /> : null}
       />
       <p aria-live="polite" className="sr-only">{announce}</p>
-      <div className="relative flex min-h-0 flex-1">
+      {/* Sur une vue étroite, la feuille de l'inspecteur se pose sur la vue entière (sa racine), en-tête compris. */}
+      <div className={cn("flex min-h-0 flex-1", !narrow && "relative")}>
         {empty ? (
           <EmptyProject slug={slug} projectId={projectId} t={t} />
         ) : filteredEmpty ? (
@@ -448,6 +450,7 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             tab={tab}
             onTab={setTab}
             mode={inspectorMode}
+            screen={!wideWindow}
             width={inspectorWidth}
             onResize={(width) => setInspectorWidth(person, width)}
             onClose={() => setInspectorOpen(false)}

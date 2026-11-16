@@ -109,10 +109,20 @@ describe("Inspector", () => {
     expect(screen.queryByText(/^Blocked by 1 issue/)).toBeNull()
   })
 
-  it("on a narrow screen, the sheet covers the whole screen", () => {
+  it("on a phone, the sheet covers the whole screen; in a narrow pane, the whole view but never the conversation", () => {
     const model = buildWorkflow({ statuses: STATUSES, issues: [issue(2)], relations: [], documents: {}, me: ME, today: "2026-11-13", runs: [] })
-    setup(model, "issue-2", "full")
+    const node = model.byKey.get("issue-2")
+    if (!node) throw new Error("no node")
+    const props = {
+      slug: "acme", projectId: 3, node, model, stages: STATUSES, agents: [], agent: null, me: ME, tab: "details" as const, mode: "full" as const,
+      width: 360, gestures: { move: vi.fn(), stop: vi.fn(), retry: vi.fn(), handTo: vi.fn(), ask: vi.fn() }, menuOpen: false, now,
+      onTab: vi.fn(), onResize: vi.fn(), onClose: vi.fn(), onSelect: vi.fn(), onOpen: vi.fn(), onOpenMission: vi.fn(), onMenuOpen: vi.fn(),
+    }
+    const { rerender } = render(<Inspector {...props} screen />)
     expect(screen.getByRole("region", { name: /, in detail$/ }).className).toContain("fixed inset-0")
+    rerender(<Inspector {...props} />)
+    expect(screen.getByRole("region", { name: /, in detail$/ }).className).toContain("absolute inset-0")
+    expect(screen.getByRole("region", { name: /, in detail$/ }).className).not.toContain("fixed")
   })
 
   it("without an agent ready for the project, says what to do instead of hiding the gesture", () => {

@@ -57,7 +57,7 @@ function Row({ label, children }: Readonly<{ label: string; children: ReactNode 
  */
 export function Inspector({
   slug, projectId, node, model, stages, agents, agent, me, tab, onTab, mode, width, onResize, onClose, onSelect, onOpen,
-  onOpenMission, gestures, menuOpen, onMenuOpen, now, focusRun = null, canWrite = true,
+  onOpenMission, gestures, menuOpen, onMenuOpen, now, focusRun = null, canWrite = true, screen = false,
 }: Readonly<{
   slug: string
   projectId: number
@@ -84,6 +84,11 @@ export function Inspector({
   focusRun?: ProjectRun | null
   /** La personne peut écrire dans le projet : déplacer, confier à un agent. */
   canWrite?: boolean
+  /**
+   * La fenêtre elle-même est étroite (un téléphone) : la feuille couvre tout l'écran. Sinon (un volet étroit à côté de la
+   * conversation), elle couvre la vue entière, en-tête compris, et jamais la conversation.
+   */
+  screen?: boolean
 }>) {
   const t = usePreferencesStore((s) => s.t.workflow)
   const earlier = focusRun !== null && focusRun.run.id !== node.run?.run.id ? focusRun : null
@@ -121,8 +126,9 @@ export function Inspector({
         "flex min-h-0 flex-col bg-background",
         mode === "side" && "relative h-full shrink-0 border-l border-border",
         mode === "sheet" && "absolute inset-y-0 right-0 z-30 max-w-full border-l border-border shadow-xl",
-        // L'écran étroit : une feuille sur tout l'écran, en-tête et onglets du projet compris.
-        mode === "full" && "fixed inset-0 z-50",
+        // L'écran étroit : une feuille sur tout l'écran d'un téléphone, onglets du projet compris ; sur un volet étroit, sur
+        // toute la vue, en-tête compris, la conversation restant à côté.
+        mode === "full" && (screen ? "fixed inset-0 z-50" : "absolute inset-0 z-30"),
       )}
     >
       {mode === "side" && (
