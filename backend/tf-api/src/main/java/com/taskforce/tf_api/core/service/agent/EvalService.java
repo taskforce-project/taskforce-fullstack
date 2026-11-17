@@ -351,8 +351,7 @@ public class EvalService {
                 List.of(new EvalGrader.Check(ModelCapabilityService.ANSWERS_IN_TIME, false, ModelCapabilityService.TOO_SLOW_DETAIL)),
                 List.of(), "", model);
         } catch (AiGatewayClient.LlmException down) {
-            throw new BusinessException("MODEL_FAILED", (model == null ? "This model" : model)
-                + " stopped answering on this machine. Replay it again, or replay another model.");
+            throw ModelRunFailure.of(model, down, "Replay it again, or replay another model.");
         }
         recordUsage(ws.getId(), outcome.usage());
         EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome);
