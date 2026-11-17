@@ -5,10 +5,12 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -32,8 +34,16 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
  * datée ne se vérifie donc pas ici. Les annonces se reconnaissent à leur verbe : « TESTTA-2 est dans Done » n'en est pas
  * une.</p>
  *
+ * <p>Ce qui a été fait dans la conversation compte aussi (R204, séance n°28) : le 17/11/2026, Cortex créait un projet
+ * dans TaskForce sur la carte de sa question, puis répondait au tour suivant qu'il n'en avait pas créé. Une phrase qui
+ * nie une action faite dans la conversation, ou dans le tour, est retirée de la même façon, et un bloc signé
+ * {@code TaskForce · done} dit ce qui a été fait, et où ; une phrase qui dit fait ce qu'un tour d'avant a fait dit vrai.
+ * Une négation qui porte sur une autre chose, un autre système (« pas dans Linear », pour un projet créé dans TaskForce),
+ * une condition, ou la carte du tour qui attend la personne ne nie rien de fait.</p>
+ *
  * <p>Du code seulement, sans modèle : la même réponse et les mêmes résultats donnent la même correction. Un bloc de
- * TaskForce que le modèle écrirait lui-même perd sa marque : seul le serveur signe pour TaskForce.</p>
+ * TaskForce que le modèle écrirait lui-même perd sa marque : seul le serveur signe pour TaskForce. La ligne qui ouvre ce
+ * que TaskForce ajoute aux réponses d'avant ({@link ThreadActs#HEADER}) disparaît aussi de ce qu'il écrit.</p>
  */
 public final class ActionClaimCheck {
 
@@ -61,21 +71,49 @@ public final class ActionClaimCheck {
         }
     }
 
-    /** Un appel d'outil du tour : son nom et son statut (success, pending, question, refused, error). */
-    public record Ran(String tool, String status) {
-        public static List<Ran> of(List<AssistantToolCall> calls) {
-            return calls == null ? List.of() : calls.stream().map(call -> new Ran(call.name(), call.status())).toList();
+    /**
+     * Un appel d'outil du tour : son nom, son statut (success, pending, question, refused, error) et, quand il est connu,
+     * ce qu'il a rendu.
+     */
+    public record Ran(String tool, String status, String output) {
+        public Ran(String tool, String status) {
+            this(tool, status, null);
         }
+
+        public static List<Ran> of(List<AssistantToolCall> calls) {
+            return calls == null ? List.of() : calls.stream().map(call -> new Ran(call.name(), call.status(), call.output()))
+                .toList();
+        }
+    }
+
+    /**
+     * Un geste fait dans la conversation, et qui reste fait (R204) : l'outil, le système où il a écrit (« TaskForce »,
+     * « Linear »), ce qu'il a rendu. Une phrase de Cortex ne le nie pas.
+     */
+    public record Done(String tool, String where, String output) {
     }
 
     /** Une phrase du modèle qui annonce une action qu'aucun outil réussi du tour n'a faite, et ce qu'elle annonce. */
     public record Claim(String sentence, Set<Kind> kinds) {
     }
 
-    /** La réponse à montrer, les phrases qu'elle ne montre plus et ce que TaskForce dit à leur place. */
-    public record Checked(String answer, List<Claim> claims, List<String> truths) {
+    /**
+     * La réponse à montrer, les phrases qu'elle ne montre plus et ce que TaskForce dit à leur place : {@code claims}, des
+     * actions annoncées sans leur résultat (R116) ; {@code denials}, des actions de la conversation niées (R204).
+     */
+    public record Checked(String answer, List<Claim> claims, List<String> truths, List<Claim> denials,
+                          List<String> doneTruths) {
+        public Checked(String answer, List<Claim> claims, List<String> truths) {
+            this(answer, claims, truths, List.of(), List.of());
+        }
+
         public boolean corrected() {
-            return !claims.isEmpty();
+            return !claims.isEmpty() || !denials.isEmpty();
+        }
+
+        /** Une phrase niait une action faite dans la conversation (R204). */
+        public boolean denied() {
+            return !denials.isEmpty();
         }
 
         /** L'incident de confiance (E17), tel que le dossier de la réponse le garde : la phrase fausse y reste. */
@@ -83,11 +121,18 @@ public final class ActionClaimCheck {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("incident", "trust");
             data.put("experiment", "E17");
-            data.put("rule", "R116");
-            data.put("said", claims.stream().map(claim -> CortexRecordService.shorten(claim.sentence())).toList());
-            data.put("kinds", claims.stream().flatMap(claim -> claim.kinds().stream()).distinct()
+            data.put("rule", claims.isEmpty() ? "R204" : denials.isEmpty() ? "R116" : "R116, R204");
+            List<Claim> all = new ArrayList<>(claims);
+            all.addAll(denials);
+            data.put("said", all.stream().map(claim -> CortexRecordService.shorten(claim.sentence())).toList());
+            data.put("kinds", all.stream().flatMap(claim -> claim.kinds().stream()).distinct()
                 .map(kind -> kind.name().toLowerCase(Locale.ROOT)).toList());
-            data.put("shown", String.join(" ", truths));
+            if (!denials.isEmpty()) {
+                data.put("denied", denials.stream().map(claim -> CortexRecordService.shorten(claim.sentence())).toList());
+            }
+            List<String> shown = new ArrayList<>(truths);
+            shown.addAll(doneTruths);
+            data.put("shown", String.join(" ", shown));
             data.put("tools", ran.stream().map(call -> call.tool() + ": " + call.status()).toList());
             return data;
         }
@@ -98,21 +143,44 @@ public final class ActionClaimCheck {
      * retirée, et un bloc de TaskForce dit la vérité à la place de la première.
      */
     public static Checked check(String answer, List<Ran> calls) {
+        return check(answer, calls, List.of(), Set.of());
+    }
+
+    /**
+     * La même vérification, avec ce que la conversation a fait (R204) : {@code thread}, les gestes des tours d'avant qui
+     * restent faits, accords et réponses donnés sur leurs cartes compris. Une phrase qui dit fait ce que la conversation a
+     * fait dit vrai ; une phrase qui le nie, ou nie ce que ce tour a fait, est retirée, et un bloc de TaskForce dit ce qui a
+     * été fait, et où, à la place de la première. {@code systems} : les systèmes qu'une phrase peut nommer (« TaskForce »,
+     * « Linear ») ; une phrase qui nie une action dans un autre système que celui où elle a été faite dit vrai.
+     */
+    public static Checked check(String answer, List<Ran> calls, List<Done> thread, Set<String> systems) {
         List<Ran> ran = calls == null ? List.of() : calls;
+        List<Done> before = thread == null ? List.of() : thread;
         String text = neutralized(answer == null ? "" : answer.replace("\r\n", "\n"));
-        Scan scan = scan(text, ran, false);
-        if (scan.claims().isEmpty()) return new Checked(text, List.of(), List.of());
-        Set<Kind> claimed = EnumSet.noneOf(Kind.class);
-        scan.claims().forEach(claim -> claimed.addAll(claim.kinds()));
-        List<String> truths = truths(claimed, ran);
-        List<String> lines = new ArrayList<>(scan.lines());
-        List<String> block = new ArrayList<>();
-        block.add("");
-        block.add(SIGNATURE);
-        truths.forEach(truth -> block.add("> " + truth));
-        block.add("");
-        lines.addAll(scan.at(), block);
-        return new Checked(tidy(lines), List.copyOf(scan.claims()), truths);
+        Set<String> names = names(systems, before);
+        Scan scan = scan(text, sentence -> unbackedKinds(sentence, ran, before, names), false);
+        List<String> truths = List.of();
+        if (!scan.claims().isEmpty()) {
+            Set<Kind> claimed = EnumSet.noneOf(Kind.class);
+            scan.claims().forEach(claim -> claimed.addAll(claim.kinds()));
+            truths = truths(claimed, ran);
+            text = withBlock(scan, SIGNATURE, truths);
+        }
+        List<Done> done = doneIn(before, ran);
+        if (done.isEmpty()) return new Checked(text, List.copyOf(scan.claims()), truths);
+        Set<String> all = names(names, done);
+        Map<String, Set<Done>> denied = new LinkedHashMap<>();
+        Scan denials = scan(text, sentence -> {
+            Set<Done> contradicted = contradicted(sentence, done, ran, all);
+            if (contradicted.isEmpty()) return EnumSet.noneOf(Kind.class);
+            denied.put(sentence.strip(), contradicted);
+            return deniedKinds(sentence);
+        }, true);
+        if (denials.claims().isEmpty()) return new Checked(text, List.copyOf(scan.claims()), truths);
+        List<Done> said = denied.values().stream().flatMap(Set::stream).distinct().limit(MAX_DONE_SAID).toList();
+        List<String> doneTruths = said.stream().map(ActionClaimCheck::doneTruth).toList();
+        return new Checked(withBlock(denials, DONE_SIGNATURE, doneTruths), List.copyOf(scan.claims()), truths,
+            List.copyOf(denials.claims()), doneTruths);
     }
 
     /**
@@ -120,7 +188,42 @@ public final class ActionClaimCheck {
      * n'en sont pas, ce sont ses mots. La banque note ainsi ce que la personne a vu (R118).
      */
     public static List<Claim> unbacked(String answer, List<Ran> calls) {
-        return scan(answer == null ? "" : answer.replace("\r\n", "\n"), calls == null ? List.of() : calls, true).claims();
+        return unbacked(answer, calls, List.of(), Set.of());
+    }
+
+    /** Les mêmes, quand la conversation avait déjà fait des gestes (R204) : dire fait ce qu'elle a fait dit vrai. */
+    public static List<Claim> unbacked(String answer, List<Ran> calls, List<Done> thread, Set<String> systems) {
+        List<Ran> ran = calls == null ? List.of() : calls;
+        List<Done> before = thread == null ? List.of() : thread;
+        Set<String> names = names(systems, before);
+        return scan(answer == null ? "" : answer.replace("\r\n", "\n"),
+            sentence -> unbackedKinds(sentence, ran, before, names), true).claims();
+    }
+
+    /**
+     * Les phrases d'une réponse déjà montrée qui nient une action faite dans la conversation ou dans le tour (R204) ; les
+     * blocs de TaskForce n'en sont pas. La banque note ainsi ce que la personne a vu.
+     */
+    public static List<Claim> denied(String answer, List<Ran> calls, List<Done> thread, Set<String> systems) {
+        List<Ran> ran = calls == null ? List.of() : calls;
+        List<Done> done = doneIn(thread, ran);
+        if (done.isEmpty()) return List.of();
+        Set<String> names = names(systems, done);
+        return scan(answer == null ? "" : answer.replace("\r\n", "\n"),
+            sentence -> contradicted(sentence, done, ran, names).isEmpty() ? EnumSet.noneOf(Kind.class) : deniedKinds(sentence),
+            true).claims();
+    }
+
+    /** Le texte d'un passage, son bloc de TaskForce à la place de la première phrase retirée. */
+    private static String withBlock(Scan scan, String signature, List<String> truths) {
+        List<String> lines = new ArrayList<>(scan.lines());
+        List<String> block = new ArrayList<>();
+        block.add("");
+        block.add(signature);
+        truths.forEach(truth -> block.add("> " + truth));
+        block.add("");
+        lines.addAll(scan.at(), block);
+        return tidy(lines);
     }
 
     // -------------------------------------------------------------------------
@@ -255,7 +358,7 @@ public final class ActionClaimCheck {
     private record Scan(List<String> lines, List<Claim> claims, int at) {
     }
 
-    private static Scan scan(String text, List<Ran> ran, boolean taskforceSpeaks) {
+    private static Scan scan(String text, Function<String, Set<Kind>> wrong, boolean taskforceSpeaks) {
         List<String> out = new ArrayList<>();
         List<Claim> claims = new ArrayList<>();
         int at = -1;
@@ -280,7 +383,7 @@ public final class ActionClaimCheck {
             List<String> after = new ArrayList<>();
             boolean removed = false;
             for (String sentence : SENTENCE_END.split(line.substring(prefix.length()))) {
-                Set<Kind> kinds = unbackedKinds(sentence, ran);
+                Set<Kind> kinds = wrong.apply(sentence);
                 if (kinds.isEmpty()) {
                     (removed ? after : before).add(sentence);
                 } else {
@@ -301,19 +404,37 @@ public final class ActionClaimCheck {
         return new Scan(out, claims, at);
     }
 
-    /** Ce qu'une phrase annonce et qu'aucun outil réussi du tour n'a fait ; vide si elle n'annonce rien de faux. */
-    private static Set<Kind> unbackedKinds(String sentence, List<Ran> ran) {
-        Set<Kind> claimed = claimedKinds(sentence);
-        claimed.removeIf(kind -> ran.stream().anyMatch(call -> "success".equals(call.status())
-            && backs(kindsOf(call.tool()), kind)));
-        return claimed;
+    /**
+     * Ce qu'une phrase annonce et qu'aucun outil réussi du tour n'a fait, ni aucun geste d'avant de la conversation qui
+     * reste fait (R204) ; vide si elle n'annonce rien de faux. Un geste d'avant n'appuie une annonce que s'il est du même
+     * genre, sur la même chose et dans le même système quand la proposition les nomme.
+     */
+    private static Set<Kind> unbackedKinds(String sentence, List<Ran> ran, List<Done> thread, Set<String> systems) {
+        Set<Kind> unbacked = EnumSet.noneOf(Kind.class);
+        for (Said said : claims(sentence)) {
+            boolean now = ran.stream().anyMatch(call -> "success".equals(call.status()) && backs(kindsOf(call.tool()), said.kind()));
+            if (now || !matching(said, thread, systems).isEmpty()) continue;
+            unbacked.add(said.kind());
+        }
+        return unbacked;
+    }
+
+    /** Une action qu'une phrase dit faite, ou nie : son genre, et la proposition qui la dit, où se lisent sa chose et son système. */
+    private record Said(Kind kind, String clause) {
     }
 
     /** Ce qu'une phrase annonce comme fait, par ses verbes. */
     static Set<Kind> claimedKinds(String sentence) {
         Set<Kind> kinds = EnumSet.noneOf(Kind.class);
+        claims(sentence).forEach(said -> kinds.add(said.kind()));
+        return kinds;
+    }
+
+    /** Ce qu'une phrase annonce comme fait, proposition par proposition. */
+    private static List<Said> claims(String sentence) {
+        List<Said> claims = new ArrayList<>();
         String s = masked(sentence).strip();
-        if (s.isEmpty() || QUESTION.matcher(s).find()) return kinds;
+        if (s.isEmpty() || QUESTION.matcher(s).find()) return claims;
         for (Form form : FORMS) {
             Matcher m = form.pattern().matcher(s);
             while (m.find()) {
@@ -329,18 +450,18 @@ public final class ActionClaimCheck {
                 boolean aboutTheAnswer = (kind == Kind.CREATE || kind == Kind.UPDATE)
                     && !WORKSPACE_THING.matcher(s.substring(start, end)).find();
                 if (aboutTheAnswer) continue;
-                kinds.add(kind);
+                claims.add(new Said(kind, s.substring(start, end)));
                 Matcher next = COORDINATED.matcher(s);
                 next.region(m.end(), s.length());
                 while (next.lookingAt()) {
                     String between = s.substring(next.regionStart(), verbStart(next));
                     if (NEGATION.matcher(between).find() || MODAL.matcher(between).find()) break;
-                    kinds.add(kindOf(next));
+                    claims.add(new Said(kindOf(next), s.substring(start, clauseEnd(s, next.end()))));
                     next.region(next.end(), s.length());
                 }
             }
         }
-        return kinds;
+        return claims;
     }
 
     /** Le texte que lisent les formes : sans emphase, les liens réduits à leur texte, un titre cité réduit à rien. */
@@ -430,6 +551,224 @@ public final class ActionClaimCheck {
     }
 
     // -------------------------------------------------------------------------
+    // Ce qu'une phrase nie (R204) : « je n'ai pas créé de projet », alors qu'il l'a été
+    // -------------------------------------------------------------------------
+
+    /** La première ligne du bloc qui dit ce qui a été fait, à la place d'une phrase qui le niait. */
+    static final String DONE_SIGNATURE = SIGNATURE + " · done";
+    /** Ce que le bloc dit au plus : les gestes que les phrases niaient, les premiers. */
+    private static final int MAX_DONE_SAID = 3;
+
+    /** Un infinitif d'action, en anglais puis en français, son genre dans le groupe nommé ({@code icreate}...). */
+    private static String infinitives(Kind kind) {
+        return switch (kind) {
+            case CREATE -> "create|add|file|cr[ée]er|ajouter";
+            case DELETE -> "delete|remove|erase|supprimer|effacer|retirer";
+            case UPDATE -> "change|modify|update|edit|rename|modifier|changer|renommer|mettre\\s+à\\s+jour";
+            case MOVE -> "move|d[ée]placer";
+            case ASSIGN -> "assign|reassign|assigner|attribuer";
+            case DELEGATE -> "delegate|hand\\s+over|d[ée]l[ée]guer|confier";
+            case MERGE -> "merge|fusionner";
+        };
+    }
+
+    private static final String INF = EnumSet.allOf(Kind.class).stream()
+        .map(kind -> "(?<i" + group(kind) + ">" + infinitives(kind) + ")")
+        .collect(Collectors.joining("|", "(?:", ")(?![\\p{L}\\p{N}])"));
+
+    /** Ce qui se glisse dans une négation : « not yet », « pas encore », « jamais vraiment ». */
+    private static final String SOFT = "(?:\\s+(?:yet|actually|really|even|in\\s+fact|encore|vraiment|du\\s+tout))*";
+    private static final String NOT_EN = "(?:did\\s+not|didn['’]t|have\\s+not|haven['’]t|has\\s+not|hasn['’]t|had\\s+not|"
+        + "hadn['’]t|could\\s+not|couldn['’]t|was\\s+not\\s+able\\s+to|wasn['’]t\\s+able\\s+to|were\\s+not\\s+able\\s+to|"
+        + "weren['’]t\\s+able\\s+to|was\\s+unable\\s+to|were\\s+unable\\s+to|never)";
+
+    /**
+     * Les formes d'une négation d'action : « I didn't create », « was not created », « no project was created », « je n'ai
+     * pas (encore, pu) créé(r) », « je ne l'ai pas créé », « je n'ai créé aucun projet », « n'a pas été créé ».
+     */
+    private static final List<Pattern> DENIALS = List.of(
+        Pattern.compile("\\b(?:i|we)\\s+" + NOT_EN + SOFT + "\\s+(?:" + INF + "|" + PP + ")", FLAGS),
+        Pattern.compile("\\b(?:was|were|is|are|has|have|had)\\s+(?:not|never)" + SOFT + "(?:\\s+been)?" + SOFT + "\\s+" + PP,
+            FLAGS),
+        Pattern.compile("\\b(?:wasn['’]t|weren['’]t|isn['’]t|aren['’]t|hasn['’]t|haven['’]t|hadn['’]t)" + SOFT + "(?:\\s+been)?"
+            + SOFT + "\\s+" + PP, FLAGS),
+        Pattern.compile("\\b(?:no|nothing|none)\\b[^.!?;:]{0,40}?\\b(?:was|were|has\\s+been|have\\s+been|got)" + SOFT + "\\s+"
+            + PP, FLAGS),
+        Pattern.compile("\\b(?:je|j['’]|nous)\\s*(?:ne\\s+|n['’]\\s*)(?:l['’]\\s*|les\\s+|lui\\s+|leur\\s+|en\\s+|y\\s+)?"
+            + "(?:ai|avons)\\s+(?:pas|jamais|rien|point)(?:\\s+(?:encore|vraiment|du\\s+tout|pu))*\\s+(?:" + INF + "|" + PP + ")",
+            FLAGS),
+        Pattern.compile("\\b(?:je|j['’]|nous)\\s*(?:ne\\s+|n['’]\\s*)(?:ai|avons)(?:\\s+encore)?\\s+" + PP
+            + "\\s+(?:aucun|aucune|rien)\\b", FLAGS),
+        Pattern.compile("\\bn['’]\\s*(?:a|ont|avait|avaient)\\s+(?:(?:toujours\\s+)?pas\\s+|jamais\\s+)?(?:encore\\s+)?[ée]t[ée]"
+            + "(?:\\s+encore)?\\s+" + PP, FLAGS));
+
+    /** Une condition n'affirme rien : « si je ne l'ai pas créé », « if it wasn't created ». */
+    private static final Pattern CONDITION = Pattern.compile("\\b(?:if|unless|whether|si|à\\s+moins)\\b", FLAGS);
+    /** Une autre chose que celle qui a été faite : « je n'ai pas créé d'autre projet ». */
+    private static final Pattern ANOTHER = Pattern.compile("\\b(?:another|other|others|autre|autres|second|deuxième|deuxieme)\\b",
+        FLAGS);
+    private static final Pattern KEY_IN = Pattern.compile("\\b" + KEY + "\\b", FLAGS);
+
+    /** Ce sur quoi porte un geste ou une phrase : une issue (une tâche, une carte), un projet, un commentaire, une note. */
+    enum Thing { ISSUE, PROJECT, COMMENT, NOTE }
+
+    private static final Map<Thing, Pattern> THINGS = Map.of(
+        Thing.ISSUE, Pattern.compile("\\b(?:issues?|cards?|tickets?|tasks?|bugs?|cartes?|t[âa]ches?)\\b", FLAGS),
+        Thing.PROJECT, Pattern.compile("\\b(?:projects?|projets?)\\b", FLAGS),
+        Thing.COMMENT, Pattern.compile("\\b(?:comments?|commentaires?)\\b", FLAGS),
+        Thing.NOTE, Pattern.compile("\\b(?:notes?)\\b", FLAGS));
+
+    /** Ce que nie une phrase, par ses verbes ; vide quand elle ne nie aucune action. */
+    static Set<Kind> deniedKinds(String sentence) {
+        Set<Kind> kinds = EnumSet.noneOf(Kind.class);
+        denials(sentence).forEach(said -> kinds.add(said.kind()));
+        return kinds;
+    }
+
+    /** Ce que nie une phrase, proposition par proposition : « je ne l'ai pas créé dans Linear » est une proposition. */
+    private static List<Said> denials(String sentence) {
+        List<Said> denials = new ArrayList<>();
+        String s = masked(sentence).strip();
+        if (s.isEmpty() || QUESTION.matcher(s).find()) return denials;
+        for (Pattern denial : DENIALS) {
+            Matcher m = denial.matcher(s);
+            while (m.find()) {
+                int start = clauseStart(s, m.start());
+                int end = clauseEnd(s, m.end());
+                if (CONDITION.matcher(s.substring(start, m.start())).find()) continue;
+                if (ANCHOR.matcher(s.substring(0, end)).find()) continue;
+                denials.add(new Said(deniedKind(m), s.substring(start, end)));
+            }
+        }
+        return denials;
+    }
+
+    /** Le genre du verbe nié : son participe, ou son infinitif dans les formes qui en ont un (« didn't create »). */
+    private static Kind deniedKind(Matcher m) {
+        Map<String, Integer> groups = m.namedGroups();
+        for (Kind kind : Kind.values()) {
+            if (m.group(group(kind)) != null) return kind;
+            String infinitive = "i" + group(kind);
+            if (groups.containsKey(infinitive) && m.group(infinitive) != null) return kind;
+        }
+        throw new IllegalStateException("A denied verb without its kind");
+    }
+
+    /**
+     * Les gestes que nie cette phrase : du même genre (« créé » pour une création), sur la même chose quand elle en nomme
+     * une (un projet, une issue), dans le même système quand elle en nomme un (« dans Linear » ne nie pas ce qui a été fait
+     * dans TaskForce), et jamais une autre chose qu'elle désigne (une autre clé, « un autre projet »). Une carte du tour
+     * qui attend la personne pour ce genre de geste est ce dont parle la phrase : elle ne nie rien de fait.
+     */
+    private static Set<Done> contradicted(String sentence, List<Done> done, List<Ran> ran, Set<String> systems) {
+        Set<Done> contradicted = new LinkedHashSet<>();
+        for (Said said : denials(sentence)) {
+            if (ANOTHER.matcher(said.clause()).find()) continue;
+            Set<Thing> things = thingsIn(said.clause());
+            boolean waiting = ran.stream().anyMatch(call -> ("pending".equals(call.status())
+                || AgentService.QUESTION.equals(call.status())) && backs(kindsOf(call.tool()), said.kind())
+                && (things.isEmpty() || things.contains(thingOf(call.tool()))));
+            if (!waiting) contradicted.addAll(matching(said, done, systems));
+        }
+        return contradicted;
+    }
+
+    /**
+     * Les gestes faits dont parle cette proposition : du même genre, sur la même chose quand elle en nomme une, dans le même
+     * système quand elle en nomme un, et la même clé quand elle en dit une.
+     */
+    private static List<Done> matching(Said said, List<Done> done, Set<String> systems) {
+        if (done.isEmpty()) return List.of();
+        Set<Thing> things = thingsIn(said.clause());
+        Set<String> named = systemsIn(said.clause(), systems);
+        List<String> keys = keysIn(said.clause());
+        List<Done> matching = new ArrayList<>();
+        for (Done act : done) {
+            if (!backs(kindsOf(act.tool()), said.kind())) continue;
+            if (!things.isEmpty() && !things.contains(thingOf(act.tool()))) continue;
+            if (!named.isEmpty() && named.stream().noneMatch(system -> system.equalsIgnoreCase(act.where()))) continue;
+            String output = act.output() == null ? "" : act.output().toUpperCase(Locale.ROOT);
+            if (!keys.isEmpty() && keys.stream().noneMatch(output::contains)) continue;
+            matching.add(act);
+        }
+        return matching;
+    }
+
+    /**
+     * Ce sur quoi porte un outil, d'après le dernier mot de son nom ({@code create_project}, {@code linear__save_issue}) ;
+     * null pour une autre chose ({@code create_issue_label} porte sur une étiquette).
+     */
+    static Thing thingOf(String tool) {
+        if (tool == null) return null;
+        int sep = tool.indexOf("__");
+        String bare = (sep >= 0 ? tool.substring(sep + 2) : tool).replaceAll("(\\p{Ll})(\\p{Lu})", "$1_$2").toLowerCase(Locale.ROOT);
+        String[] words = bare.split("[^a-z]+");
+        if (words.length == 0) return null;
+        String last = words[words.length - 1];
+        for (Map.Entry<Thing, Pattern> thing : THINGS.entrySet()) {
+            if (thing.getValue().matcher(last).matches()) return thing.getKey();
+        }
+        return null;
+    }
+
+    private static Set<Thing> thingsIn(String sentence) {
+        Set<Thing> things = EnumSet.noneOf(Thing.class);
+        THINGS.forEach((thing, pattern) -> { if (pattern.matcher(sentence).find()) things.add(thing); });
+        return things;
+    }
+
+    /** Les systèmes que la phrase nomme, parmi ceux que TaskForce connaît ici. */
+    private static Set<String> systemsIn(String sentence, Set<String> systems) {
+        Set<String> named = new LinkedHashSet<>();
+        for (String system : systems) {
+            if (system == null || system.isBlank()) continue;
+            Pattern word = Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(system) + "(?![\\p{L}\\p{N}])", FLAGS);
+            if (word.matcher(sentence).find()) named.add(system);
+        }
+        return named;
+    }
+
+    private static List<String> keysIn(String sentence) {
+        List<String> keys = new ArrayList<>();
+        Matcher key = KEY_IN.matcher(sentence);
+        while (key.find()) keys.add(key.group().toUpperCase(Locale.ROOT));
+        return keys;
+    }
+
+    /** Ce qui a été fait et reste fait : la conversation, puis les gestes réussis du tour. */
+    private static List<Done> doneIn(List<Done> thread, List<Ran> ran) {
+        List<Done> done = new ArrayList<>(thread == null ? List.of() : thread);
+        for (Ran call : ran) {
+            if ("success".equals(call.status()) && !kindsOf(call.tool()).isEmpty()) {
+                String connector = TargetSystems.connectorOf(call.tool());
+                done.add(new Done(call.tool(), connector == null ? TargetSystems.TASKFORCE : TargetSystems.plainName(connector),
+                    call.output()));
+            }
+        }
+        return done;
+    }
+
+    /** Les systèmes qu'une phrase peut nommer : ceux qu'on donne, TaskForce, et ceux où les gestes ont été faits. */
+    private static Set<String> names(Set<String> systems, List<Done> done) {
+        Set<String> names = new LinkedHashSet<>(systems == null ? Set.of() : systems);
+        names.add(TargetSystems.TASKFORCE);
+        done.forEach(act -> { if (act.where() != null) names.add(act.where()); });
+        return names;
+    }
+
+    /** Ce que dit TaskForce d'un geste qu'une phrase niait : qu'il a été fait, où, et ce qu'il a rendu. */
+    private static String doneTruth(Done act) {
+        String where = act.where() == null || act.where().isBlank() ? "" : ", in " + act.where();
+        String output = act.output() == null ? "" : act.output().replaceAll("\\s+", " ").replaceAll(" \\(id \\d+\\)", "")
+            .replace(" in " + TargetSystems.TASKFORCE, "").strip();
+        if (output.length() > 200) output = output.substring(0, 200).stripTrailing() + "...";
+        Set<Kind> kinds = kindsOf(act.tool());
+        String what = kinds.isEmpty() ? "done" : kinds.iterator().next().done();
+        return output.isEmpty() ? "This was " + what + " in this conversation" + where + "."
+            : "This was " + what + " in this conversation" + where + ": " + output;
+    }
+
+    // -------------------------------------------------------------------------
     // La vérité, depuis les résultats du tour
     // -------------------------------------------------------------------------
 
@@ -483,8 +822,16 @@ public final class ActionClaimCheck {
 
     /** Un bloc de TaskForce écrit par le modèle perd sa marque : il redevient une citation du modèle, relue comme telle. */
     private static String neutralized(String text) {
-        return FORGED.matcher(text).replaceAll("");
+        return RECORD_LINE.matcher(FORGED.matcher(text).replaceAll("")).replaceAll("");
     }
+
+    /**
+     * La ligne qui ouvre ce que TaskForce ajoute aux réponses d'avant pour le modèle ({@link ThreadActs#HEADER}) : le
+     * modèle qui la recopie ne parle pas pour TaskForce, elle disparaît de sa réponse ; ce qu'il écrit dessous est relu
+     * comme ses mots.
+     */
+    private static final Pattern RECORD_LINE = Pattern.compile("(?m)^[ \\t>]*\\[TaskForce record[^\\n]*\\n?",
+        Pattern.CASE_INSENSITIVE);
 
     private static final Pattern FORGED = Pattern.compile("\\[!taskforce]\\s?", Pattern.CASE_INSENSITIVE);
 

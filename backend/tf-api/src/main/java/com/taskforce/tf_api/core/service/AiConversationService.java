@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,11 @@ import com.taskforce.tf_api.core.model.AiMessage;
 import com.taskforce.tf_api.core.repository.AiConversationRepository;
 import com.taskforce.tf_api.core.repository.AiMessageRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.service.agent.ActionClaimCheck;
+import com.taskforce.tf_api.core.service.agent.CortexRecordService;
+import com.taskforce.tf_api.core.service.agent.CortexRecordService.Act;
+import com.taskforce.tf_api.core.service.agent.TargetSystems;
+import com.taskforce.tf_api.core.service.agent.ThreadActs;
 import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
 import com.taskforce.tf_api.core.service.ai.AttachedFile;
 import com.taskforce.tf_api.core.service.ai.ContextBudget;
@@ -72,6 +78,8 @@ public class AiConversationService {
     /** Ce qu'un message garde en plus de ce que le modèle a lu : les fichiers joints à une demande, la carte d'une réponse. */
     private static final String ATTACHED_FILES = "attachedFiles";
     private static final String CARD = "card";
+    /** Le dossier d'une réponse qui n'a pas gardé ce que le modèle a lu (une carte refaite sans lui, R135). */
+    private static final String ANSWER_RECORD = "answerRecord";
     /** Les messages relus pour retrouver la dernière carte préparée. */
     private static final int CARD_LOOKBACK = 12;
 
@@ -87,6 +95,9 @@ public class AiConversationService {
     private final AiMeter aiMeter; // gate quota + comptage de la conso tokens de la compression d'historique
     private final TransactionTemplate transactionTemplate;
     private final ProjectRepository projectRepository;
+    /** Le dossier de chaque réponse : ce qu'elle a fait repart avec elle au modèle (R204). */
+    private final CortexRecordService records;
+    private final TargetSystems targets;
 
     // ── Lecture ───────────────────────────────────────────────────────────────
 
@@ -123,6 +134,7 @@ public class AiConversationService {
         Map<String, Object> reading = new HashMap<>(message.getReading());
         reading.remove(ATTACHED_FILES);
         reading.remove(CARD);
+        reading.remove(ANSWER_RECORD);
         if (reading.isEmpty()) return null;
         try {
             return JSON.convertValue(reading, AssistantRead.class);
@@ -186,7 +198,7 @@ public class AiConversationService {
         if (kept.summary() != null) {
             out.add(summaryMessage(kept.summary()));
         }
-        kept.messages().forEach(message -> out.add(llmMessage(message)));
+        kept.messages().forEach(message -> out.add(llmMessage(message, kept.acts())));
         return out;
     }
 
@@ -214,8 +226,8 @@ public class AiConversationService {
             return chosen(kept, budget, 0);
         }
         save(conversationId, summary, pending.uptoId());
-        return chosen(new Kept(kept.workspaceId(), summary, kept.messages().subList(pending.count(), kept.messages().size())),
-            budget, pending.count());
+        return chosen(new Kept(kept.workspaceId(), summary, kept.messages().subList(pending.count(), kept.messages().size()),
+            kept.acts()), budget, pending.count());
     }
 
     /**
@@ -259,7 +271,7 @@ public class AiConversationService {
         appendMessage(conversationId, "assistant", written, COMPACT_MODE, 0, null,
             new AssistantRead(List.of(), List.of(), List.of(), 0, new ContextRead(pending.count(), 0, 0)));
         // Ce qui partira maintenant : le résumé, et les messages que la compaction n'a pas pris.
-        int[] sizes = sizes(kept.messages());
+        int[] sizes = sizes(kept.messages(), kept.acts());
         int left = 0;
         for (int i = pending.count(); i < sizes.length; i++) {
             left += sizes[i];
@@ -268,8 +280,11 @@ public class AiConversationService {
             window == null ? null : Integer.valueOf(window.tokens()), window != null && window.estimated());
     }
 
-    /** Ce qu'il y a à envoyer : le résumé courant, et les messages au-delà de son filigrane. */
-    private record Kept(Long workspaceId, String summary, List<AiMessage> messages) {}
+    /**
+     * Ce qu'il y a à envoyer : le résumé courant, les messages au-delà de son filigrane, et ce que chaque réponse a fait,
+     * par message, tel que son dossier le garde (R204).
+     */
+    private record Kept(Long workspaceId, String summary, List<AiMessage> messages, Map<Long, List<Act>> acts) {}
 
     /** Une compaction à faire : son prompt, sa longueur, ce qu'elle condense et le dernier message couvert (null : aucun). */
     private record Condensation(String prompt, int words, int count, Long uptoId) {}
@@ -283,7 +298,65 @@ public class AiConversationService {
         List<AiMessage> messages = messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, upto)
             .stream().filter(AiConversationService::reachedTheModel).toList();
         String summary = conv.getSummary();
-        return new Kept(conv.getWorkspaceId(), summary == null || summary.isBlank() ? null : summary, messages);
+        return new Kept(conv.getWorkspaceId(), summary == null || summary.isBlank() ? null : summary, messages,
+            actsOf(messages));
+    }
+
+    /**
+     * Ce que chaque réponse de ces messages a fait, lu dans son dossier en un seul appel (R204) : ses gestes, l'accord ou
+     * les réponses donnés sur ses cartes après elle compris. Une panne du dossier ne casse jamais le tour : l'historique
+     * part alors sans les gestes, comme avant.
+     */
+    private Map<Long, List<Act>> actsOf(List<AiMessage> messages) {
+        Map<Long, UUID> byMessage = new HashMap<>();
+        for (AiMessage message : messages) {
+            UUID record = recordOf(message);
+            if (record != null && message.getId() != null) byMessage.put(message.getId(), record);
+        }
+        if (byMessage.isEmpty()) return Map.of();
+        try {
+            Map<UUID, List<Act>> acts = records.acts(byMessage.values());
+            Map<Long, List<Act>> out = new HashMap<>();
+            byMessage.forEach((id, record) -> {
+                List<Act> done = acts.get(record);
+                if (done != null && !done.isEmpty()) out.put(id, done);
+            });
+            return out;
+        } catch (RuntimeException e) {
+            log.warn("Gestes de la conversation non relus au dossier : {}", LogSafe.of(e.getMessage()));
+            return Map.of();
+        }
+    }
+
+    /** Le dossier d'une réponse : celui que garde ce que le modèle a lu, ou celui gardé à part ; null sans dossier. */
+    private static UUID recordOf(AiMessage message) {
+        if (!"assistant".equals(message.getRole()) || message.getReading() == null) return null;
+        Object kept = message.getReading().get("record");
+        if (kept == null) kept = message.getReading().get(ANSWER_RECORD);
+        if (kept == null) return null;
+        try {
+            return UUID.fromString(kept.toString());
+        } catch (IllegalArgumentException unreadable) {
+            return null;
+        }
+    }
+
+    /**
+     * Ce qui a été fait dans cette conversation et reste fait (R204) : les gestes réussis de toutes ses réponses, condensées
+     * ou non, accords et réponses donnés sur les cartes compris, sauf ce que la personne a défait. Une phrase de Cortex qui
+     * le nie se corrige.
+     */
+    @Transactional(readOnly = true)
+    public List<ActionClaimCheck.Done> threadDone(Long conversationId) {
+        if (conversationId == null) return List.of();
+        List<AiMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+        Map<Long, List<Act>> acts = actsOf(messages);
+        List<ActionClaimCheck.Done> done = new ArrayList<>();
+        for (AiMessage message : messages) {
+            List<Act> of = acts.get(message.getId());
+            if (of != null) done.addAll(ThreadActs.done(of, targets::of));
+        }
+        return done;
     }
 
     /** La ligne de « /compact » et une demande qui n'a pas tenu la fenêtre restent dans le fil : le modèle ne les lit jamais. */
@@ -295,18 +368,24 @@ public class AiConversationService {
         return Map.of("role", "system", "content", "Summary of the earlier exchanges of this conversation: " + summary);
     }
 
-    /** Un message tel qu'il part au modèle : les fichiers joints à une demande restent avec elle (R134). */
-    private static Map<String, Object> llmMessage(AiMessage message) {
+    /**
+     * Un message tel qu'il part au modèle : les fichiers joints à une demande restent avec elle (R134) ; une réponse emporte
+     * ce que son dossier dit qu'elle a fait, et où (R204).
+     */
+    private Map<String, Object> llmMessage(AiMessage message, Map<Long, List<Act>> acts) {
         String files = AttachedFile.block(filesOf(message));
-        return Map.of("role", message.getRole(), "content", files.isEmpty() ? message.getContent() : message.getContent() + "\n\n" + files);
+        String content = files.isEmpty() ? message.getContent() : message.getContent() + "\n\n" + files;
+        List<Act> done = message.getId() == null ? null : acts.get(message.getId());
+        if (done != null) content = ThreadActs.withActs(content, done, targets::of);
+        return Map.of("role", message.getRole(), "content", content == null ? "" : content);
     }
 
     private static int tokensOf(Map<String, Object> message) {
         return ContextBudget.tokensOf(JSON, message);
     }
 
-    private static int[] sizes(List<AiMessage> messages) {
-        return messages.stream().mapToInt(message -> tokensOf(llmMessage(message))).toArray();
+    private int[] sizes(List<AiMessage> messages, Map<Long, List<Act>> acts) {
+        return messages.stream().mapToInt(message -> tokensOf(llmMessage(message, acts))).toArray();
     }
 
     private static int sum(int[] sizes, int count) {
@@ -326,7 +405,7 @@ public class AiConversationService {
             return null; // ce que la personne a joint prend toute la place : un résumé ne partirait pas davantage
         }
         int summary = kept.summary() == null ? 0 : tokensOf(summaryMessage(kept.summary()));
-        int[] sizes = sizes(kept.messages());
+        int[] sizes = sizes(kept.messages(), kept.acts());
         int total = summary + sum(sizes, sizes.length);
         boolean summaryTooLong = summary > budget.summaryTokens() * 2 && summary > budget.historyRoom();
         if (!budget.compactionDue(total) && !summaryTooLong) {
@@ -350,7 +429,7 @@ public class AiConversationService {
      * La compaction des {@code count} messages les plus anciens : son prompt tient la fenêtre du modèle, et s'il faut, le
      * résumé n'en couvre que les premiers ({@code count} le dit) ; les autres attendent, verbatim ou coupés pour ce tour.
      */
-    private static Condensation condensation(Kept kept, ContextBudget budget, int count) {
+    private Condensation condensation(Kept kept, ContextBudget budget, int count) {
         int words = budget.summaryWords();
         String ask = "\nUpdated summary (" + words + " words max):";
         int room = budget.capacity() - ContextBudget.tokensOf(JSON, summarySystem(words)) - ContextBudget.tokensOf(JSON, ask);
@@ -366,7 +445,7 @@ public class AiConversationService {
         int taken = 0;
         Long uptoId = null;
         for (AiMessage message : kept.messages().subList(0, count)) {
-            String line = summaryLine(message, perMessage);
+            String line = summaryLine(message, perMessage, kept.acts());
             used += ContextBudget.tokensOf(JSON, line);
             if (used > room) {
                 break;
@@ -385,11 +464,17 @@ public class AiConversationService {
         return String.format(Locale.ROOT, SUMMARY_SYSTEM, words);
     }
 
-    /** Une ligne du prompt de résumé : qui parle, et le début de ce qu'il a dit. */
-    private static String summaryLine(AiMessage message, int chars) {
+    /**
+     * Une ligne du prompt de résumé : qui parle, le début de ce qu'il a dit, et pour une réponse ce que son dossier dit
+     * qu'elle a fait (R204) : un résumé ne fait pas oublier au modèle un projet créé.
+     */
+    private String summaryLine(AiMessage message, int chars, Map<Long, List<Act>> acts) {
         String who = "assistant".equals(message.getRole()) ? "Cortex" : "User";
         String content = message.getContent() != null ? message.getContent() : "";
-        return "- " + who + ": " + clipped(content, chars).replace("\n", " ") + "\n";
+        List<Act> done = message.getId() == null ? null : acts.get(message.getId());
+        String block = done == null ? "" : ThreadActs.block(done, targets::of);
+        return "- " + who + ": " + clipped(content, chars).replace("\n", " ")
+            + (block.isEmpty() ? "" : " " + block.replace("\n", " ")) + "\n";
     }
 
     private static String clipped(String text, int chars) {
@@ -423,7 +508,7 @@ public class AiConversationService {
      * Ce qui part : le résumé puis les messages les plus récents qui tiennent, et ce qui n'a pas pu partir. Un résumé trop
      * long pour ce modèle (un plus grand l'a écrit, et le raccourcir a raté) part amputé de sa fin.
      */
-    private static TurnHistory.Fitted chosen(Kept kept, ContextBudget budget, int summarized) {
+    private TurnHistory.Fitted chosen(Kept kept, ContextBudget budget, int summarized) {
         List<Map<String, Object>> out = new ArrayList<>();
         int room = budget.historyRoom();
         int leftOut = 0;
@@ -440,9 +525,9 @@ public class AiConversationService {
                 room -= size;
             }
         }
-        int[] sizes = sizes(kept.messages());
+        int[] sizes = sizes(kept.messages(), kept.acts());
         int keep = ContextBudget.keepNewest(sizes, room);
-        kept.messages().subList(sizes.length - keep, sizes.length).forEach(message -> out.add(llmMessage(message)));
+        kept.messages().subList(sizes.length - keep, sizes.length).forEach(message -> out.add(llmMessage(message, kept.acts())));
         return new TurnHistory.Fitted(out, summarized, leftOut + sizes.length - keep);
     }
 
@@ -516,8 +601,19 @@ public class AiConversationService {
     @Transactional
     public void appendAnswer(Long conversationId, String content, String mode, long tokens, String model, AssistantRead read,
                              LastCard card) {
+        appendAnswer(conversationId, content, mode, tokens, model, read, card, null);
+    }
+
+    /**
+     * La même réponse, avec son dossier quand ce que le modèle a lu ne le garde pas (une carte refaite sans le modèle,
+     * R135) : ce qu'elle a fait repart avec elle au modèle aux tours suivants (R204).
+     */
+    @Transactional
+    public void appendAnswer(Long conversationId, String content, String mode, long tokens, String model, AssistantRead read,
+                             LastCard card, String record) {
         Map<String, Object> reading = read == null ? new HashMap<>() : JSON.convertValue(read, READING);
         if (card != null) reading.put(CARD, Map.of("tool", card.tool(), "input", card.input() == null ? "{}" : card.input()));
+        if (record != null && reading.get("record") == null) reading.put(ANSWER_RECORD, record);
         append(conversationId, "assistant", content, mode, tokens, model, reading.isEmpty() ? null : reading);
     }
 

@@ -581,10 +581,13 @@ public class EvalService {
         }
     }
 
-    private static ReplayCase replayCase(EvalCase evalCase) {
+    /** Le cas tel que le rejeu le joue : sa question, ses notes, sa cassette, et ce qui l'entourait (R204). */
+    static ReplayCase replayCase(EvalCase evalCase) {
+        String context = evalCase.getContext();
         return new ReplayCase(evalCase.getQuestion(), evalCase.getAskedOn(),
             read(evalCase.getNotes(), new TypeReference<List<FrozenNote>>() {}),
-            read(evalCase.getCassette(), new TypeReference<List<CassetteEntry>>() {}));
+            read(evalCase.getCassette(), new TypeReference<List<CassetteEntry>>() {}),
+            context == null || context.isBlank() ? ReplayContext.NONE : read(context, ReplayContext.class));
     }
 
     private static Result result(EvalResult result, EvalCase evalCase) {

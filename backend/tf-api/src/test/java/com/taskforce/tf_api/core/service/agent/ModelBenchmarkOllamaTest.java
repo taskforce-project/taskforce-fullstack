@@ -88,7 +88,7 @@ class ModelBenchmarkOllamaTest {
         client = new AiGatewayClient(gateway, status);
         // Une réponse sans outil ne lit que le client du modèle : le reste de Cortex n'y sert pas.
         AgentService agent = new AgentService(null, null, null, client, json, null, null, null, null, null, null, null, null, null,
-            null, null);
+            null, null, null);
 
         BrainAccessGuard access = mock(BrainAccessGuard.class);
         when(access.resolveAndAuthorize("acme", 7L)).thenReturn(Workspace.builder().id(1L).slug("acme").build());

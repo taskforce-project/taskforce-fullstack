@@ -41,6 +41,16 @@ describe("AnswerText : ce que TaskForce dit se voit comme sa parole (R116)", () 
     expect(screen.getByText("Answered by qwen3:8b, as you asked.")).toBeInTheDocument()
   })
 
+  it("says what was done when Cortex said it wasn't, under TaskForce's name (R204)", () => {
+    render(<AnswerText text={"> [!taskforce] TaskForce · done\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO.\n\nQuel nom ?"} />)
+
+    const note = screen.getByRole("note", { name: t.taskforceSaysLabel })
+    expect(note).toHaveAttribute("title", t.taskforceSaysDoneHint)
+    expect(note).toHaveTextContent(t.taskforceSaysDoneWhat)
+    expect(note).toHaveTextContent("This was created in this conversation, in TaskForce: Project created: TESTTASKFO.")
+    expect(screen.getByText("Quel nom ?")).toBeInTheDocument()
+  })
+
   it("renders an answer without a correction as Cortex's markdown only", () => {
     render(<AnswerText text={"TESTTA-2 is in **In review by AI**."} />)
 

@@ -63,6 +63,17 @@ class AiConversationServiceTest {
     @Mock private ProjectRepository projectRepository;
     @org.mockito.Spy private org.springframework.transaction.support.TransactionTemplate transactionTemplate =
         new com.taskforce.tf_api.util.InlineTransactionTemplate();
+    /** Le dossier de chaque réponse (R204) : ce qu'elle a fait repart avec elle. */
+    @Mock private com.taskforce.tf_api.core.service.agent.CortexRecordService records;
+    @org.mockito.Spy private com.taskforce.tf_api.core.service.agent.TargetSystems targets =
+        new com.taskforce.tf_api.core.service.agent.TargetSystems(catalog());
+
+    private static com.taskforce.tf_api.core.service.integration.ConnectorCatalog catalog() {
+        com.taskforce.tf_api.core.service.integration.ConnectorCatalog catalog =
+            new com.taskforce.tf_api.core.service.integration.ConnectorCatalog();
+        catalog.build();
+        return catalog;
+    }
 
     @InjectMocks private AiConversationService service;
 
@@ -653,5 +664,87 @@ class AiConversationServiceTest {
         assertThat(service.currentProject(5L)).isEqualTo(9L);
         when(conversationRepository.findById(6L)).thenReturn(Optional.empty());
         assertThat(service.currentProject(6L)).isNull();
+    }
+
+    // -------------------------------------------------------------------------
+    // R204 : ce que la conversation a fait repart au modèle (recette de la 1.17.0, s17, échanges 1 et 2)
+    // -------------------------------------------------------------------------
+
+    private static final java.util.UUID S17_RECORD = java.util.UUID.fromString("00000000-0000-0000-0000-000000000017");
+
+    /** La réponse de l'échange 1 de s17 : la question de TaskForce, à laquelle la personne a répondu sur sa carte. */
+    private static List<AiMessage> s17() {
+        AiMessage asked = msg(1L, "user", "Tu peux me creer un nouveau projet dans Linear la ou pas ?");
+        AiMessage answer = msg(2L, "assistant", "> [!taskforce] TaskForce · asks\n> What should the project be called?\n");
+        answer.setReading(new java.util.HashMap<>(Map.of("record", S17_RECORD.toString(), "notes", 0)));
+        return List.of(asked, answer);
+    }
+
+    private void s17Record() {
+        when(records.acts(any())).thenReturn(Map.of(S17_RECORD, List.of(
+            new com.taskforce.tf_api.core.service.agent.CortexRecordService.Act("create_project", "{}", "question",
+                "Nothing was done: TaskForce asks the person first.", "h1", null),
+            new com.taskforce.tf_api.core.service.agent.CortexRecordService.Act("create_project",
+                "{\"name\":\"Test Taskforce\"}", "success", "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).",
+                "h2", null))));
+    }
+
+    @Test
+    @DisplayName("R204 : la réponse repart au modèle avec ce que son dossier dit qu'elle a fait, la réponse de la carte comprise")
+    void the_history_carries_what_each_answer_did() {
+        when(llm.isConfigured()).thenReturn(true);
+        holding(s17());
+        s17Record();
+
+        TurnHistory.Fitted fitted = service.fit(1L, budget(8_192), "fast");
+
+        assertThat(fitted.messages()).hasSize(2);
+        assertThat((String) fitted.messages().get(0).get("content")).doesNotContain("TaskForce record");
+        assertThat((String) fitted.messages().get(1).get("content"))
+            .startsWith("> [!taskforce] TaskForce · asks")
+            .contains(com.taskforce.tf_api.core.service.agent.ThreadActs.HEADER)
+            .contains("- create_project, in TaskForce (name: Test Taskforce): done. Result: Project created in TaskForce: TESTTASKFO");
+    }
+
+    @Test
+    @DisplayName("R204 : ce qui a été fait dans la conversation, pour la vérification d'une phrase qui le nierait")
+    void what_the_conversation_did() {
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(1L)).thenReturn(s17());
+        s17Record();
+
+        assertThat(service.threadDone(1L)).containsExactly(new com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done(
+            "create_project", "TaskForce", "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12)."));
+        assertThat(service.threadDone(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R204 : un dossier qui ne se lit pas ne casse pas le tour ; l'historique part sans les gestes")
+    void an_unreadable_record_does_not_break_the_turn() {
+        when(llm.isConfigured()).thenReturn(true);
+        holding(s17());
+        when(records.acts(any())).thenThrow(new IllegalStateException("database down"));
+
+        TurnHistory.Fitted fitted = service.fit(1L, budget(8_192), "fast");
+
+        assertThat((String) fitted.messages().get(1).get("content")).doesNotContain("TaskForce record");
+    }
+
+    @Test
+    @DisplayName("R204 : une réponse sans lecture garde son dossier à part, sans rien montrer de plus à la réouverture")
+    void an_answer_without_reading_keeps_its_record() {
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+
+        service.appendAnswer(5L, "The card is ready in Web: check it, then create it.", "deep", 0, null, null, null,
+            S17_RECORD.toString());
+
+        assertThat(saved.getValue().getReading()).containsEntry("answerRecord", S17_RECORD.toString());
+        AiConversation conv = new AiConversation();
+        conv.setId(5L);
+        when(conversationRepository.findByIdAndUserId(5L, 7L)).thenReturn(Optional.of(conv));
+        AiMessage kept = saved.getValue();
+        kept.setId(3L);
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(5L)).thenReturn(List.of(kept));
+        assertThat(service.detail(5L, 7L).messages()).extracting(MessageDto::read).containsExactly((AssistantRead) null);
     }
 }

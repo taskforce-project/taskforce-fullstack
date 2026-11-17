@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.agent;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -268,6 +269,42 @@ public class CortexRecordService {
             .map(first -> parse(first.getData()).path("model").asText(""))
             .map(String::strip)
             .filter(model -> !model.isEmpty());
+    }
+
+    /**
+     * Un geste d'une réponse tel que son dossier le garde (R204) : l'outil, les arguments avec lesquels il a été demandé
+     * (après les réponses de la personne, pour un geste repris sur une carte), ce qu'il est devenu ({@code success},
+     * {@code pending}, {@code question}, {@code refused}, {@code error}, {@code undone}) et ce qu'il a rendu. {@code hash}
+     * : l'empreinte de son résultat ; {@code undoes} : pour un geste défait, l'empreinte du résultat qu'il défait.
+     */
+    public record Act(String tool, String arguments, String status, String output, String hash, String undoes) {}
+
+    /**
+     * Ce que chacun de ces dossiers a fait, geste par geste, dans l'ordre de sa chaîne : un accord ou des réponses donnés
+     * après la réponse comptent, puisqu'ils y entrent. Un seul appel à la base pour toute une conversation. Un dossier
+     * sans geste n'y est pas.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, List<Act>> acts(Collection<UUID> recordIds) {
+        if (recordIds == null || recordIds.isEmpty()) return Map.of();
+        Map<UUID, List<Act>> acts = new LinkedHashMap<>();
+        Map<UUID, Map<String, String>> asked = new HashMap<>();
+        for (CortexRecordEvent event : eventRepository.findByRecordIdInOrderByRecordIdAscSeqAsc(recordIds)) {
+            ObjectNode data = parse(event.getData());
+            String tool = data.path("tool").asText("");
+            if (tool.isEmpty()) continue;
+            Map<String, String> requested = asked.computeIfAbsent(event.getRecordId(), id -> new HashMap<>());
+            if ("action.requested".equals(event.getType())) {
+                requested.put(tool, data.path("arguments").asText(""));
+            } else if ("action.result".equals(event.getType())) {
+                String arguments = data.hasNonNull("arguments") ? data.path("arguments").asText("")
+                    : requested.getOrDefault(tool, "");
+                acts.computeIfAbsent(event.getRecordId(), id -> new ArrayList<>()).add(new Act(tool, arguments,
+                    data.path("status").asText(""), data.path("output").asText(""), event.getHash(),
+                    data.hasNonNull("ref") ? data.path("ref").asText() : null));
+            }
+        }
+        return acts;
     }
 
     /** Les événements du dossier, chaînés, tels qu'un export les relit et les vérifie. */

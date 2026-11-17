@@ -12,6 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Checked;
+import com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done;
 import com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Kind;
 import com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Ran;
 
@@ -256,5 +257,136 @@ class ActionClaimCheckTest {
     })
     void what_a_tool_does_comes_from_its_name(String tool, String expected) {
         assertThat(ActionClaimCheck.kindsOf(tool)).isEqualTo(kinds(expected));
+    }
+
+    // -------------------------------------------------------------------------
+    // R204 : ce que la conversation a fait, Cortex ne le nie pas (recette de la 1.17.0, 17/11/2026)
+    // -------------------------------------------------------------------------
+
+    /** Le projet que Cortex a créé dans TaskForce, sur la carte de sa question, au tour d'avant (s17, échange 1). */
+    private static final Done CREATED = new Done("create_project", "TaskForce",
+        "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).");
+    private static final Set<String> SYSTEMS = Set.of("TaskForce", "Linear");
+
+    @ParameterizedTest(name = "« {0} » nie le projet créé : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // L'échange 2 de s17, puis ce qu'un petit modèle écrit d'ordinaire.
+        "Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Je n'ai pas encore créé de projet faute de nom.                  | true",
+        "Je ne l'ai pas créé.                                             | true",
+        "Je n'ai créé aucun projet.                                       | true",
+        "Aucun projet n'a été créé.                                       | true",
+        "Le projet n'a pas encore été créé.                               | true",
+        "Je n'ai pas pu créer le projet.                                  | true",
+        "I didn't create the project because you gave no name.           | true",
+        "I haven't created any project yet.                               | true",
+        "No project was created.                                          | true",
+        "The project was not created.                                     | true",
+        "Nothing has been created.                                        | true",
+        // Ce qui ne nie pas le projet créé dans TaskForce : un autre système, une autre chose, une condition, un fait.
+        "Je ne l'ai pas créé dans Linear : il est dans TaskForce.         | false",
+        "I didn't create it in Linear, only in TaskForce.                 | false",
+        "Je n'ai pas créé de tâche.                                       | false",
+        "Je n'ai pas créé d'autre projet.                                 | false",
+        "Je n'ai pas supprimé le projet.                                  | false",
+        "Si je ne l'ai pas créé, dis-le moi.                              | false",
+        "Je l'ai créé dans TaskForce : TESTTASKFO.                        | false",
+        "Je ne peux pas créer de projet dans Linear.                      | false",
+        "Je n'ai pas d'outil pour créer des tâches dans Linear.           | false",
+        "Je n'ai créé que le projet TESTTASKFO.                           | false",
+        "Le projet n'a pas été créé hier.                                 | false",
+        "Has the project been created?                                    | false",
+    })
+    void a_sentence_that_denies_what_the_conversation_did(String sentence, boolean denies) {
+        Checked checked = ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS);
+
+        assertThat(checked.denied()).isEqualTo(denies);
+        assertThat(checked.corrected()).isEqualTo(denies);
+    }
+
+    @Test
+    @DisplayName("R204 : la phrase qui nie s'en va, et TaskForce dit ce qui a été fait, et où, sous sa signature")
+    void the_truth_of_what_was_done_takes_its_place() {
+        Checked checked = ActionClaimCheck.check(
+            "Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. Quel nom voulez-vous ?", List.of(),
+            List.of(CREATED), SYSTEMS);
+
+        assertThat(checked.answer()).isEqualTo(ActionClaimCheck.DONE_SIGNATURE
+            + "\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."
+            + "\n\nQuel nom voulez-vous ?");
+        assertThat(checked.denials()).singleElement()
+            .satisfies(denial -> assertThat(denial.sentence()).startsWith("Je n'ai pas créé de projet"));
+        assertThat(checked.claims()).isEmpty();
+        assertThat(checked.incident(List.of()))
+            .containsEntry("rule", "R204")
+            .containsEntry("denied", List.of("Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom."))
+            .containsEntry("kinds", List.of("create"));
+    }
+
+    @Test
+    @DisplayName("R204 : dire fait ce que la conversation a fait dit vrai, dans le système où elle l'a fait")
+    void saying_done_what_an_earlier_turn_did_is_true() {
+        assertThat(ActionClaimCheck.check("J'ai créé le projet TESTTASKFO dans TaskForce, pas dans Linear.", List.of(),
+            List.of(CREATED), SYSTEMS).corrected()).isFalse();
+        assertThat(ActionClaimCheck.check("Le projet a été créé.", List.of(), List.of(CREATED), SYSTEMS).corrected()).isFalse();
+        // Un autre système, une autre chose : rien de la conversation ne l'appuie.
+        assertThat(ActionClaimCheck.check("J'ai créé le projet dans Linear.", List.of(), List.of(CREATED), SYSTEMS).claims())
+            .hasSize(1);
+        assertThat(ActionClaimCheck.check("J'ai créé la tâche.", List.of(), List.of(CREATED), SYSTEMS).claims()).hasSize(1);
+        // Sans la conversation, la même phrase reste une annonce sans résultat (R116).
+        assertThat(ActionClaimCheck.check("Le projet a été créé.", List.of()).claims()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("R204 : la carte du tour qui attend la personne est ce dont parle « pas encore créé » ; rien de fait n'est nié")
+    void not_yet_speaks_of_the_card_of_the_turn() {
+        Checked checked = ActionClaimCheck.check("Je n'ai pas encore créé le projet : dis-moi son nom.",
+            List.of(new Ran("create_project", "question")), List.of(CREATED), SYSTEMS);
+
+        assertThat(checked.corrected()).isFalse();
+    }
+
+    @Test
+    @DisplayName("R204 : ce que ce tour a fait ne se nie pas non plus ; une lecture ne fait rien")
+    void what_this_turn_did_cannot_be_denied_either() {
+        List<Ran> turn = List.of(new Ran("create_project", "success", "Project created in TaskForce: WEB \"Site\" (id 3)."));
+
+        assertThat(ActionClaimCheck.check("I haven't created the project.", turn, List.of(), SYSTEMS).denied()).isTrue();
+        assertThat(ActionClaimCheck.check("I haven't created the project.", List.of(LIST), List.of(), SYSTEMS).corrected())
+            .isFalse();
+    }
+
+    @Test
+    @DisplayName("R204 : la banque relit la réponse montrée ; le bloc de TaskForce n'y nie rien")
+    void what_taskforce_says_denies_nothing() {
+        String raw = "No project was created.";
+
+        assertThat(ActionClaimCheck.denied(raw, List.of(), List.of(CREATED), Set.of())).hasSize(1);
+        assertThat(ActionClaimCheck.denied(ActionClaimCheck.check(raw, List.of(), List.of(CREATED), Set.of()).answer(),
+            List.of(), List.of(CREATED), Set.of())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R204 : la ligne de TaskForce que le modèle recopie disparaît de sa réponse, ce qui suit se relit")
+    void the_model_cannot_write_the_record_of_taskforce() {
+        Checked checked = ActionClaimCheck.check(ThreadActs.HEADER + "\n- create_issue, in TaskForce: done.", List.of(LIST));
+
+        assertThat(checked.answer()).doesNotContain("TaskForce record").isEqualTo("- create_issue, in TaskForce: done.");
+    }
+
+    @ParameterizedTest(name = "{0} : {1}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        "create_project            | PROJECT",
+        "create_issue              | ISSUE",
+        "linear__save_issue        | ISSUE",
+        "linear__save_project      | PROJECT",
+        "asana__create_tasks       | ISSUE",
+        "add_comment               | COMMENT",
+        "create_note               | NOTE",
+        "linear__create_issue_label | -",
+        "delegate_issue            | ISSUE",
+    })
+    void what_a_tool_acts_on_comes_from_the_last_word_of_its_name(String tool, String thing) {
+        assertThat(ActionClaimCheck.thingOf(tool)).isEqualTo(thing == null ? null : ActionClaimCheck.Thing.valueOf(thing));
     }
 }

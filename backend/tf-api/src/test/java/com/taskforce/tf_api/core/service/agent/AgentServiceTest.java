@@ -100,8 +100,17 @@ class AgentServiceTest {
     @Mock private IssueMaterial material;
     @Mock private com.taskforce.tf_api.core.service.agent.tools.ProjectResolver projects;
     @Mock private com.taskforce.tf_api.core.service.AiConversationService conversations;
+    /** Où écrit chaque outil, avec les noms du vrai catalogue (R204). */
+    @Spy private TargetSystems targets = new TargetSystems(builtCatalog());
 
     @InjectMocks private AgentService service;
+
+    private static com.taskforce.tf_api.core.service.integration.ConnectorCatalog builtCatalog() {
+        com.taskforce.tf_api.core.service.integration.ConnectorCatalog catalog =
+            new com.taskforce.tf_api.core.service.integration.ConnectorCatalog();
+        catalog.build();
+        return catalog;
+    }
 
     private static final UUID RECORD = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
@@ -2352,5 +2361,75 @@ class AgentServiceTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static ArgumentCaptor<List<Map<String, Object>>> captorOfMessages() {
         return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+    }
+
+    // -------------------------------------------------------------------------
+    // R204 : les échecs de Cortex à la recette de la 1.17.0 (16 et 17/11/2026), et leurs cas de la banque
+    // -------------------------------------------------------------------------
+
+    /** Le projet que Cortex a créé dans TaskForce sur la carte de sa question, à l'échange 1 de s17. */
+    private static final ActionClaimCheck.Done S17_CREATED = new ActionClaimCheck.Done("create_project", "TaskForce",
+        "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).");
+    private static final String S17_DENIAL = "Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom.";
+
+    @Test
+    @DisplayName("R204 (s17, échange 2) : Cortex nie le projet créé au tour d'avant ; TaskForce corrige, signé, et l'incident entre au dossier")
+    void a_denial_of_what_the_conversation_did_is_corrected() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", S17_DENIAL))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu l'as creer ou ? Je le vois pas dans linear",
+            TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE)
+            .contains("This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\".")
+            .doesNotContain("Je n'ai pas créé");
+        assertThat(answer.steps().getLast().status()).isEqualTo("error");
+        assertThat(answer.steps().getLast().description()).contains("wasn't done");
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Map<String, Object>> incident = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).incident(any(), any(), eq("Tu l'as creer ou ? Je le vois pas dans linear"), any(), incident.capture());
+        assertThat(incident.getValue()).containsEntry("rule", "R204").containsEntry("denied", List.of(S17_DENIAL));
+    }
+
+    @Test
+    @DisplayName("R204 : le modèle apprend que les réponses d'avant portent ce que TaskForce a fait, et qu'il ne le nie pas")
+    void the_prompt_says_how_to_read_what_was_done() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, "Tu l'as creer ou ?");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).contains(ThreadActs.HEADER)
+            .contains("never say that something it shows done was not done");
+    }
+
+    @Test
+    @DisplayName("R204 : le cas 1 du seed se rejoue avec ses tours d'avant ; le modèle reçoit le projet créé, sa phrase qui le nie est corrigée")
+    void the_seed_case_of_the_denial_replays_with_what_was_done() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", S17_DENIAL))));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        assertThat(sent.getValue()).extracting(message -> message.get("role"))
+            .containsExactly("system", "user", "assistant", "user");
+        assertThat(sent.getValue().get(2).get("content").toString()).contains(ThreadActs.HEADER)
+            .contains("- create_project, in TaskForce (name: Test Taskforce): done. Result: Project created in TaskForce: TESTTASKFO");
+        assertThat(outcome.thread()).extracting(ActionClaimCheck.Done::tool).containsExactly("create_project");
+        assertThat(outcome.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain("Je n'ai pas créé");
+        EvalCriteria criteria = json.readValue(row.criteria(), EvalCriteria.class);
+        assertThat(EvalGrader.grade(criteria, outcome).passed()).isTrue();
+        // La réponse que la Présidence a lue le 17/11/2026, sans correction ni tours d'avant : le cas la note ratée.
+        assertThat(EvalGrader.grade(criteria, new ReplayOutcome(S17_DENIAL, List.of(), "qwen3.5:9b", null)).passed()).isFalse();
     }
 }

@@ -108,6 +108,8 @@ public class AgentService {
     private final IssueMaterial       material;
     private final ProjectResolver     projects;
     private final AiConversationService conversations;
+    /** Où écrit chaque outil : TaskForce, ou l'outil connecté que son nom porte (R204). */
+    private final TargetSystems       targets;
 
     // Tier des tours avec outils externes MCP. Défaut "fast" ; "standard" pour plus de fiabilité
     // multi-outils si le matériel suit.
@@ -514,17 +516,25 @@ public class AgentService {
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
             String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, input.files(), reading), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
-            // TaskForce, et l'incident entre au dossier de la réponse (E17).
-            ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls));
+            // TaskForce, et l'incident entre au dossier de la réponse (E17). R204 : une phrase qui nie une action faite
+            // dans la conversation, ou dans ce tour, l'est aussi.
+            ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls),
+                threadDone(ctx), systemsOf(ctx));
             String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
             if (!checked.corrected()) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
             } else {
-                log.warn("Cortex (ws={}) : la réponse annonçait une action qu'aucun outil n'a faite, corrigée par TaskForce",
-                    ws.getId());
+                if (checked.denied()) {
+                    log.warn("Cortex (ws={}) : la réponse niait une action faite dans la conversation, corrigée par TaskForce",
+                        ws.getId());
+                } else {
+                    log.warn("Cortex (ws={}) : la réponse annonçait une action qu'aucun outil n'a faite, corrigée par TaskForce",
+                        ws.getId());
+                }
                 record = trustIncident(ctx, message, hits, toolCalls, checked, record);
-                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error",
-                    "Cortex said something was done that no action did: TaskForce corrected it"));
+                steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "error", checked.claims().isEmpty()
+                    ? "Cortex said something wasn't done that this conversation did: TaskForce corrected it"
+                    : "Cortex said something was done that no action did: TaskForce corrected it"));
             }
             // La question d'un geste se reconnaît à sa marque (R115) : la carte la montre à sa place ; et quand Cortex n'a
             // rien dit (qwen3:8b, souvent, après une demande de suppression), ce qui s'est passé se dit à sa place.
@@ -575,6 +585,29 @@ public class AgentService {
         } finally {
             llm.endUsageCapture();
         }
+    }
+
+    /**
+     * Ce qui a été fait dans la conversation de ce tour, et reste fait (R204) : rien hors d'une conversation. Une panne du
+     * dossier ne casse pas la réponse : elle se journalise, et la vérification ne voit que ce tour.
+     */
+    private List<ActionClaimCheck.Done> threadDone(AgentContext ctx) {
+        if (ctx.conversation() == null) return List.of();
+        try {
+            List<ActionClaimCheck.Done> done = conversations.threadDone(ctx.conversation());
+            return done == null ? List.of() : done;
+        } catch (RuntimeException e) {
+            log.warn("Cortex : gestes de la conversation non relus : {}", LogSafe.of(e.getMessage()));
+            return List.of();
+        }
+    }
+
+    /** Les systèmes qu'une phrase de Cortex peut nommer ici : TaskForce, et chaque outil connecté pour la personne. */
+    private Set<String> systemsOf(AgentContext ctx) {
+        Set<String> systems = new LinkedHashSet<>();
+        systems.add(TargetSystems.TASKFORCE);
+        for (AgentTool tool : workspaceMcp.toolsFor(ctx)) systems.add(targets.of(tool.name()));
+        return systems;
     }
 
     /** Le projet de ce tour : celui que la personne a joint à sa demande, quand il n'y en a qu'un, sinon celui de la conversation. */
@@ -1009,10 +1042,18 @@ public class AgentService {
             .map(note -> KnowledgeNode.builder().title(note.title()).domain(domainOf(note.domain()))
                 .content(note.content()).build())
             .toList();
+        // Les tours d'avant du cas, avec ce que chaque réponse a fait, partent comme ceux d'une conversation (R204).
+        ReplayContext context = replayCase.context();
+        List<Map<String, Object>> history = context.history().stream()
+            .map(turn -> Map.<String, Object>of("role", turn.role(), "content",
+                "assistant".equals(turn.role()) ? ThreadActs.withActs(turn.content(), turn.acts(), targets::of)
+                    : turn.content() == null ? "" : turn.content()))
+            .toList();
         // Le plan de la question, comme dans une réponse (R117) : la banque dit s'il est suivi.
         List<Map<String, Object>> messages = withHistory(systemPrompt(CortexPlans.forRequest(replayCase.question()).orElse(null),
-            "", notes, List.of(), replayCase.askedOn()), List.of(), replayCase.question());
+            "", notes, List.of(), replayCase.askedOn()), history, replayCase.question());
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
+        List<ActionClaimCheck.Done> thread = context.done(targets::of);
         llm.beginUsageCapture();
         try {
             String answer = toolLoop(messages, tools.toolDefinitions(List.of()), List.of(), new ArrayList<>(),
@@ -1020,11 +1061,11 @@ public class AgentService {
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
                 step, null, null);
-            // R116 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
+            // R116, R204 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
-            return new ReplayOutcome(ActionClaimCheck.check(answer, ran).answer(), step.calls, llm.currentModel(),
-                llm.currentUsage());
+            return new ReplayOutcome(ActionClaimCheck.check(answer, ran, thread, Set.of()).answer(), step.calls,
+                llm.currentModel(), llm.currentUsage(), thread);
         } finally {
             llm.endUsageCapture();
         }
@@ -1661,6 +1702,12 @@ public class AgentService {
           .append("Never create anything the user did not ask for. ")
           .append("Say that you created, changed or deleted something only when a tool result in this conversation ")
           .append("confirms it; if no tool ran or a tool failed, say plainly that it was not done. ")
+          // R204 : ce que les réponses d'avant ont fait repart avec elles, sous la ligne de TaskForce (ThreadActs).
+          .append("Your earlier replies may end with a block that TaskForce adds, starting with \"")
+          .append(ThreadActs.HEADER).append("\": it says what was really done, where (TaskForce or a connected tool), ")
+          .append("and what is still waiting for the person, including what the person approved or answered on a card ")
+          .append("after that reply. Rely on it: never say that something it shows done was not done, say where it was ")
+          .append("done, and never write such a block yourself. ")
           .append("Never name your tools or describe your internal steps to the user. ")
           .append("If you need data from an external system you have no tool for, call find_integration: when ")
           .append("the integration exists but is not connected, invite the user to connect it (Settings > ")

@@ -2486,6 +2486,9 @@ export const CONSTANTS_EN = {
     taskforceSaysWhat: "corrected what Cortex said was done",
     taskforceSaysLabel: "Correction by TaskForce",
     taskforceSaysHint: "Cortex said something was done, but no action of this turn did it. TaskForce replaced its sentence with what happened: these are not the model's words.",
+    // R204: the same correction when Cortex said something wasn't done that an action of this conversation did.
+    taskforceSaysDoneWhat: "corrected what Cortex said was not done",
+    taskforceSaysDoneHint: "Cortex said something wasn't done, but an action of this conversation did it. TaskForce replaced its sentence with what was done, and where: these are not the model's words.",
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
     issueCardTitle: "New issue, prepared by Cortex",
     issueCardHint: "Filled from your request and the project",

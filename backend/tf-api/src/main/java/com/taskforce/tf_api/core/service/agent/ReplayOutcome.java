@@ -8,10 +8,17 @@ import com.taskforce.tf_api.core.service.LlmUsage;
  * Ce qu'un rejeu a donné : la réponse du modèle, ses appels d'outils, le modèle qui a répondu, et l'usage, que
  * l'appelant compte comme celui d'une réponse.
  */
-public record ReplayOutcome(String answer, List<ReplayCall> calls, String model, LlmUsage usage) {
+public record ReplayOutcome(String answer, List<ReplayCall> calls, String model, LlmUsage usage,
+                            List<ActionClaimCheck.Done> thread) {
 
     public ReplayOutcome {
         calls = calls == null ? List.of() : List.copyOf(calls);
+        thread = thread == null ? List.of() : List.copyOf(thread);
+    }
+
+    /** Un rejeu d'une seule question : rien n'avait été fait avant elle. */
+    public ReplayOutcome(String answer, List<ReplayCall> calls, String model, LlmUsage usage) {
+        this(answer, calls, model, usage, List.of());
     }
 
     /**

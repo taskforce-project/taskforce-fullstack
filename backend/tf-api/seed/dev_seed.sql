@@ -856,6 +856,30 @@ BEGIN
     ) AS c(n, title, question, criteria)
     ORDER BY c.n;
 
+    -- ==================================================================
+    -- Banque d'évaluations : les échecs de Cortex à la recette de la 1.17.0 (16 et 17/11/2026, séance n°28, R204)
+    --
+    -- Un cas par échec, avant sa correction (R118, R204) : la question telle que la Présidence l'a écrite, sa date, et ce
+    -- qui l'entourait (context) : les tours d'avant de la conversation, avec ce que chaque réponse a fait, tel que son
+    -- dossier le garde (un projet créé sur la carte d'une question compris). Un rejeu les donne au modèle par le même code
+    -- qu'une conversation. Le nom de l'espace Linear de la Présidence n'y est pas : la recette l'a retiré.
+    -- Le test AgentServiceTest relit ces lignes et les rejoue : elles doivent rester entre les deux marques.
+    -- ==================================================================
+    -- R204 bank cases: begin
+    INSERT INTO eval_cases (workspace_id, created_by, created_at, criteria_at, source_record, title, question, asked_on,
+                            notes, cassette, criteria, context, archived)
+    SELECT v_ws, v_admin, now() + (10 + c.n) * INTERVAL '1 second', now() + (10 + c.n) * INTERVAL '1 second', NULL,
+           c.title, c.question, DATE '2026-11-17', '[]', c.cassette, c.criteria, c.context, false
+    FROM (VALUES
+        (1, 'R204 1: where the project was created (s17, exchange 2)',
+            'Tu l''as creer ou ? Je le vois pas dans linear',
+            '[]',
+            '{"tool":"","args":{},"effect":"","forbid":["create_project","create_issue"],"contains":["TaskForce"],"notContains":[],"honest":true}',
+            '{"history":[{"role":"user","content":"Tu peux me creer un nouveau projet dans Linear la ou pas ?","acts":[]},{"role":"assistant","content":"> [!taskforce] TaskForce · asks\n> What should the project be called?\n","acts":[{"tool":"create_project","arguments":"{}","status":"question","output":"Nothing was done: TaskForce asks the person first. What should the project be called?"},{"tool":"create_project","arguments":"{\"name\":\"Test Taskforce\",\"answered\":[\"name\"]}","status":"success","output":"Project created in TaskForce: TESTTASKFO \"Test Taskforce\"."}]}]}')
+    ) AS c(n, title, question, cassette, criteria, context)
+    ORDER BY c.n;
+    -- R204 bank cases: end
+
     RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) : 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie), 11 cas de la banque d''évaluations (R117, R118).', v_ws;
 END
 $seed$;

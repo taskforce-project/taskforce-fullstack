@@ -110,7 +110,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.answer").value("Done."));
         // Rien n'a changé de modèle : la personne décide d'un clic.
         org.assertj.core.api.Assertions.assertThat(used.get()).isNull();
-        verify(conversationService).appendAnswer(1L, "Done." + ModelCapabilityService.block(text), "deep", 0, null, null, null);
+        verify(conversationService).appendAnswer(1L, "Done." + ModelCapabilityService.block(text), "deep", 0, null, null, null, null);
     }
 
     @Test
@@ -132,7 +132,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.offer").doesNotExist());
         verify(capabilities, never()).offer(anyString(), any(), anyString());
         verify(conversationService).appendNotSent(1L, "Summarize", java.util.List.of());
-        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null, null);
+        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null, null, null);
     }
 
     @Test
@@ -150,7 +150,7 @@ class AssistantControllerWebMvcTest {
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:8b");
         verify(capabilities, never()).offer(anyString(), any(), anyString());
         verify(conversationService).appendAnswer(1L,
-            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null, null);
+            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null, null, null);
     }
 
     @Test
@@ -168,7 +168,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.model").value("qwen3:14b"));
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:14b");
         // Le modèle qui a répondu reste avec la réponse : une conversation rouverte le montre encore.
-        verify(conversationService).appendAnswer(1L, "Hi.", "deep", 0, "qwen3:14b", null, null);
+        verify(conversationService).appendAnswer(1L, "Hi.", "deep", 0, "qwen3:14b", null, null, null);
     }
 
     @Test
@@ -331,7 +331,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.answer.mode").value("stopped"));
         verify(capabilities, never()).offer(anyString(), any(), anyString());
-        verify(conversationService).appendAnswer(1L, "Stopped by you.", "stopped", 30, null, null, null);
+        verify(conversationService).appendAnswer(1L, "Stopped by you.", "stopped", 30, null, null, null, null);
     }
 
     @Test
@@ -348,7 +348,7 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Crée une issue Test\"}"))
             .andExpect(status().isOk());
         verify(conversationService).appendAnswer(1L, "Prête.", "deep", 0, null, null,
-            new TurnInput.LastCard("create_issue", "{\"title\":\"Test\"}"));
+            new TurnInput.LastCard("create_issue", "{\"title\":\"Test\"}"), null);
         org.assertj.core.api.Assertions.assertThat(sentInput().lastCard()).isNull();
     }
 
@@ -413,7 +413,7 @@ class AssistantControllerWebMvcTest {
         // Une issue sans son projet ne se lit pas.
         org.assertj.core.api.Assertions.assertThat(sentInput().attached())
             .containsExactly(new Screen(30L, 350L), new Screen(31L, null));
-        verify(conversationService).appendAnswer(1L, "Réponse", "fast", 0, "qwen3:8b", read, null);
+        verify(conversationService).appendAnswer(1L, "Réponse", "fast", 0, "qwen3:8b", read, null, null);
     }
 
     @Test

@@ -22,4 +22,7 @@ public interface CortexRecordEventRepository extends JpaRepository<CortexRecordE
     /** Les événements d'un genre, posés par un même acteur, dans ces dossiers : les notes du serveur, par exemple. */
     List<CortexRecordEvent> findByRecordIdInAndTypeAndActorKindOrderBySeqAsc(Collection<UUID> recordIds, String type,
                                                                             String actorKind);
+
+    /** Ces dossiers entiers, chacun dans l'ordre de sa chaîne : les gestes d'une conversation, lus en une fois (R204). */
+    List<CortexRecordEvent> findByRecordIdInOrderByRecordIdAscSeqAsc(Collection<UUID> recordIds);
 }

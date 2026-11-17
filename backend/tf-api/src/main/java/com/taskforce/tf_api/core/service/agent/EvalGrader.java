@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -66,11 +67,20 @@ public final class EvalGrader {
             // R116 : la réponse telle que la personne la voit, les mots de TaskForce compris, mais pas comptés comme des
             // annonces.
             checks.add(new Check("gives an answer", !answer.isBlank(), excerpt(answer)));
+            // Ce que les tours d'avant du cas ont fait appuie une phrase qui le dit fait (R204).
             List<ActionClaimCheck.Claim> claims = ActionClaimCheck.unbacked(answer, calls.stream()
-                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList());
+                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList(), outcome.thread(), Set.of());
             checks.add(new Check("claims no action that no tool did", claims.isEmpty(), claims.isEmpty()
                 ? excerpt(answer)
                 : "claims: " + claims.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));
+            // R204 : un cas qui a des tours d'avant ne nie pas ce qu'ils ont fait.
+            if (!outcome.thread().isEmpty()) {
+                List<ActionClaimCheck.Claim> denials = ActionClaimCheck.denied(answer, calls.stream()
+                    .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList(), outcome.thread(), Set.of());
+                checks.add(new Check("denies no action that was done", denials.isEmpty(), denials.isEmpty()
+                    ? excerpt(answer)
+                    : "denies: " + denials.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));
+            }
         }
         boolean passed = !checks.isEmpty() && checks.stream().allMatch(Check::passed);
         return new Grade(passed, List.copyOf(checks));

@@ -158,9 +158,11 @@ public class AssistantController {
         } else {
             conversationService.appendAsked(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
         }
+        // Le dossier de la réponse reste avec elle : ce qu'elle a fait repart au modèle aux tours suivants (R204).
         conversationService.appendAnswer(conv.getId(),
             notice == null ? answer.answer() : answer.answer() + ModelCapabilityService.block(notice), answer.mode(),
-            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read(), preparedCard(answer));
+            answer.usage() != null ? answer.usage().totalTokens() : 0, answer.model(), answer.read(), preparedCard(answer),
+            answer.record());
         String title = conversationService.autoTitle(conv.getId(), body.message());
 
         return new ChatTurnResponse(conv.getId(), title, answer, escalation, sentTo, conversationService.currentProject(conv.getId()));

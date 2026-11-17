@@ -62,6 +62,14 @@ describe("splitAnswer : ce que Cortex écrit, ce que TaskForce dit (R116)", () =
     ])
   })
 
+  it("reads what was done in the conversation apart from a correction of an action never done (R204)", () => {
+    const answer = "> [!taskforce] TaskForce · done\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\".\n\nQuel nom ?"
+    expect(splitAnswer(answer)).toEqual([
+      { by: "taskforce", lines: ["This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."], kind: "done" },
+      { by: "cortex", text: "Quel nom ?" },
+    ])
+  })
+
   it("gives nothing for an empty answer", () => {
     expect(splitAnswer("")).toEqual([])
   })
