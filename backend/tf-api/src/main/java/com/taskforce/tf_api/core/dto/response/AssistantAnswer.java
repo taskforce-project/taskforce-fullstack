@@ -159,20 +159,35 @@ public record AssistantAnswer(
      * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024). {@code questions} : ce que
      * TaskForce demande à la personne avant le geste (R115), deux questions au plus dans la même carte, avec un statut
      * question ; la carte montre leurs choix, et {@code ref} nomme alors la carte à laquelle les réponses se rattachent.
+     * {@code where} : où écrit l'appel, que sa carte dit avant le geste (R204) ; null pour une lecture.
      */
     public record AssistantToolCall(String name, String status, String input, String output, String record, String ref,
-                                    Map<String, Object> target, List<AssistantQuestion> questions) {
+                                    Map<String, Object> target, List<AssistantQuestion> questions, AssistantWhere where) {
+        /** Un appel dont la cible n'est pas dite : une lecture, ou une réponse d'avant R204. */
+        public AssistantToolCall(String name, String status, String input, String output, String record, String ref,
+                                 Map<String, Object> target, List<AssistantQuestion> questions) {
+            this(name, status, input, output, record, ref, target, questions, null);
+        }
+
         /** Un appel sans question de TaskForce. */
         public AssistantToolCall(String name, String status, String input, String output, String record, String ref,
                                  Map<String, Object> target) {
-            this(name, status, input, output, record, ref, target, null);
+            this(name, status, input, output, record, ref, target, null, null);
         }
 
         /** Un appel sans empreinte ni issue : une proposition, ou une réponse d'avant les gestes. */
         public AssistantToolCall(String name, String status, String input, String output, String record) {
-            this(name, status, input, output, record, null, null, null);
+            this(name, status, input, output, record, null, null, null, null);
         }
     }
+
+    /**
+     * Où écrit une action, que sa carte dit avant le geste (R204, R201 « demander ») : {@code system}, « TaskForce » ou
+     * l'outil connecté (« Linear ») ; {@code workspace}, l'espace de TaskForce où elle écrit, null ailleurs ; {@code asked},
+     * l'outil que la demande nommait quand l'action écrit ailleurs (« crée un projet dans Linear » et un projet de
+     * TaskForce), null sinon. Null pour une lecture.
+     */
+    public record AssistantWhere(String system, String workspace, String asked) {}
 
     /**
      * Une question de TaskForce avant un geste (R115), dans la forme des questions de Claude : l'argument que la réponse

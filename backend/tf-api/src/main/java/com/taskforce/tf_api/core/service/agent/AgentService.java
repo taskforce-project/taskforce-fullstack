@@ -37,8 +37,11 @@ import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantSource;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantStep;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantToolCall;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage;
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantWhere;
 import com.taskforce.tf_api.core.dto.response.ChatTurnResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectResponse;
+import com.taskforce.tf_api.core.enums.ConnectionScope;
+import com.taskforce.tf_api.core.enums.ToolClass;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.harness.rules.RulesEngine;
 import com.taskforce.tf_api.core.service.rules.RuleApprovers;
@@ -64,6 +67,7 @@ import com.taskforce.tf_api.core.service.ai.TurnStoppedException;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
+import com.taskforce.tf_api.core.service.mcp.McpClient;
 import com.taskforce.tf_api.core.service.mcp.WorkspaceMcpService;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -282,7 +286,8 @@ public class AgentService {
         AgentContext ctx = new AgentContext(slug, ws.getId(), userId,
             new Screen(longOrNull(where.path("projectId")), longOrNull(where.path("issueId"))));
         String argsJson = args.toString();
-        ToolOutcome outcome = new Kernel(ctx, record).apply(tool, toolName, argsJson);
+        Kernel kernel = new Kernel(ctx, record, ws.getName());
+        ToolOutcome outcome = kernel.apply(tool, toolName, argsJson);
         // Le projet que la personne vient de choisir sur la carte devient celui de sa conversation (R135) : la rangée le
         // montre, et la question ne revient pas au geste suivant.
         if (said.containsKey(ProjectResolver.FIELD) && "pending".equals(outcome.status())) {
@@ -290,7 +295,7 @@ public class AgentService {
         }
         String shown = outcome.input() != null ? outcome.input() : argsJson;
         return new AssistantToolCall(toolName, outcome.status(), shown, outcome.result(), record.toString(), outcome.ref(),
-            outcome.target(), card(outcome.questions()));
+            outcome.target(), card(outcome.questions()), kernel.where(tool, toolName));
     }
 
     private void adoptProject(JsonNode conversation, String project, Long workspaceId, AgentContext ctx) {
@@ -476,7 +481,7 @@ public class AgentService {
             input.conversation());
 
         // « Tu t'es trompé de projet », après une carte : le choix du projet, sans le modèle (R135).
-        AssistantAnswer corrected = input.lastCard() == null ? null : correctProject(ws.getId(), ctx, message, input.lastCard());
+        AssistantAnswer corrected = input.lastCard() == null ? null : correctProject(ws, ctx, message, input.lastCard());
         if (corrected != null) return corrected;
 
         // Salutation ou remerciement : réponse directe, sans recherche (pas de sources hors sujet). Ce qui est joint se lit.
@@ -514,7 +519,8 @@ public class AgentService {
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
-            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, input.files(), reading), toolCalls);
+            String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, input.files(), reading,
+                ws.getName()), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
             // TaskForce, et l'incident entre au dossier de la réponse (E17). R204 : une phrase qui nie une action faite
             // dans la conversation, ou dans ce tour, l'est aussi.
@@ -643,7 +649,8 @@ public class AgentService {
      * par le modèle. Quand la phrase nomme un autre projet, la carte y est refaite tout de suite. Null quand la phrase n'en
      * dit rien, ou qu'il n'y a qu'un projet à proposer : le tour continue comme d'habitude.
      */
-    private AssistantAnswer correctProject(Long workspaceId, AgentContext ctx, String message, LastCard last) {
+    private AssistantAnswer correctProject(Workspace ws, AgentContext ctx, String message, LastCard last) {
+        Long workspaceId = ws.getId();
         if (!ProjectCorrection.asks(message)) return null;
         AgentTool tool = tools.get(last.tool());
         if (tool == null) return null;
@@ -651,7 +658,7 @@ public class AgentService {
         String was = args.path(ProjectResolver.FIELD).asText("");
         args.remove(ProjectResolver.FIELD);
         args.remove(Question.ANSWERED);
-        Kernel kernel = new Kernel(ctx, message, origin(null, List.of()));
+        Kernel kernel = new Kernel(ctx, message, origin(null, List.of()), ws.getName());
         ToolOutcome outcome;
         Optional<ProjectResponse> written = projects.writtenIn(ctx).filter(project -> !project.getIdentifier().equalsIgnoreCase(was));
         if (written.isPresent()) {
@@ -667,7 +674,7 @@ public class AgentService {
         }
         String shown = outcome.input() != null ? outcome.input() : args.toString();
         List<AssistantToolCall> calls = List.of(new AssistantToolCall(last.tool(), outcome.status(), shown, outcome.result(),
-            kernel.recordRef(), outcome.ref(), outcome.target(), card(outcome.questions())));
+            kernel.recordRef(), outcome.ref(), outcome.target(), card(outcome.questions()), kernel.where(tool, last.tool())));
         String text;
         if (outcome.questions() != null) {
             text = askedAnswer(asking(outcome.questions()), calls);
@@ -920,7 +927,7 @@ public class AgentService {
 
     private String runToolLoop(String message, List<KnowledgeNode> hits, AgentContext ctx,
                                List<AssistantToolCall> toolCalls, TurnHistory memory,
-                               List<Screen> attached, List<AttachedFile> files, Reading reading) {
+                               List<Screen> attached, List<AttachedFile> files, Reading reading, String workspace) {
         // Outils externes (serveurs MCP connectés sur le workspace), découverts par requête et bornés par
         // pertinence avant l'envoi : un gros serveur MCP envoyé en entier sature un petit modèle.
         List<AgentTool> external = relevantExternal(workspaceMcp.toolsFor(ctx), message);
@@ -949,7 +956,9 @@ public class AgentService {
                     reading.board(board);
                 }
             });
-        CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
+        // Une demande qui nomme un outil connecté (« crée un projet dans Linear ») ne prend aucun plan de TaskForce (R204) :
+        // le plan « créer un projet » posait lui-même la question d'un projet de TaskForce, et le créait dans TaskForce.
+        CortexPlans.Plan plan = targets.namedIn(message).isEmpty() ? CortexPlans.forRequest(message).orElse(null) : null;
         // Résumer une issue : TaskForce la lit et la donne au modèle avant qu'il écrive, au lieu d'espérer qu'il la lise
         // (test du CEO du 05/11/2026 : qwen3:8b commentait OPS-35 avec ce qu'elle ne dit pas). Une issue jointe se lit
         // aussi, résumé ou non.
@@ -998,7 +1007,7 @@ public class AgentService {
         // Une issue importée d'un outil de l'entreprise sous les yeux de la réponse (séance n°22, R158) : un contenu du
         // dehors, que le socle compte avant une écriture ou une sortie, et que le dossier garde.
         if (gate.importedInView(ctx, joined, read == null ? List.of() : read.ids())) origin.put(CortexGate.IMPORTED, true);
-        Kernel kernel = new Kernel(ctx, message, origin);
+        Kernel kernel = new Kernel(ctx, message, origin, workspace);
         String answer = toolLoop(messages, toolDefs, external, toolCalls, (msgs, defs) -> llm.rawChat(msgs, defs, tier), kernel,
             reading, loopFit);
         // Le geste du plan, quand Cortex ne l'a pas fait et que rien n'attend déjà la personne (une carte, une question).
@@ -1024,11 +1033,11 @@ public class AgentService {
             // Le geste a trouvé ce qu'il lui faut : sa carte attend la personne, la réponse dit où décider (cardAnswer).
             if (!"pending".equals(outcome.status()) || outcome.target() == null) return answer;
             toolCalls.add(new AssistantToolCall(name, outcome.status(), input, outcome.result(), kernel.recordRef(),
-                outcome.ref(), outcome.target()));
+                outcome.ref(), outcome.target(), null, kernel.where(gesture, name)));
             return answer;
         }
         toolCalls.add(new AssistantToolCall(name, outcome.status(), input, outcome.result(), kernel.recordRef(), outcome.ref(),
-            outcome.target(), card(outcome.questions())));
+            outcome.target(), card(outcome.questions()), kernel.where(gesture, name)));
         return asking(outcome.questions());
     }
 
@@ -1049,14 +1058,19 @@ public class AgentService {
                 "assistant".equals(turn.role()) ? ThreadActs.withActs(turn.content(), turn.acts(), targets::of)
                     : turn.content() == null ? "" : turn.content()))
             .toList();
-        // Le plan de la question, comme dans une réponse (R117) : la banque dit s'il est suivi.
-        List<Map<String, Object>> messages = withHistory(systemPrompt(CortexPlans.forRequest(replayCase.question()).orElse(null),
-            "", notes, List.of(), replayCase.askedOn()), history, replayCase.question());
+        // Les outils connectés du cas, figés, choisis par le même code qu'une réponse (R204) : jamais exécutés.
+        List<AgentTool> external = relevantExternal(context.external().stream().map(this::frozen).toList(),
+            replayCase.question());
+        // Le plan de la question, comme dans une réponse (R117, R204) : la banque dit s'il est suivi.
+        CortexPlans.Plan plan = targets.namedIn(replayCase.question()).isEmpty()
+            ? CortexPlans.forRequest(replayCase.question()).orElse(null) : null;
+        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, "", notes, external, replayCase.askedOn()), history,
+            replayCase.question());
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
         List<ActionClaimCheck.Done> thread = context.done(targets::of);
         llm.beginUsageCapture();
         try {
-            String answer = toolLoop(messages, tools.toolDefinitions(List.of()), List.of(), new ArrayList<>(),
+            String answer = toolLoop(messages, tools.toolDefinitions(external), external, new ArrayList<>(),
                 (msgs, defs) -> model == null || model.isBlank()
                     ? llm.rawChat(msgs, defs, "fast")
                     : llm.rawChatWithModel(msgs, defs, model),
@@ -1069,6 +1083,17 @@ public class AgentService {
         } finally {
             llm.endUsageCapture();
         }
+    }
+
+    /**
+     * Un outil connecté tel que le cas l'a figé (R204) : son nom, ce qu'il dit de lui, son schéma et sa classe, jugés par les
+     * règles comme dans une réponse. Sans client : au rejeu, rien ne l'exécute, une lecture vient de la cassette et une
+     * écriture est proposée.
+     */
+    private AgentTool frozen(ReplayContext.FrozenTool tool) {
+        return new ExternalMcpTool(null, new McpClient.ServerRef(tool.connector(), null, null),
+            new McpClient.ToolDef(tool.name(), tool.description(), tool.inputSchema(), tool.readOnly()), objectMapper,
+            tool.readOnly() ? ToolClass.READ : ToolClass.WRITE, ConnectionScope.PERSONAL);
     }
 
     /**
@@ -1100,6 +1125,11 @@ public class AgentService {
         ToolOutcome apply(AgentTool tool, String name, String argsJson);
 
         String recordRef();
+
+        /** Où écrit cet appel, que sa carte dit (R204) ; rien pour une lecture, ni au rejeu, qui ne montre pas de carte. */
+        default AssistantWhere where(AgentTool tool, String name) {
+            return null;
+        }
     }
 
     /**
@@ -1228,6 +1258,16 @@ public class AgentService {
     private static final String ASKED_TEXT = "This can't be undone from the conversation, so it waits for the person's "
         + "approval on the card below. Do not call this tool again; say in one sentence what you propose.";
 
+    /**
+     * Ce que lit le modèle d'une écriture qui ne va pas où la demande le disait (R204) : rien n'est fait, la carte le dit, et
+     * sa phrase ne prétend pas le contraire.
+     */
+    static String elsewhereText(String asked, String system) {
+        return "Not done: the person asked for " + asked + ", and this action writes in " + system + ". It waits for the "
+            + "person's approval on the card below, which says so. Do not call this tool again; tell the person in one "
+            + "sentence that this would be done in " + system + ", not in " + asked + ".";
+    }
+
     /** Une lecture, ou un résultat que « Undo » défait : Cortex le fait sans demander, quand les règles le permettent. */
     private static boolean doneAtOnce(String name, CortexGate.Verdict verdict) {
         return CortexGate.READS.contains(verdict.facts().get("action")) || CortexUndo.TOOLS.contains(name);
@@ -1321,7 +1361,7 @@ public class AgentService {
                     : step.apply(tool, name, argsJson);
                 String shown = outcome.input() != null ? outcome.input() : argsJson;
                 toolCalls.add(new AssistantToolCall(name, outcome.status(), shown, outcome.result(), step.recordRef(),
-                    outcome.ref(), outcome.target(), card(outcome.questions())));
+                    outcome.ref(), outcome.target(), card(outcome.questions()), tool == null ? null : step.where(tool, name)));
                 if (reading != null && tool != null && "success".equals(outcome.status())
                         && CortexGate.READS.contains(CortexGate.facts(tool).get("action"))) {
                     reading.tool(name);
@@ -1438,18 +1478,46 @@ public class AgentService {
         /** La dernière décision des règles du travail, avec ce qu'un accord doit réunir dans chaque projet. */
         private CortexGate.Judged lastJudged;
         private UUID record;
+        /** L'espace de TaskForce où ses outils écrivent, que la carte d'une écriture nomme (R204). */
+        private final String workspace;
+        /** Les outils que la demande nomme (« dans Linear ») : une écriture ailleurs se montre comme telle (R204). */
+        private final List<TargetSystems.Named> named;
 
-        Kernel(AgentContext ctx, String question, Map<String, Object> origin) {
+        Kernel(AgentContext ctx, String question, Map<String, Object> origin, String workspace) {
             this.ctx = ctx;
             this.question = question;
             this.origin = origin;
             this.exposure = CortexGate.Exposure.of(origin);
+            this.workspace = workspace;
+            this.named = targets.namedIn(question);
         }
 
-        /** Le noyau d'un geste qui reprend après la réponse de la personne : le dossier est celui de sa question. */
-        Kernel(AgentContext ctx, UUID record) {
-            this(ctx, null, Map.of());
+        /**
+         * Le noyau d'un geste qui reprend après la réponse de la personne : le dossier est celui de sa question. Sa carte a
+         * déjà dit où le geste écrirait, et l'outil que la demande nommait : la personne a répondu en le sachant.
+         */
+        Kernel(AgentContext ctx, UUID record, String workspace) {
+            this(ctx, null, Map.of(), workspace);
             this.record = record;
+        }
+
+        /**
+         * Où écrit cet appel, que sa carte dit avant le geste (R204) : TaskForce et son espace, ou l'outil connecté ; et
+         * l'outil que la demande nommait quand l'appel écrit ailleurs. Rien pour une lecture.
+         */
+        @Override
+        public AssistantWhere where(AgentTool tool, String name) {
+            if (CortexGate.READS.contains(CortexGate.facts(tool).get("action"))) return null;
+            String system = targets.of(name);
+            TargetSystems.Named asked = elsewhere(system);
+            return new AssistantWhere(system, TargetSystems.TASKFORCE.equals(system) ? workspace : null,
+                asked == null ? null : asked.name());
+        }
+
+        /** L'outil que la demande nomme quand cette écriture n'y écrit pas ; null quand elle y écrit, ou n'en nomme aucun. */
+        private TargetSystems.Named elsewhere(String system) {
+            if (named.isEmpty() || named.stream().anyMatch(tool -> tool.is(system))) return null;
+            return named.get(0);
         }
 
         /**
@@ -1516,9 +1584,12 @@ public class AgentService {
                         status = "pending";
                         if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
                     }
-                } else if (!doneAtOnce(name, verdict)) {
+                } else if (!doneAtOnce(name, verdict) || elsewhere(targets.of(name)) != null) {
+                    // R204 : une écriture qui ne va pas dans l'outil que la demande nomme ne se fait pas d'emblée, même
+                    // quand elle se défait : sa carte dit où elle écrirait, et la personne décide.
+                    TargetSystems.Named instead = elsewhere(targets.of(name));
                     String resolved = ask(tool, argsJson);
-                    result = ASKED_TEXT;
+                    result = instead == null ? ASKED_TEXT : elsewhereText(instead.name(), targets.of(name));
                     status = "pending";
                     if (!resolved.equals(argsJson)) shown = resolved;
                 } else {

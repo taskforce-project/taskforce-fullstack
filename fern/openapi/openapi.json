@@ -19311,6 +19311,23 @@
             "items": {
               "$ref": "#/components/schemas/AssistantQuestion"
             }
+          },
+          "where": {
+            "$ref": "#/components/schemas/AssistantWhere"
+          }
+        }
+      },
+      "AssistantWhere": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          },
+          "asked": {
+            "type": "string"
           }
         }
       },

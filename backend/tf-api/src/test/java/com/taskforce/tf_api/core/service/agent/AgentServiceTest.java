@@ -2432,4 +2432,140 @@ class AgentServiceTest {
         // La réponse que la Présidence a lue le 17/11/2026, sans correction ni tours d'avant : le cas la note ratée.
         assertThat(EvalGrader.grade(criteria, new ReplayOutcome(S17_DENIAL, List.of(), "qwen3.5:9b", null)).passed()).isFalse();
     }
+
+    /** La demande de l'échange 1 de s17 : un projet dans Linear. */
+    private static final String S17_ASK = "Tu peux me creer un nouveau projet dans Linear la ou pas ?";
+
+    @Test
+    @DisplayName("R204 (s17, échange 1) : la demande nomme Linear ; TaskForce ne pose pas lui-même la question d'un projet de TaskForce")
+    void a_request_that_names_a_connected_tool_gets_no_taskforce_plan() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Quel nom voulez-vous donner au projet ?\"}"));
+        CortexGesture create = Mockito.mock(CortexGesture.class);
+        lenient().when(create.name()).thenReturn("create_project");
+        lenient().when(create.action()).thenReturn("project.create");
+        lenient().when(tools.get("create_project")).thenReturn(create);
+        lenient().when(create.ask(any(), any())).thenThrow(new QuestionNeeded(Question.free("name", "Name",
+            "What should the project be called?")));
+
+        AssistantAnswer answer = service.run("acme", 7L, S17_ASK);
+
+        assertThat(answer.toolCalls()).isEmpty();
+        assertThat(answer.answer()).isEqualTo("Quel nom voulez-vous donner au projet ?");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).doesNotContain("Plan to create a project");
+    }
+
+    @Test
+    @DisplayName("R204 (s17, échange 1) : la demande nomme Linear, l'écriture choisie est dans TaskForce ; elle attend la carte, rien n'est fait")
+    void a_write_elsewhere_than_the_named_tool_waits_for_its_card() throws Exception {
+        modelCalls("create_project", "{\"name\":\"Test Taskforce\"}", "Projet créé.");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Crée un projet Test Taskforce dans Linear");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo("pending"));
+        verify(create, never()).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("R204 : sans outil nommé, un projet de TaskForce se crée d'emblée, comme avant (il se défait)")
+    void a_write_in_taskforce_without_a_named_tool_is_still_done_at_once() throws Exception {
+        modelCalls("create_project", "{\"name\":\"Test Taskforce\"}", "Projet créé.");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(create.perform(any(), any())).thenReturn(new CortexGesture.Done(
+            "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).", null, Map.of("projectId", 12)));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Crée un projet Test Taskforce");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo("success"));
+    }
+
+    @Test
+    @DisplayName("R204 : la carte de la question dit où le geste écrira, et que la demande nommait Linear")
+    void the_question_card_says_where_and_what_was_asked() throws Exception {
+        modelCalls("create_project", "{}", "Quel nom ?");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenThrow(new QuestionNeeded(Question.free("name", "Name",
+            "What should the project be called?")));
+
+        AssistantAnswer answer = service.run("acme", 7L, S17_ASK);
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo(AgentService.QUESTION);
+            assertThat(call.where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", "Linear"));
+        });
+    }
+
+    @Test
+    @DisplayName("R204 : la carte d'une écriture dans TaskForce dit son espace ; une écriture dans l'outil nommé n'avertit de rien")
+    void a_write_card_says_where_it_writes() throws Exception {
+        modelCalls("create_project", "{\"name\":\"Test Taskforce\"}", "Projet prêt.");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssistantToolCall elsewhere = service.run("acme", 7L, "Crée un projet Test Taskforce dans Linear").toolCalls().get(0);
+
+        assertThat(elsewhere.where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", "Linear"));
+        assertThat(elsewhere.output()).contains("the person asked for Linear, and this action writes in TaskForce");
+    }
+
+    @Test
+    @DisplayName("R204 : l'écriture dans l'outil que la demande nomme dit cet outil, sans avertir ; une lecture ne dit rien")
+    void a_write_in_the_named_tool_and_a_read() throws Exception {
+        stubWorkspace();
+        stubExternalWrite();
+        when(authorization.isManager(1L, 7L)).thenReturn(true);
+        AssistantToolCall write = service.run("acme", 7L, "Crée le ticket dans srv").toolCalls().get(0);
+
+        assertThat(write.status()).isEqualTo("pending");
+        assertThat(write.where()).isEqualTo(new AssistantAnswer.AssistantWhere("Srv", null, null));
+    }
+
+    @Test
+    @DisplayName("R204 : le cas 2 du seed se rejoue avec les outils de Linear de la Présidence, sans plan de TaskForce ; un projet de TaskForce le rate")
+    @SuppressWarnings("unchecked")
+    void the_seed_case_of_a_project_in_linear_replays_with_its_tools() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 2).findFirst().orElseThrow();
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        CortexGesture create = gesture("create_project", "project.create");
+        lenient().when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_project\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Quel nom pour le projet ?\"}"));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        ArgumentCaptor<List<AgentTool>> sentTools = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        verify(tools).toolDefinitions(sentTools.capture());
+        assertThat(sentTools.getValue()).hasSize(12).allSatisfy(tool -> assertThat(tool.name()).startsWith("linear__"));
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString())
+            .doesNotContain("Plan to create a project").contains("linear__");
+        // Un projet de TaskForce pour « dans Linear » : le cas le note raté, comme la Présidence l'a vu le 17/11/2026.
+        assertThat(outcome.calls()).extracting(ReplayOutcome.ReplayCall::tool).containsExactly("create_project");
+        assertThat(EvalGrader.grade(json.readValue(row.criteria(), EvalCriteria.class), outcome).passed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("R204 : une lecture n'a pas de cible à dire")
+    void a_read_says_no_target() throws Exception {
+        modelCalls("get_mission", "{\"issue\":\"TF-12\"}", "La mission attend.");
+        CortexGesture mission = gesture("get_mission", "issue.read");
+        when(mission.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(mission.perform(any(), any())).thenReturn(new CortexGesture.Done("The mission on TF-12 waits for the runner.",
+            null, null));
+
+        AssistantToolCall read = service.run("acme", 7L, "Où en est la mission de TF-12 ?").toolCalls().get(0);
+
+        assertThat(read.status()).isEqualTo("success");
+        assertThat(read.where()).isNull();
+    }
 }

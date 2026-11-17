@@ -1600,6 +1600,12 @@ export const CONSTANTS_EN = {
     // The card of an action that waits for the person's approval.
     proposes: "Cortex proposes to {what}. Nothing changes until you approve it.",
     proposesThis: "do this",
+    // Where a write lands, on its card, before the gesture (R204): TaskForce and its workspace, or the connected tool;
+    // and, when the request named another tool, that it is not there.
+    whereLabel: "Where it writes",
+    whereIn: "In {system}",
+    whereInWorkspace: "In {system}, workspace {workspace}",
+    whereElsewhere: "You asked for {asked}. This is done in {system}, not in {asked}.",
     proposesExternal: "Cortex proposes an action in {service}. Nothing is sent until you approve it.",
     // The card of an action in a connected tool (R160): the action in words and its main values, the arguments one
     // click away under "Details"

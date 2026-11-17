@@ -45,8 +45,35 @@ final class SeedCases {
         int end = seed.indexOf(END);
         if (begin < 0 || end < begin) throw new IllegalStateException("The R204 cases are not between their marks");
         String block = seed.substring(begin, end);
-        int values = block.indexOf("FROM (VALUES");
-        return rows(block.substring(values + "FROM (VALUES".length()));
+        // Les outils de Linear, figés une fois dans la CTE « linear » : le seed les met à la place de "external":"linear".
+        String linear = null;
+        int cte = block.indexOf(LINEAR);
+        if (cte >= 0) linear = literal(block, block.indexOf('\'', cte + LINEAR.length()));
+        int values = block.indexOf("(VALUES", Math.max(0, block.indexOf("CROSS JOIN")));
+        List<Row> rows = rows(block.substring(values + "(VALUES".length()));
+        if (linear == null) return rows;
+        String tools = linear;
+        return rows.stream().map(row -> new Row(row.n(), row.title(), row.question(), row.cassette(), row.criteria(),
+            row.context().replace("\"external\":\"linear\"", "\"external\":" + tools))).toList();
+    }
+
+    static final String LINEAR = "WITH linear(tools) AS (VALUES (";
+
+    /** La chaîne SQL qui commence à {@code at} (son apostrophe), ses '' rendues en '. */
+    private static String literal(String sql, int at) {
+        StringBuilder text = new StringBuilder();
+        for (int i = at + 1; i < sql.length(); i++) {
+            char c = sql.charAt(i);
+            if (c == '\'' && i + 1 < sql.length() && sql.charAt(i + 1) == '\'') {
+                text.append('\'');
+                i++;
+            } else if (c == '\'') {
+                return text.toString();
+            } else {
+                text.append(c);
+            }
+        }
+        throw new IllegalStateException("An SQL string that never ends");
     }
 
     /** Les lignes {@code (n, 'texte', ...)} d'un VALUES : des nombres et des chaînes SQL, leurs '' rendues en '. */
