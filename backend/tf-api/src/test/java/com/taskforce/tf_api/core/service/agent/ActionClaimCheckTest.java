@@ -603,4 +603,49 @@ class ActionClaimCheckTest {
     void a_proper_name_still_contradicts(String sentence) {
         assertThat(ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS).claims()).hasSize(1);
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548, troisième tour (N1) : une question sur le passé, juste dans les deux sens
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "à « {0} », TESTTASKFO créé à la réponse précédente : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Tu l'as bien créé ? Je le vois pas dans Linear       | Oui, je l'ai créé dans TaskForce, pas dans Linear. | false",
+        "Tu l'as bien créé ? Je le vois pas dans Linear       | Non, je ne l'ai pas créé, il me manquait le nom.   | true",
+        "Tu ne l'as pas créé ?                                | Si, je l'ai créé dans TaskForce.                   | false",
+        "Tu ne l'as pas créé ?                                | Non, je n'ai pas créé le projet.                   | true",
+        "T'as vraiment créé le projet ?                       | Oui, je l'ai créé dans TaskForce.                  | false",
+        "T'as vraiment créé le projet ?                       | Non, je n'ai pas créé le projet.                   | true",
+        "Did you create the project? I don't see it in Linear | Yes, I created it in TaskForce, not in Linear.     | false",
+        "Did you create the project? I don't see it in Linear | No, I didn't create the project.                   | true",
+        "Did you really create it?                            | Yes, I created it in TaskForce.                    | false",
+        "Did you really create it?                            | No, I didn't create it.                            | true",
+        "Et le nouveau projet ?                               | Je l'ai créé dans TaskForce.                       | false",
+        "Et le nouveau projet ?                               | Je n'ai pas créé de nouveau projet.                | true",
+    })
+    void a_question_about_the_past_is_answered_by_what_was_done(String request, String answer, boolean corrected) {
+        Checked checked = ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request);
+
+        assertThat(checked.corrected()).isEqualTo(corrected);
+        if (corrected) {
+            assertThat(checked.denied()).isTrue();
+            assertThat(checked.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).contains("TESTTASKFO");
+        } else {
+            assertThat(checked.answer()).isEqualTo(answer);
+        }
+    }
+
+    @Test
+    @DisplayName("R159, troisième tour (N1) : « déjà » sur ce que la demande demande : la phrase reste, avec à côté ce que la conversation a fait")
+    void already_about_what_the_request_asks_comes_with_the_record() {
+        Checked checked = ActionClaimCheck.check("J'ai déjà créé le projet.", List.of(), List.of(CREATED), SYSTEMS,
+            "Crée aussi le projet Marketing");
+
+        assertThat(checked.corrected()).isFalse();
+        assertThat(checked.answer()).startsWith("J'ai déjà créé le projet.").contains(ActionClaimCheck.RECORD_SIGNATURE)
+            .contains("TESTTASKFO");
+        // Le geste qu'elle désigne l'appuie : rien à ajouter.
+        assertThat(ActionClaimCheck.check("J'ai déjà créé le projet TESTTASKFO.", List.of(), List.of(CREATED), SYSTEMS,
+            "Crée aussi le projet Marketing").answer()).isEqualTo("J'ai déjà créé le projet TESTTASKFO.");
+    }
 }

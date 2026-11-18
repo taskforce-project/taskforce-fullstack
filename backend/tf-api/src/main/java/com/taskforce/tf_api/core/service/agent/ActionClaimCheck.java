@@ -508,9 +508,12 @@ public final class ActionClaimCheck {
                 if (same.stream().noneMatch(act -> designates(designation, act))) unbacked.add(said.kind());
                 continue;
             }
-            if (requested.asks(said) && !ALREADY.matcher(said.clause()).find()) {
-                // Ce que la demande en cours demande, et rien de ce tour ne l'a fait (R116).
-                unbacked.add(said.kind());
+            if (requested.asks(said)) {
+                // Ce que la demande en cours demande, et rien de ce tour ne l'a fait (R116) ; « déjà » renvoie peut-être à un
+                // geste d'avant, que rien ne désigne : la phrase reste, avec à côté ce que la conversation a fait (troisième
+                // tour de la relecture R159).
+                if (ALREADY.matcher(said.clause()).find()) unsure.addAll(same);
+                else unbacked.add(said.kind());
                 continue;
             }
             if (designation.weak()) {

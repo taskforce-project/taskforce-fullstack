@@ -3276,4 +3276,27 @@ class AgentServiceTest {
         assertThat(summarized.subjects()).containsExactly(new AssistantAnswer.Subject("TF-30", 30L, 3L));
         assertThat(board.subjects()).isEmpty();
     }
+
+    @ParameterizedTest(name = "« {0} » corrigée {1}")
+    @CsvSource(delimiter = '|', value = {
+        "Oui, je l'ai créé dans TaskForce, pas dans Linear. | false",
+        "Non, je ne l'ai pas créé, il me manquait le nom.   | true",
+    })
+    @DisplayName("R159, troisième tour (N1) : à « Tu l'as bien créé ? », la réponse vraie reste, la négation fausse se corrige")
+    void a_question_about_the_past_is_answered_by_what_the_conversation_did(String said, boolean corrected) throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu l'as bien créé ? Je le vois pas dans Linear",
+            TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        if (corrected) {
+            assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).contains("TESTTASKFO")
+                .doesNotContain("il me manquait le nom");
+        } else {
+            assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
+        }
+    }
 }

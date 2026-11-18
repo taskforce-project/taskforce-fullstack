@@ -102,4 +102,39 @@ class IntentTest {
     void a_question_word_at_the_head_writes_nothing(String request, boolean writes) {
         assertThat(Intent.writes(request)).isEqualTo(writes);
     }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Troisième tour de la relecture R159 (N1) : une question sur le passé ne demande pas d'écrire, même avec un
+        // adverbe, une négation ou « did » entre l'auxiliaire et le verbe.
+        "Tu l'as bien créé ? Je le vois pas dans Linear       | false",
+        "Tu ne l'as pas créé ?                                | false",
+        "T'as vraiment créé le projet ?                       | false",
+        "As-tu créé le projet ?                               | false",
+        "Did you create the project? I don't see it in Linear | false",
+        "Did you really create it?                            | false",
+        "Didn't you create the issue in Linear?               | false",
+        // Ses voisins : une demande, polie ou non, écrit.
+        "Peux-tu bien créer le projet ?                       | true",
+        "Merci de bien créer le projet                        | true",
+        "Can you create the project in Linear?                | true",
+        "Tu crées le projet Marketing ?                       | true",
+    })
+    void a_question_about_the_past_writes_nothing(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+    }
+
+    @Test
+    @DisplayName("R159, troisième tour (N1) : une question ne demande d'écrire qu'explicitement ; « le nouveau » n'en demande pas un autre")
+    void a_question_asks_to_write_only_explicitly() {
+        assertThat(Intent.writeVerbs("Tu peux me creer un nouveau projet dans Linear la ou pas ?")).containsExactly("creer");
+        assertThat(Intent.writeVerbs("Est-ce que tu peux créer le projet ?")).containsExactly("creer");
+        assertThat(Intent.writeVerbs("Tu crées le projet Marketing ?")).containsExactly("crees");
+        assertThat(Intent.writeVerbs("Le projet, créé ou pas ?")).isEmpty();
+        assertThat(Intent.writeVerbs("Créé ou pas ?")).isEmpty();
+        assertThat(Intent.asksForMore("Et le nouveau projet ?")).isFalse();
+        assertThat(Intent.asksForMore("Et l'autre projet ?")).isFalse();
+        assertThat(Intent.asksForMore("Et un nouveau projet ?")).isTrue();
+        assertThat(Intent.asksForMore("Un autre ?")).isTrue();
+    }
 }

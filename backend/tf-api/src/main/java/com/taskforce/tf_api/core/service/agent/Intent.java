@@ -20,8 +20,14 @@ final class Intent {
     /** Ce que fait une proposition. */
     enum Does { WRITE, READ, NOTHING }
 
-    /** Une proposition de la demande : son texte, d'un seul tenant, et ce qu'elle fait. */
-    record Clause(String text, Does does) {
+    /**
+     * Une proposition de la demande : son texte, d'un seul tenant, ce qu'elle fait, et si elle est posée en question
+     * ({@code asked}, troisième tour de la relecture R159 de la PR #548).
+     */
+    record Clause(String text, Does does, boolean asked) {
+        Clause(String text, Does does) {
+            this(text, does, false);
+        }
     }
 
     /** Où une proposition finit : une ponctuation, ou une conjonction qui en ouvre une autre. */
@@ -60,10 +66,23 @@ final class Intent {
         "list", "show", "find", "search", "look", "see", "read", "get", "give", "summarize", "summarise", "check", "tell",
         "explain", "fetch", "open", "browse");
 
-    /** Un auxiliaire, une copule : le verbe qui suit raconte, il ne demande rien (« tu l'as créé », « was set »). */
+    /**
+     * Un auxiliaire, une copule : le verbe qui suit raconte, il ne demande rien (« tu l'as créé », « was set », « did you
+     * create », « didn't you create »).
+     */
     private static final Set<String> AUXILIARIES = Set.of("a", "as", "ai", "avons", "avez", "ont", "avait", "avaient", "ete",
         "etait", "etaient", "est", "sont", "sera", "seront", "has", "have", "had", "was", "were", "is", "are", "been",
-        "being", "be", "ve", "d");
+        "being", "be", "ve", "d", "did", "do", "does", "didn", "don", "doesn", "hasn", "haven", "hadn", "wasn", "weren",
+        "isn", "aren");
+    /**
+     * Ce qui se glisse entre l'auxiliaire et le verbe sans rien changer au temps : une négation, un adverbe, le sujet d'une
+     * question (« tu l'as bien créé », « tu ne l'as pas créé », « t'as vraiment créé », « as-tu créé », « did you really
+     * create »), troisième tour de la relecture R159.
+     */
+    private static final Set<String> BETWEEN = Set.of("ne", "n", "pas", "plus", "jamais", "rien", "point", "bien",
+        "vraiment", "deja", "encore", "aussi", "toujours", "effectivement", "finalement", "tu", "vous", "il", "elle", "on",
+        "nous", "ils", "elles", "not", "never", "really", "actually", "already", "ever", "yet", "just", "also", "finally",
+        "indeed", "truly", "you", "we", "they", "he", "she", "it", "i");
 
     /** Ce qui fait d'un mot un nom : « la liste », « the post », « any change », « quel poste ». */
     private static final Set<String> DETERMINERS = Set.of("le", "la", "les", "l", "un", "une", "des", "du", "de", "the", "an",
@@ -134,13 +153,13 @@ final class Intent {
                     leading.append(piece).append(' ');
                 } else {
                     Clause last = clauses.remove(clauses.size() - 1);
-                    clauses.add(new Clause(last.text() + ", " + piece.strip(), last.does()));
+                    clauses.add(new Clause(last.text() + ", " + piece.strip(), last.does(), last.asked() || asked.get(i)));
                 }
                 continue;
             }
             String text = leading.isEmpty() ? piece.strip() : (leading + piece).strip();
             leading.setLength(0);
-            clauses.add(new Clause(text, does));
+            clauses.add(new Clause(text, does, asked.get(i)));
         }
         if (!leading.isEmpty()) clauses.add(new Clause(leading.toString().strip(), Does.NOTHING));
         return clauses;
@@ -158,7 +177,9 @@ final class Intent {
 
     /**
      * Le verbe d'écriture de chaque proposition qui écrit, sans accents (« cree », « supprime », « add ») : ce que la
-     * demande en cours demande de faire (second tour de la relecture R159 de la PR #548).
+     * demande en cours demande de faire (second tour de la relecture R159 de la PR #548). Une proposition posée en question
+     * n'en demande un que de façon explicite (troisième tour) : un impératif, « peux-tu », « est-ce que tu peux », « can
+     * you », « tu crées » ; « le projet, créé ou pas ? » ne demande rien.
      */
     static List<String> writeVerbs(String request) {
         List<String> verbs = new ArrayList<>();
@@ -166,23 +187,64 @@ final class Intent {
             if (clause.does() != Does.WRITE) continue;
             List<String> words = words(clause.text());
             int at = writeAt(words, false);
-            if (at >= 0) verbs.add(words.get(at));
+            if (at < 0) continue;
+            if (clause.asked() && !explicit(words, at, originalWords(clause.text()))) continue;
+            verbs.add(words.get(at));
         }
         return verbs;
     }
 
-    /** Ce qui en veut une de plus sans verbe : « Et un autre projet ? », « un nouveau, stp ». */
-    private static final Set<String> MORE = Set.of("autre", "autres", "another", "other", "nouveau", "nouvelle", "nouveaux",
-        "nouvelles", "nouvel", "new", "encore", "more");
+    /**
+     * Une question qui demande d'écrire, explicitement : devant le verbe, seulement la politesse, une modalité ou le sujet
+     * (« peux-tu le créer », « tu me crées », « can you create », « est-ce que tu peux »), et le verbe n'est pas un
+     * participe (« créé ou pas ? »).
+     */
+    private static boolean explicit(List<String> words, int at, List<String> original) {
+        int from = 0;
+        if (words.size() > 2 && "est".equals(words.get(0)) && "ce".equals(words.get(1))
+            && ("que".equals(words.get(2)) || "qu".equals(words.get(2)))) from = 3;
+        for (int k = from; k < at; k++) {
+            if (!LEADS.contains(words.get(k)) && !CLITICS.contains(words.get(k))) return false;
+        }
+        return at >= original.size() || !participle(original.get(at));
+    }
+
+    /** Les mots d'un morceau tels qu'il les écrit, en minuscules, accents compris : un participe s'y reconnaît. */
+    private static List<String> originalWords(String piece) {
+        List<String> words = new ArrayList<>();
+        for (String token : piece.toLowerCase(java.util.Locale.ROOT).replace('’', '\'').split("[^\\p{L}\\p{N}]+")) {
+            if (!token.isEmpty()) words.add(token);
+        }
+        return words;
+    }
+
+    /**
+     * Un participe français, à ses accents : « créé », « créées », « ajouté », « supprimée » ; pas « crée », « ajoute ».
+     * Sans accents, rien ne le distingue de l'impératif.
+     */
+    static boolean participle(String word) {
+        String base = word.endsWith("s") ? word.substring(0, word.length() - 1) : word;
+        if (base.startsWith("cré") || base.startsWith("recré")) return base.contains("éé");
+        if (base.endsWith("e")) base = base.substring(0, base.length() - 1);
+        return base.endsWith("é");
+    }
+
+    /**
+     * Ce qui en veut une de plus sans verbe : « un nouveau », « a new », « un autre », « another », « encore un ». « Le
+     * nouveau projet », « l'autre » parlent d'une chose déjà là (troisième tour de la relecture R159).
+     */
+    private static final Pattern MORE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:un\\s+nouve(?:au|l)|une\\s+nouvelle|de\\s+nouve"
+        + "(?:aux|lles)|d\\s+autres|une?\\s+autre|a\\s+new|another|encore\\s+une?|one\\s+more)(?![\\p{L}\\p{N}])");
 
     /**
      * Une demande sans verbe qui en veut une de plus (« Et un autre projet ? ») : elle demande d'en créer une. Pas une
-     * question (« Quels sont les nouveaux projets ? »), ni une lecture (« montre les nouveaux projets »).
+     * question (« Quels sont les nouveaux projets ? »), ni une lecture (« montre les nouveaux projets »), ni une chose
+     * déjà là (« Et le nouveau projet ? »).
      */
     static boolean asksForMore(String request) {
         List<String> words = words(request == null ? "" : request);
         if (words.isEmpty() || QUESTIONS.contains(words.get(0))) return false;
-        return words.stream().noneMatch(Intent::isVerb) && words.stream().anyMatch(MORE::contains);
+        return words.stream().noneMatch(Intent::isVerb) && MORE.matcher(String.join(" ", words)).find();
     }
 
     /** Les mots d'un morceau, sans accents ni ponctuation. */
@@ -229,7 +291,7 @@ final class Intent {
         boolean infinitive = verb.length() > 4 && INFINITIVE.matcher(verb).find();
         if (i > 0 && DETERMINERS.contains(words.get(i - 1)) && !infinitive) return false;
         int j = i - 1;
-        while (j >= 0 && CLITICS.contains(words.get(j))) j--;
+        while (j >= 0 && (CLITICS.contains(words.get(j)) || BETWEEN.contains(words.get(j)))) j--;
         if (j >= 0 && AUXILIARIES.contains(words.get(j))) return false;
         if (AMBIGUOUS.contains(verb)) {
             for (int k = 0; k < i; k++) if (!LEADS.contains(words.get(k)) && !CLITICS.contains(words.get(k))) return false;
