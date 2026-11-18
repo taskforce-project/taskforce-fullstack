@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,8 +13,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.taskforce.tf_api.core.model.AiConversation;
 import com.taskforce.tf_api.core.model.AiMessage;
@@ -28,6 +33,7 @@ import com.taskforce.tf_api.core.service.integration.ConnectorCatalog;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -50,6 +56,8 @@ class ConversationActsTransactionIntegrationTest extends AbstractIntegrationTest
     private static final UUID RECORD = UUID.fromString("00000000-0000-0000-0000-000000000159");
 
     @Autowired private AiConversationService service;
+    @Autowired private CortexRecordService records;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @MockitoBean private AiConversationRepository conversations;
     @MockitoBean private AiMessageRepository messages;
@@ -102,5 +110,25 @@ class ConversationActsTransactionIntegrationTest extends AbstractIntegrationTest
 
         assertThat(service.fit(1L, budget, "fast").messages()).extracting(message -> message.get("content"))
             .containsExactly("Crée le projet Test", "Le projet est créé.");
+    }
+
+    @Test
+    @DisplayName("R159, second tour (H) : les gestes se lisent dans la transaction de l'appelant, sans seconde connexion, et leur échec ne l'annule pas")
+    void the_acts_are_read_in_the_transaction_of_the_caller() {
+        AtomicInteger suspended = new AtomicInteger();
+
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void suspend() {
+                    suspended.incrementAndGet();
+                }
+            });
+            assertThatThrownBy(() -> records.acts(List.of(RECORD))).isInstanceOf(IllegalStateException.class);
+            assertThat(status.isRollbackOnly()).isFalse();
+        });
+
+        // Une transaction à elle (REQUIRES_NEW) suspendait celle de l'appelant, et prenait une seconde connexion.
+        assertThat(suspended).hasValue(0);
     }
 }

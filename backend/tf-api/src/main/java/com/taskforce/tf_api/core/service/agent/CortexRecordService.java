@@ -15,7 +15,6 @@ import java.util.UUID;
 import java.util.function.Function;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -285,10 +284,12 @@ public class CortexRecordService {
      * après la réponse comptent, puisqu'ils y entrent. Un seul appel à la base pour toute une conversation. Un dossier
      * sans geste n'y est pas.
      *
-     * <p>Dans sa transaction à elle (relecture R159 de la PR #548) : un dossier illisible ne marque jamais pour
-     * l'annulation la transaction de qui l'appelle, qui part alors sans les gestes au lieu de casser le tour au commit.</p>
+     * <p>Dans la transaction de qui l'appelle, et sur sa connexion : une transaction à elle en prenait une seconde, trois
+     * fois par tour, sur un pool de six au desktop (second tour de la relecture R159 de la PR #548). Son échec ne marque
+     * jamais cette transaction pour l'annulation ({@code noRollbackFor}) : l'appelant part alors sans les gestes au lieu
+     * de casser le tour au commit.</p>
      */
-    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
+    @Transactional(readOnly = true, noRollbackFor = RuntimeException.class)
     public Map<UUID, List<Act>> acts(Collection<UUID> recordIds) {
         if (recordIds == null || recordIds.isEmpty()) return Map.of();
         Map<UUID, List<Act>> acts = new LinkedHashMap<>();
