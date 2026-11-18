@@ -581,8 +581,9 @@ public final class ActionClaimCheck {
             if (requested.asks(said)) {
                 // Ce que la demande en cours demande, et rien de ce tour ne l'a fait (R116) ; « déjà » renvoie peut-être à un
                 // geste d'avant, que rien ne désigne : la phrase reste, avec à côté ce que la conversation a fait (troisième
-                // tour de la relecture R159).
-                if (ALREADY.matcher(said.clause()).find()) unsure.claim(said, same);
+                // tour de la relecture R159). De même quand la demande ne nomme aucune chose, juste après un geste du même
+                // genre (« Tu le crées ou pas ? », cinquième tour) : « le » est peut-être ce geste.
+                if (ALREADY.matcher(said.clause()).find() || pronounAfterAnAct(requested, same)) unsure.claim(said, same);
                 else unbacked.add(said.kind());
                 continue;
             }
@@ -594,6 +595,14 @@ public final class ActionClaimCheck {
             if (same.stream().noneMatch(Done::recent)) unsure.claim(said, same);
         }
         return unbacked;
+    }
+
+    /**
+     * Une demande qui ne nomme aucune chose (un pronom : « Tu le crées ou pas ? », « Tu peux la créer ? »), juste après un
+     * geste du même genre : elle parle peut-être de ce geste (cinquième tour de la relecture R159 de la PR #548).
+     */
+    private static boolean pronounAfterAnAct(Requested requested, List<Done> same) {
+        return requested.things().isEmpty() && same.stream().anyMatch(Done::recent);
     }
 
     /** Ce qui renvoie à un geste d'avant, pas à la demande en cours : « le projet a déjà été créé ». */
@@ -873,8 +882,12 @@ public final class ActionClaimCheck {
                 continue;
             }
             if (requested.asks(said)) {
-                // La demande en cours demande ce geste : la phrase parle d'elle ; seul ce tour la contredit (reste du 3).
-                same.stream().filter(now::contains).forEach(contradicted::add);
+                // La demande en cours demande ce geste : la phrase parle d'elle ; seul ce tour la contredit (reste du 3). Quand
+                // elle ne nomme aucune chose, juste après un geste du même genre (« Tu le crées ou pas ? »), la phrase reste,
+                // avec à côté ce que la conversation a fait (cinquième tour de la relecture R159).
+                List<Done> thisTurn = same.stream().filter(now::contains).toList();
+                contradicted.addAll(thisTurn);
+                if (thisTurn.isEmpty() && pronounAfterAnAct(requested, same)) unsure.denial(said, same);
                 continue;
             }
             List<Done> recent = same.stream().filter(Done::recent).toList();

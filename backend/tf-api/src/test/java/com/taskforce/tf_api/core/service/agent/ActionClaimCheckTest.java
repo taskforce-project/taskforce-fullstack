@@ -750,8 +750,6 @@ class ActionClaimCheckTest {
         "Could you just create the Marketing project?  | I haven't created it yet. Which template?                        | false",
         "Du coup tu crées le projet Marketing ?       | Je l'ai créé.                                                    | true",
         "Du coup tu crées le projet Marketing ?       | Je ne l'ai pas encore créé. Tu confirmes ?                       | false",
-        // Le témoin : une demande explicite.
-        "Tu peux la créer ?                           | Je l'ai créé.                                                    | true",
     })
     void a_question_is_read_as_its_verb_says(String request, String answer, boolean corrected) {
         Checked checked = ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request);
@@ -794,5 +792,21 @@ class ActionClaimCheckTest {
         assertThat(checked.corrected()).isEqualTo(corrected);
         if (corrected) assertThat(checked.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).contains("TESTTASKFO");
         else assertThat(checked.answer()).isEqualTo(answer);
+    }
+
+    @ParameterizedTest(name = "à « {0} », TESTTASKFO créé à la réponse précédente : « {1} » reste, avec le bloc record")
+    @CsvSource(delimiter = '|', value = {
+        // R2 : une demande qui ne nomme aucune chose (un pronom) juste après un geste du même genre : la phrase reste, le bloc
+        // record dit à côté ce qui a été fait ; ni correction, ni négation laissée sans rien.
+        "Tu le crées ou pas ? | Je l'ai créé dans TaskForce.",
+        "Tu le crées ou pas ? | Je ne l'ai pas encore créé.",
+        "Tu le crées ou pas ? | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom.",
+        "Tu peux la créer ?   | Je l'ai créé.",
+    })
+    void a_request_that_names_nothing_after_an_act_comes_with_the_record(String request, String answer) {
+        Checked checked = ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request);
+
+        assertThat(checked.corrected()).isFalse();
+        assertThat(checked.answer()).startsWith(answer).contains(ActionClaimCheck.RECORD_SIGNATURE).contains("TESTTASKFO");
     }
 }

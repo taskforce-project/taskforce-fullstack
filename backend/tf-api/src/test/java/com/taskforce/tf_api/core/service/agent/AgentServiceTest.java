@@ -3389,4 +3389,19 @@ class AgentServiceTest {
         if (corrected) assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain(said);
         else assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
     }
+
+    @Test
+    @DisplayName("R159, cinquième tour (R2) : de bout en bout, « Tu le crées ou pas ? » après la création garde la réponse, avec le bloc record")
+    void a_request_that_names_nothing_comes_with_the_record_through_a_turn() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        String said = "Je l'ai créé dans TaskForce.";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu le crées ou pas ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).startsWith(said).contains(ActionClaimCheck.RECORD_SIGNATURE).contains("TESTTASKFO");
+    }
 }
