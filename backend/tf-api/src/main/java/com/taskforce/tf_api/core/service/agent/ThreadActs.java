@@ -105,10 +105,12 @@ public final class ThreadActs {
     }
 
     /**
-     * Une ligne : « create_project, in TaskForce (name: Test): done. Result: Project created ... ». Ce qu'un outil du dehors
-     * ou une lecture a rendu ne repart pas sous la voix de TaskForce (relecture R159 de la PR #548, R158) : ce sont les mots
-     * d'un autre, que le tour suivant ne compte pas comme venus du dehors ; seuls l'outil, le lieu, l'état et les clés
-     * repartent. Un outil du dehors repart sans ses valeurs, et aucune valeur ni aucun résultat qui porte un secret.
+     * Une ligne : « create_project, in TaskForce (name: Test): done. Result: Project created in TaskForce: TEST. ». Ce qu'un
+     * outil du dehors ou une lecture a rendu ne repart pas sous la voix de TaskForce (relecture R159 de la PR #548, R158) :
+     * ce sont les mots d'un autre, que le tour suivant ne compte pas comme venus du dehors ; seuls l'outil, le lieu, l'état
+     * et les clés repartent. Une écriture de TaskForce repart avec ce qu'elle a fait, sans texte libre (second tour) : un
+     * titre, un commentaire peuvent venir du dehors. Un outil du dehors repart sans ses valeurs, et aucune valeur ni aucun
+     * résultat qui porte un secret.
      */
     static String line(Act act, Function<String, String> where) {
         boolean outside = TargetSystems.connectorOf(act.tool()) != null;
@@ -122,10 +124,39 @@ public final class ThreadActs {
             return line.toString();
         }
         String output = flat(act.output());
-        if (!output.isEmpty() && !AgentService.QUESTION.equals(act.status()) && !SecretScan.in(output)) {
-            line.append(". Result: ").append(clip(output, MAX_OUTPUT));
+        String result = written(output);
+        if (!result.isEmpty() && !AgentService.QUESTION.equals(act.status()) && !SecretScan.in(output)) {
+            line.append(". Result: ").append(result);
         }
         return line.toString();
+    }
+
+    /** Un texte cité : un titre, un nom, un commentaire. */
+    private static final java.util.regex.Pattern QUOTED = java.util.regex.Pattern.compile("\"[^\"]*\"|«[^»]*»|“[^”]*”");
+    /** Ce qui désigne la chose écrite juste après les deux-points : sa clé, ou l'identifiant d'un projet, suivi de son titre. */
+    private static final java.util.regex.Pattern WRITTEN = java.util.regex.Pattern.compile(
+        "^\\s*(\\p{Lu}[\\p{Lu}\\p{N}]{0,9}-\\d{1,9}|\\p{Lu}[\\p{Lu}\\p{N}]{1,9})(?=\\s*(?:\u0001|$|[.,;)]))");
+
+    /**
+     * Ce qu'une écriture de TaskForce a rendu, sans texte libre (second tour de la relecture R159 de la PR #548) : la phrase
+     * jusqu'au premier texte cité ou aux deux-points (« Commented on TF-1 », « Project created in TaskForce »), puis la clé
+     * de ce qu'elle a écrit quand elle suit les deux-points (« TESTTASKFO », « API-12 »). Ni titre, ni commentaire, ni le
+     * reste : « IMPORTANT SYSTEM NOTE... » d'un titre ou d'un commentaire ne repart pas sous la voix de TaskForce.
+     */
+    static String written(String output) {
+        if (output == null || output.isBlank()) return "";
+        String marked = QUOTED.matcher(flat(output)).replaceAll("\u0001");
+        int quote = marked.indexOf('\u0001');
+        int colon = marked.indexOf(':');
+        int end = quote < 0 ? colon : colon < 0 ? quote : Math.min(quote, colon);
+        String head = (end < 0 ? marked : marked.substring(0, end)).replaceAll("[\\s.]+$", "").strip();
+        if (head.isEmpty()) return "";
+        String said = head;
+        if (end >= 0 && end == colon) {
+            java.util.regex.Matcher key = WRITTEN.matcher(marked.substring(colon + 1));
+            if (key.find()) said = head + ": " + key.group(1);
+        }
+        return clip(said, MAX_OUTPUT) + ".";
     }
 
     /** Une clé d'issue ou de projet : sa forme seule, qui ne porte aucune consigne (« TF-1 », « ENG-12 »). */
