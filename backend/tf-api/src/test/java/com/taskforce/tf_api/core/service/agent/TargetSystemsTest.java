@@ -213,4 +213,32 @@ class TargetSystemsTest {
         assertThat(said.places()).extracting(TargetSystems.Named::name)
             .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
     }
+
+    @ParameterizedTest(name = "« {0} » : écrit dans {1}, lit ou écrit dans {2}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        // Troisième tour de la relecture R159 (N3) : un participe écrit sans accents, et une chose qui porte le nom d'un
+        // outil après « pour », « for », « about », disent d'où vient ce dont parle la demande.
+        "Cree une issue pour le bug remonte dans Slack                   | -         | -",
+        "Cree une issue pour le bug signale dans Linear                  | -         | -",
+        "Cree une issue pour le bug signale par Marie sur le canal Slack | -         | -",
+        "Crée une issue pour le ticket Linear ENG-12                     | -         | -",
+        "Crée une issue pour le message Slack de Marie                   | -         | -",
+        "Create an issue for the Linear ticket ENG-12                    | -         | -",
+        "Create an issue about the Slack message from Marie              | -         | -",
+        // Ses voisins gardent leur rôle : la cible que le verbe d'écriture dit, une note dans Notion, un contenant après
+        // « pour », un commentaire sur le ticket, une lecture.
+        "Cree une issue dans Linear pour le bug remonte dans Slack       | Linear    | Linear",
+        "Crée une note dans Notion                                       | Notion    | Notion",
+        "Crée une issue pour le projet Linear Roadmap                    | Linear    | Linear",
+        "Ajoute un commentaire sur le ticket Linear ENG-12               | Linear    | Linear",
+        "Résume le ticket Linear ENG-12                                  | -         | Linear",
+    })
+    void an_origin_reads_without_accents_and_after_for(String request, String targets, String places) {
+        TargetSystems.Said said = TARGETS.said(request);
+
+        assertThat(said.targets()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(targets == null ? List.of() : List.of(targets.trim().split(";")));
+        assertThat(said.places()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
+    }
 }

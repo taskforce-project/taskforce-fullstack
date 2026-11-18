@@ -243,9 +243,10 @@ public class TargetSystems {
         // Après une chose : « un projet TaskForce », « à partir du projet Linear », « ma page Notion ».
         Matcher thing = THING_BEFORE.matcher(before);
         if (thing.find()) return phraseRole(before.substring(0, thing.start()), original.substring(0, Math.min(thing.start(),
-            original.length())));
+            original.length())), thing.group());
         // Avant elle, en anglais : « a Linear issue », « from the Linear project ».
-        if (THING_AFTER.matcher(said.substring(end)).lookingAt()) return phraseRole(before, original);
+        Matcher after = THING_AFTER.matcher(said.substring(end));
+        if (after.lookingAt()) return phraseRole(before, original, after.group());
         // L'objet d'un verbe : « Search Notion for », « regarde Linear ».
         String[] words = before.strip().split("[^\\p{L}\\p{N}]+");
         int last = words.length - 1;
@@ -254,9 +255,15 @@ public class TargetSystems {
         return Role.MENTION;
     }
 
-    /** Le rôle d'une chose qui porte le nom d'un outil : d'où elle vient, où elle va, ou ce sur quoi la phrase agit. */
-    private static Role phraseRole(String before, String original) {
+    /**
+     * Le rôle d'une chose qui porte le nom d'un outil : d'où elle vient, où elle va, ou ce sur quoi la phrase agit. Une
+     * chose qui se lit (un ticket, un message), après « pour », « for », « about » ou « concernant », est ce dont parle la
+     * demande, et vient de cet outil (« pour le ticket Linear ENG-12 ») ; un contenant (« pour le projet Linear ») reste ce
+     * sur quoi elle agit (troisième tour de la relecture R159 de la PR #548).
+     */
+    private static Role phraseRole(String before, String original, String thing) {
         if (origin(before, original)) return Role.ORIGIN;
+        if (ITEM.matcher(thing.strip()).matches() && TOPIC_BEFORE.matcher(before).find()) return Role.ORIGIN;
         if (SOURCE_BEFORE.matcher(before).find()) return Role.SOURCE;
         if (DEST_BEFORE.matcher(before).find() || ACCENT_A_BEFORE.matcher(original).find()) return Role.DEST;
         return Role.OBJECT;
@@ -295,9 +302,37 @@ public class TargetSystems {
         + "(?:\\s+(?:deja|encore|toujours|already|still|now|maintenant))?"
         + "\\s+(?:dans|sur|en|au|aux|chez|via|in|on|inside|within|at)\\s+" + DET + "$");
 
+    /**
+     * Le même lieu après un participe écrit sans accents (« le bug remonte dans Slack », « signale dans Linear », comme
+     * l'écrit la Présidence), quand un nom le précède : un impératif (« et signale-le dans Slack ») n'en a pas. Seulement
+     * des verbes qui ne demandent pas d'écrire (troisième tour de la relecture R159).
+     */
+    private static final Pattern ORIGIN_PLAIN = Pattern.compile("(?<![\\p{L}\\p{N}])([\\p{L}\\p{N}]{2,})\\s+"
+        + "(?:remonte|signale|mentionne|evoque|souleve|releve|detecte|rapporte|reporte|remarque|constate|identifie|repere|"
+        + "rencontre|observe|logge|discute|partage|enregistre|trouve)(?:e|s|es)?"
+        + "(?:\\s+(?:hier|aujourd'hui|recemment|deja))?"
+        + "(?:\\s+par\\s+[\\p{L}\\p{N}'-]+(?:\\s+[\\p{L}\\p{N}'-]+)?)?"
+        + "\\s+(?:dans|sur|en|au|aux|chez|via)\\s+" + DET + "$");
+    /** Ce qui, devant ce participe, n'est pas un nom : un article, un pronom, une conjonction. */
+    private static final Set<String> NOT_A_NOUN = Set.of("le", "la", "les", "un", "une", "des", "du", "de", "ce", "cet",
+        "cette", "ces", "mon", "ma", "mes", "ton", "ta", "tes", "son", "sa", "ses", "notre", "votre", "nos", "vos", "leur",
+        "leurs", "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles", "me", "te", "se", "et", "ou", "puis", "mais",
+        "donc", "ensuite", "alors", "stp", "svp");
+    /** Ce dont parle une demande : « pour le ticket », « for the », « about the », « concernant le ». */
+    private static final Pattern TOPIC_BEFORE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:pour|for|about|concernant|"
+        + "regarding)\\s+" + DET + "$");
+    /** Une chose qui se lit, pas un contenant : un ticket, un message, une page ; un projet, un canal, une équipe, non. */
+    private static final Pattern ITEM = Pattern.compile("(?:issues?|tickets?|taches?|tasks?|cartes?|cards?|bugs?|pages?|"
+        + "documents?|docs?|commentaires?|comments?|notes?|messages?|deals?|contacts?|leads?|evenements?|events?|reunions?|"
+        + "meetings?|prs?|pull\\s+requests?|fichiers?|files?)");
+
     /** Ce qui précède un outil dit-il d'où vient la chose dont parle la proposition, plutôt qu'où elle écrit ? */
     private static boolean origin(String before, String original) {
-        return ORIGIN_PARTICIPLE.matcher(original.replace('’', '\'')).find() || ORIGIN_RELATIVE.matcher(before).find();
+        if (ORIGIN_PARTICIPLE.matcher(original.replace('’', '\'')).find() || ORIGIN_RELATIVE.matcher(before).find()) {
+            return true;
+        }
+        Matcher plain = ORIGIN_PLAIN.matcher(before);
+        return plain.find() && !NOT_A_NOUN.contains(plain.group(1));
     }
 
     private static final String THINGS = "(?:issues?|tickets?|taches?|tasks?|cartes?|cards?|bugs?|projets?|projects?|pages?|"

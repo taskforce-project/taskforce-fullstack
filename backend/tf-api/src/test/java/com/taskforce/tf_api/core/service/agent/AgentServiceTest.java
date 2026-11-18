@@ -3322,4 +3322,27 @@ class AgentServiceTest {
         assertThat(incident.getValue()).containsEntry("uncertain", true).containsEntry("rule", "R116")
             .containsEntry("said", List.of(said));
     }
+
+    @ParameterizedTest(name = "« {0} » : l'issue se prépare dans TaskForce, sans alerte ni bloc sur l'outil")
+    @ValueSource(strings = {
+        "Cree une issue pour le bug remonte dans Slack",
+        "Cree une issue pour le bug signale dans Linear",
+        "Crée une issue pour le ticket Linear ENG-12",
+        "Crée une issue pour le message Slack de Marie",
+        "Create an issue for the Linear ticket ENG-12",
+    })
+    @DisplayName("R159, troisième tour (N3) : sans accents, ou une chose d'un outil après « pour » : le lieu d'origine n'est pas la cible")
+    void an_origin_without_accents_or_after_for_is_not_the_target(String request) throws Exception {
+        modelCalls("create_issue", "{\"title\":\"Login fails\"}", "Voici la carte.");
+        CortexGesture create = gesture("create_issue", "issue.create");
+        lenient().when(create.prepare(any(), any())).thenReturn(null);
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls().get(0).where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", null));
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString()).doesNotContain("never in TaskForce instead");
+    }
 }
