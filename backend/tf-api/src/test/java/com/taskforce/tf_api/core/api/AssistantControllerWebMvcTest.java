@@ -285,7 +285,26 @@ class AssistantControllerWebMvcTest {
         java.util.List<com.taskforce.tf_api.core.service.ai.AttachedFile> files =
             java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("notes.md", "corps"));
         org.assertj.core.api.Assertions.assertThat(sentInput().files()).isEqualTo(files);
-        verify(conversationService).appendAsked(1L, "Lis", files);
+        verify(conversationService).appendAsked(1L, "Lis", files, java.util.List.of());
+    }
+
+    @Test
+    @DisplayName("POST assistant : l'issue dont parlait la demande reste avec elle, sujet du tour suivant (R204)")
+    void chat_keeps_the_subject_of_the_request() throws Exception {
+        answering("x");
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("API-3 est en cours.", null, "deep", java.util.List.of(),
+                java.util.List.of(), java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE)
+                .withSubjects(java.util.List.of("API-3")));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"T'en ai a ou sur cette tache ?\",\"attach\":[{\"projectId\":3,\"issueId\":21}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.answer.subjects").doesNotExist());
+        verify(conversationService).appendAsked(1L, "T'en ai a ou sur cette tache ?", java.util.List.of(),
+            java.util.List.of("API-3"));
     }
 
     @Test
@@ -298,7 +317,7 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Lis\",\"files\":[{\"name\":\"big.log\",\"text\":\"corps\"}]}"))
             .andExpect(status().isOk());
         verify(conversationService).appendAsked(1L, "Lis",
-            java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("big.log", "")));
+            java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("big.log", "")), java.util.List.of());
     }
 
     @ParameterizedTest(name = "{0} → 400")

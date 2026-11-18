@@ -156,7 +156,8 @@ public class AssistantController {
         if (AssistantAnswer.NOT_SENT.equals(answer.mode())) {
             conversationService.appendNotSent(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
         } else {
-            conversationService.appendAsked(conv.getId(), body.message(), keptFiles(body.filesOf(), answer));
+            // L'issue dont parlait la demande reste avec elle : « cette tâche », au tour suivant, se lit encore (R204).
+            conversationService.appendAsked(conv.getId(), body.message(), keptFiles(body.filesOf(), answer), answer.subjects());
         }
         // Le dossier de la réponse reste avec elle : ce qu'elle a fait repart au modèle aux tours suivants (R204).
         conversationService.appendAnswer(conv.getId(),

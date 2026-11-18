@@ -67,9 +67,28 @@ public class IssueMaterial {
     static final String HEADER = "The issue to summarize, as TaskForce read it just now. It is all there is: summarize only "
         + "from it, never add a fact, a feature or a plan it does not state, and when it says little, say so in one "
         + "sentence.\n";
-    /** Les issues jointes par la personne à une demande qui n'est pas un résumé (R123). */
-    static final String ATTACHED = "Attached by the person to their request, as TaskForce read it just now. Use it as it "
-        + "is: never add a fact it does not state.\n";
+    /**
+     * Les issues jointes par la personne à une demande qui n'est pas un résumé (R123), dites comme ce que la demande désigne
+     * (R204 : le 16/11/2026, à « T'en ai a ou sur cette tache ? » avec TF-21 jointe, Cortex répondait ne voir aucune tâche).
+     */
+    static final String ATTACHED = "Attached by the person to their request, as TaskForce read it just now: when they say "
+        + "\"this issue\", \"this task\", \"cette tâche\", \"celle-ci\" or \"it\", they mean the issue attached here. Use it "
+        + "as it is: never add a fact it does not state.\n";
+    /**
+     * L'issue d'une conversation, jointe à une demande d'avant, quand la demande la désigne sans la joindre de nouveau ni
+     * la nommer (R204 : elle reste le sujet au tour suivant).
+     */
+    static final String EARLIER = "The issue this conversation is about: the person attached it to an earlier message, and "
+        + "TaskForce read it again just now. When they say \"this issue\", \"this task\", \"cette tâche\", \"dessus\" or "
+        + "\"it\", they mean it. Use it as it is: never add a fact it does not state.\n";
+
+    /**
+     * Ce qui désigne une issue sans la nommer : « cette tâche », « ce ticket », « celle-ci », « dessus », « this issue »,
+     * « that task ». Une demande qui en dit un, sans clé ni pièce jointe, parle de l'issue de la conversation.
+     */
+    private static final Pattern POINTS_AT = Pattern.compile("(?<![\\p{L}\\p{N}])(?:(?:cette|cet|ce)\\s+(?:t[âa]che|issue|"
+        + "carte|ticket|bug|truc|sujet)|celle-ci|celui-ci|l[àa]-dessus|dessus|(?:this|that)\\s+(?:issue|task|ticket|card|bug|"
+        + "one))(?![\\p{L}\\p{N}])", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     /** Les issues jointes lues au plus : ce que le compositeur laisse joindre. */
     static final int MAX_ATTACHED = 3;
 
@@ -137,14 +156,67 @@ public class IssueMaterial {
     }
 
     /**
+     * L'issue d'une conversation, jointe à une demande d'avant (R204), relue par sa clé avec les droits de la personne :
+     * sous le titre qui dit qu'elle est le sujet de la conversation. Rien quand elle ne se lit plus.
+     */
+    public Read readEarlier(AgentContext ctx, String key) {
+        Map<Long, Long> wanted = byKeys(ctx, key, 1);
+        StringBuilder text = new StringBuilder();
+        List<AssistantRead.IssueRead> read = new ArrayList<>();
+        List<Long> ids = new ArrayList<>();
+        for (Map.Entry<Long, Long> issue : wanted.entrySet()) {
+            try {
+                Block block = material(ctx, issue.getValue(), issue.getKey());
+                text.append(block.text());
+                read.add(new AssistantRead.IssueRead(block.key(), block.comments()));
+                ids.add(issue.getKey());
+            } catch (RuntimeException e) {
+                log.debug("Cortex : issue {} de la conversation non relue : {}", issue.getKey(), LogSafe.of(e.getMessage()));
+            }
+        }
+        return text.isEmpty() ? Read.NOTHING : new Read(EARLIER + text, read, ids);
+    }
+
+    /**
+     * Une demande d'avant telle qu'elle repart au modèle (R204) : son texte, puis les issues dont elle parlait. Le même
+     * texte dans une conversation et au rejeu d'un cas de la banque.
+     */
+    public static String withSubjects(String content, List<String> keys) {
+        String said = content == null ? "" : content;
+        if (keys == null || keys.isEmpty()) return said;
+        return said + "\n\n[Attached to this message: " + String.join(", ", keys) + "]";
+    }
+
+    /** La demande désigne-t-elle une issue sans la nommer : « cette tâche », « dessus », « this issue » ? */
+    public static boolean pointsAt(String request) {
+        return request != null && POINTS_AT.matcher(request).find();
+    }
+
+    /** La demande écrit-elle une clé d'issue (« OPS-35 », « ops 35 ») ? */
+    public static boolean namesAKey(String request) {
+        return request != null && KEY.matcher(request).find();
+    }
+
+    /**
      * Les issues que la demande nomme, id vers projet : par leur clé, parmi les projets que la personne voit ; sans clé,
      * l'issue ouverte, sauf quand la demande parle du projet ou du tableau.
      */
     Map<Long, Long> named(AgentContext ctx, String request) {
-        Map<Long, Long> named = new LinkedHashMap<>();
+        Map<Long, Long> named = byKeys(ctx, request, MAX_ISSUES);
         if (request == null || request.isBlank()) return named;
-        Matcher key = KEY.matcher(request);
-        while (key.find() && named.size() < MAX_ISSUES) {
+        Screen screen = ctx.screen();
+        if (named.isEmpty() && screen.issueId() != null && !BOARD.matcher(request).find()) {
+            named.put(screen.issueId(), screen.projectId());
+        }
+        return named;
+    }
+
+    /** Les issues que ce texte nomme par leur clé, {@code max} au plus, parmi les projets que la personne voit. */
+    private Map<Long, Long> byKeys(AgentContext ctx, String text, int max) {
+        Map<Long, Long> named = new LinkedHashMap<>();
+        if (text == null || text.isBlank()) return named;
+        Matcher key = KEY.matcher(text);
+        while (key.find() && named.size() < max) {
             String identifier = key.group(1).toUpperCase(Locale.ROOT);
             Project project = projects.findByWorkspaceIdAndIdentifier(ctx.workspaceId(), identifier)
                 .filter(p -> visibility.canView(p, ctx.userId())).orElse(null);
@@ -152,10 +224,6 @@ public class IssueMaterial {
             issues.findByProjectIdAndSequenceNumber(project.getId(), Integer.valueOf(key.group(2)))
                 .map(Issue::getId)
                 .ifPresent(id -> named.putIfAbsent(id, project.getId()));
-        }
-        Screen screen = ctx.screen();
-        if (named.isEmpty() && screen.issueId() != null && !BOARD.matcher(request).find()) {
-            named.put(screen.issueId(), screen.projectId());
         }
         return named;
     }

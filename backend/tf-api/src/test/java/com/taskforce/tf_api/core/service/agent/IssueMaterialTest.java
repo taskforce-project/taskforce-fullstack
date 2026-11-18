@@ -240,6 +240,12 @@ class IssueMaterialTest {
     }
 
     @Test
+    @DisplayName("R204 (s14) : l'issue jointe se dit comme celle que « this task », « cette tâche » désignent")
+    void the_attached_issue_is_what_this_task_means() {
+        assertThat(IssueMaterial.ATTACHED).contains("\"this issue\"").contains("\"this task\"").contains("\"cette tâche\"");
+    }
+
+    @Test
     @DisplayName("jointe et nommée : lue une fois ; un projet joint (sans issue) n'est pas une issue ; rien sans pièce")
     void an_issue_attached_and_named_is_read_once() {
         ops35WithComments(0);

@@ -730,6 +730,46 @@ class AiConversationServiceTest {
     }
 
     @Test
+    @DisplayName("R204 (s14) : la demande garde l'issue dont elle parlait ; elle repart avec elle, et reste le sujet")
+    void a_request_keeps_the_issue_it_was_about() {
+        org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
+        when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
+
+        service.appendAsked(5L, "T'en ai a ou sur cette tache ?", List.of(), List.of("API-3"));
+
+        AiMessage asked = saved.getValue();
+        assertThat(asked.getReading()).containsEntry("subjects", List.of("API-3"));
+        asked.setId(1L);
+        AiMessage answer = msg(2L, "assistant", "API-3 est en cours.");
+        when(llm.isConfigured()).thenReturn(true);
+        holding(List.of(asked, answer));
+        TurnHistory.Fitted fitted = service.fit(1L, budget(8_192), "fast");
+        assertThat((String) fitted.messages().get(0).get("content"))
+            .isEqualTo("T'en ai a ou sur cette tache ?\n\n[Attached to this message: API-3]");
+        assertThat((String) fitted.messages().get(1).get("content")).isEqualTo("API-3 est en cours.");
+        when(messageRepository.findByConversationIdOrderByCreatedAtDesc(eq(1L), any())).thenReturn(List.of(answer, asked));
+        assertThat(service.lastSubject(1L)).isEqualTo("API-3");
+        // Rien ne change à l'écran : la demande se relit telle qu'elle a été écrite.
+        AiConversation conv = new AiConversation();
+        conv.setId(1L);
+        when(conversationRepository.findByIdAndUserId(1L, 7L)).thenReturn(Optional.of(conv));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(1L)).thenReturn(List.of(asked));
+        assertThat(service.detail(1L, 7L).messages()).singleElement().satisfies(message -> {
+            assertThat(message.content()).isEqualTo("T'en ai a ou sur cette tache ?");
+            assertThat(message.read()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("R204 : une conversation sans issue jointe n'a pas de sujet")
+    void a_conversation_without_attachment_has_no_subject() {
+        when(messageRepository.findByConversationIdOrderByCreatedAtDesc(eq(1L), any()))
+            .thenReturn(List.of(msg(2L, "assistant", "Ok."), msg(1L, "user", "Bonjour")));
+
+        assertThat(service.lastSubject(1L)).isNull();
+    }
+
+    @Test
     @DisplayName("R204 : une réponse sans lecture garde son dossier à part, sans rien montrer de plus à la réouverture")
     void an_answer_without_reading_keeps_its_record() {
         org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);

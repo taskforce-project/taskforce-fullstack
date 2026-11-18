@@ -38,9 +38,30 @@ public record AssistantAnswer(
     String record,
     String model,
     AssistantRead read,
-    @JsonIgnore ChatTurnResponse.Escalation offer
+    @JsonIgnore ChatTurnResponse.Escalation offer,
+    @JsonIgnore List<String> subjects
 ) {
     public static final String NOT_SENT = "not_sent";
+
+    /**
+     * {@code subjects} : les clés des issues dont parle la demande, jointes par la personne ou reprises de la conversation
+     * (R204) : la conversation les garde avec la demande, et elles restent le sujet au tour suivant. Jamais dans la réponse.
+     */
+    public AssistantAnswer {
+        subjects = subjects == null ? List.of() : List.copyOf(subjects);
+    }
+
+    /** Une réponse avec sa proposition d'un autre modèle, sans issue jointe. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record, String model, AssistantRead read, ChatTurnResponse.Escalation offer) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer, List.of());
+    }
+
+    /** La même réponse, avec les issues dont parlait sa demande. */
+    public AssistantAnswer withSubjects(List<String> keys) {
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer, keys);
+    }
 
     /** Une réponse sans proposition d'un autre modèle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
@@ -71,7 +92,8 @@ public record AssistantAnswer(
 
     /** La même réponse, avec ce que TaskForce a donné à lire au modèle. */
     public AssistantAnswer withRead(AssistantRead read) {
-        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer);
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer,
+            subjects);
     }
 
     /**

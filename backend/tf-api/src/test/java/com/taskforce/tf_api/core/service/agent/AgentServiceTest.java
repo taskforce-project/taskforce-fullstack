@@ -2687,6 +2687,115 @@ class AgentServiceTest {
         assertThat(sent.getValue()).extracting(AgentTool::name).hasSize(12).contains(expected, "linear__list_teams");
     }
 
+    /** La question de l'étape s14, mot pour mot, une issue jointe. */
+    private static final String S14 = "T'en ai a ou sur cette tache ?";
+    /** L'issue API-3 du seed de dev, telle que TaskForce la lit (le contenu de TF-21, l'issue de la Présidence, n'est pas connu). */
+    private static final String API3 = "API-3 \"Webhooks Stripe (lifecycle abonnement)\": in In Progress, assigned to Aïcha Diallo, "
+        + "priority high, 8 points.\nDescription: none.\nChecklist: none.\nComments: none.\n";
+
+    @Test
+    @DisplayName("R204 (s14) : l'issue jointe est celle que « cette tâche » désigne, et la demande que lit le modèle le dit")
+    void the_attached_issue_is_what_this_task_means() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"API-3 est en cours.\"}"));
+        List<Screen> attached = List.of(new Screen(3L, 21L));
+        when(material.read(any(), eq(S14), eq(attached), eq(false))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.ATTACHED + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
+
+        service.run("acme", 7L, new TurnInput(S14, TurnHistory.of(List.of()), Screen.NONE, attached, List.of(), 5L, null, null));
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        Map<String, Object> asked = sent.getValue().get(sent.getValue().size() - 1);
+        assertThat(asked.get("role")).isEqualTo("user");
+        assertThat(asked.get("content").toString()).startsWith(S14).contains("API-3").contains("cette tâche");
+    }
+
+    @Test
+    @DisplayName("R204 (s14) : la réponse garde l'issue dont parlait la demande, pour la conversation")
+    void the_answer_keeps_the_issue_its_request_was_about() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"API-3 est en cours.\"}"));
+        List<Screen> attached = List.of(new Screen(3L, 21L));
+        when(material.read(any(), eq(S14), eq(attached), eq(false))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.ATTACHED + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(S14, TurnHistory.of(List.of()), Screen.NONE, attached,
+            List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly("API-3");
+    }
+
+    @Test
+    @DisplayName("R204 (s14) : au tour suivant, « dessus » désigne encore l'issue jointe ; TaskForce la relit, et le dit au modèle")
+    void the_attached_issue_stays_the_subject_on_the_next_turn() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Aïcha Diallo.\"}"));
+        when(conversations.lastSubject(5L)).thenReturn("API-3");
+        when(material.readEarlier(any(), eq("API-3"))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.EARLIER + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et qui bosse dessus ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).contains(IssueMaterial.EARLIER).contains("Aïcha Diallo");
+        assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
+            .startsWith("Et qui bosse dessus ?").contains("[This message is about API-3, which the person attached to an earlier message");
+        assertThat(answer.subjects()).containsExactly("API-3");
+        assertThat(answer.read().issues()).containsExactly(new AssistantRead.IssueRead("API-3", 0));
+    }
+
+    @ParameterizedTest(name = "« {0} » ne reprend pas l'issue de la conversation")
+    @ValueSource(strings = {"Et qui bosse sur API-4 ?", "Quel est le plan du projet ?", "Merci, et la suite ?"})
+    void a_request_that_names_another_issue_or_none_takes_no_subject(String message) throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput(message, TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L,
+            null, null));
+
+        verify(conversations, never()).lastSubject(any());
+        verify(material, never()).readEarlier(any(), any());
+    }
+
+    @ParameterizedTest(name = "cas {0} du seed : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "5 | [The person attached API-3 to this message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
+        "6 | [This message is about API-3, which the person attached to an earlier message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
+    })
+    void the_seed_cases_of_the_attached_issue_replay_with_it(int n, String line) throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == n).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()), "qwen3.5:9b");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        List<Map<String, Object>> messages = sent.getValue();
+        assertThat(messages.get(0).get("content").toString())
+            .contains(n == 5 ? IssueMaterial.ATTACHED : IssueMaterial.EARLIER).contains("API-3 \"Webhooks Stripe");
+        assertThat(messages.get(messages.size() - 1).get("content").toString()).startsWith(row.question()).endsWith(line);
+        if (n == 6) {
+            assertThat(messages.get(1).get("content").toString()).endsWith("[Attached to this message: API-3]");
+        }
+    }
+
+    @Test
+    @DisplayName("R204 : une demande sans pièce jointe part telle quelle")
+    void a_request_without_attachment_goes_as_it_is() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, "Quel est le plan ?");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content")).isEqualTo("Quel est le plan ?");
+    }
+
     @Test
     @DisplayName("R204 : une lecture n'a pas de cible à dire")
     void a_read_says_no_target() throws Exception {

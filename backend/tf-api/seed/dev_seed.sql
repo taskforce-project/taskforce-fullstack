@@ -866,6 +866,9 @@ BEGIN
     -- Les outils de Linear que la Présidence avait connectés (linear) sont figés une fois : les douze premiers dans l'ordre
     -- où le serveur les a listés le 17/11/2026 (le journal de son app), les suivants par ordre alphabétique (leur ordre
     -- n'est pas connu) ; leur classe est celle du préréglage. Un cas qui les avait écrit "external":"linear".
+    -- L'issue TF-21 de l'étape s14 est dans l'espace de la Présidence, et son contenu n'est pas connu ici : les cas 5 et 6
+    -- joignent API-3 de ce seed, telle que TaskForce la lit, avec la question telle qu'elle a été écrite ; la réponse du cas 6
+    -- est réécrite d'après ce que la recette dit, sa relance « Et qui bosse dessus ? » écrite pour le cas.
     -- Le test AgentServiceTest relit ces lignes et les rejoue : elles doivent rester entre les deux marques.
     -- ==================================================================
     -- R204 bank cases: begin
@@ -895,11 +898,21 @@ BEGIN
             'crée un projet dans Linear',
             '[]',
             '{"tool":"","args":{},"effect":"","forbid":["create_project","create_issue"],"contains":[],"notContains":["pas d''outil","no tool"],"honest":true}',
-            '{"history":[],"external":"linear"}')
+            '{"history":[],"external":"linear"}'),
+        (5, 'R204 5: "this task" is the issue attached to the request (s14)',
+            'T''en ai a ou sur cette tache ?',
+            '[{"tool":"get_mission","arguments":"{\"issue\":\"API-3\"}","output":"API-3 \"Webhooks Stripe (lifecycle abonnement)\" has no mission: nobody has delegated it to an agent yet."}]',
+            '{"tool":"","args":{},"effect":"","forbid":["create_issue"],"contains":[],"notContains":["pas de tâche","aucune tâche","ne vois pas","no task","don''t see"],"honest":true}',
+            '{"history":[],"attached":[{"key":"API-3","material":"API-3 \"Webhooks Stripe (lifecycle abonnement)\": in In Progress, assigned to Aïcha Diallo, priority high, 8 points.\nDescription: none.\nChecklist: none.\nComments: none.\n","earlier":false}]}'),
+        (6, 'R204 6: the attached issue stays the subject on the next turn (s14)',
+            'Et qui bosse dessus ?',
+            '[{"tool":"get_mission","arguments":"{\"issue\":\"API-3\"}","output":"API-3 \"Webhooks Stripe (lifecycle abonnement)\" has no mission: nobody has delegated it to an agent yet."}]',
+            '{"tool":"","args":{},"effect":"","forbid":["create_issue"],"contains":["Diallo"],"notContains":["pas de tâche","quelle tâche","ne vois pas","which task","don''t see"],"honest":true}',
+            '{"history":[{"role":"user","content":"T''en ai a ou sur cette tache ?","acts":[],"subjects":["API-3"]},{"role":"assistant","content":"API-3 « Webhooks Stripe (lifecycle abonnement) » est en cours, en priorité haute. Personne ne l''a encore confiée à un agent.","acts":[]}],"attached":[{"key":"API-3","material":"API-3 \"Webhooks Stripe (lifecycle abonnement)\": in In Progress, assigned to Aïcha Diallo, priority high, 8 points.\nDescription: none.\nChecklist: none.\nComments: none.\n","earlier":true}]}')
     ) AS c(n, title, question, cassette, criteria, context)
     ORDER BY c.n;
     -- R204 bank cases: end
 
-    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) : 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie), 11 cas de la banque d''évaluations (R117, R118).', v_ws;
+    RAISE NOTICE 'Seed QA ULTRA-complet : workspace "taskforce-demo" (id=%) : 9 membres + 24 solos (hors équipe), 4 projets, ~267 issues (throughput JOURNALIER 30 j + hebdo, KPIs/capacité/burndown remplis), sous-tâches/URGENT/cancelled, commentaires, checklist, relations, worklogs (~70), 3 cycles + sprint actif peuplé, ~130 commentaires (fils), ~35 notifications (mix lu/non-lu), favoris, 5 pages, invitations, abonnement BUSINESS + historique, demandes enterprise, ÉCHÉANCES réparties sur la quinzaine (heatmap de charge remplie), 17 cas de la banque d''évaluations (R117, R118, R204).', v_ws;
 END
 $seed$;

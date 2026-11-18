@@ -33,6 +33,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.service.agent.ActionClaimCheck;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService.Act;
+import com.taskforce.tf_api.core.service.agent.IssueMaterial;
 import com.taskforce.tf_api.core.service.agent.TargetSystems;
 import com.taskforce.tf_api.core.service.agent.ThreadActs;
 import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
@@ -80,6 +81,8 @@ public class AiConversationService {
     private static final String CARD = "card";
     /** Le dossier d'une réponse qui n'a pas gardé ce que le modèle a lu (une carte refaite sans lui, R135). */
     private static final String ANSWER_RECORD = "answerRecord";
+    /** Les issues dont parlait une demande, jointes ou reprises de la conversation (R204) : elles restent son sujet. */
+    private static final String SUBJECTS = "subjects";
     /** Les messages relus pour retrouver la dernière carte préparée. */
     private static final int CARD_LOOKBACK = 12;
 
@@ -135,6 +138,7 @@ public class AiConversationService {
         reading.remove(ATTACHED_FILES);
         reading.remove(CARD);
         reading.remove(ANSWER_RECORD);
+        reading.remove(SUBJECTS);
         if (reading.isEmpty()) return null;
         try {
             return JSON.convertValue(reading, AssistantRead.class);
@@ -175,6 +179,28 @@ public class AiConversationService {
             .map(AiConversationService::cardOf)
             .filter(Objects::nonNull)
             .findFirst();
+    }
+
+    /**
+     * L'issue dont parlait en dernier une demande de cette conversation (R204) : la dernière jointe, ou reprise ; null sans
+     * elle. Une demande qui la désigne (« cette tâche », « dessus ») sans la joindre en parle encore.
+     */
+    @Transactional(readOnly = true)
+    public String lastSubject(Long conversationId) {
+        return messageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId, PageRequest.of(0, CARD_LOOKBACK)).stream()
+            .filter(message -> "user".equals(message.getRole()))
+            .map(AiConversationService::subjectsOf)
+            .filter(keys -> !keys.isEmpty())
+            .map(keys -> keys.get(keys.size() - 1))
+            .findFirst()
+            .orElse(null);
+    }
+
+    /** Les issues dont parlait cette demande (R204) ; aucune pour une réponse, ou illisibles. */
+    private static List<String> subjectsOf(AiMessage message) {
+        Object kept = message.getReading() == null ? null : message.getReading().get(SUBJECTS);
+        if (!(kept instanceof List<?> keys)) return List.of();
+        return keys.stream().filter(String.class::isInstance).map(String.class::cast).toList();
     }
 
     /** Le projet où la conversation travaille maintenant ; null sans projet. */
@@ -377,6 +403,8 @@ public class AiConversationService {
         String content = files.isEmpty() ? message.getContent() : message.getContent() + "\n\n" + files;
         List<Act> done = message.getId() == null ? null : acts.get(message.getId());
         if (done != null) content = ThreadActs.withActs(content, done, targets::of);
+        // Une demande garde l'issue qu'elle désignait : « cette tâche », au tour suivant, se lit encore (R204).
+        if ("user".equals(message.getRole())) content = IssueMaterial.withSubjects(content, subjectsOf(message));
         return Map.of("role", message.getRole(), "content", content == null ? "" : content);
     }
 
@@ -581,7 +609,21 @@ public class AiConversationService {
     /** La demande de la personne, avec les fichiers qu'elle a joints (R134) : ils restent avec le message. */
     @Transactional
     public void appendAsked(Long conversationId, String content, List<AttachedFile> files) {
-        append(conversationId, "user", content, null, 0, null, attached(files));
+        appendAsked(conversationId, content, files, List.of());
+    }
+
+    /**
+     * La même demande, avec les issues dont elle parlait, jointes ou reprises de la conversation (R204) : elles repartent
+     * avec elle au modèle, et restent le sujet de la conversation.
+     */
+    @Transactional
+    public void appendAsked(Long conversationId, String content, List<AttachedFile> files, List<String> subjects) {
+        Map<String, Object> reading = attached(files);
+        if (subjects != null && !subjects.isEmpty()) {
+            reading = reading == null ? new HashMap<>() : reading;
+            reading.put(SUBJECTS, List.copyOf(subjects));
+        }
+        append(conversationId, "user", content, null, 0, null, reading);
     }
 
     /** Une demande qui n'a pas tenu la fenêtre du modèle : elle reste dans le fil, et il ne la relit jamais. */

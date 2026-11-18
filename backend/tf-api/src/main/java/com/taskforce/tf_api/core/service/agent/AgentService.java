@@ -559,7 +559,7 @@ public class AgentService {
             recordUsage(ws.getId(), usage);
             return new AssistantAnswer(answer, null, toolCalls.isEmpty() ? "fast" : "deep",
                 sources, steps, toolCalls, usage(usage), record, llm.currentModel(),
-                reading.read(toolCalls, record, startedAt));
+                reading.read(toolCalls, record, startedAt)).withSubjects(reading.subjects());
         } catch (TurnStoppedException stopped) {
             return stoppedByPerson(ws.getId(), steps, sources, toolCalls, reading);
         } catch (TooBig tooBig) {
@@ -644,7 +644,7 @@ public class AgentService {
         if (!steps.isEmpty()) steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Stopped by you"));
         String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
         return new AssistantAnswer(toolCalls.isEmpty() ? STOPPED_TEXT : STOPPED_AFTER_WORK, null, STOPPED_MODE, sources, steps,
-            toolCalls, usage(usage), record, llm.currentModel(), reading.read());
+            toolCalls, usage(usage), record, llm.currentModel(), reading.read()).withSubjects(reading.subjects());
     }
 
     /**
@@ -970,7 +970,18 @@ public class AgentService {
         boolean summarize = plan != null && CortexPlans.SUMMARIZE.equals(plan.id());
         boolean anyIssue = joined.stream().anyMatch(item -> item.issueId() != null);
         IssueMaterial.Read read = summarize || anyIssue ? material.read(ctx, message, joined, summarize) : null;
+        // R204 : l'issue jointe à une demande d'avant reste le sujet de la conversation : une demande qui la désigne
+        // (« cette tâche », « dessus ») sans la joindre de nouveau ni la nommer la relit.
+        String earlier = (read == null || read.isEmpty()) && !anyIssue && IssueMaterial.pointsAt(message)
+            && !IssueMaterial.namesAKey(message) ? lastSubject(ctx) : null;
+        if (earlier != null) read = material.readEarlier(ctx, earlier);
         String issue = read == null || read.isEmpty() ? "" : read.text();
+        // Ce que la demande désigne, dit dans la demande même que lit le modèle (R204 : à « T'en ai a ou sur cette tache ? »,
+        // TF-21 jointe, Cortex répondait ne voir aucune tâche).
+        List<String> subjects = earlier != null && read != null && !read.isEmpty() ? read.issues().stream()
+            .map(AssistantRead.IssueRead::key).toList() : attachedKeys(joined, read);
+        reading.subjects(subjects);
+        String asked = message + subjectLine(subjects, earlier != null);
         if (read != null) reading.issues(read.issues());
         String seen = issue.isEmpty() ? screen : screen.isEmpty() ? issue : screen.strip() + "\n\n" + issue;
         if (!boards.isEmpty()) {
@@ -994,11 +1005,11 @@ public class AgentService {
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le budget de la requête, contre la fenêtre de son modèle (TF-J1-13) : ce qui ne tient pas ne part pas, et
         // l'historique ne prend que ce qu'il reste.
-        ContextBudget budget = budget(tier, system, toolDefs, seen, message);
+        ContextBudget budget = budget(tier, system, toolDefs, seen, asked);
         if (!budget.fits()) throw new TooBig(budget, tier);
         TurnHistory.Fitted fitted = memory.fit(budget, tier);
         reading.fitted(fitted);
-        List<Map<String, Object>> messages = withHistory(system, fitted.messages(), message);
+        List<Map<String, Object>> messages = withHistory(system, fitted.messages(), asked);
         ToolLoopFit loopFit = new ToolLoopFit(objectMapper, budget, fitted.messages().size());
         reading.watch(loopFit);
         // Le noyau (R35) : les règles de l'espace et le dossier de la réponse, ouverts au premier outil. Le dossier garde
@@ -1020,6 +1031,47 @@ public class AgentService {
             || QUESTION.equals(call.status()) || "pending".equals(call.status()));
         return plan != null && plan.ask() != null && !gestureMade ? askedForCortex(plan.ask(), kernel, toolCalls, answer)
             : answer;
+    }
+
+    /**
+     * Les clés des issues que la personne a jointes à cette demande et que TaskForce a lues, dans l'ordre où elle les a
+     * jointes : chacune par son id parmi ce qui a été lu (une issue qu'elle ne voit pas ne se lit pas, et ne se dit pas).
+     */
+    static List<String> attachedKeys(List<Screen> joined, IssueMaterial.Read read) {
+        if (read == null || read.isEmpty() || read.ids().isEmpty()) return List.of();
+        List<String> keys = new ArrayList<>();
+        for (Screen item : joined) {
+            int at = item.issueId() == null ? -1 : read.ids().indexOf(item.issueId());
+            if (at >= 0 && at < read.issues().size() && !keys.contains(read.issues().get(at).key())) {
+                keys.add(read.issues().get(at).key());
+            }
+        }
+        return keys;
+    }
+
+    /**
+     * Ce que la demande désigne, ajouté à la demande que lit le modèle (R204) : l'issue jointe, ou celle de la conversation,
+     * et ce que « cette tâche » veut dire. Rien quand la demande ne parle d'aucune issue.
+     */
+    static String subjectLine(List<String> keys, boolean earlier) {
+        if (keys.isEmpty()) return "";
+        String named = String.join(" and ", keys);
+        String means = keys.size() == 1 ? "\"this issue\", \"this task\", \"cette tâche\" mean " + named
+            : "\"these issues\", \"ces tâches\" mean them";
+        return earlier
+            ? "\n\n[This message is about " + named + ", which the person attached to an earlier message: " + means + ".]"
+            : "\n\n[The person attached " + named + " to this message: " + means + ".]";
+    }
+
+    /** L'issue que la personne a jointe en dernier dans cette conversation ; null hors d'une conversation, ou sans elle. */
+    private String lastSubject(AgentContext ctx) {
+        if (ctx.conversation() == null) return null;
+        try {
+            return conversations.lastSubject(ctx.conversation());
+        } catch (RuntimeException e) {
+            log.warn("Cortex : sujet de la conversation non relu : {}", LogSafe.of(e.getMessage()));
+            return null;
+        }
     }
 
     /**
@@ -1061,8 +1113,15 @@ public class AgentService {
         List<Map<String, Object>> history = context.history().stream()
             .map(turn -> Map.<String, Object>of("role", turn.role(), "content",
                 "assistant".equals(turn.role()) ? ThreadActs.withActs(turn.content(), turn.acts(), targets::of)
-                    : turn.content() == null ? "" : turn.content()))
+                    : IssueMaterial.withSubjects(turn.content(), turn.subjects())))
             .toList();
+        // Les issues dont parle la question, telles que TaskForce les a lues, dites comme dans une réponse (R204).
+        List<ReplayContext.FrozenIssue> issues = context.attached();
+        boolean earlier = !issues.isEmpty() && issues.stream().allMatch(ReplayContext.FrozenIssue::earlier);
+        String seen = issues.isEmpty() ? "" : (earlier ? IssueMaterial.EARLIER : IssueMaterial.ATTACHED)
+            + issues.stream().map(ReplayContext.FrozenIssue::material).collect(Collectors.joining());
+        String asked = replayCase.question()
+            + subjectLine(issues.stream().map(ReplayContext.FrozenIssue::key).toList(), earlier);
         // Les outils connectés du cas, figés, choisis par le même code qu'une réponse (R204) : jamais exécutés.
         List<AgentTool> connected = context.external().stream().map(this::frozen).toList();
         List<AgentTool> external = relevantExternal(connected, replayCase.question());
@@ -1070,8 +1129,8 @@ public class AgentService {
         CortexPlans.Plan plan = targets.namedIn(replayCase.question()).isEmpty()
             ? CortexPlans.forRequest(replayCase.question()).orElse(null) : null;
         List<Gap> gaps = gaps(connected, replayCase.question(), Map.of());
-        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, "", notes, external, replayCase.askedOn(), gaps),
-            history, replayCase.question());
+        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, seen, notes, external, replayCase.askedOn(), gaps),
+            history, asked);
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
         List<ActionClaimCheck.Done> thread = context.done(targets::of);
         llm.beginUsageCapture();
@@ -1165,6 +1224,16 @@ public class AgentService {
         private int summarized;
         private int leftOut;
         private ToolLoopFit loop;
+        /** Les issues dont parle la demande (R204) : la conversation les garde avec elle. */
+        private List<String> subjects = List.of();
+
+        void subjects(List<String> keys) {
+            subjects = keys == null ? List.of() : List.copyOf(keys);
+        }
+
+        List<String> subjects() {
+            return subjects;
+        }
 
         Reading(List<KnowledgeNode> hits) {
             notes = hits.stream().map(note -> new AssistantRead.NoteRead(note.getId(), note.getTitle())).toList();
