@@ -175,4 +175,21 @@ class IntentTest {
         assertThat(Intent.writes(request)).isEqualTo(writes);
         assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
     }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Cinquième tour de la relecture R159 (R1) : « ta », « tas », « las » tapés pour « t'as », « l'as », juste devant le
+        // verbe, disent le passé.
+        "Ta creer le projet ou ? Je le vois pas dans linear | false",
+        "Ta creer le projet ?                               | false",
+        "Tu las creer ou ?                                  | false",
+        "Tas creer le projet ?                              | false",
+        // Ses voisins : « ta » qui ouvre une chose, après le verbe, ne dit rien du temps.
+        "Crée ta tâche dans Linear                          | true",
+        "Ajoute ta note dans Notion                         | true",
+    })
+    void a_misspelled_auxiliary_tells_the_past(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+        assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
+    }
 }

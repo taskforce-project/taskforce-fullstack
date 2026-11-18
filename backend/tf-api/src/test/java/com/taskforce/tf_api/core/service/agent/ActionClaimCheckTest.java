@@ -771,4 +771,28 @@ class ActionClaimCheckTest {
         assertThat(ActionClaimCheck.check("Je ne l'ai pas encore créée : dans quel projet ?", List.of(), List.of(api12),
             SYSTEMS, request).corrected()).isFalse();
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548, cinquième tour (R1, R2)
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "à « {0} », TESTTASKFO créé à la réponse précédente : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        // R1 : « ta », « tas », « las » pour « t'as », « l'as » ; la réponse vraie reste, la négation de la recette se corrige.
+        "Ta creer le projet ou ? Je le vois pas dans linear | Oui, je l'ai créé dans TaskForce.                                | false",
+        "Ta creer le projet ou ? Je le vois pas dans linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Ta creer le projet ?                               | Oui, je l'ai créé dans TaskForce.                                | false",
+        "Ta creer le projet ?                               | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Tu las creer ou ?                                  | Oui, je l'ai créé dans TaskForce.                                | false",
+        "Tu las creer ou ?                                  | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Tas creer le projet ?                              | Oui, je l'ai créé dans TaskForce.                                | false",
+        "Tas creer le projet ?                              | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+    })
+    void a_misspelled_auxiliary_is_a_question_about_the_past(String request, String answer, boolean corrected) {
+        Checked checked = ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request);
+
+        assertThat(checked.corrected()).isEqualTo(corrected);
+        if (corrected) assertThat(checked.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).contains("TESTTASKFO");
+        else assertThat(checked.answer()).isEqualTo(answer);
+    }
 }

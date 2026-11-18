@@ -3370,4 +3370,23 @@ class AgentServiceTest {
                 .doesNotContain(ActionClaimCheck.DONE_SIGNATURE);
         }
     }
+
+    @ParameterizedTest(name = "à « {0} » : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Ta creer le projet ou ? Je le vois pas dans linear | Oui, je l'ai créé dans TaskForce, pas dans Linear.              | false",
+        "Ta creer le projet ou ? Je le vois pas dans linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+    })
+    @DisplayName("R159, cinquième tour (R1) : de bout en bout, « ta » pour « t'as » est une question sur le passé")
+    void a_misspelled_auxiliary_is_a_question_through_a_turn(String request, String said, boolean corrected) throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(request, TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        if (corrected) assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain(said);
+        else assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
+    }
 }

@@ -68,12 +68,13 @@ final class Intent {
 
     /**
      * Un auxiliaire, une copule : le verbe qui suit raconte, il ne demande rien (« tu l'as créé », « was set », « did you
-     * create », « didn't you create »).
+     * create », « didn't you create »). « ta », « tas », « las » sont « t'as », « l'as » tapés vite (« Ta creer le
+     * projet ? », « Tu las creer ou ? », cinquième tour de la relecture R159) : devant un verbe, jamais un article.
      */
     private static final Set<String> AUXILIARIES = Set.of("a", "as", "ai", "avons", "avez", "ont", "avait", "avaient", "ete",
         "etait", "etaient", "est", "sont", "sera", "seront", "has", "have", "had", "was", "were", "is", "are", "been",
         "being", "be", "ve", "d", "did", "do", "does", "didn", "don", "doesn", "hasn", "haven", "hadn", "wasn", "weren",
-        "isn", "aren");
+        "isn", "aren", "ta", "tas", "las");
     /**
      * Ce qui se glisse entre l'auxiliaire et le verbe sans rien changer au temps : une négation, un adverbe, le sujet d'une
      * question (« tu l'as bien créé », « tu ne l'as pas créé », « t'as vraiment créé », « as-tu créé », « did you really
