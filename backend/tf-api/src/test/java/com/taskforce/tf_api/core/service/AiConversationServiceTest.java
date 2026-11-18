@@ -759,10 +759,12 @@ class AiConversationServiceTest {
         org.mockito.ArgumentCaptor<AiMessage> saved = org.mockito.ArgumentCaptor.forClass(AiMessage.class);
         when(messageRepository.save(saved.capture())).thenAnswer(call -> call.getArgument(0));
 
-        service.appendAsked(5L, "T'en ai a ou sur cette tache ?", List.of(), List.of("API-3"));
+        service.appendAsked(5L, "T'en ai a ou sur cette tache ?", List.of(),
+            List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("API-3", 21L, 3L)));
 
         AiMessage asked = saved.getValue();
-        assertThat(asked.getReading()).containsEntry("subjects", List.of("API-3"));
+        assertThat(asked.getReading()).containsEntry("subjects", List.of(Map.of("key", "API-3", "issueId", 21L,
+            "projectId", 3L)));
         asked.setId(1L);
         AiMessage answer = msg(2L, "assistant", "API-3 est en cours.");
         when(llm.isConfigured()).thenReturn(true);
@@ -772,7 +774,8 @@ class AiConversationServiceTest {
             .isEqualTo("T'en ai a ou sur cette tache ?\n\n[Attached to this message: API-3]");
         assertThat((String) fitted.messages().get(1).get("content")).isEqualTo("API-3 est en cours.");
         when(messageRepository.findByConversationIdOrderByCreatedAtDesc(eq(1L), any())).thenReturn(List.of(answer, asked));
-        assertThat(service.lastSubject(1L)).isEqualTo("API-3");
+        assertThat(service.lastSubject(1L))
+            .isEqualTo(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("API-3", 21L, 3L));
         // Rien ne change à l'écran : la demande se relit telle qu'elle a été écrite.
         AiConversation conv = new AiConversation();
         conv.setId(1L);

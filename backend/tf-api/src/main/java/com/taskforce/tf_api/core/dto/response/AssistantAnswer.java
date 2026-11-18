@@ -39,13 +39,25 @@ public record AssistantAnswer(
     String model,
     AssistantRead read,
     @JsonIgnore ChatTurnResponse.Escalation offer,
-    @JsonIgnore List<String> subjects
+    @JsonIgnore List<Subject> subjects
 ) {
     public static final String NOT_SENT = "not_sent";
 
     /**
-     * {@code subjects} : les clés des issues dont parle la demande, jointes par la personne ou reprises de la conversation
-     * (R204) : la conversation les garde avec la demande, et elles restent le sujet au tour suivant. Jamais dans la réponse.
+     * Une issue dont parle une demande (R204) : sa clé, et ses ids, que la conversation garde pour la relire au tour suivant
+     * avec les droits de la personne, même si sa clé change (relecture R159 de la PR #548).
+     */
+    public record Subject(String key, Long issueId, Long projectId) {
+        /** Une issue connue par sa clé seule. */
+        public Subject(String key) {
+            this(key, null, null);
+        }
+    }
+
+    /**
+     * {@code subjects} : les issues dont parle la demande, jointes par la personne, nommées par leur clé, ou reprises de la
+     * conversation (R204, R159) : la conversation les garde avec la demande, et elles restent le sujet au tour suivant.
+     * Jamais dans la réponse.
      */
     public AssistantAnswer {
         subjects = subjects == null ? List.of() : List.copyOf(subjects);
@@ -59,8 +71,8 @@ public record AssistantAnswer(
     }
 
     /** La même réponse, avec les issues dont parlait sa demande. */
-    public AssistantAnswer withSubjects(List<String> keys) {
-        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer, keys);
+    public AssistantAnswer withSubjects(List<Subject> issues) {
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer, issues);
     }
 
     /** Une réponse sans proposition d'un autre modèle. */

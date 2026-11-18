@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -182,11 +183,11 @@ public class AiConversationService {
     }
 
     /**
-     * L'issue dont parlait en dernier une demande de cette conversation (R204) : la dernière jointe, ou reprise ; null sans
-     * elle. Une demande qui la désigne (« cette tâche », « dessus ») sans la joindre en parle encore.
+     * L'issue dont parlait en dernier une demande de cette conversation (R204) : la dernière jointe, nommée ou reprise, avec
+     * ses ids (relecture R159) ; null sans elle. Une demande qui la désigne (« cette tâche », « dessus ») en parle encore.
      */
     @Transactional(readOnly = true)
-    public String lastSubject(Long conversationId) {
+    public AssistantAnswer.Subject lastSubject(Long conversationId) {
         return messageRepository.findByConversationIdOrderByCreatedAtDesc(conversationId, PageRequest.of(0, CARD_LOOKBACK)).stream()
             .filter(message -> "user".equals(message.getRole()))
             .map(AiConversationService::subjectsOf)
@@ -196,11 +197,23 @@ public class AiConversationService {
             .orElse(null);
     }
 
-    /** Les issues dont parlait cette demande (R204) ; aucune pour une réponse, ou illisibles. */
-    private static List<String> subjectsOf(AiMessage message) {
+    /** Les issues dont parlait cette demande (R204), avec leurs ids ; aucune pour une réponse, ou illisibles. */
+    private static List<AssistantAnswer.Subject> subjectsOf(AiMessage message) {
         Object kept = message.getReading() == null ? null : message.getReading().get(SUBJECTS);
-        if (!(kept instanceof List<?> keys)) return List.of();
-        return keys.stream().filter(String.class::isInstance).map(String.class::cast).toList();
+        if (!(kept instanceof List<?> issues)) return List.of();
+        List<AssistantAnswer.Subject> subjects = new ArrayList<>();
+        for (Object issue : issues) {
+            if (issue instanceof String key) {
+                subjects.add(new AssistantAnswer.Subject(key));
+            } else if (issue instanceof Map<?, ?> fields && fields.get("key") instanceof String key) {
+                subjects.add(new AssistantAnswer.Subject(key, idOf(fields.get("issueId")), idOf(fields.get("projectId"))));
+            }
+        }
+        return subjects;
+    }
+
+    private static Long idOf(Object value) {
+        return value instanceof Number number ? Long.valueOf(number.longValue()) : null;
     }
 
     /** Le projet où la conversation travaille maintenant ; null sans projet. */
@@ -409,7 +422,9 @@ public class AiConversationService {
         List<Act> done = message.getId() == null ? null : acts.get(message.getId());
         if (done != null) content = ThreadActs.withActs(content, done, targets::of);
         // Une demande garde l'issue qu'elle désignait : « cette tâche », au tour suivant, se lit encore (R204).
-        if ("user".equals(message.getRole())) content = IssueMaterial.withSubjects(content, subjectsOf(message));
+        if ("user".equals(message.getRole())) {
+            content = IssueMaterial.withSubjects(content, subjectsOf(message).stream().map(AssistantAnswer.Subject::key).toList());
+        }
         return Map.of("role", message.getRole(), "content", content == null ? "" : content);
     }
 
@@ -622,11 +637,20 @@ public class AiConversationService {
      * avec elle au modèle, et restent le sujet de la conversation.
      */
     @Transactional
-    public void appendAsked(Long conversationId, String content, List<AttachedFile> files, List<String> subjects) {
+    public void appendAsked(Long conversationId, String content, List<AttachedFile> files,
+                            List<AssistantAnswer.Subject> subjects) {
         Map<String, Object> reading = attached(files);
         if (subjects != null && !subjects.isEmpty()) {
             reading = reading == null ? new HashMap<>() : reading;
-            reading.put(SUBJECTS, List.copyOf(subjects));
+            List<Map<String, Object>> kept = new ArrayList<>();
+            for (AssistantAnswer.Subject subject : subjects) {
+                Map<String, Object> fields = new LinkedHashMap<>();
+                fields.put("key", subject.key());
+                if (subject.issueId() != null) fields.put("issueId", subject.issueId());
+                if (subject.projectId() != null) fields.put("projectId", subject.projectId());
+                kept.add(fields);
+            }
+            reading.put(SUBJECTS, kept);
         }
         append(conversationId, "user", content, null, 0, null, reading);
     }

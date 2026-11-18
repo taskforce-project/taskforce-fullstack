@@ -2723,7 +2723,7 @@ class AgentServiceTest {
         AssistantAnswer answer = service.run("acme", 7L, new TurnInput(S14, TurnHistory.of(List.of()), Screen.NONE, attached,
             List.of(), 5L, null, null));
 
-        assertThat(answer.subjects()).containsExactly("API-3");
+        assertThat(answer.subjects()).extracting(AssistantAnswer.Subject::key).containsExactly("API-3");
     }
 
     @Test
@@ -2731,8 +2731,8 @@ class AgentServiceTest {
     void the_attached_issue_stays_the_subject_on_the_next_turn() throws Exception {
         stubModel();
         when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Aïcha Diallo.\"}"));
-        when(conversations.lastSubject(5L)).thenReturn("API-3");
-        when(material.readEarlier(any(), eq("API-3"))).thenReturn(new IssueMaterial.Read(
+        when(conversations.lastSubject(5L)).thenReturn(new AssistantAnswer.Subject("API-3", 21L, 3L));
+        when(material.readEarlier(any(), eq(new AssistantAnswer.Subject("API-3", 21L, 3L)))).thenReturn(new IssueMaterial.Read(
             IssueMaterial.EARLIER + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
 
         AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et qui bosse dessus ?", TurnHistory.of(List.of()),
@@ -2743,7 +2743,7 @@ class AgentServiceTest {
         assertThat(sent.getValue().get(0).get("content").toString()).contains(IssueMaterial.EARLIER).contains("Aïcha Diallo");
         assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
             .startsWith("Et qui bosse dessus ?").contains("[This message is about API-3, which the person attached to an earlier message");
-        assertThat(answer.subjects()).containsExactly("API-3");
+        assertThat(answer.subjects()).extracting(AssistantAnswer.Subject::key).containsExactly("API-3");
         assertThat(answer.read().issues()).containsExactly(new AssistantRead.IssueRead("API-3", 0));
     }
 
@@ -3051,5 +3051,77 @@ class AgentServiceTest {
 
         assertThat(sent.getValue()).extracting(AgentTool::name).contains("notion__notion-search", "notion__notion-fetch")
             .filteredOn(name -> name.startsWith("notion__")).hasSize(6);
+    }
+
+    @Test
+    @DisplayName("R159 (7) : une issue ouverte à l'écran est celle que « cette tâche » désigne ; celle de la conversation ne revient pas")
+    void the_issue_on_screen_wins_over_the_issue_of_the_conversation() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput("Qui bosse sur cette tâche ?", TurnHistory.of(List.of()), new Screen(3L, 30L),
+            List.of(), List.of(), 5L, null, null));
+
+        verify(conversations, never()).lastSubject(any());
+    }
+
+    @Test
+    @DisplayName("R159 (7) : un projet joint est ce que « celui-ci » désigne ; l'issue de la conversation ne revient pas")
+    void an_attached_project_wins_over_the_issue_of_the_conversation() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput("Et celui-ci ?", TurnHistory.of(List.of()), Screen.NONE,
+            List.of(new Screen(4L, null)), List.of(), 5L, null, null));
+
+        verify(conversations, never()).lastSubject(any());
+    }
+
+    @Test
+    @DisplayName("R159 (7) : « dans 2 jours » n'est pas une clé d'issue ; « dessus » désigne encore l'issue de la conversation")
+    void a_number_after_a_word_is_not_an_issue_key() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput("Et qui bosse dessus dans 2 jours ?", TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        verify(conversations).lastSubject(5L);
+    }
+
+    @Test
+    @DisplayName("R159 (7) : une issue nommée par sa clé devient le sujet de la conversation, à la place de celle d'avant")
+    void a_named_issue_becomes_the_subject() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        AssistantAnswer.Subject api4 = new AssistantAnswer.Subject("API-4", 40L, 4L);
+        when(material.namedSubjects(any(), eq("Et sur API-4 ?"))).thenReturn(List.of(api4));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et sur API-4 ?", TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly(api4);
+        verify(conversations, never()).lastSubject(any());
+    }
+
+    @Test
+    @DisplayName("R159 (7) : au tour suivant, « dessus » relit l'issue nommée, par ses ids")
+    void the_named_issue_is_read_again_by_its_ids() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Marc Dupont.\"}"));
+        AssistantAnswer.Subject api4 = new AssistantAnswer.Subject("API-4", 40L, 4L);
+        when(conversations.lastSubject(5L)).thenReturn(api4);
+        when(material.readEarlier(any(), eq(api4))).thenReturn(new IssueMaterial.Read(IssueMaterial.EARLIER
+            + "API-4 \"Export CSV\": in Todo, assigned to Marc Dupont.\n", List.of(new AssistantRead.IssueRead("API-4", 0)),
+            List.of(40L)));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et qui bosse dessus ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly(api4);
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
+            .contains("[This message is about API-4, which the person attached to an earlier message");
     }
 }

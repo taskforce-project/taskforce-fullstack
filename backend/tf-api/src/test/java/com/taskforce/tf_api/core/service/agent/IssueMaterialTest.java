@@ -258,4 +258,36 @@ class IssueMaterialTest {
         assertThat(material.read(ctx(null), "bonjour", null, false)).isSameAs(IssueMaterial.Read.NOTHING);
         assertThat(IssueMaterial.Read.NOTHING.isEmpty()).isTrue();
     }
+
+    @ParameterizedTest(name = "« {0} » nomme : {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        // Relecture R159 (7) : seule une clé qui existe, et que la personne voit, nomme une issue.
+        "Et sur OPS-35 ?                      | OPS-35",
+        "Et sur ops 35 ?                      | OPS-35",
+        "Et qui bosse dessus dans 2 jours ?   | -",
+        "On fait ça au 30 ?                   | -",
+        "Et sur SEC-1 ?                       | -",
+    })
+    void only_an_existing_key_names_an_issue(String request, String key) {
+        List<com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject> named = material.namedSubjects(ctx(null), request);
+
+        assertThat(named).extracting(com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject::key)
+            .containsExactlyElementsOf(key == null ? List.of() : List.of(key));
+        if (key != null) {
+            assertThat(named.get(0).issueId()).isEqualTo(350L);
+            assertThat(named.get(0).projectId()).isEqualTo(30L);
+        }
+    }
+
+    @Test
+    @DisplayName("R159 (7) : l'issue de la conversation se relit par ses ids, avec les droits de la personne")
+    void the_issue_of_the_conversation_is_read_again_by_its_ids() {
+        when(issueService.getIssue("acme", 30L, 350L, ME)).thenReturn(ops35().build());
+
+        IssueMaterial.Read read = material.readEarlier(ctx(null),
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("OPS-35", 350L, 30L));
+
+        assertThat(read.text()).startsWith(IssueMaterial.EARLIER).contains("Itération #35");
+        verify(projects, never()).findByWorkspaceIdAndIdentifier(any(), any());
+    }
 }

@@ -970,18 +970,23 @@ public class AgentService {
         boolean summarize = plan != null && CortexPlans.SUMMARIZE.equals(plan.id());
         boolean anyIssue = joined.stream().anyMatch(item -> item.issueId() != null);
         IssueMaterial.Read read = summarize || anyIssue ? material.read(ctx, message, joined, summarize) : null;
-        // R204 : l'issue jointe à une demande d'avant reste le sujet de la conversation : une demande qui la désigne
-        // (« cette tâche », « dessus ») sans la joindre de nouveau ni la nommer la relit.
-        String earlier = (read == null || read.isEmpty()) && !anyIssue && IssueMaterial.pointsAt(message)
-            && !IssueMaterial.namesAKey(message) ? lastSubject(ctx) : null;
+        // R204 : l'issue dont parlait une demande d'avant reste le sujet de la conversation : une demande qui la désigne
+        // (« cette tâche », « dessus ») sans joindre ni nommer d'issue la relit. Relecture R159 : une issue nommée par sa
+        // clé devient le sujet ; une issue à l'écran ou un projet joint est ce que la demande désigne, pas elle.
+        boolean anyProject = joined.stream().anyMatch(item -> item.issueId() == null && item.projectId() != null);
+        List<AssistantAnswer.Subject> named = anyIssue || !IssueMaterial.mayNameAKey(message) ? List.of()
+            : material.namedSubjects(ctx, message);
+        AssistantAnswer.Subject earlier = takesTheEarlierSubject(message, anyIssue || read != null && !read.isEmpty(),
+            anyProject, ctx.screen().issueId() != null, !named.isEmpty()) ? lastSubject(ctx) : null;
         if (earlier != null) read = material.readEarlier(ctx, earlier);
+        boolean reread = earlier != null && read != null && !read.isEmpty();
         String issue = read == null || read.isEmpty() ? "" : read.text();
         // Ce que la demande désigne, dit dans la demande même que lit le modèle (R204 : à « T'en ai a ou sur cette tache ? »,
         // TF-21 jointe, Cortex répondait ne voir aucune tâche).
-        List<String> subjects = earlier != null && read != null && !read.isEmpty() ? read.issues().stream()
-            .map(AssistantRead.IssueRead::key).toList() : attachedKeys(joined, read);
+        List<AssistantAnswer.Subject> subjects = reread ? List.of(earlier) : anyIssue ? attachedSubjects(joined, read) : named;
         reading.subjects(subjects);
-        String asked = message + subjectLine(subjects, earlier != null);
+        String asked = message + (reread || anyIssue ? subjectLine(subjects.stream().map(AssistantAnswer.Subject::key)
+            .toList(), reread) : "");
         if (read != null) reading.issues(read.issues());
         String seen = issue.isEmpty() ? screen : screen.isEmpty() ? issue : screen.strip() + "\n\n" + issue;
         if (!boards.isEmpty()) {
@@ -1034,19 +1039,31 @@ public class AgentService {
     }
 
     /**
-     * Les clés des issues que la personne a jointes à cette demande et que TaskForce a lues, dans l'ordre où elle les a
-     * jointes : chacune par son id parmi ce qui a été lu (une issue qu'elle ne voit pas ne se lit pas, et ne se dit pas).
+     * La demande parle-t-elle de l'issue de la conversation (R204) : elle la désigne (« cette tâche », « dessus »), sans
+     * joindre ni lire d'issue, sans projet joint, sans issue à l'écran, et sans nommer une issue qui existe (relecture R159).
+     * La même décision dans une conversation et au rejeu d'un cas.
      */
-    static List<String> attachedKeys(List<Screen> joined, IssueMaterial.Read read) {
+    static boolean takesTheEarlierSubject(String message, boolean anIssueIsRead, boolean aProjectIsAttached,
+                                          boolean anIssueIsOnScreen, boolean anIssueIsNamed) {
+        return !anIssueIsRead && !aProjectIsAttached && !anIssueIsOnScreen && !anIssueIsNamed && IssueMaterial.pointsAt(message);
+    }
+
+    /**
+     * Les issues que la personne a jointes à cette demande et que TaskForce a lues, dans l'ordre où elle les a jointes :
+     * chacune par son id parmi ce qui a été lu (une issue qu'elle ne voit pas ne se lit pas, et ne se dit pas), avec ses ids.
+     */
+    static List<AssistantAnswer.Subject> attachedSubjects(List<Screen> joined, IssueMaterial.Read read) {
         if (read == null || read.isEmpty() || read.ids().isEmpty()) return List.of();
-        List<String> keys = new ArrayList<>();
+        List<AssistantAnswer.Subject> subjects = new ArrayList<>();
         for (Screen item : joined) {
             int at = item.issueId() == null ? -1 : read.ids().indexOf(item.issueId());
-            if (at >= 0 && at < read.issues().size() && !keys.contains(read.issues().get(at).key())) {
-                keys.add(read.issues().get(at).key());
+            if (at < 0 || at >= read.issues().size()) continue;
+            String key = read.issues().get(at).key();
+            if (subjects.stream().noneMatch(subject -> subject.key().equals(key))) {
+                subjects.add(new AssistantAnswer.Subject(key, item.issueId(), item.projectId()));
             }
         }
-        return keys;
+        return subjects;
     }
 
     /**
@@ -1063,8 +1080,8 @@ public class AgentService {
             : "\n\n[The person attached " + named + " to this message: " + means + ".]";
     }
 
-    /** L'issue que la personne a jointe en dernier dans cette conversation ; null hors d'une conversation, ou sans elle. */
-    private String lastSubject(AgentContext ctx) {
+    /** L'issue dont la conversation a parlé en dernier ; null hors d'une conversation, ou sans elle. */
+    private AssistantAnswer.Subject lastSubject(AgentContext ctx) {
         if (ctx.conversation() == null) return null;
         try {
             return conversations.lastSubject(ctx.conversation());
@@ -1225,13 +1242,13 @@ public class AgentService {
         private int leftOut;
         private ToolLoopFit loop;
         /** Les issues dont parle la demande (R204) : la conversation les garde avec elle. */
-        private List<String> subjects = List.of();
+        private List<AssistantAnswer.Subject> subjects = List.of();
 
-        void subjects(List<String> keys) {
-            subjects = keys == null ? List.of() : List.copyOf(keys);
+        void subjects(List<AssistantAnswer.Subject> issues) {
+            subjects = issues == null ? List.of() : List.copyOf(issues);
         }
 
-        List<String> subjects() {
+        List<AssistantAnswer.Subject> subjects() {
             return subjects;
         }
 

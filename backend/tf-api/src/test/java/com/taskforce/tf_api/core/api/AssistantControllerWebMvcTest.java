@@ -295,7 +295,8 @@ class AssistantControllerWebMvcTest {
         when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
             new com.taskforce.tf_api.core.dto.response.AssistantAnswer("API-3 est en cours.", null, "deep", java.util.List.of(),
                 java.util.List.of(), java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE)
-                .withSubjects(java.util.List.of("API-3")));
+                .withSubjects(java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("API-3", 21L,
+                    3L))));
 
         mockMvc.perform(post(URL).with(auth())
                 .accept(MediaType.APPLICATION_JSON)
@@ -304,7 +305,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.answer.subjects").doesNotExist());
         verify(conversationService).appendAsked(1L, "T'en ai a ou sur cette tache ?", java.util.List.of(),
-            java.util.List.of("API-3"));
+            java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("API-3", 21L, 3L)));
     }
 
     @Test

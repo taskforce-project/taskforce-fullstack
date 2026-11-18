@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.taskforce.tf_api.core.dto.response.AssistantAnswer;
 import com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantRead;
 import com.taskforce.tf_api.core.dto.response.ChecklistItemResponse;
 import com.taskforce.tf_api.core.dto.response.IssueActivityResponse;
@@ -156,11 +157,14 @@ public class IssueMaterial {
     }
 
     /**
-     * L'issue d'une conversation, jointe à une demande d'avant (R204), relue par sa clé avec les droits de la personne :
-     * sous le titre qui dit qu'elle est le sujet de la conversation. Rien quand elle ne se lit plus.
+     * L'issue d'une conversation, dont parlait une demande d'avant (R204), relue avec les droits de la personne : par ses
+     * ids quand la conversation les a gardés, sinon par sa clé (relecture R159) ; sous le titre qui dit qu'elle est le sujet
+     * de la conversation. Rien quand elle ne se lit plus.
      */
-    public Read readEarlier(AgentContext ctx, String key) {
-        Map<Long, Long> wanted = byKeys(ctx, key, 1);
+    public Read readEarlier(AgentContext ctx, AssistantAnswer.Subject subject) {
+        if (subject == null) return Read.NOTHING;
+        Map<Long, Long> wanted = subject.issueId() != null && subject.projectId() != null
+            ? Map.of(subject.issueId(), subject.projectId()) : byKeys(ctx, subject.key(), 1);
         StringBuilder text = new StringBuilder();
         List<AssistantRead.IssueRead> read = new ArrayList<>();
         List<Long> ids = new ArrayList<>();
@@ -192,8 +196,16 @@ public class IssueMaterial {
         return request != null && POINTS_AT.matcher(request).find();
     }
 
-    /** La demande écrit-elle une clé d'issue (« OPS-35 », « ops 35 ») ? */
-    public static boolean namesAKey(String request) {
+    /**
+     * Les issues que la demande nomme par leur clé et qui existent, parmi les projets que la personne voit (relecture R159) :
+     * elles deviennent le sujet de la conversation. « dans 2 jours », « au 30 » ne nomment aucune issue.
+     */
+    public List<AssistantAnswer.Subject> namedSubjects(AgentContext ctx, String request) {
+        return subjectsByKeys(ctx, request, MAX_ISSUES);
+    }
+
+    /** La demande a-t-elle la forme d'une clé (« OPS-35 », « ops 35 », « dans 2 ») ? Seule une clé qui existe en nomme une. */
+    public static boolean mayNameAKey(String request) {
         return request != null && KEY.matcher(request).find();
     }
 
@@ -214,6 +226,13 @@ public class IssueMaterial {
     /** Les issues que ce texte nomme par leur clé, {@code max} au plus, parmi les projets que la personne voit. */
     private Map<Long, Long> byKeys(AgentContext ctx, String text, int max) {
         Map<Long, Long> named = new LinkedHashMap<>();
+        subjectsByKeys(ctx, text, max).forEach(subject -> named.putIfAbsent(subject.issueId(), subject.projectId()));
+        return named;
+    }
+
+    /** Les mêmes, avec leur clé : une par issue, dans l'ordre du texte. */
+    private List<AssistantAnswer.Subject> subjectsByKeys(AgentContext ctx, String text, int max) {
+        List<AssistantAnswer.Subject> named = new ArrayList<>();
         if (text == null || text.isBlank()) return named;
         Matcher key = KEY.matcher(text);
         while (key.find() && named.size() < max) {
@@ -221,9 +240,11 @@ public class IssueMaterial {
             Project project = projects.findByWorkspaceIdAndIdentifier(ctx.workspaceId(), identifier)
                 .filter(p -> visibility.canView(p, ctx.userId())).orElse(null);
             if (project == null) continue;
+            String said = identifier + "-" + Integer.valueOf(key.group(2));
             issues.findByProjectIdAndSequenceNumber(project.getId(), Integer.valueOf(key.group(2)))
                 .map(Issue::getId)
-                .ifPresent(id -> named.putIfAbsent(id, project.getId()));
+                .filter(id -> named.stream().noneMatch(subject -> id.equals(subject.issueId())))
+                .ifPresent(id -> named.add(new AssistantAnswer.Subject(said, id, project.getId())));
         }
         return named;
     }
