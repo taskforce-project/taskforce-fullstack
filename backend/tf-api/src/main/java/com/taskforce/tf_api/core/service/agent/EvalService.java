@@ -89,6 +89,8 @@ public class EvalService {
     static final String DEFAULT_MODEL = "default";
     /** D'où vient un cas, pour l'histoire de la banque (R125). */
     static final String ORIGIN_INCIDENT = "incident";
+    /** Une trace incertaine (troisième tour de la relecture R159) : TaskForce a laissé la phrase, et dit à côté ce qui a été fait. */
+    static final String ORIGIN_UNCERTAIN = "uncertain";
     static final String ORIGIN_ANSWER = "answer";
     static final String ORIGIN_UNKNOWN = "unknown";
     private static final int MAX_ANSWER = 1000;
@@ -629,7 +631,8 @@ public class EvalService {
             if (!sentence.asText("").isBlank()) said.add(sentence.asText());
         });
         String shown = incident.path("shown").asText("").strip();
-        return new EvalHistoryResponse.Origin(ORIGIN_INCIDENT, List.copyOf(said), shown.isEmpty() ? null : shown);
+        String kind = incident.path("uncertain").asBoolean(false) ? ORIGIN_UNCERTAIN : ORIGIN_INCIDENT;
+        return new EvalHistoryResponse.Origin(kind, List.copyOf(said), shown.isEmpty() ? null : shown);
     }
 
     /** Les notes d'un cas, dans l'ordre des rejeux. */

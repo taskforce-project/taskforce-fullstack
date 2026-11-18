@@ -619,4 +619,21 @@ class EvalServiceTest {
         });
     }
 
+    @Test
+    @DisplayName("R159, troisième tour (N2) : un cas venu d'une trace incertaine le dit, avec ce que Cortex a dit et ce que TaskForce a montré")
+    void a_case_from_an_uncertain_trace_says_so() throws Exception {
+        LocalDateTime nov2 = LocalDateTime.of(2026, 11, 2, 15, 8);
+        when(runs.findTop100ByWorkspaceIdOrderByStartedAtDesc(1L)).thenReturn(List.of());
+        when(cases.findByWorkspaceIdAndArchivedFalseOrderByCreatedAtDesc(1L)).thenReturn(List.of(caseFrom(40L, 7L, RECORD,
+            nov2)));
+        when(records.incidents(List.of(RECORD))).thenReturn(Map.of(RECORD, JSON.readTree("{\"incident\":\"trust\","
+            + "\"uncertain\":true,\"said\":[\"J'ai créé le projet et assigné les tâches.\"],"
+            + "\"shown\":\"Nothing was created or assigned in this turn.\"}")));
+
+        EvalHistoryResponse history = service.history("acme", 7L);
+
+        assertThat(history.cases()).singleElement().satisfies(evalCase -> assertThat(evalCase.origin()).isEqualTo(
+            new EvalHistoryResponse.Origin("uncertain", List.of("J'ai créé le projet et assigné les tâches."),
+                "Nothing was created or assigned in this turn.")));
+    }
 }

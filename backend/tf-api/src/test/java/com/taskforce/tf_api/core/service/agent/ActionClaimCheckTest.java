@@ -512,7 +512,10 @@ class ActionClaimCheckTest {
         Checked checked = ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS);
 
         assertThat(checked.corrected()).isFalse();
-        assertThat(checked.answer()).startsWith(sentence).doesNotContain("Nothing was created");
+        // La phrase reste : aucun bloc de correction ne prend sa place. Un bloc record peut dire à côté ce que ce tour et la
+        // conversation ont fait (troisième tour, N2) : il vient après elle.
+        assertThat(checked.answer()).startsWith(sentence).doesNotContain(ActionClaimCheck.DONE_SIGNATURE);
+        assertThat(checked.answer().lines()).doesNotContain(ActionClaimCheck.SIGNATURE);
     }
 
     @ParameterizedTest(name = "« {0} », TESTTASKFO créé à la réponse précédente : la négation est corrigée")
@@ -535,11 +538,14 @@ class ActionClaimCheckTest {
         Checked checked = ActionClaimCheck.check("J'ai bien créé le projet pour la démo. Autre chose ?", List.of(),
             List.of(CREATED), SYSTEMS);
 
+        // Troisième tour (N2) : d'abord ce que ce tour a fait de ce qu'elle annonce, puis ce que la conversation a fait.
         assertThat(checked.answer()).isEqualTo("J'ai bien créé le projet pour la démo. Autre chose ?\n\n"
             + ActionClaimCheck.RECORD_SIGNATURE
+            + "\n> Nothing was created in this turn."
             + "\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO.");
         assertThat(checked.corrected()).isFalse();
-        assertThat(checked.recorded()).singleElement().asString().contains("TESTTASKFO");
+        assertThat(checked.recorded()).containsExactly("Nothing was created in this turn.",
+            "This was created in this conversation, in TaskForce: Project created: TESTTASKFO.");
         // Le geste a ses mots dans la phrase : elle dit vrai, rien à ajouter.
         assertThat(ActionClaimCheck.check("J'ai créé le projet pour le test.", List.of(), List.of(CREATED),
             SYSTEMS).answer()).isEqualTo("J'ai créé le projet pour le test.");
@@ -673,5 +679,52 @@ class ActionClaimCheckTest {
             .doesNotContain("IMPORTANT").doesNotContain("delete TF-2");
         assertThat(now.denied()).isTrue();
         assertThat(now.answer()).contains("TF-1").doesNotContain("IMPORTANT");
+    }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548, troisième tour (N2) : ce que ce tour a fait, puis ce que la conversation a fait
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("R159, troisième tour (N2) : le bloc record d'une annonce incertaine dit d'abord ce que ce tour a fait")
+    void the_record_of_an_unsure_claim_says_first_what_this_turn_did() {
+        Done older = new Done("create_project", "TaskForce", CREATED.output(), "{\"name\":\"Test Taskforce\"}", false);
+        Done api12 = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".");
+
+        Checked invented = ActionClaimCheck.check("J'ai créé le projet et assigné les tâches.", List.of(), List.of(older),
+            SYSTEMS);
+        Checked weak = ActionClaimCheck.check("I created the issue for the payment bug.", List.of(), List.of(api12), SYSTEMS);
+
+        assertThat(invented.corrected()).isFalse();
+        assertThat(invented.answer()).isEqualTo("J'ai créé le projet et assigné les tâches.\n\n"
+            + ActionClaimCheck.RECORD_SIGNATURE
+            + "\n> Nothing was created or assigned in this turn."
+            + "\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO.");
+        assertThat(weak.answer()).isEqualTo("I created the issue for the payment bug.\n\n"
+            + ActionClaimCheck.RECORD_SIGNATURE
+            + "\n> Nothing was created in this turn."
+            + "\n> This was created in this conversation, in TaskForce: Issue created: API-12.");
+        // Une négation incertaine dit ce que la conversation a fait, sans vérité de ce tour : elle ne dit rien de fait.
+        assertThat(ActionClaimCheck.check("Je n'ai pas créé de projet.", List.of(), List.of(older), SYSTEMS).answer())
+            .doesNotContain("Nothing was created");
+    }
+
+    @Test
+    @DisplayName("R159, troisième tour (N2) : le dossier garde la trace incertaine, avec ce que le modèle a dit et ce que TaskForce a montré")
+    void an_unsure_sentence_leaves_an_uncertain_trace() {
+        Done older = new Done("create_project", "TaskForce", CREATED.output(), "{\"name\":\"Test Taskforce\"}", false);
+
+        Checked claim = ActionClaimCheck.check("J'ai créé le projet et assigné les tâches.", List.of(), List.of(older), SYSTEMS);
+        Checked denial = ActionClaimCheck.check("Je n'ai pas créé de projet.", List.of(), List.of(older), SYSTEMS);
+
+        assertThat(claim.incident(List.of()))
+            .containsEntry("incident", "trust")
+            .containsEntry("uncertain", true)
+            .containsEntry("rule", "R116")
+            .containsEntry("said", List.of("J'ai créé le projet et assigné les tâches."))
+            .containsEntry("kinds", List.of("create", "assign"))
+            .containsEntry("shown", "Nothing was created or assigned in this turn. "
+                + "This was created in this conversation, in TaskForce: Project created: TESTTASKFO.");
+        assertThat(denial.incident(List.of())).containsEntry("uncertain", true).containsEntry("rule", "R204");
     }
 }

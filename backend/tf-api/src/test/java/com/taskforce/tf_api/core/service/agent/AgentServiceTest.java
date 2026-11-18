@@ -3299,4 +3299,27 @@ class AgentServiceTest {
             assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
         }
     }
+
+    @Test
+    @DisplayName("R159, troisième tour (N2) : une annonce incertaine reste, dit ce que ce tour a fait, et laisse au dossier une trace incertaine")
+    void an_unsure_claim_leaves_an_uncertain_trace_in_the_record() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(new ActionClaimCheck.Done("create_project", "TaskForce",
+            S17_CREATED.output(), "{\"name\":\"Test Taskforce\"}", false)));
+        String said = "J'ai créé le projet et assigné les tâches.";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Que reste-t-il à faire ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).startsWith(said).contains(ActionClaimCheck.RECORD_SIGNATURE)
+            .contains("Nothing was created or assigned in this turn.");
+        assertThat(answer.steps().getLast().status()).isEqualTo("done");
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Map<String, Object>> incident = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).incident(any(), any(), eq("Que reste-t-il à faire ?"), any(), incident.capture());
+        assertThat(incident.getValue()).containsEntry("uncertain", true).containsEntry("rule", "R116")
+            .containsEntry("said", List.of(said));
+    }
 }

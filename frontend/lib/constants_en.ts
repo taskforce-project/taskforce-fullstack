@@ -2253,6 +2253,8 @@ export const CONSTANTS_EN = {
     improved: "What improved it",
     improvedHint: "Each case someone kept from an answer, where it came from, and its result since.",
     originIncident: "From a trust incident on {date}: TaskForce corrected the answer.",
+    // R159: TaskForce left a sentence of Cortex it couldn't tie to an action, and said next to it what was done.
+    originUncertain: "From a trust incident on {date}: TaskForce couldn't tie what Cortex said to what was done, and said what was done next to it.",
     originSaid: "Cortex said: {text}",
     originShown: "TaskForce showed: {text}",
     originAnswer: "From an answer of Cortex on {date}.",

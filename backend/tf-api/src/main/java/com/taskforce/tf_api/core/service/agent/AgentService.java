@@ -533,6 +533,14 @@ public class AgentService {
             String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
             if (!checked.corrected()) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
+                if (checked.uncertain()) {
+                    // Une phrase parlait d'un geste d'avant sans le désigner : elle reste, le bloc record dit à côté ce que ce
+                    // tour et la conversation ont fait, et le dossier en garde une trace incertaine, que la banque compte
+                    // (troisième tour de la relecture R159).
+                    log.info("Cortex (ws={}) : une phrase parlait d'un geste d'avant sans le désigner, TaskForce dit à côté "
+                        + "ce qui a été fait", ws.getId());
+                    record = trustIncident(ctx, message, hits, toolCalls, checked, record);
+                }
             } else {
                 if (checked.denied()) {
                     log.warn("Cortex (ws={}) : la réponse niait une action faite dans la conversation, corrigée par TaskForce",

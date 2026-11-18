@@ -112,20 +112,22 @@ public final class ActionClaimCheck {
     /**
      * La réponse à montrer, les phrases qu'elle ne montre plus et ce que TaskForce dit à leur place : {@code claims}, des
      * actions annoncées sans leur résultat (R116) ; {@code denials}, des actions de la conversation niées (R204) ;
-     * {@code recorded}, ce que la conversation a fait, dit à côté d'une phrase incertaine qui reste (relecture R159).
+     * {@code recorded}, le bloc dit à côté d'une phrase incertaine qui reste (relecture R159) : ce que ce tour a fait de ce
+     * qu'elle annonce, puis ce que la conversation a fait ; {@code unsure}, ces phrases incertaines.
      */
     public record Checked(String answer, List<Claim> claims, List<String> truths, List<Claim> denials,
-                          List<String> doneTruths, List<String> recorded) {
+                          List<String> doneTruths, List<String> recorded, List<Claim> unsure) {
         public Checked {
             recorded = recorded == null ? List.of() : List.copyOf(recorded);
+            unsure = unsure == null ? List.of() : List.copyOf(unsure);
         }
 
         public Checked(String answer, List<Claim> claims, List<String> truths) {
-            this(answer, claims, truths, List.of(), List.of(), List.of());
+            this(answer, claims, truths, List.of(), List.of(), List.of(), List.of());
         }
 
         public Checked(String answer, List<Claim> claims, List<String> truths, List<Claim> denials, List<String> doneTruths) {
-            this(answer, claims, truths, denials, doneTruths, List.of());
+            this(answer, claims, truths, denials, doneTruths, List.of(), List.of());
         }
 
         public boolean corrected() {
@@ -137,11 +139,35 @@ public final class ActionClaimCheck {
             return !denials.isEmpty();
         }
 
-        /** L'incident de confiance (E17), tel que le dossier de la réponse le garde : la phrase fausse y reste. */
+        /**
+         * Une phrase parlait d'un geste d'avant sans le désigner : elle reste, avec le bloc record à côté (troisième tour
+         * de la relecture R159 de la PR #548) ; le dossier en garde la trace.
+         */
+        public boolean uncertain() {
+            return !unsure.isEmpty();
+        }
+
+        /**
+         * L'incident de confiance (E17), tel que le dossier de la réponse le garde : la phrase fausse y reste. Une réponse
+         * qui n'a qu'une phrase incertaine le garde aussi, marqué {@code uncertain} (troisième tour de la relecture R159) :
+         * ce que le modèle a dit, ce que TaskForce a montré à côté ; la banque le compte.
+         */
         public Map<String, Object> incident(List<Ran> ran) {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("incident", "trust");
             data.put("experiment", "E17");
+            if (!corrected()) {
+                boolean claimed = unsure.stream().anyMatch(claim -> !claimedKinds(claim.sentence()).isEmpty());
+                boolean denying = unsure.stream().anyMatch(claim -> !deniedKinds(claim.sentence()).isEmpty());
+                data.put("uncertain", true);
+                data.put("rule", claimed && denying ? "R116, R204" : claimed ? "R116" : "R204");
+                data.put("said", unsure.stream().map(claim -> CortexRecordService.shorten(claim.sentence())).toList());
+                data.put("kinds", unsure.stream().flatMap(claim -> claim.kinds().stream()).distinct()
+                    .map(kind -> kind.name().toLowerCase(Locale.ROOT)).toList());
+                data.put("shown", String.join(" ", recorded));
+                data.put("tools", ran.stream().map(call -> call.tool() + ": " + call.status()).toList());
+                return data;
+            }
             data.put("rule", claims.isEmpty() ? "R204" : denials.isEmpty() ? "R116" : "R116, R204");
             List<Claim> all = new ArrayList<>(claims);
             all.addAll(denials);
@@ -154,8 +180,33 @@ public final class ActionClaimCheck {
             List<String> shown = new ArrayList<>(truths);
             shown.addAll(doneTruths);
             data.put("shown", String.join(" ", shown));
+            if (!unsure.isEmpty()) {
+                data.put("unsure", unsure.stream().map(claim -> CortexRecordService.shorten(claim.sentence())).toList());
+            }
             data.put("tools", ran.stream().map(call -> call.tool() + ": " + call.status()).toList());
             return data;
+        }
+    }
+
+    /**
+     * Ce qui reste incertain dans une réponse (relecture R159 de la PR #548) : les gestes d'avant dont une phrase parle
+     * sans les désigner, et ces phrases, annonces et négations, avec ce qu'elles disent.
+     */
+    private static final class Unsure {
+        private final Set<Done> acts = new LinkedHashSet<>();
+        private final Map<String, Set<Kind>> claims = new LinkedHashMap<>();
+        private final Map<String, Set<Kind>> denials = new LinkedHashMap<>();
+
+        /** Une annonce incertaine : ce que ce tour en a fait se dira, puis ces gestes. */
+        void claim(Said said, List<Done> same) {
+            acts.addAll(same);
+            claims.computeIfAbsent(said.sentence().strip(), sentence -> EnumSet.noneOf(Kind.class)).add(said.kind());
+        }
+
+        /** Une négation incertaine : ces gestes se diront. */
+        void denial(Said said, List<Done> same) {
+            acts.addAll(same);
+            denials.computeIfAbsent(said.sentence().strip(), sentence -> EnumSet.noneOf(Kind.class)).add(said.kind());
         }
     }
 
@@ -190,7 +241,7 @@ public final class ActionClaimCheck {
         String text = neutralized(answer == null ? "" : answer.replace("\r\n", "\n"));
         Set<String> names = names(systems, before);
         Requested requested = requested(request);
-        Set<Done> unsure = new LinkedHashSet<>();
+        Unsure unsure = new Unsure();
         Scan scan = scan(text, sentence -> unbackedKinds(sentence, ran, before, names, requested, unsure), false);
         List<String> truths = List.of();
         if (!scan.claims().isEmpty()) {
@@ -213,12 +264,31 @@ public final class ActionClaimCheck {
         List<Done> said = denied.values().stream().flatMap(Set::stream).distinct().limit(MAX_DONE_SAID).toList();
         List<String> doneTruths = said.stream().map(ActionClaimCheck::doneTruth).toList();
         String shown = contradicted ? withBlock(denials, DONE_SIGNATURE, doneTruths) : text;
-        // Ce qui reste incertain : la phrase reste, et à côté, ce que la conversation a fait (relecture R159).
-        List<String> recorded = unsure.stream().filter(act -> !said.contains(act)).limit(MAX_DONE_SAID)
-            .map(ActionClaimCheck::doneTruth).distinct().toList();
+        // Ce qui reste incertain : la phrase reste (relecture R159). À côté, ce que ce tour a fait de ce qu'elle annonce,
+        // la vérité de R116 (troisième tour), puis ce que la conversation a fait.
+        Set<String> removed = new LinkedHashSet<>();
+        scan.claims().forEach(claim -> removed.add(claim.sentence()));
+        if (contradicted) denials.claims().forEach(claim -> removed.add(claim.sentence()));
+        List<Claim> uncertain = new ArrayList<>();
+        Set<Kind> announced = EnumSet.noneOf(Kind.class);
+        unsure.claims.forEach((sentence, kinds) -> {
+            if (removed.contains(sentence)) return;
+            uncertain.add(new Claim(sentence, kinds));
+            announced.addAll(kinds);
+        });
+        unsure.denials.forEach((sentence, kinds) -> {
+            if (!removed.contains(sentence)) uncertain.add(new Claim(sentence, kinds));
+        });
+        List<String> recorded = new ArrayList<>();
+        List<String> told = truths;
+        if (!announced.isEmpty()) truths(announced, ran).stream().filter(truth -> !told.contains(truth)).forEach(recorded::add);
+        unsure.acts.stream().filter(act -> !said.contains(act)).limit(MAX_DONE_SAID).map(ActionClaimCheck::doneTruth)
+            .distinct().forEach(recorded::add);
+        if (uncertain.isEmpty()) recorded.clear();
         if (!recorded.isEmpty()) shown = withRecord(shown, recorded);
         return new Checked(shown, List.copyOf(scan.claims()), truths,
-            contradicted ? List.copyOf(denials.claims()) : List.of(), contradicted ? doneTruths : List.of(), recorded);
+            contradicted ? List.copyOf(denials.claims()) : List.of(), contradicted ? doneTruths : List.of(), recorded,
+            uncertain);
     }
 
     /**
@@ -242,7 +312,7 @@ public final class ActionClaimCheck {
         Set<String> names = names(systems, before);
         Requested requested = requested(request);
         return scan(answer == null ? "" : answer.replace("\r\n", "\n"),
-            sentence -> unbackedKinds(sentence, ran, before, names, requested, new LinkedHashSet<>()), true).claims();
+            sentence -> unbackedKinds(sentence, ran, before, names, requested, new Unsure()), true).claims();
     }
 
     /**
@@ -263,7 +333,7 @@ public final class ActionClaimCheck {
         Set<String> names = names(systems, done);
         Requested requested = requested(request);
         return scan(answer == null ? "" : answer.replace("\r\n", "\n"),
-            sentence -> contradicted(sentence, done, now, ran, names, requested, new LinkedHashSet<>()).isEmpty()
+            sentence -> contradicted(sentence, done, now, ran, names, requested, new Unsure()).isEmpty()
                 ? EnumSet.noneOf(Kind.class) : deniedKinds(sentence), true).claims();
     }
 
@@ -492,7 +562,7 @@ public final class ActionClaimCheck {
      * {@code unsure} : TaskForce les dit à côté.
      */
     private static Set<Kind> unbackedKinds(String sentence, List<Ran> ran, List<Done> thread, Set<String> systems,
-                                           Requested requested, Set<Done> unsure) {
+                                           Requested requested, Unsure unsure) {
         Set<Kind> unbacked = EnumSet.noneOf(Kind.class);
         for (Said said : claims(sentence)) {
             boolean now = ran.stream().anyMatch(call -> "success".equals(call.status()) && backs(kindsOf(call.tool()), said.kind()));
@@ -512,16 +582,16 @@ public final class ActionClaimCheck {
                 // Ce que la demande en cours demande, et rien de ce tour ne l'a fait (R116) ; « déjà » renvoie peut-être à un
                 // geste d'avant, que rien ne désigne : la phrase reste, avec à côté ce que la conversation a fait (troisième
                 // tour de la relecture R159).
-                if (ALREADY.matcher(said.clause()).find()) unsure.addAll(same);
+                if (ALREADY.matcher(said.clause()).find()) unsure.claim(said, same);
                 else unbacked.add(said.kind());
                 continue;
             }
             if (designation.weak()) {
                 // Ce dont parle la chose : les mots d'un geste l'appuient ; sinon, incertaine.
-                if (same.stream().noneMatch(act -> mentions(designation, act))) unsure.addAll(same);
+                if (same.stream().noneMatch(act -> mentions(designation, act))) unsure.claim(said, same);
                 continue;
             }
-            if (same.stream().noneMatch(Done::recent)) unsure.addAll(same);
+            if (same.stream().noneMatch(Done::recent)) unsure.claim(said, same);
         }
         return unbacked;
     }
@@ -786,7 +856,7 @@ public final class ActionClaimCheck {
      * gestes vont dans {@code unsure} : TaskForce les dit à côté.
      */
     private static Set<Done> contradicted(String sentence, List<Done> done, List<Done> now, List<Ran> ran,
-                                          Set<String> systems, Requested requested, Set<Done> unsure) {
+                                          Set<String> systems, Requested requested, Unsure unsure) {
         Set<Done> contradicted = new LinkedHashSet<>();
         for (Said said : denials(sentence)) {
             if (ANOTHER.matcher(said.clause()).find()) continue;
@@ -810,7 +880,7 @@ public final class ActionClaimCheck {
             List<Done> recent = same.stream().filter(Done::recent).toList();
             if (NEW.matcher(said.clause()).find() && recent.isEmpty()) continue;
             if (designation.weak() || recent.isEmpty()) {
-                unsure.addAll(same);
+                unsure.denial(said, same);
                 continue;
             }
             contradicted.addAll(recent);
