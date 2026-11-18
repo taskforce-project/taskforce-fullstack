@@ -2384,7 +2384,7 @@ class AgentServiceTest {
             TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
 
         assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE)
-            .contains("This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\".")
+            .contains("This was created in this conversation, in TaskForce: Project created: TESTTASKFO.")
             .doesNotContain("Je n'ai pas créé");
         assertThat(answer.steps().getLast().status()).isEqualTo("error");
         assertThat(answer.steps().getLast().description()).contains("wasn't done");

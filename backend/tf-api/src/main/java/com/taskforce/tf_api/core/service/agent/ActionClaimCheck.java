@@ -1090,10 +1090,14 @@ public final class ActionClaimCheck {
         return names;
     }
 
-    /** Ce que dit TaskForce d'un geste qu'une phrase niait : qu'il a été fait, où, et ce qu'il a rendu. */
+    /**
+     * Ce que dit TaskForce d'un geste qu'une phrase niait, ou dont elle parlait sans le désigner : qu'il a été fait, où, et
+     * ce qu'il a fait, sans aucun texte libre de son résultat (troisième tour de la relecture R159 : un commentaire, un titre
+     * peuvent venir du dehors, et ce bloc repart au modèle sous la signature de TaskForce).
+     */
     private static String doneTruth(Done act) {
         String where = act.where() == null || act.where().isBlank() ? "" : ", in " + act.where();
-        String output = act.output() == null ? "" : act.output().replaceAll("\\s+", " ").replaceAll(" \\(id \\d+\\)", "")
+        String output = ThreadActs.said(act.tool(), act.output()).replaceAll(" \\(id \\d+\\)", "")
             .replace(" in " + TargetSystems.TASKFORCE, "").strip();
         if (output.length() > 200) output = output.substring(0, 200).stripTrailing() + "...";
         Set<Kind> kinds = kindsOf(act.tool());

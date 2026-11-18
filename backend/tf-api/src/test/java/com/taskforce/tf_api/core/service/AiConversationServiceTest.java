@@ -712,9 +712,10 @@ class AiConversationServiceTest {
         when(messageRepository.findByConversationIdOrderByCreatedAtAsc(1L)).thenReturn(s17());
         s17Record();
 
+        // Ce que l'écriture a fait, et sa clé : son titre ne revient pas (troisième tour de la relecture R159, N4).
         assertThat(service.threadDone(1L)).containsExactly(new com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done(
-            "create_project", "TaskForce", "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).",
-            "{\"name\":\"Test Taskforce\"}", true));
+            "create_project", "TaskForce", "Project created in TaskForce: TESTTASKFO.", "{\"name\":\"Test Taskforce\"}",
+            true));
         assertThat(service.threadDone(null)).isEmpty();
     }
 

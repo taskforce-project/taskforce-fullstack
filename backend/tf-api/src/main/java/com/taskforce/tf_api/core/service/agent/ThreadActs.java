@@ -166,23 +166,40 @@ public final class ThreadActs {
 
     /** Les clés que nomment les arguments et le résultat d'un geste, trois au plus. */
     private static String keys(Act act) {
+        return keysIn((act.arguments() == null ? "" : act.arguments()) + " " + (act.output() == null ? "" : act.output()));
+    }
+
+    /** Les clés que nomme ce texte, trois au plus : « TF-1, ENG-12 ». */
+    static String keysIn(String text) {
         Set<String> keys = new java.util.LinkedHashSet<>();
-        java.util.regex.Matcher found = KEY.matcher((act.arguments() == null ? "" : act.arguments()) + " "
-            + (act.output() == null ? "" : act.output()));
+        java.util.regex.Matcher found = KEY.matcher(text == null ? "" : text);
         while (found.find() && keys.size() < MAX_KEYS) keys.add(found.group());
         return String.join(", ", keys);
     }
 
     /**
-     * Ce que TaskForce dit d'un geste fait, s'il est nié (R204) : son résultat quand il vient de TaskForce et ne porte aucun
-     * secret ; pour un outil du dehors, ses clés seulement, jamais le texte de l'éditeur.
+     * Ce que TaskForce peut dire du résultat d'un geste, dans ses blocs comme dans l'historique (troisième tour de la
+     * relecture R159 de la PR #548) : pour un outil du dehors, ses clés ; pour TaskForce, ce qu'il a fait et la clé de ce
+     * qu'il a écrit ({@link #written}) ; jamais un texte libre, rien qui porte un secret.
+     */
+    static String said(String tool, String output) {
+        if (output == null || output.isBlank() || SecretScan.in(output)) return "";
+        if (TargetSystems.connectorOf(tool) != null) return keysIn(output);
+        return written(flat(output));
+    }
+
+    /**
+     * Ce que TaskForce dit d'un geste fait, s'il est nié (R204) : pour un outil du dehors, ses clés seulement, jamais le
+     * texte de l'éditeur ; pour TaskForce, ce qu'il a fait et la clé de ce qu'il a écrit, sans titre ni commentaire, qui
+     * peuvent venir du dehors (troisième tour de la relecture R159) ; rien qui porte un secret.
      */
     private static String told(Act act) {
         if (TargetSystems.connectorOf(act.tool()) != null) {
             String keys = keys(act);
             return keys.isEmpty() ? null : keys;
         }
-        return act.output() == null || SecretScan.in(act.output()) ? null : act.output();
+        String said = said(act.tool(), act.output());
+        return said.isEmpty() ? null : said;
     }
 
     /** Ce qu'est devenu un geste, dans les mots que le modèle répète sans se tromper. */
