@@ -10,6 +10,7 @@ import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.harness.rules.SecretScan;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService.Act;
 
 /**
@@ -97,23 +98,60 @@ public final class ThreadActs {
         List<ActionClaimCheck.Done> done = new ArrayList<>();
         for (Act act : acts) {
             if ("success".equals(act.status()) && (act.hash() == null || !undone.contains(act.hash()))) {
-                done.add(new ActionClaimCheck.Done(act.tool(), where.apply(act.tool()), act.output(), act.arguments(), recent));
+                done.add(new ActionClaimCheck.Done(act.tool(), where.apply(act.tool()), told(act), act.arguments(), recent));
             }
         }
         return done;
     }
 
-    /** Une ligne : « create_project, in TaskForce (name: Test): done. Result: Project created ... ». */
+    /**
+     * Une ligne : « create_project, in TaskForce (name: Test): done. Result: Project created ... ». Ce qu'un outil du dehors
+     * ou une lecture a rendu ne repart pas sous la voix de TaskForce (relecture R159 de la PR #548, R158) : ce sont les mots
+     * d'un autre, que le tour suivant ne compte pas comme venus du dehors ; seuls l'outil, le lieu, l'état et les clés
+     * repartent. Un outil du dehors repart sans ses valeurs, et aucune valeur ni aucun résultat qui porte un secret.
+     */
     static String line(Act act, Function<String, String> where) {
+        boolean outside = TargetSystems.connectorOf(act.tool()) != null;
         StringBuilder line = new StringBuilder(act.tool()).append(", in ").append(where.apply(act.tool()));
-        String values = values(act.arguments());
+        String values = outside ? "" : values(act.arguments());
         if (!values.isEmpty()) line.append(" (").append(values).append(')');
         line.append(": ").append(state(act.status()));
+        if (outside || ActionClaimCheck.kindsOf(act.tool()).isEmpty()) {
+            String keys = keys(act);
+            if (!keys.isEmpty()) line.append(" (").append(keys).append(')');
+            return line.toString();
+        }
         String output = flat(act.output());
-        if (!output.isEmpty() && !AgentService.QUESTION.equals(act.status())) {
+        if (!output.isEmpty() && !AgentService.QUESTION.equals(act.status()) && !SecretScan.in(output)) {
             line.append(". Result: ").append(clip(output, MAX_OUTPUT));
         }
         return line.toString();
+    }
+
+    /** Une clé d'issue ou de projet : sa forme seule, qui ne porte aucune consigne (« TF-1 », « ENG-12 »). */
+    private static final java.util.regex.Pattern KEY = java.util.regex.Pattern.compile(
+        "(?<![\\p{L}\\p{N}])\\p{Lu}[\\p{Lu}\\p{N}]{0,9}-\\d{1,9}(?![\\p{L}\\p{N}])");
+    static final int MAX_KEYS = 3;
+
+    /** Les clés que nomment les arguments et le résultat d'un geste, trois au plus. */
+    private static String keys(Act act) {
+        Set<String> keys = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher found = KEY.matcher((act.arguments() == null ? "" : act.arguments()) + " "
+            + (act.output() == null ? "" : act.output()));
+        while (found.find() && keys.size() < MAX_KEYS) keys.add(found.group());
+        return String.join(", ", keys);
+    }
+
+    /**
+     * Ce que TaskForce dit d'un geste fait, s'il est nié (R204) : son résultat quand il vient de TaskForce et ne porte aucun
+     * secret ; pour un outil du dehors, ses clés seulement, jamais le texte de l'éditeur.
+     */
+    private static String told(Act act) {
+        if (TargetSystems.connectorOf(act.tool()) != null) {
+            String keys = keys(act);
+            return keys.isEmpty() ? null : keys;
+        }
+        return act.output() == null || SecretScan.in(act.output()) ? null : act.output();
     }
 
     /** Ce qu'est devenu un geste, dans les mots que le modèle répète sans se tromper. */
@@ -146,7 +184,7 @@ public final class ThreadActs {
             JsonNode value = field.getValue();
             if (SKIPPED.contains(field.getKey()) || value == null || value.isNull() || value.isContainerNode()) continue;
             String text = flat(value.asText());
-            if (text.isEmpty()) continue;
+            if (text.isEmpty() || SecretScan.in(text)) continue;
             String pair = field.getKey() + ": " + clip(text, MAX_VALUE);
             if (length + pair.length() > MAX_VALUES) break;
             said.add(pair);
