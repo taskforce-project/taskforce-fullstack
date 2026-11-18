@@ -983,8 +983,11 @@ public class AgentService {
         boolean reread = earlier != null && read != null && !read.isEmpty();
         String issue = read == null || read.isEmpty() ? "" : read.text();
         // Ce que la demande désigne, dit dans la demande même que lit le modèle (R204 : à « T'en ai a ou sur cette tache ? »,
-        // TF-21 jointe, Cortex répondait ne voir aucune tâche).
-        List<AssistantAnswer.Subject> subjects = reread ? List.of(earlier) : anyIssue ? attachedSubjects(joined, read) : named;
+        // TF-21 jointe, Cortex répondait ne voir aucune tâche). Sans issue jointe ni nommée, l'issue ouverte à l'écran, ou
+        // résumée, devient le sujet : au tour suivant, écran fermé, c'est elle que « dessus » désigne (second tour de la
+        // relecture R159).
+        List<AssistantAnswer.Subject> subjects = reread ? List.of(earlier) : anyIssue ? attachedSubjects(joined, read)
+            : !named.isEmpty() ? named : screenSubject(ctx.screen(), onScreen, read, message);
         reading.subjects(subjects);
         String asked = message + (reread || anyIssue ? subjectLine(subjects.stream().map(AssistantAnswer.Subject::key)
             .toList(), reread) : "");
@@ -1065,6 +1068,23 @@ public class AgentService {
             }
         }
         return subjects;
+    }
+
+    /**
+     * L'issue ouverte à l'écran, sujet de la demande quand elle n'en joint ni n'en nomme aucune (second tour de la relecture
+     * R159) : par sa clé, telle que l'écran ou le résumé l'a lue, avec ses ids. Rien sans issue ouverte, quand la personne ne
+     * la voit pas, ou quand la demande parle du projet ou du tableau.
+     */
+    static List<AssistantAnswer.Subject> screenSubject(Screen screen, ScreenContext.Seen onScreen, IssueMaterial.Read read,
+                                                       String message) {
+        if (screen == null || screen.issueId() == null || IssueMaterial.aboutTheBoard(message)) return List.of();
+        String key = onScreen == null || onScreen.isEmpty() ? null : onScreen.open();
+        if (key == null && read != null && !read.isEmpty()) {
+            int at = read.ids().indexOf(screen.issueId());
+            if (at >= 0 && at < read.issues().size()) key = read.issues().get(at).key();
+        }
+        return key == null || key.isBlank() ? List.of()
+            : List.of(new AssistantAnswer.Subject(key, screen.issueId(), screen.projectId()));
     }
 
     /**

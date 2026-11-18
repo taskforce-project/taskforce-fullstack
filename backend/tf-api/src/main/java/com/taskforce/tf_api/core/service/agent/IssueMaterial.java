@@ -191,6 +191,11 @@ public class IssueMaterial {
         return said + "\n\n[Attached to this message: " + String.join(", ", keys) + "]";
     }
 
+    /** La demande parle-t-elle du projet ou du tableau, plutôt que de l'issue ouverte ? */
+    public static boolean aboutTheBoard(String request) {
+        return request != null && BOARD.matcher(request).find();
+    }
+
     /** La demande désigne-t-elle une issue sans la nommer : « cette tâche », « dessus », « this issue » ? */
     public static boolean pointsAt(String request) {
         return request != null && POINTS_AT.matcher(request).find();

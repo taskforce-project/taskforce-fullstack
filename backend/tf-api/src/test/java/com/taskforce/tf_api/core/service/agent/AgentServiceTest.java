@@ -3241,4 +3241,35 @@ class AgentServiceTest {
 
         assertThat(answer.answer()).isEqualTo("Voici.");
     }
+
+    @Test
+    @DisplayName("R159, second tour (7) : l'issue ouverte à l'écran devient le sujet de la conversation")
+    void the_issue_on_screen_becomes_the_subject() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        when(screens.read(any())).thenReturn(new ScreenContext.Seen("On screen: TF-30 \"Export CSV\".\n", "TF", 1, "TF-30"));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Qui bosse sur cette tâche ?", TurnHistory.of(List.of()),
+            new Screen(3L, 30L), List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly(new AssistantAnswer.Subject("TF-30", 30L, 3L));
+    }
+
+    @Test
+    @DisplayName("R159, second tour (7) : l'issue résumée devient le sujet ; une demande sur le projet n'en a pas")
+    void the_summarized_issue_becomes_the_subject() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        when(material.read(any(), eq("Résume cette tâche"), anyList(), eq(true))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.HEADER + "TF-30 \"Export CSV\": in Todo.\n", List.of(new AssistantRead.IssueRead("TF-30", 0)),
+            List.of(30L)));
+
+        AssistantAnswer summarized = service.run("acme", 7L, new TurnInput("Résume cette tâche", TurnHistory.of(List.of()),
+            new Screen(3L, 30L), List.of(), List.of(), 5L, null, null));
+        AssistantAnswer board = service.run("acme", 7L, new TurnInput("Combien d'issues dans le projet ?",
+            TurnHistory.of(List.of()), new Screen(3L, 30L), List.of(), List.of(), 5L, null, null));
+
+        assertThat(summarized.subjects()).containsExactly(new AssistantAnswer.Subject("TF-30", 30L, 3L));
+        assertThat(board.subjects()).isEmpty();
+    }
 }
