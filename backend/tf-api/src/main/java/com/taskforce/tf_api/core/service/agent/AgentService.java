@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -519,8 +518,12 @@ public class AgentService {
         try {
             steps.add(new AssistantStep(STEP_ANSWER, "active", "Cortex answers, with its tools if needed"));
             // Un geste qui se demande parle par sa carte : la phrase du modèle ne dit pas « je supprime » à sa place.
+            // R204 : l'outil que la demande nomme, quand Cortex ne peut pas y faire ce qu'elle dit, se dit au modèle, puis
+            // sous la réponse, de la main de TaskForce.
+            List<Gap> gaps = gaps(workspaceMcp.toolsFor(ctx), message,
+                targets.namedIn(message).isEmpty() ? Map.of() : connectionStates(ctx));
             String modelAnswer = cardAnswer(runToolLoop(message, hits, ctx, toolCalls, memory, attached, input.files(), reading,
-                ws.getName()), toolCalls);
+                ws.getName(), gaps), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
             // TaskForce, et l'incident entre au dossier de la réponse (E17). R204 : une phrase qui nie une action faite
             // dans la conversation, ou dans ce tour, l'est aussi.
@@ -549,6 +552,7 @@ public class AgentService {
             if (!answer.equals(asked)) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", "Cortex said nothing: what happened was said instead"));
             }
+            answer = withGaps(answer, gaps);
             // Toute réponse d'un modèle a son dossier : « bien » et « pas bien » en font un cas (R137, R61).
             if (record == null) record = recordForTheBank(ctx, message, hits);
             LlmUsage usage = llm.currentUsage();
@@ -927,7 +931,8 @@ public class AgentService {
 
     private String runToolLoop(String message, List<KnowledgeNode> hits, AgentContext ctx,
                                List<AssistantToolCall> toolCalls, TurnHistory memory,
-                               List<Screen> attached, List<AttachedFile> files, Reading reading, String workspace) {
+                               List<Screen> attached, List<AttachedFile> files, Reading reading, String workspace,
+                               List<Gap> gaps) {
         // Outils externes (serveurs MCP connectés sur le workspace), découverts par requête et bornés par
         // pertinence avant l'envoi : un gros serveur MCP envoyé en entier sature un petit modèle.
         List<AgentTool> external = relevantExternal(workspaceMcp.toolsFor(ctx), message);
@@ -984,7 +989,7 @@ public class AgentService {
         // Où travaille la conversation (R135), dit au modèle ; l'écran le renseigne, ce projet-ci décide.
         String workingIn = ctx.project() == null ? "" : screens.conversationProject(ctx);
         if (workingIn != null && !workingIn.isBlank()) seen = workingIn.strip() + (seen.isEmpty() ? "\n" : "\n\n" + seen);
-        String system = systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC));
+        String system = systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC), gaps);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le budget de la requête, contre la fenêtre de son modèle (TF-J1-13) : ce qui ne tient pas ne part pas, et
@@ -1059,13 +1064,14 @@ public class AgentService {
                     : turn.content() == null ? "" : turn.content()))
             .toList();
         // Les outils connectés du cas, figés, choisis par le même code qu'une réponse (R204) : jamais exécutés.
-        List<AgentTool> external = relevantExternal(context.external().stream().map(this::frozen).toList(),
-            replayCase.question());
+        List<AgentTool> connected = context.external().stream().map(this::frozen).toList();
+        List<AgentTool> external = relevantExternal(connected, replayCase.question());
         // Le plan de la question, comme dans une réponse (R117, R204) : la banque dit s'il est suivi.
         CortexPlans.Plan plan = targets.namedIn(replayCase.question()).isEmpty()
             ? CortexPlans.forRequest(replayCase.question()).orElse(null) : null;
-        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, "", notes, external, replayCase.askedOn()), history,
-            replayCase.question());
+        List<Gap> gaps = gaps(connected, replayCase.question(), Map.of());
+        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, "", notes, external, replayCase.askedOn(), gaps),
+            history, replayCase.question());
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
         List<ActionClaimCheck.Done> thread = context.done(targets::of);
         llm.beginUsageCapture();
@@ -1078,7 +1084,7 @@ public class AgentService {
             // R116, R204 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
-            return new ReplayOutcome(ActionClaimCheck.check(answer, ran, thread, Set.of()).answer(), step.calls,
+            return new ReplayOutcome(withGaps(ActionClaimCheck.check(answer, ran, thread, Set.of()).answer(), gaps), step.calls,
                 llm.currentModel(), llm.currentUsage(), thread);
         } finally {
             llm.endUsageCapture();
@@ -1722,31 +1728,109 @@ public class AgentService {
     }
 
     /**
-     * Borne des outils MCP externes avant l'envoi au modèle. Sous {@code maxExternalTools}, on garde tout ;
-     * au-dessus, on priorise (connecteur nommé dans le message, puis nom d'outil qui recoupe le message,
-     * ex. « issues » pour {@code list_issues}) et on plafonne.
+     * Borne des outils MCP externes avant l'envoi au modèle (R204, R201 « chercher ») : sous {@code maxExternalTools}, on
+     * garde tout ; au-dessus, le code les classe ({@link ToolChoice}) : les outils du connecteur que la demande nomme
+     * d'abord, et parmi eux ceux qui font ce qu'elle dit, en français comme en anglais ; puis on plafonne.
      */
     private List<AgentTool> relevantExternal(List<AgentTool> external, String message) {
-        if (maxExternalTools <= 0) return List.of();
-        if (external.size() <= maxExternalTools) return external;
-        String lower = message == null ? "" : message.toLowerCase();
-        return external.stream()
-            .sorted(Comparator.comparingInt((AgentTool t) -> toolScore(t.name(), lower)).reversed())
-            .limit(maxExternalTools)
-            .toList();
+        return ToolChoice.choose(external, message, targets.namedIn(message), maxExternalTools);
     }
 
-    /** Priorité d'un outil : +100 si son connecteur (préfixe avant « __ ») est nommé dans le message,
-     *  +1 par segment de son nom (après « __ », coupé sur _/-, au moins 3 lettres) présent dans le message. */
-    private static int toolScore(String toolName, String lowerMessage) {
-        int sep = toolName.indexOf("__");
-        int score = 0;
-        if (sep > 0 && lowerMessage.contains(toolName.substring(0, sep).toLowerCase())) score += 100;
-        String bare = (sep > 0 ? toolName.substring(sep + 2) : toolName).toLowerCase();
-        for (String part : bare.split("[_-]")) {
-            if (part.length() >= 3 && lowerMessage.contains(part)) score++;
+    /**
+     * Ce que TaskForce constate de l'outil que la demande nomme, quand Cortex ne peut pas y agir (R204, R201) : il n'est pas
+     * connecté pour la personne, il attend une reconnexion ou son administrateur, il n'a pas répondu, ou il ne l'est qu'en
+     * lecture alors que la demande écrit. Une lecture dans un outil en lecture seule ne manque de rien.
+     */
+    record Gap(String name, String state) {
+        static final String NOT_CONNECTED = "not-connected";
+        static final String NEEDS_RECONNECT = "needs-reconnect";
+        static final String WAITING_FOR_ADMIN = "waiting-for-admin";
+        static final String UNREACHABLE = "unreachable";
+        static final String READ_ONLY = "read-only";
+
+        /** Ce que le modèle lit de cet outil, dans le prompt : l'état, ce qu'il dit, ce qu'il propose. */
+        String forTheModel() {
+            return switch (state) {
+                case READ_ONLY -> "TaskForce checked the tool the person named: " + name + " is connected for reading only, so "
+                    + "you can read it but not change it. Say so in one sentence and offer to allow changes (Settings, "
+                    + "Integrations, " + name + ", connect it again with changes allowed); never only answer that you can't. ";
+                case NEEDS_RECONNECT -> "TaskForce checked the tool the person named: " + name + " needs reconnecting. Say so, "
+                    + "and offer to reconnect it (Settings, Integrations, " + name + "). ";
+                case WAITING_FOR_ADMIN -> "TaskForce checked the tool the person named: " + name + " waits for its admin. Say "
+                    + "so, and point to Settings, Integrations, " + name + ", which says what to send them. ";
+                case UNREACHABLE -> "TaskForce checked the tool the person named: " + name + " is connected but did not "
+                    + "answer, so its tools are not here. Say so, and offer to try again in a moment. ";
+                default -> "TaskForce checked the tool the person named: Cortex isn't connected to " + name + " for this "
+                    + "person. Say so in one sentence and offer to connect it (Settings, Integrations, " + name + "); never "
+                    + "only answer that you can't. ";
+            };
         }
-        return score;
+
+        /** Ce que TaskForce dit à la personne, sous la réponse. */
+        String forThePerson() {
+            return switch (state) {
+                case READ_ONLY -> name + " is connected for reading only, so Cortex can read it but not change it. To let it "
+                    + "propose changes, connect " + name + " again in Settings, Integrations, and allow changes.";
+                case NEEDS_RECONNECT -> name + " needs reconnecting before Cortex can use it: Settings, Integrations, " + name
+                    + ".";
+                case WAITING_FOR_ADMIN -> name + " waits for your admin before anyone can connect it: Settings, Integrations, "
+                    + name + " says what to send them.";
+                case UNREACHABLE -> name + " is connected but didn't answer, so Cortex couldn't use it. Try again in a moment.";
+                default -> "Cortex isn't connected to " + name + " for you yet, so it can't act there. Connect it in "
+                    + "Settings, Integrations, then ask again.";
+            };
+        }
+    }
+
+    /** La signature de ce que TaskForce dit de l'outil nommé : ce n'est pas une correction. */
+    static final String ABOUT_CONNECTIONS = ActionClaimCheck.SIGNATURE + " · connections";
+
+    /**
+     * Les outils que la demande nomme et où Cortex ne peut pas faire ce qu'elle dit (R204) : sans outil servi pour la
+     * personne, l'état de sa connexion le dit ({@code states}, par clé de connecteur ; vide au rejeu) ; avec des outils
+     * qui ne font que lire, une demande qui écrit manque de l'écriture.
+     */
+    List<Gap> gaps(List<AgentTool> external, String message, Map<String, String> states) {
+        List<TargetSystems.Named> named = targets.namedIn(message);
+        if (named.isEmpty()) return List.of();
+        boolean writes = ToolChoice.asked(message).writes();
+        List<Gap> gaps = new ArrayList<>();
+        for (TargetSystems.Named tool : named) {
+            List<AgentTool> its = external.stream().filter(t -> ToolChoice.isNamed(t, List.of(tool))).toList();
+            if (its.isEmpty()) {
+                String state = tool.keys().stream().map(states::get).filter(Objects::nonNull).findFirst().orElse(Gap.NOT_CONNECTED);
+                gaps.add(new Gap(tool.name(), state));
+            } else if (writes && its.stream().allMatch(t -> t instanceof ExternalMcpTool e && e.isReadOnly())) {
+                gaps.add(new Gap(tool.name(), Gap.READ_ONLY));
+            }
+        }
+        return gaps;
+    }
+
+    /** L'état de chaque connexion de la personne qui ne sert pas d'outils : à reconnecter, en attente, injoignable. */
+    private Map<String, String> connectionStates(AgentContext ctx) {
+        Map<String, String> states = new HashMap<>();
+        try {
+            for (WorkspaceMcpService.ConnectedServer server : workspaceMcp.connectedServers(ctx.workspaceId(), ctx.userId())) {
+                String state = switch (server.state() == null ? "" : server.state().name()) {
+                    case "NEEDS_RECONNECT" -> Gap.NEEDS_RECONNECT;
+                    case "WAITING_FOR_ADMIN" -> Gap.WAITING_FOR_ADMIN;
+                    case "CONNECTED" -> Gap.UNREACHABLE;
+                    default -> null;
+                };
+                if (state != null) states.put(server.connectorKey(), state);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Cortex : état des connexions non lu : {}", LogSafe.of(e.getMessage()));
+        }
+        return states;
+    }
+
+    /** La réponse, et sous elle ce que TaskForce dit de l'outil nommé, une ligne par outil. */
+    static String withGaps(String answer, List<Gap> gaps) {
+        if (gaps.isEmpty()) return answer;
+        String said = signed(ABOUT_CONNECTIONS, gaps.stream().map(Gap::forThePerson).toList());
+        return answer == null || answer.isBlank() ? said : answer.stripTrailing() + "\n\n" + said;
     }
 
     /** Liste de messages : système + historique (mémoire multi-tours) + message courant. */
@@ -1765,6 +1849,12 @@ public class AgentService {
      */
     private String systemPrompt(CortexPlans.Plan plan, String screen, List<KnowledgeNode> hits, List<AgentTool> external,
                                 LocalDate today) {
+        return systemPrompt(plan, screen, hits, external, today, List.of());
+    }
+
+    /** Le même, avec ce que TaskForce a constaté de l'outil que la demande nomme (R204). */
+    private String systemPrompt(CortexPlans.Plan plan, String screen, List<KnowledgeNode> hits, List<AgentTool> external,
+                                LocalDate today, List<Gap> gaps) {
         StringBuilder sb = new StringBuilder();
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
@@ -1822,8 +1912,12 @@ public class AgentService {
               .append("For an action possible on both sides (e.g. creating an issue), target TaskForce by default; ")
               .append("target an external system only when the user names it. ")
               .append("Call an external write tool only with explicit, checked parameters and only when the user ")
-              .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ");
+              .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ")
+              // R204 : la demande qui nomme un outil s'y fait, avec ses outils ; jamais dans TaskForce à sa place.
+              .append("When the person names a connected tool (\"in Linear\"), do it there with that tool's own tools, never ")
+              .append("in TaskForce instead; when a value it needs is missing (a team, a name), read it with that tool or ask. ");
         }
+        gaps.forEach(gap -> sb.append(gap.forTheModel()));
         if (plan != null) sb.append("\n\n").append(plan.text());
         if (screen != null && !screen.isBlank()) sb.append("\n\n").append(screen.strip());
         if (!hits.isEmpty()) {

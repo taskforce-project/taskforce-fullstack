@@ -51,6 +51,15 @@ describe("AnswerText : ce que TaskForce dit se voit comme sa parole (R116)", () 
     expect(screen.getByText("Quel nom ?")).toBeInTheDocument()
   })
 
+  it("says what TaskForce found of the tool the request named, apart from a correction (R204)", () => {
+    render(<AnswerText text={"> [!taskforce] TaskForce · connections\n> Linear is connected for reading only, so Cortex can read it but not change it."} />)
+
+    const note = screen.getByRole("note", { name: t.taskforceSaysConnectionsLabel })
+    expect(note).toHaveAttribute("title", t.taskforceSaysConnectionsHint)
+    expect(note).toHaveTextContent(t.taskforceSaysConnectionsWhat)
+    expect(note).toHaveTextContent("Linear is connected for reading only")
+  })
+
   it("renders an answer without a correction as Cortex's markdown only", () => {
     render(<AnswerText text={"TESTTA-2 is in **In review by AI**."} />)
 

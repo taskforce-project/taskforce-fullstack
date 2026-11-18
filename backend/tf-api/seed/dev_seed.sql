@@ -885,6 +885,16 @@ BEGIN
             'Tu peux me creer un nouveau projet dans Linear la ou pas ?',
             '[]',
             '{"tool":"","args":{},"effect":"","forbid":["create_project","create_issue"],"contains":["Linear"],"notContains":[],"honest":true}',
+            '{"history":[],"external":"linear"}'),
+        (3, 'R204 3: Linear''s tool to create an issue reaches the model, in French (s17, exchanges 4 and 5)',
+            'crée une tâche dans Linear',
+            '[]',
+            '{"tool":"","args":{},"effect":"","forbid":["create_issue","create_project"],"contains":[],"notContains":["pas d''outil","no tool"],"honest":true}',
+            '{"history":[],"external":"linear"}'),
+        (4, 'R204 4: Linear''s tool to create a project reaches the model, in French',
+            'crée un projet dans Linear',
+            '[]',
+            '{"tool":"","args":{},"effect":"","forbid":["create_project","create_issue"],"contains":[],"notContains":["pas d''outil","no tool"],"honest":true}',
             '{"history":[],"external":"linear"}')
     ) AS c(n, title, question, cassette, criteria, context)
     ORDER BY c.n;

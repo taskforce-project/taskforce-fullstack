@@ -70,6 +70,14 @@ describe("splitAnswer : ce que Cortex écrit, ce que TaskForce dit (R116)", () =
     ])
   })
 
+  it("reads what TaskForce says of the tool the request named apart from a correction (R204)", () => {
+    const answer = "Je peux le faire dès qu'Asana est là.\n\n> [!taskforce] TaskForce · connections\n> Cortex isn't connected to Asana for you yet."
+    expect(splitAnswer(answer)).toEqual([
+      { by: "cortex", text: "Je peux le faire dès qu'Asana est là." },
+      { by: "taskforce", lines: ["Cortex isn't connected to Asana for you yet."], kind: "connections" },
+    ])
+  })
+
   it("gives nothing for an empty answer", () => {
     expect(splitAnswer("")).toEqual([])
   })

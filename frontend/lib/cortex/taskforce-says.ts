@@ -10,9 +10,10 @@
  * Un bloc marqué « TaskForce · asks » dit les questions d'un geste (R115), une par ligne : la conversation montre leur
  * carte à sa place, et une conversation rouverte, sans la carte, les relit comme les mots de Cortex (R136).
  * Un bloc signé « TaskForce · done » corrige une phrase qui niait une action faite dans la conversation (R204) : il dit
- * ce qui a été fait, et où.
+ * ce qui a été fait, et où. Un bloc signé « TaskForce · connections » dit que l'outil que la demande nomme n'est pas
+ * connecté, ou l'est en lecture seule, et comment y remédier (R204, R201) : ce n'est pas une correction.
  */
-export type AnswerKind = "models" | "asks" | "done"
+export type AnswerKind = "models" | "asks" | "done" | "connections"
 
 export type AnswerPart =
   | { by: "cortex"; text: string }
@@ -23,11 +24,13 @@ const QUOTED = /^\s*>\s?/
 const ABOUT_MODELS = /·\s*models\s*$/i
 const ASKS = /·\s*asks\s*$/i
 const DONE = /·\s*done\s*$/i
+const CONNECTIONS = /·\s*connections\s*$/i
 
 function kindOf(signature: string): AnswerKind | undefined {
   if (ABOUT_MODELS.test(signature)) return "models"
   if (ASKS.test(signature)) return "asks"
   if (DONE.test(signature)) return "done"
+  if (CONNECTIONS.test(signature)) return "connections"
   return undefined
 }
 

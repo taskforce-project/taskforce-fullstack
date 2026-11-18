@@ -2440,6 +2440,9 @@ class AgentServiceTest {
     @DisplayName("R204 (s17, échange 1) : la demande nomme Linear ; TaskForce ne pose pas lui-même la question d'un projet de TaskForce")
     void a_request_that_names_a_connected_tool_gets_no_taskforce_plan() throws Exception {
         stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
         when(llm.rawChat(anyList(), anyList(), anyString()))
             .thenReturn(json.readTree("{\"content\":\"Quel nom voulez-vous donner au projet ?\"}"));
         CortexGesture create = Mockito.mock(CortexGesture.class);
@@ -2552,6 +2555,136 @@ class AgentServiceTest {
         // Un projet de TaskForce pour « dans Linear » : le cas le note raté, comme la Présidence l'a vu le 17/11/2026.
         assertThat(outcome.calls()).extracting(ReplayOutcome.ReplayCall::tool).containsExactly("create_project");
         assertThat(EvalGrader.grade(json.readValue(row.criteria(), EvalCriteria.class), outcome).passed()).isFalse();
+    }
+
+    /**
+     * Les 70 outils de Linear que la Présidence avait connectés, tels que le seed les fige : les douze premiers dans
+     * l'ordre du serveur le 17/11/2026, puis les autres. {@code readsOnly} : seulement ses lectures, comme une connexion à
+     * l'adresse de lecture seule.
+     */
+    private List<AgentTool> linearTools(boolean readsOnly) throws Exception {
+        String context = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow().context();
+        List<AgentTool> tools = new ArrayList<>();
+        for (JsonNode tool : json.readTree(context).path("external")) {
+            boolean read = tool.path("readOnly").asBoolean();
+            if (readsOnly && !read) continue;
+            tools.add(new ExternalMcpTool(extClient, new McpClient.ServerRef("linear", "https://mcp.linear.app/mcp", null),
+                new McpClient.ToolDef(tool.path("name").asText(), tool.path("description").asText(), tool.path("inputSchema"),
+                    read), json, read ? com.taskforce.tf_api.core.enums.ToolClass.READ : com.taskforce.tf_api.core.enums.ToolClass.WRITE,
+                com.taskforce.tf_api.core.enums.ConnectionScope.PERSONAL));
+        }
+        return tools;
+    }
+
+    /** Les outils externes que le modèle reçoit pour cette demande, la Présidence ayant connecté Linear. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<String> externalToolsSentFor(String message) throws Exception {
+        stubWorkspace();
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        lenient().when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        lenient().when(llm.isConfigured()).thenReturn(true);
+        lenient().when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ArgumentCaptor<List<AgentTool>> sent = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        lenient().when(tools.toolDefinitions(sent.capture())).thenReturn(List.of());
+
+        service.run("acme", 7L, message);
+
+        return sent.getValue().stream().map(AgentTool::name).toList();
+    }
+
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // R204 : les mots de la Présidence (s17) et ceux du Conseil, en français, puis en anglais.
+        "crée une tâche dans Linear                                 | linear__save_issue",
+        "crée un projet dans Linear                                 | linear__save_project",
+        "Tu peux me creer un nouveau projet dans Linear la ou pas ? | linear__save_project",
+        "tu peux creer une tache dans linear stp ? avec une priorite | linear__save_issue",
+        "liste les projets de Linear                                | linear__list_projects",
+        "create an issue in Linear                                  | linear__save_issue",
+        "create a project in Linear                                 | linear__save_project",
+    })
+    void the_tools_of_a_named_connector_that_do_what_the_request_says_reach_the_model(String message, String expected)
+        throws Exception {
+        List<String> sent = externalToolsSentFor(message);
+
+        assertThat(sent).hasSize(12).contains(expected).allSatisfy(name -> assertThat(name).startsWith("linear__"));
+        // Ce qui aide à le faire passe aussi : l'équipe, qu'une issue ou un projet de Linear exige.
+        if (expected.contains("save_")) assertThat(sent).contains("linear__list_teams");
+    }
+
+    @Test
+    @DisplayName("R204 : le choix des outils est du code : la même demande donne les mêmes outils, dans le même ordre, douze au plus")
+    void the_choice_of_tools_is_deterministic() throws Exception {
+        List<String> first = externalToolsSentFor("crée une tâche dans Linear");
+        Mockito.reset(tools);
+        List<String> second = externalToolsSentFor("crée une tâche dans Linear");
+
+        assertThat(second).isEqualTo(first);
+        assertThat(first.get(0)).isEqualTo("linear__save_issue");
+    }
+
+    @Test
+    @DisplayName("R204 : la demande nomme un outil qui n'est pas connecté ; TaskForce le dit, et dit comment le connecter")
+    void a_named_tool_that_is_not_connected_is_said_so() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Je ne peux pas créer de tâche dans Asana.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "crée une tâche dans Asana");
+
+        assertThat(answer.answer()).contains("> [!taskforce] TaskForce · connections")
+            .contains("Cortex isn't connected to Asana for you").contains("Settings, Integrations");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).contains("Cortex isn't connected to Asana for this person");
+    }
+
+    @Test
+    @DisplayName("R204 : la demande écrit dans un outil connecté en lecture seule ; TaskForce le dit, et propose l'écriture")
+    void a_named_tool_connected_for_reading_only_is_said_so() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Je n'ai pas d'outil pour créer des tâches dans Linear.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "crée une tâche dans Linear");
+
+        assertThat(answer.answer()).contains("> [!taskforce] TaskForce · connections")
+            .contains("Linear is connected for reading only").contains("allow changes");
+    }
+
+    @Test
+    @DisplayName("R204 : lire dans un outil connecté en lecture seule ne demande rien de plus")
+    void reading_in_a_tool_connected_for_reading_only_says_nothing_more() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici les projets.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "liste les projets de Linear");
+
+        assertThat(answer.answer()).isEqualTo("Voici les projets.");
+    }
+
+    @ParameterizedTest(name = "cas {0} du seed : {1}")
+    @CsvSource({"2, linear__save_project", "3, linear__save_issue", "4, linear__save_project"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void the_seed_cases_of_linear_give_the_model_the_tool_to_write_there(int n, String expected) throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == n).findFirst().orElseThrow();
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ArgumentCaptor<List<AgentTool>> sent = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        when(tools.toolDefinitions(sent.capture())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b")))
+            .thenReturn(json.readTree("{\"content\":\"Dans quelle équipe Linear ?\"}"));
+
+        service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()), "qwen3.5:9b");
+
+        assertThat(sent.getValue()).extracting(AgentTool::name).hasSize(12).contains(expected, "linear__list_teams");
     }
 
     @Test
