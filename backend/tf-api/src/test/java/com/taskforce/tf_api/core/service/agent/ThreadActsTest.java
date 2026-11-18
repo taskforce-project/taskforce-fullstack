@@ -68,7 +68,7 @@ class ThreadActsTest {
             new Act("create_project", "", "undone", "The project AAA was deleted.", "h3", "h1"));
 
         assertThat(ThreadActs.done(acts, WHERE)).containsExactly(
-            new ActionClaimCheck.Done("update_issue", "TaskForce", "TF-1 moved to Done."));
+            new ActionClaimCheck.Done("update_issue", "TaskForce", "TF-1 moved to Done.", "{\"issue\":\"TF-1\"}", true));
         assertThat(ThreadActs.block(acts, WHERE)).contains("- create_project, in TaskForce: undone by the person");
     }
 
@@ -85,5 +85,20 @@ class ThreadActsTest {
         assertThat(block.lines().count()).isEqualTo(1 + ThreadActs.MAX_ACTS);
         assertThat(block).contains("issue: TF-11").doesNotContain("issue: TF-3,").contains("x".repeat(ThreadActs.MAX_VALUE) + "...");
         assertThat(block.lines().skip(1)).allSatisfy(line -> assertThat(line.length()).isLessThan(560));
+    }
+
+    @Test
+    @DisplayName("R159 (2) : au rejeu, les gestes de la dernière réponse sont récents ; ceux d'une plus ancienne, non")
+    void the_acts_of_the_last_answer_of_a_case_are_recent() {
+        List<Act> older = List.of(new Act("create_issue", "{}", "success", "Issue created: API-12 \"Fix login\".", "h1", null));
+        ReplayContext context = new ReplayContext(List.of(
+            new ReplayContext.Turn("user", "Crée l'issue", List.of()),
+            new ReplayContext.Turn("assistant", "API-12 est créée.", older),
+            new ReplayContext.Turn("user", "Et un projet", List.of()),
+            new ReplayContext.Turn("assistant", "Quel nom ?", S17)));
+
+        assertThat(context.done(WHERE)).extracting(ActionClaimCheck.Done::tool, ActionClaimCheck.Done::recent)
+            .containsExactly(org.assertj.core.api.Assertions.tuple("create_issue", false),
+                org.assertj.core.api.Assertions.tuple("create_project", true));
     }
 }

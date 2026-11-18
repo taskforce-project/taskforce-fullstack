@@ -62,10 +62,17 @@ public record ReplayContext(List<Turn> history, List<FrozenTool> external, List<
     public record FrozenIssue(String key, String material, boolean earlier) {
     }
 
-    /** Ce qui a été fait dans ces tours et reste fait, que la réponse ne peut pas nier (R204). */
+    /**
+     * Ce qui a été fait dans ces tours et reste fait, que la réponse ne peut pas nier (R204) : les gestes de la dernière
+     * réponse, et ceux des plus anciennes, qui ne comptent que pour la phrase qui les désigne (relecture R159).
+     */
     public List<ActionClaimCheck.Done> done(Function<String, String> where) {
+        int last = -1;
+        for (int i = 0; i < history.size(); i++) {
+            if ("assistant".equals(history.get(i).role())) last = i;
+        }
         List<ActionClaimCheck.Done> done = new ArrayList<>();
-        for (Turn turn : history) done.addAll(ThreadActs.done(turn.acts(), where));
+        for (int i = 0; i < history.size(); i++) done.addAll(ThreadActs.done(history.get(i).acts(), where, i == last));
         return done;
     }
 }

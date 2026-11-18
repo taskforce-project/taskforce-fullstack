@@ -377,10 +377,15 @@ public class AiConversationService {
         if (conversationId == null) return List.of();
         List<AiMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
         Map<Long, List<Act>> acts = actsOf(messages);
+        // La réponse précédente : ses gestes comptent pour une phrase qui ne les désigne pas (relecture R159 de la PR #548).
+        Long previous = null;
+        for (AiMessage message : messages) {
+            if ("assistant".equals(message.getRole())) previous = message.getId();
+        }
         List<ActionClaimCheck.Done> done = new ArrayList<>();
         for (AiMessage message : messages) {
             List<Act> of = acts.get(message.getId());
-            if (of != null) done.addAll(ThreadActs.done(of, targets::of));
+            if (of != null) done.addAll(ThreadActs.done(of, targets::of, Objects.equals(message.getId(), previous)));
         }
         return done;
     }

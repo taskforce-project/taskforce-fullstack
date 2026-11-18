@@ -389,4 +389,37 @@ class ActionClaimCheckTest {
     void what_a_tool_acts_on_comes_from_the_last_word_of_its_name(String tool, String thing) {
         assertThat(ActionClaimCheck.thingOf(tool)).isEqualTo(thing == null ? null : ActionClaimCheck.Thing.valueOf(thing));
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548 (2) : un geste d'avant n'appuie que la phrase qui le désigne
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "« {0} », le projet TESTTASKFO créé au tour d'avant : corrigée {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Un autre projet que celui de la conversation, nommé ou cité : rien ne l'appuie, R116 le corrige.
+        "J'ai créé le projet Marketing.                     | true",
+        "J'ai créé le projet « Marketing ».                 | true",
+        "I created the project Marketing.                   | true",
+        "I created the Marketing project.                   | true",
+        // Le projet de la conversation, par son nom, sa clé, ou sans autre chose qui le désigne.
+        "J'ai créé le projet Test Taskforce dans TaskForce. | false",
+        "J'ai créé le projet TESTTASKFO.                    | false",
+        "Je l'ai créé dans TaskForce.                       | false",
+        "Le projet a été créé.                              | false",
+    })
+    void an_earlier_act_backs_only_the_sentence_that_designates_it(String sentence, boolean corrected) {
+        assertThat(ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS).corrected()).isEqualTo(corrected);
+    }
+
+    @Test
+    @DisplayName("R159 (2) : l'issue créée plus tôt n'appuie pas l'annonce d'une autre ; la sienne, oui")
+    void an_earlier_issue_does_not_back_another_one() {
+        Done api12 = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".");
+
+        assertThat(ActionClaimCheck.check("I created the issue for the payment bug.", List.of(), List.of(api12), SYSTEMS)
+            .claims()).hasSize(1);
+        assertThat(ActionClaimCheck.check("I created API-12.", List.of(), List.of(api12), SYSTEMS).corrected()).isFalse();
+        assertThat(ActionClaimCheck.check("I created the issue for the login fix.", List.of(), List.of(api12), SYSTEMS)
+            .corrected()).isFalse();
+    }
 }

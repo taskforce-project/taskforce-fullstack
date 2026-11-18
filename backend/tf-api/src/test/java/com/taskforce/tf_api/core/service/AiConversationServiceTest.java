@@ -713,8 +713,32 @@ class AiConversationServiceTest {
         s17Record();
 
         assertThat(service.threadDone(1L)).containsExactly(new com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done(
-            "create_project", "TaskForce", "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12)."));
+            "create_project", "TaskForce", "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).",
+            "{\"name\":\"Test Taskforce\"}", true));
         assertThat(service.threadDone(null)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R159 (2) : les gestes de la réponse précédente sont récents ; ceux d'une plus ancienne, non")
+    void the_acts_of_the_previous_answer_are_recent() {
+        java.util.UUID older = java.util.UUID.fromString("00000000-0000-0000-0000-000000000012");
+        java.util.UUID previous = java.util.UUID.fromString("00000000-0000-0000-0000-000000000013");
+        AiMessage first = msg(2L, "assistant", "API-12 est créée.");
+        first.setReading(new java.util.HashMap<>(Map.of("record", older.toString())));
+        AiMessage last = msg(4L, "assistant", "Le projet est créé.");
+        last.setReading(new java.util.HashMap<>(Map.of("record", previous.toString())));
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(1L)).thenReturn(List.of(msg(1L, "user", "Crée l'issue"),
+            first, msg(3L, "user", "Et un projet"), last));
+        when(records.acts(any())).thenReturn(Map.of(
+            older, List.of(new com.taskforce.tf_api.core.service.agent.CortexRecordService.Act("create_issue", "{}", "success",
+                "Issue created: API-12 \"Fix login\".", "h1", null)),
+            previous, List.of(new com.taskforce.tf_api.core.service.agent.CortexRecordService.Act("create_project", "{}",
+                "success", "Project created in TaskForce: WEB \"Site\" (id 3).", "h2", null))));
+
+        assertThat(service.threadDone(1L)).extracting(com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done::tool,
+                com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done::recent)
+            .containsExactly(org.assertj.core.api.Assertions.tuple("create_issue", false),
+                org.assertj.core.api.Assertions.tuple("create_project", true));
     }
 
     @Test

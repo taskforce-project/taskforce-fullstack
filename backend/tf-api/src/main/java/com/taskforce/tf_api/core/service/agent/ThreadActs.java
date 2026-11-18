@@ -80,16 +80,24 @@ public final class ThreadActs {
 
     /**
      * Ce qui a été fait et reste fait : les gestes réussis que la personne n'a pas défaits. Ce qu'une phrase de Cortex
-     * ne peut pas nier (R204).
+     * ne peut pas nier (R204). Les gestes de la réponse précédente.
      */
     public static List<ActionClaimCheck.Done> done(List<Act> acts, Function<String, String> where) {
+        return done(acts, where, true);
+    }
+
+    /**
+     * Les mêmes, en disant s'ils viennent de la réponse précédente ({@code recent}) ou d'une plus ancienne : un geste plus
+     * ancien ne compte que pour la phrase qui le désigne (relecture R159 de la PR #548).
+     */
+    public static List<ActionClaimCheck.Done> done(List<Act> acts, Function<String, String> where, boolean recent) {
         if (acts == null || acts.isEmpty()) return List.of();
         Set<String> undone = new HashSet<>();
         acts.stream().filter(act -> "undone".equals(act.status()) && act.undoes() != null).forEach(act -> undone.add(act.undoes()));
         List<ActionClaimCheck.Done> done = new ArrayList<>();
         for (Act act : acts) {
             if ("success".equals(act.status()) && (act.hash() == null || !undone.contains(act.hash()))) {
-                done.add(new ActionClaimCheck.Done(act.tool(), where.apply(act.tool()), act.output()));
+                done.add(new ActionClaimCheck.Done(act.tool(), where.apply(act.tool()), act.output(), act.arguments(), recent));
             }
         }
         return done;

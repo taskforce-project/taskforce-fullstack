@@ -88,9 +88,15 @@ public final class ActionClaimCheck {
 
     /**
      * Un geste fait dans la conversation, et qui reste fait (R204) : l'outil, le système où il a écrit (« TaskForce »,
-     * « Linear »), ce qu'il a rendu. Une phrase de Cortex ne le nie pas.
+     * « Linear »), ce qu'il a rendu, ses arguments, et s'il vient de la réponse précédente ou de ce tour ({@code recent}).
+     * Une phrase de Cortex ne le nie pas. Un geste plus ancien ne compte que pour la phrase qui le désigne, par sa clé, son
+     * nom ou son titre (relecture R159 de la PR #548).
      */
-    public record Done(String tool, String where, String output) {
+    public record Done(String tool, String where, String output, String arguments, boolean recent) {
+        /** Un geste de la réponse précédente, ou de ce tour. */
+        public Done(String tool, String where, String output) {
+            this(tool, where, output, null, true);
+        }
     }
 
     /** Une phrase du modèle qui annonce une action qu'aucun outil réussi du tour n'a faite, et ce qu'elle annonce. */
@@ -407,7 +413,9 @@ public final class ActionClaimCheck {
     /**
      * Ce qu'une phrase annonce et qu'aucun outil réussi du tour n'a fait, ni aucun geste d'avant de la conversation qui
      * reste fait (R204) ; vide si elle n'annonce rien de faux. Un geste d'avant n'appuie une annonce que s'il est du même
-     * genre, sur la même chose et dans le même système quand la proposition les nomme.
+     * genre, sur la même chose et dans le même système quand la proposition les nomme, et qu'elle le désigne : par sa clé,
+     * son nom ou son titre ; sans rien qui désigne la chose (« le projet », « je l'ai créé »), seul un geste de la réponse
+     * précédente l'appuie. Sinon R116 la corrige (relecture R159 : « J'ai créé le projet Marketing. », après TESTTASKFO).
      */
     private static Set<Kind> unbackedKinds(String sentence, List<Ran> ran, List<Done> thread, Set<String> systems) {
         Set<Kind> unbacked = EnumSet.noneOf(Kind.class);
@@ -419,8 +427,11 @@ public final class ActionClaimCheck {
         return unbacked;
     }
 
-    /** Une action qu'une phrase dit faite, ou nie : son genre, et la proposition qui la dit, où se lisent sa chose et son système. */
-    private record Said(Kind kind, String clause) {
+    /**
+     * Une action qu'une phrase dit faite, ou nie : son genre, la proposition qui la dit, où se lisent sa chose et son
+     * système, et la phrase entière, où se lisent les titres qu'elle cite.
+     */
+    private record Said(Kind kind, String clause, String sentence) {
     }
 
     /** Ce qu'une phrase annonce comme fait, par ses verbes. */
@@ -450,13 +461,13 @@ public final class ActionClaimCheck {
                 boolean aboutTheAnswer = (kind == Kind.CREATE || kind == Kind.UPDATE)
                     && !WORKSPACE_THING.matcher(s.substring(start, end)).find();
                 if (aboutTheAnswer) continue;
-                claims.add(new Said(kind, s.substring(start, end)));
+                claims.add(new Said(kind, s.substring(start, end), sentence));
                 Matcher next = COORDINATED.matcher(s);
                 next.region(m.end(), s.length());
                 while (next.lookingAt()) {
                     String between = s.substring(next.regionStart(), verbStart(next));
                     if (NEGATION.matcher(between).find() || MODAL.matcher(between).find()) break;
-                    claims.add(new Said(kindOf(next), s.substring(start, clauseEnd(s, next.end()))));
+                    claims.add(new Said(kindOf(next), s.substring(start, clauseEnd(s, next.end())), sentence));
                     next.region(next.end(), s.length());
                 }
             }
@@ -637,7 +648,7 @@ public final class ActionClaimCheck {
                 int end = clauseEnd(s, m.end());
                 if (CONDITION.matcher(s.substring(start, m.start())).find()) continue;
                 if (ANCHOR.matcher(s.substring(0, end)).find()) continue;
-                denials.add(new Said(deniedKind(m), s.substring(start, end)));
+                denials.add(new Said(deniedKind(m), s.substring(start, end), sentence));
             }
         }
         return denials;
@@ -675,23 +686,118 @@ public final class ActionClaimCheck {
 
     /**
      * Les gestes faits dont parle cette proposition : du même genre, sur la même chose quand elle en nomme une, dans le même
-     * système quand elle en nomme un, et la même clé quand elle en dit une.
+     * système quand elle en nomme un, et celui qu'elle désigne (relecture R159) : sa clé, son nom ou son titre quand elle
+     * en dit un ; sans rien qui le désigne, un geste de la réponse précédente ou de ce tour seulement.
      */
     private static List<Done> matching(Said said, List<Done> done, Set<String> systems) {
         if (done.isEmpty()) return List.of();
         Set<Thing> things = thingsIn(said.clause());
         Set<String> named = systemsIn(said.clause(), systems);
-        List<String> keys = keysIn(said.clause());
+        Designation designation = designation(said, systems);
         List<Done> matching = new ArrayList<>();
         for (Done act : done) {
             if (!backs(kindsOf(act.tool()), said.kind())) continue;
             if (!things.isEmpty() && !things.contains(thingOf(act.tool()))) continue;
             if (!named.isEmpty() && named.stream().noneMatch(system -> system.equalsIgnoreCase(act.where()))) continue;
-            String output = act.output() == null ? "" : act.output().toUpperCase(Locale.ROOT);
-            if (!keys.isEmpty() && keys.stream().noneMatch(output::contains)) continue;
+            if (designation.any() ? !designates(designation, act) : !act.recent()) continue;
             matching.add(act);
         }
         return matching;
+    }
+
+    /**
+     * Ce qui désigne une chose dans une proposition : une clé (« API-12 »), un titre cité, ou ses mots, un nom (« le projet
+     * Marketing », « the Marketing project ») ou ce dont elle parle (« l'issue pour le bug du paiement ») ; rien pour « le
+     * projet », « it », « je l'ai créé ». Le lieu (« dans TaskForce ») ne désigne pas la chose.
+     */
+    private record Designation(List<String> keys, List<String> titles, List<String> words) {
+        boolean any() {
+            return !keys.isEmpty() || !titles.isEmpty() || !words.isEmpty();
+        }
+    }
+
+    private static final Pattern THING_WORD = Pattern.compile("\\b(?:issues?|cards?|tickets?|tasks?|bugs?|cartes?|"
+        + "t[âa]ches?|projects?|projets?|comments?|commentaires?|notes?)\\b", FLAGS);
+    private static final Pattern QUOTED = Pattern.compile("«\\s*([^»]{2,}?)\\s*»|\"([^\"]{2,})\"|“([^”]{2,})”");
+    /** Ce qui dit de quoi parle une chose : « l'issue pour le bug », « the issue about login ». */
+    private static final Set<String> DESCRIBED = Set.of("for", "about", "regarding", "named", "called", "titled", "pour",
+        "concernant", "nomme", "nommee", "appele", "appelee", "intitule", "intitulee");
+    /** Ce qui situe une chose plutôt que la nommer : « le projet dans TaskForce ». */
+    private static final Set<String> PLACED = Set.of("dans", "in", "into", "sur", "on", "chez", "at");
+    private static final Set<String> FILLERS = Set.of("the", "a", "an", "le", "la", "les", "l", "un", "une", "des", "du",
+        "de", "d", "of", "to", "and", "et", "with", "avec", "this", "that", "ce", "cet", "cette", "ces", "son", "sa", "ses",
+        "its", "their", "leur", "leurs", "mon", "ma", "mes", "my", "your", "our", "votre", "notre", "q", "aucun", "aucune",
+        "no", "any", "some", "every", "each", "all", "tout", "tous", "toute", "toutes", "chaque", "nul", "nulle", "ni", "n");
+
+    private static Designation designation(Said said, Set<String> systems) {
+        List<String> titles = new ArrayList<>();
+        Matcher quoted = QUOTED.matcher(said.sentence());
+        while (quoted.find()) {
+            for (int g = 1; g <= 3; g++) {
+                if (quoted.group(g) != null && !quoted.group(g).isBlank()) titles.add(TargetSystems.plain(quoted.group(g)).strip());
+            }
+        }
+        List<String> words = new ArrayList<>();
+        Matcher thing = THING_WORD.matcher(said.clause());
+        if (thing.find()) {
+            // Avant la chose, en anglais : « the Marketing project ».
+            String[] before = said.clause().substring(0, thing.start()).split("[^\\p{L}\\p{N}]+");
+            for (int i = before.length - 1; i >= 0; i--) {
+                String token = before[i];
+                if (token.isEmpty() || isSystem(token, systems)) continue;
+                if (FILLERS.contains(TargetSystems.plain(token)) || !isName(token)) break;
+                words.add(TargetSystems.plain(token));
+            }
+            // Après elle : « le projet Marketing », « the issue for the payment bug ».
+            boolean described = false;
+            boolean placed = false;
+            for (String token : said.clause().substring(thing.end()).split("[^\\p{L}\\p{N}]+")) {
+                if (token.isEmpty()) continue;
+                String plain = TargetSystems.plain(token);
+                if (isSystem(token, systems)) continue;
+                if (PLACED.contains(plain)) {
+                    placed = true;
+                    continue;
+                }
+                if (DESCRIBED.contains(plain)) {
+                    described = true;
+                    placed = false;
+                    continue;
+                }
+                if (FILLERS.contains(plain) || THING_WORD.matcher(token).matches()) continue;
+                if (placed && isName(token)) continue;
+                placed = false;
+                if (isName(token) || described && plain.length() >= 3) {
+                    words.add(plain);
+                    continue;
+                }
+                break;
+            }
+        }
+        return new Designation(keysIn(said.clause()), titles, words);
+    }
+
+    /** Un nom plutôt qu'un mot : une majuscule, ou un chiffre (« Marketing », « TESTTASKFO », « Q4 »). */
+    private static boolean isName(String token) {
+        return token.length() >= 2 && (Character.isUpperCase(token.charAt(0)) || token.chars().anyMatch(Character::isDigit));
+    }
+
+    private static boolean isSystem(String token, Set<String> systems) {
+        String plain = TargetSystems.plain(token);
+        return systems.stream().anyMatch(system -> system != null && TargetSystems.plain(system).equals(plain));
+    }
+
+    /** Ce que la phrase désigne est-il ce geste : sa clé, son titre ou un de ses mots, dans ses arguments ou ce qu'il a rendu. */
+    private static boolean designates(Designation said, Done act) {
+        String identity = TargetSystems.plain((act.output() == null ? "" : act.output()) + " "
+            + (act.arguments() == null ? "" : act.arguments()));
+        if (!said.keys().isEmpty()) {
+            String upper = identity.toUpperCase(Locale.ROOT);
+            return said.keys().stream().anyMatch(upper::contains);
+        }
+        if (!said.titles().isEmpty()) return said.titles().stream().anyMatch(identity::contains);
+        Set<String> tokens = Set.copyOf(List.of(identity.split("[^\\p{L}\\p{N}]+")));
+        return said.words().stream().anyMatch(tokens::contains);
     }
 
     /**
@@ -742,7 +848,7 @@ public final class ActionClaimCheck {
             if ("success".equals(call.status()) && !kindsOf(call.tool()).isEmpty()) {
                 String connector = TargetSystems.connectorOf(call.tool());
                 done.add(new Done(call.tool(), connector == null ? TargetSystems.TASKFORCE : TargetSystems.plainName(connector),
-                    call.output()));
+                    call.output(), null, true));
             }
         }
         return done;
