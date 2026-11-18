@@ -2502,6 +2502,11 @@ export const CONSTANTS_EN = {
     taskforceSaysConnectionsWhat: "about the tool you named",
     taskforceSaysConnectionsLabel: "TaskForce about your connections",
     taskforceSaysConnectionsHint: "TaskForce checked the tool you named in your request: whether Cortex can act there, and what to do if it can't. These are not the model's words.",
+    // R204, R159: next to a sentence of Cortex about an earlier action that TaskForce couldn't tie to one for sure, what
+    // this conversation really did. Cortex's sentence stays as it was: this is not a correction.
+    taskforceSaysRecordWhat: "what this conversation did",
+    taskforceSaysRecordLabel: "TaskForce on what this conversation did",
+    taskforceSaysRecordHint: "Cortex spoke of an earlier action. TaskForce left its words as they were and shows, next to them, what this conversation really did, and where: these are not the model's words.",
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
     issueCardTitle: "New issue, prepared by Cortex",
     issueCardHint: "Filled from your request and the project",

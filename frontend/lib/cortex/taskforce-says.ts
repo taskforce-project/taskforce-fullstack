@@ -12,8 +12,11 @@
  * Un bloc signé « TaskForce · done » corrige une phrase qui niait une action faite dans la conversation (R204) : il dit
  * ce qui a été fait, et où. Un bloc signé « TaskForce · connections » dit que l'outil que la demande nomme n'est pas
  * connecté, ou l'est en lecture seule, et comment y remédier (R204, R201) : ce n'est pas une correction.
+ * Un bloc signé « TaskForce · record » dit ce que la conversation a fait, à côté d'une phrase de Cortex sur un geste
+ * d'avant que TaskForce n'a pas pu rattacher à coup sûr : la phrase reste telle quelle, ce n'est pas une correction
+ * (second tour de la relecture R159 de la PR #548).
  */
-export type AnswerKind = "models" | "asks" | "done" | "connections"
+export type AnswerKind = "models" | "asks" | "done" | "connections" | "record"
 
 export type AnswerPart =
   | { by: "cortex"; text: string }
@@ -25,12 +28,14 @@ const ABOUT_MODELS = /·\s*models\s*$/i
 const ASKS = /·\s*asks\s*$/i
 const DONE = /·\s*done\s*$/i
 const CONNECTIONS = /·\s*connections\s*$/i
+const RECORD = /·\s*record\s*$/i
 
 function kindOf(signature: string): AnswerKind | undefined {
   if (ABOUT_MODELS.test(signature)) return "models"
   if (ASKS.test(signature)) return "asks"
   if (DONE.test(signature)) return "done"
   if (CONNECTIONS.test(signature)) return "connections"
+  if (RECORD.test(signature)) return "record"
   return undefined
 }
 

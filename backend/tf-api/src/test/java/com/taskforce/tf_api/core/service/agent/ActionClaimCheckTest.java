@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Checked;
 import com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done;
@@ -412,34 +413,48 @@ class ActionClaimCheckTest {
     }
 
     @Test
-    @DisplayName("R159 (2) : l'issue créée plus tôt n'appuie pas l'annonce d'une autre ; la sienne, oui")
+    @DisplayName("R159 (2) : l'issue créée plus tôt n'appuie pas l'annonce de celle que la demande demande ; la sienne, oui")
     void an_earlier_issue_does_not_back_another_one() {
         Done api12 = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".");
 
-        assertThat(ActionClaimCheck.check("I created the issue for the payment bug.", List.of(), List.of(api12), SYSTEMS)
-            .claims()).hasSize(1);
+        // La demande en cours demande une autre issue, et rien de ce tour ne l'a créée : R116 corrige.
+        assertThat(ActionClaimCheck.check("I created the issue for the payment bug.", List.of(), List.of(api12), SYSTEMS,
+            "Create an issue for the payment bug").claims()).hasSize(1);
+        assertThat(ActionClaimCheck.check("J'ai créé l'issue.", List.of(), List.of(api12), SYSTEMS,
+            "Crée une issue pour le bug du paiement").claims()).hasSize(1);
         assertThat(ActionClaimCheck.check("I created API-12.", List.of(), List.of(api12), SYSTEMS).corrected()).isFalse();
         assertThat(ActionClaimCheck.check("I created the issue for the login fix.", List.of(), List.of(api12), SYSTEMS)
             .corrected()).isFalse();
+        // Second tour : sans la demande, « pour le bug du paiement » ne désigne pas nettement une autre issue ; la phrase
+        // reste, et TaskForce dit à côté ce que la conversation a fait.
+        Checked unsure = ActionClaimCheck.check("I created the issue for the payment bug.", List.of(), List.of(api12),
+            SYSTEMS);
+        assertThat(unsure.corrected()).isFalse();
+        assertThat(unsure.answer()).startsWith("I created the issue for the payment bug.")
+            .contains(ActionClaimCheck.RECORD_SIGNATURE).contains("API-12");
     }
 
     // -------------------------------------------------------------------------
     // Relecture R159 de la PR #548 (3) : une phrase vraie sur une nouvelle demande n'est pas corrigée
     // -------------------------------------------------------------------------
 
-    @ParameterizedTest(name = "« {0} », le projet TESTTASKFO créé au tour d'avant : corrigée {1}")
-    @CsvSource(delimiter = '|', value = {
-        // Une autre chose que celle de la conversation : une nouvelle, un doublon.
-        "Je n'ai pas encore créé le nouveau projet.        | false",
-        "Je n'ai pas créé de nouveau projet.               | false",
-        "I haven't created the new project yet.            | false",
-        "Je n'ai pas créé de doublon du projet.            | false",
-        "I didn't create a duplicate project.              | false",
-        // Le projet de la conversation, nié : corrigé, comme à la recette.
-        "Je n'ai pas créé de projet.                       | true",
+    @ParameterizedTest(name = "« {0} », à « {1} », le projet TESTTASKFO créé au tour d'avant : corrigée {2}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        // Une autre chose que celle de la conversation : la nouvelle que la demande en cours demande, un doublon.
+        "Je n'ai pas encore créé le nouveau projet.        | Crée-moi un nouveau projet        | false",
+        "Je n'ai pas créé de nouveau projet.               | Et un autre projet ?              | false",
+        "I haven't created the new project yet.            | Create a new project for the demo | false",
+        "Je n'ai pas créé de doublon du projet.            | -                                 | false",
+        "I didn't create a duplicate project.              | -                                 | false",
+        // Le projet de la conversation, nié : corrigé, comme à la recette, « nouveau » compris quand rien n'en demande un
+        // (second tour de la relecture R159).
+        "Je n'ai pas créé de projet.                       | -                                 | true",
+        "Je n'ai pas encore créé le nouveau projet.        | Merci !                           | true",
+        "Je n'ai pas créé de nouveau projet.               | Tu l'as creer ou ? Je le vois pas dans linear | true",
     })
-    void a_denial_of_another_thing_than_the_conversation_s_is_true(String sentence, boolean corrected) {
-        assertThat(ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS).corrected()).isEqualTo(corrected);
+    void a_denial_of_another_thing_than_the_conversation_s_is_true(String sentence, String request, boolean corrected) {
+        assertThat(ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS, request).corrected())
+            .isEqualTo(corrected);
     }
 
     @Test
@@ -475,5 +490,117 @@ class ActionClaimCheckTest {
         // Un mot courant ne nomme un outil qu'après un lieu : « to close the sprint » ne parle pas de Close.
         assertThat(ActionClaimCheck.check("I created the project to close the sprint.", List.of(), List.of(CREATED), Set.of())
             .corrected()).isFalse();
+    }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548, second tour (A, B) : une phrase vraie n'est jamais corrigée, une négation nette l'est
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "« {0} », TESTTASKFO créé à la réponse précédente : la phrase reste")
+    @ValueSource(strings = {
+        "J'ai créé le projet pour vous dans TaskForce.",
+        "I created the project for you.",
+        "Ton projet a été créé.",
+        "Ton projet est bien créé dans TaskForce.",
+        "Tes projets ont été créés.",
+        "J'ai bien créé le projet pour la démo.",
+        "J'ai créé le projet pour l'équipe Core.",
+        "J'ai créé le projet comme demandé.",
+    })
+    void a_true_sentence_about_the_previous_answer_is_never_corrected(String sentence) {
+        Checked checked = ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS);
+
+        assertThat(checked.corrected()).isFalse();
+        assertThat(checked.answer()).startsWith(sentence).doesNotContain("Nothing was created");
+    }
+
+    @ParameterizedTest(name = "« {0} », TESTTASKFO créé à la réponse précédente : la négation est corrigée")
+    @ValueSource(strings = {
+        "Je n'ai pas créé de nouveau projet, car vous ne m'avez pas donné de nom.",
+        "Je n'ai pas créé de projet pour vous car vous ne m'avez pas donné de nom.",
+        "Je n'ai pas créé le projet pour toi.",
+        "I haven't created a new project yet.",
+    })
+    void the_closest_variants_of_the_s17_denial_are_corrected(String sentence) {
+        Checked checked = ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS);
+
+        assertThat(checked.denied()).isTrue();
+        assertThat(checked.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).contains("TESTTASKFO");
+    }
+
+    @Test
+    @DisplayName("R159, second tour (A) : une phrase incertaine reste telle quelle ; à côté, TaskForce dit ce que la conversation a fait")
+    void an_unsure_sentence_stays_with_what_the_conversation_did() {
+        Checked checked = ActionClaimCheck.check("J'ai bien créé le projet pour la démo. Autre chose ?", List.of(),
+            List.of(CREATED), SYSTEMS);
+
+        assertThat(checked.answer()).isEqualTo("J'ai bien créé le projet pour la démo. Autre chose ?\n\n"
+            + ActionClaimCheck.RECORD_SIGNATURE
+            + "\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\".");
+        assertThat(checked.corrected()).isFalse();
+        assertThat(checked.recorded()).singleElement().asString().contains("TESTTASKFO");
+        // Le geste a ses mots dans la phrase : elle dit vrai, rien à ajouter.
+        assertThat(ActionClaimCheck.check("J'ai créé le projet pour le test.", List.of(), List.of(CREATED),
+            SYSTEMS).answer()).isEqualTo("J'ai créé le projet pour le test.");
+    }
+
+    @Test
+    @DisplayName("R159, second tour (A) : un geste plus ancien que la réponse précédente n'appuie ni ne contredit sans être désigné ; la phrase reste")
+    void an_older_act_neither_backs_nor_contradicts_an_undesignated_sentence() {
+        Done older = new Done("create_project", "TaskForce", CREATED.output(), null, false);
+
+        Checked said = ActionClaimCheck.check("J'ai créé le projet.", List.of(), List.of(older), SYSTEMS);
+        Checked denied = ActionClaimCheck.check("Je n'ai pas créé de projet.", List.of(), List.of(older), SYSTEMS);
+
+        assertThat(said.corrected()).isFalse();
+        assertThat(said.answer()).startsWith("J'ai créé le projet.").contains(ActionClaimCheck.RECORD_SIGNATURE);
+        assertThat(denied.corrected()).isFalse();
+        assertThat(denied.answer()).startsWith("Je n'ai pas créé de projet.").contains(ActionClaimCheck.RECORD_SIGNATURE);
+        // Désigné par son nom, il appuie ou contredit nettement.
+        assertThat(ActionClaimCheck.check("J'ai créé le projet TESTTASKFO.", List.of(), List.of(older), SYSTEMS).answer())
+            .isEqualTo("J'ai créé le projet TESTTASKFO.");
+        assertThat(ActionClaimCheck.check("Je n'ai pas créé le projet TESTTASKFO.", List.of(), List.of(older), SYSTEMS)
+            .denied()).isTrue();
+    }
+
+    @Test
+    @DisplayName("R159, second tour (3) : ce que la demande en cours demande ne se nie pas des tours d'avant ; seul ce tour le contredit")
+    void a_denial_about_what_the_request_asks_speaks_of_this_turn() {
+        Done api12 = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".");
+        String said = "Je n'ai pas encore créé l'issue. Dans quel projet la mettre ?";
+        String request = "Crée une issue pour le bug du paiement";
+
+        Checked checked = ActionClaimCheck.check(said, List.of(), List.of(api12), SYSTEMS, request);
+
+        assertThat(checked.corrected()).isFalse();
+        assertThat(checked.answer()).isEqualTo(said);
+        // Ce tour l'a créée : la négation est fausse.
+        List<Ran> created = List.of(new Ran("create_issue", "success", "Issue created: API-13 \"Payment bug\"."));
+        assertThat(ActionClaimCheck.check("Je n'ai pas créé l'issue.", created, List.of(api12), SYSTEMS, request).denied())
+            .isTrue();
+        // Une demande qui ne demande pas ce geste ne change rien : la réponse qui suit API-12 le nie.
+        assertThat(ActionClaimCheck.check(said, List.of(), List.of(api12), SYSTEMS, "Merci").denied()).isTrue();
+    }
+
+    @Test
+    @DisplayName("R159, second tour : « déjà » renvoie au geste d'avant, pas à la demande en cours ; R116 ne le corrige pas")
+    void already_speaks_of_the_earlier_act() {
+        assertThat(ActionClaimCheck.check("Le projet a déjà été créé.", List.of(), List.of(CREATED), SYSTEMS,
+            "Crée le projet").corrected()).isFalse();
+        assertThat(ActionClaimCheck.check("The project has already been created.", List.of(), List.of(CREATED), SYSTEMS,
+            "Create the project").corrected()).isFalse();
+        // Sans « déjà », c'est l'annonce de ce que la demande demande, et rien de ce tour ne l'a fait.
+        assertThat(ActionClaimCheck.check("Le projet a été créé.", List.of(), List.of(CREATED), SYSTEMS,
+            "Crée un projet Marketing").claims()).hasSize(1);
+    }
+
+    @ParameterizedTest(name = "« {0} » nomme une autre chose que TESTTASKFO : corrigée par R116")
+    @ValueSource(strings = {
+        "J'ai créé le projet appelé Marketing.",
+        "I created the project named Marketing.",
+        "Le projet Marketing a été créé pour vous.",
+    })
+    void a_proper_name_still_contradicts(String sentence) {
+        assertThat(ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS).claims()).hasSize(1);
     }
 }

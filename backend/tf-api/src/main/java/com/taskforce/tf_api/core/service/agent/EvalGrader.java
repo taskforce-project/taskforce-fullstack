@@ -29,6 +29,14 @@ public final class EvalGrader {
     }
 
     public static Grade grade(EvalCriteria criteria, ReplayOutcome outcome) {
+        return grade(criteria, outcome, null);
+    }
+
+    /**
+     * La même note, avec la question du cas : une phrase sur ce qu'elle demande parle d'elle, pas des tours d'avant, comme
+     * dans une conversation (second tour de la relecture R159 de la PR #548).
+     */
+    public static Grade grade(EvalCriteria criteria, ReplayOutcome outcome, String question) {
         List<Check> checks = new ArrayList<>();
         List<ReplayOutcome.ReplayCall> calls = outcome.calls();
         String answer = outcome.answer() == null ? "" : outcome.answer();
@@ -70,16 +78,17 @@ public final class EvalGrader {
             // annonces.
             checks.add(new Check("gives an answer", !answer.isBlank(), excerpt(answer)));
             // Ce que les tours d'avant du cas ont fait appuie une phrase qui le dit fait (R204).
-            List<ActionClaimCheck.Claim> claims = ActionClaimCheck.unbacked(answer, calls.stream()
-                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList(), outcome.thread(), Set.of());
+            List<ActionClaimCheck.Ran> ran = calls.stream()
+                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
+            List<ActionClaimCheck.Claim> claims = ActionClaimCheck.unbacked(answer, ran, outcome.thread(), Set.of(), question);
             checks.add(new Check("claims no action that no tool did", claims.isEmpty(), claims.isEmpty()
                 ? excerpt(answer)
                 : "claims: " + claims.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));
             // R204 : un cas qui a des tours d'avant ne nie pas ce qu'ils ont fait ; noté sur ce que le modèle a répondu, pas
             // sur ce que la correction a remplacé (relecture R159 de la PR #548).
             if (!outcome.thread().isEmpty()) {
-                List<ActionClaimCheck.Claim> denials = ActionClaimCheck.denied(outcome.said(), calls.stream()
-                    .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList(), outcome.thread(), Set.of());
+                List<ActionClaimCheck.Claim> denials = ActionClaimCheck.denied(outcome.said(), ran, outcome.thread(), Set.of(),
+                    question);
                 checks.add(new Check("denies no action that was done", denials.isEmpty(), denials.isEmpty()
                     ? excerpt(answer)
                     : "denies: " + denials.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));

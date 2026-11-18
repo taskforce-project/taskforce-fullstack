@@ -526,9 +526,10 @@ public class AgentService {
                 ws.getName(), gaps), toolCalls);
             // R116 : une phrase qui annonce une action sans son résultat d'outil est remplacée par la vérité, signée par
             // TaskForce, et l'incident entre au dossier de la réponse (E17). R204 : une phrase qui nie une action faite
-            // dans la conversation, ou dans ce tour, l'est aussi.
+            // dans la conversation, ou dans ce tour, l'est aussi. La demande en cours dit de quoi parle une phrase sur ce
+            // qu'elle demande ; une phrase incertaine reste, avec à côté ce que la conversation a fait (relecture R159).
             ActionClaimCheck.Checked checked = ActionClaimCheck.check(modelAnswer, ActionClaimCheck.Ran.of(toolCalls),
-                threadDone(ctx), systemsOf(ctx));
+                threadDone(ctx), systemsOf(ctx), message);
             String record = toolCalls.stream().map(AssistantToolCall::record).filter(Objects::nonNull).findFirst().orElse(null);
             if (!checked.corrected()) {
                 steps.set(steps.size() - 1, new AssistantStep(STEP_ANSWER, "done", toolsDescription(toolCalls)));
@@ -1169,8 +1170,8 @@ public class AgentService {
             // R116, R204 : la banque note la réponse que la personne verrait, corrigée par TaskForce.
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
-            return new ReplayOutcome(withGaps(ActionClaimCheck.check(answer, ran, thread, Set.of()).answer(), gaps), step.calls,
-                llm.currentModel(), llm.currentUsage(), thread, answer);
+            return new ReplayOutcome(withGaps(ActionClaimCheck.check(answer, ran, thread, Set.of(), question).answer(), gaps),
+                step.calls, llm.currentModel(), llm.currentUsage(), thread, answer);
         } finally {
             llm.endUsageCapture();
         }

@@ -148,16 +148,56 @@ final class Intent {
     }
 
     /**
+     * Le verbe d'écriture de chaque proposition qui écrit, sans accents (« cree », « supprime », « add ») : ce que la
+     * demande en cours demande de faire (second tour de la relecture R159 de la PR #548).
+     */
+    static List<String> writeVerbs(String request) {
+        List<String> verbs = new ArrayList<>();
+        for (Clause clause : clauses(request)) {
+            if (clause.does() != Does.WRITE) continue;
+            List<String> words = words(clause.text());
+            int at = writeAt(words);
+            if (at >= 0) verbs.add(words.get(at));
+        }
+        return verbs;
+    }
+
+    /** Ce qui en veut une de plus sans verbe : « Et un autre projet ? », « un nouveau, stp ». */
+    private static final Set<String> MORE = Set.of("autre", "autres", "another", "other", "nouveau", "nouvelle", "nouveaux",
+        "nouvelles", "nouvel", "new", "encore", "more");
+
+    /**
+     * Une demande sans verbe qui en veut une de plus (« Et un autre projet ? ») : elle demande d'en créer une. Pas une
+     * question (« Quels sont les nouveaux projets ? »), ni une lecture (« montre les nouveaux projets »).
+     */
+    static boolean asksForMore(String request) {
+        List<String> words = words(request == null ? "" : request);
+        if (words.isEmpty() || QUESTIONS.contains(words.get(0))) return false;
+        return words.stream().noneMatch(Intent::isVerb) && words.stream().anyMatch(MORE::contains);
+    }
+
+    /** Les mots d'un morceau, sans accents ni ponctuation. */
+    private static List<String> words(String piece) {
+        List<String> words = new ArrayList<>();
+        for (String token : TargetSystems.plain(piece).split("[^\\p{L}\\p{N}]+")) if (!token.isEmpty()) words.add(token);
+        return words;
+    }
+
+    /** La place du premier verbe d'écriture qui demande, dans ces mots ; -1 sans lui. */
+    private static int writeAt(List<String> words) {
+        for (int i = 0; i < words.size(); i++) {
+            if (WRITES.contains(words.get(i)) && writesAt(words, i)) return i;
+        }
+        return -1;
+    }
+
+    /**
      * Ce que fait un morceau : écrire, lire, rien (un constat, par sa copule) ; null pour un morceau sans verbe ni question,
      * un participe seul compris, qui décrit ce qu'écrit la proposition d'avant.
      */
     static Does does(String piece, boolean question) {
-        String[] tokens = TargetSystems.plain(piece).split("[^\\p{L}\\p{N}]+");
-        List<String> words = new ArrayList<>();
-        for (String token : tokens) if (!token.isEmpty()) words.add(token);
-        for (int i = 0; i < words.size(); i++) {
-            if (WRITES.contains(words.get(i)) && writesAt(words, i)) return Does.WRITE;
-        }
+        List<String> words = words(piece);
+        if (writeAt(words) >= 0) return Does.WRITE;
         boolean reads = question || !words.isEmpty() && QUESTIONS.contains(words.get(0));
         for (int i = 0; i < words.size() && !reads; i++) {
             reads = READS.contains(words.get(i)) && (i == 0 || !DETERMINERS.contains(words.get(i - 1)));

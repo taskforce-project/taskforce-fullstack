@@ -63,4 +63,25 @@ class IntentTest {
         assertThat(Intent.clauses("Merged on GitHub, move TF-12 to Done")).extracting(Intent.Clause::does)
             .containsExactly(Intent.Does.NOTHING, Intent.Does.WRITE);
     }
+
+    @Test
+    @DisplayName("R159, second tour : le verbe de chaque proposition qui écrit dit ce que la demande en cours demande")
+    void the_write_verbs_say_what_the_request_asks() {
+        assertThat(Intent.writeVerbs("Crée une issue pour le bug du paiement et assigne-la à Marie"))
+            .containsExactly("cree", "assigne");
+        assertThat(Intent.writeVerbs("C'est mergé sur GitHub, passe TF-12 en Done")).containsExactly("passe");
+        assertThat(Intent.writeVerbs("Tu l'as creer ou ? Je le vois pas dans linear")).isEmpty();
+    }
+
+    @ParameterizedTest(name = "« {0} » en demande une de plus : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "Et un autre projet ?                       | true",
+        "Un nouveau projet, stp                     | true",
+        "Quels sont les nouveaux projets ?          | false",
+        "Montre-moi les nouveaux projets            | false",
+        "Merci !                                    | false",
+    })
+    void a_request_without_a_verb_may_ask_for_one_more(String request, boolean more) {
+        assertThat(Intent.asksForMore(request)).isEqualTo(more);
+    }
 }

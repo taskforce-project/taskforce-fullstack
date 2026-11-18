@@ -60,6 +60,17 @@ describe("AnswerText : ce que TaskForce dit se voit comme sa parole (R116)", () 
     expect(note).toHaveTextContent("Linear is connected for reading only")
   })
 
+  it("shows what the conversation did next to Cortex's sentence, which stays, as no correction (R159)", () => {
+    render(<AnswerText text={"J'ai bien créé le projet pour la démo.\n\n> [!taskforce] TaskForce · record\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO."} />)
+
+    const note = screen.getByRole("note", { name: t.taskforceSaysRecordLabel })
+    expect(note).toHaveAttribute("title", t.taskforceSaysRecordHint)
+    expect(note).toHaveTextContent(t.taskforceSaysRecordWhat)
+    expect(note).not.toHaveTextContent(t.taskforceSaysWhat)
+    expect(note).toHaveTextContent("This was created in this conversation, in TaskForce: Project created: TESTTASKFO.")
+    expect(screen.getByText("J'ai bien créé le projet pour la démo.")).toBeInTheDocument()
+  })
+
   it("renders an answer without a correction as Cortex's markdown only", () => {
     render(<AnswerText text={"TESTTA-2 is in **In review by AI**."} />)
 

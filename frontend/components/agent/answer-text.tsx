@@ -50,7 +50,9 @@ export function TaskForceSays({ lines, kind, children }: Readonly<{
       ? { label: t.taskforceSaysLabel, hint: t.taskforceSaysDoneHint, what: t.taskforceSaysDoneWhat }
       : kind === "connections"
         ? { label: t.taskforceSaysConnectionsLabel, hint: t.taskforceSaysConnectionsHint, what: t.taskforceSaysConnectionsWhat }
-        : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
+        : kind === "record"
+          ? { label: t.taskforceSaysRecordLabel, hint: t.taskforceSaysRecordHint, what: t.taskforceSaysRecordWhat }
+          : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
   return (
     <div
       role="note"

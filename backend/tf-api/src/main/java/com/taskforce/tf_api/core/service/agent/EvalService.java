@@ -354,7 +354,8 @@ public class EvalService {
             throw ModelRunFailure.of(model, down, "Replay it again, or replay another model.");
         }
         recordUsage(ws.getId(), outcome.usage());
-        EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome);
+        EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome,
+            evalCase.getQuestion());
         Details details = new Details(grade.checks(), outcome.calls(), shorten(outcome.answer(), MAX_ANSWER), outcome.model());
         EvalResult saved;
         try {

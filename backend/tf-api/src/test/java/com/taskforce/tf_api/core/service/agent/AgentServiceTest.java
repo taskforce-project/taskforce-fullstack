@@ -3169,4 +3169,20 @@ class AgentServiceTest {
         assertThat(system.contains(IssueMaterial.EARLIER)).isEqualTo(takes);
         assertThat(asked.contains("[This message is about API-3")).isEqualTo(takes);
     }
+
+    @Test
+    @DisplayName("R159, second tour (3) : une négation sur ce que la demande en cours demande ne nie rien du fil")
+    void a_denial_about_what_the_request_asks_denies_nothing_of_the_thread() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(new ActionClaimCheck.Done("create_issue", "TaskForce",
+            "Issue created: API-12 \"Fix login\".")));
+        String said = "Je n'ai pas encore créé l'issue. Dans quel projet la mettre ?";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Crée une issue pour le bug du paiement",
+            TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).isEqualTo(said);
+    }
 }

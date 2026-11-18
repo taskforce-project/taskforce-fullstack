@@ -78,6 +78,14 @@ describe("splitAnswer : ce que Cortex écrit, ce que TaskForce dit (R116)", () =
     ])
   })
 
+  it("reads what the conversation did next to a sentence that stays, apart from a correction (R159)", () => {
+    const answer = "J'ai bien créé le projet pour la démo.\n\n> [!taskforce] TaskForce · record\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."
+    expect(splitAnswer(answer)).toEqual([
+      { by: "cortex", text: "J'ai bien créé le projet pour la démo." },
+      { by: "taskforce", lines: ["This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."], kind: "record" },
+    ])
+  })
+
   it("gives nothing for an empty answer", () => {
     expect(splitAnswer("")).toEqual([])
   })
