@@ -220,6 +220,18 @@ public final class ActionClaimCheck {
             true).claims();
     }
 
+    /** Le texte sans les blocs signés par TaskForce : les mots du modèle seuls (relecture R159). */
+    public static String withoutTaskForce(String text) {
+        if (text == null || text.isEmpty()) return "";
+        List<String> kept = new ArrayList<>();
+        boolean block = false;
+        for (String line : text.replace("\r\n", "\n").split("\n", -1)) {
+            block = SIGNED.matcher(line).find() || block && line.strip().startsWith(">");
+            if (!block) kept.add(line);
+        }
+        return tidy(kept);
+    }
+
     /** Le texte d'un passage, son bloc de TaskForce à la place de la première phrase retirée. */
     private static String withBlock(Scan scan, String signature, List<String> truths) {
         List<String> lines = new ArrayList<>(scan.lines());

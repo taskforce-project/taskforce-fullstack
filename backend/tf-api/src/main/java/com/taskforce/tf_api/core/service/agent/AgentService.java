@@ -1132,13 +1132,22 @@ public class AgentService {
                 "assistant".equals(turn.role()) ? ThreadActs.withActs(turn.content(), turn.acts(), targets::of)
                     : IssueMaterial.withSubjects(turn.content(), turn.subjects())))
             .toList();
-        // Les issues dont parle la question, telles que TaskForce les a lues, dites comme dans une réponse (R204).
-        List<ReplayContext.FrozenIssue> issues = context.attached();
-        boolean earlier = !issues.isEmpty() && issues.stream().allMatch(ReplayContext.FrozenIssue::earlier);
+        // Les issues dont parle la question, telles que TaskForce les a lues, dites comme dans une réponse (R204) ; l'issue
+        // d'avant revient par la même règle que dans une conversation (relecture R159) : la question la désigne sans joindre
+        // ni nommer d'issue, et la dernière demande qui en parlait est dans l'historique du cas.
+        String question = replayCase.question();
+        List<ReplayContext.FrozenIssue> frozen = context.attached();
+        List<ReplayContext.FrozenIssue> attachedNow = frozen.stream().filter(issue -> !issue.earlier()).toList();
+        List<String> keysAsked = IssueMaterial.keysIn(question);
+        boolean named = frozen.stream().anyMatch(issue -> keysAsked.contains(issue.key().toUpperCase(Locale.ROOT)));
+        String last = lastSubjectOf(context.history());
+        ReplayContext.FrozenIssue again = last == null || !takesTheEarlierSubject(question, !attachedNow.isEmpty(), false,
+            false, named) ? null : frozen.stream().filter(issue -> issue.key().equalsIgnoreCase(last)).findFirst().orElse(null);
+        boolean earlier = again != null;
+        List<ReplayContext.FrozenIssue> issues = earlier ? List.of(again) : attachedNow;
         String seen = issues.isEmpty() ? "" : (earlier ? IssueMaterial.EARLIER : IssueMaterial.ATTACHED)
             + issues.stream().map(ReplayContext.FrozenIssue::material).collect(Collectors.joining());
-        String asked = replayCase.question()
-            + subjectLine(issues.stream().map(ReplayContext.FrozenIssue::key).toList(), earlier);
+        String asked = question + subjectLine(issues.stream().map(ReplayContext.FrozenIssue::key).toList(), earlier);
         // Les outils connectés du cas, figés, choisis par le même code qu'une réponse (R204) : jamais exécutés.
         List<AgentTool> connected = context.external().stream().map(this::frozen).toList();
         List<AgentTool> external = relevantExternal(connected, replayCase.question());
@@ -1161,10 +1170,19 @@ public class AgentService {
             List<ActionClaimCheck.Ran> ran = step.calls.stream()
                 .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
             return new ReplayOutcome(withGaps(ActionClaimCheck.check(answer, ran, thread, Set.of()).answer(), gaps), step.calls,
-                llm.currentModel(), llm.currentUsage(), thread);
+                llm.currentModel(), llm.currentUsage(), thread, answer);
         } finally {
             llm.endUsageCapture();
         }
+    }
+
+    /** La dernière issue dont parlait une demande des tours d'avant d'un cas ; null sans elle. */
+    private static String lastSubjectOf(List<ReplayContext.Turn> history) {
+        for (int i = history.size() - 1; i >= 0; i--) {
+            ReplayContext.Turn turn = history.get(i);
+            if ("user".equals(turn.role()) && !turn.subjects().isEmpty()) return turn.subjects().get(turn.subjects().size() - 1);
+        }
+        return null;
     }
 
     /**

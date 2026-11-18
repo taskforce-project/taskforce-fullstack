@@ -144,4 +144,22 @@ class EvalGraderTest {
 
         assertThat(grade.passed()).isTrue();
     }
+
+    @Test
+    @DisplayName("R159 (11) : la banque note la négation sur ce que le modèle a répondu, et ses mots sans ceux de TaskForce")
+    void the_bank_grades_what_the_model_said_itself() {
+        List<ActionClaimCheck.Done> thread = List.of(new ActionClaimCheck.Done("create_project", "TaskForce",
+            "Project created in TaskForce: TESTTASKFO \"Test Taskforce\"."));
+        String said = "Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom.";
+        String shown = ActionClaimCheck.check(said, List.of(), thread, java.util.Set.of()).answer();
+        EvalCriteria criteria = new EvalCriteria(null, null, null, null, List.of("TaskForce"), null, true);
+
+        EvalGrader.Grade grade = EvalGrader.grade(criteria, new ReplayOutcome(shown, List.of(), "qwen3.5:9b", LlmUsage.ZERO,
+            thread, said));
+
+        assertThat(shown).startsWith(ActionClaimCheck.DONE_SIGNATURE);
+        assertThat(grade.passed()).isFalse();
+        assertThat(grade.checks()).filteredOn(check -> !check.passed()).extracting(EvalGrader.Check::criterion)
+            .containsExactlyInAnyOrder("says \"TaskForce\"", "denies no action that was done");
+    }
 }

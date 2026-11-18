@@ -204,6 +204,15 @@ public class IssueMaterial {
         return subjectsByKeys(ctx, request, MAX_ISSUES);
     }
 
+    /** Les clés qu'écrit ce texte, sous leur forme d'issue (« ops 35 » se lit « OPS-35 ») : qu'elles existent ou non. */
+    public static List<String> keysIn(String text) {
+        List<String> keys = new ArrayList<>();
+        if (text == null) return keys;
+        Matcher key = KEY.matcher(text);
+        while (key.find()) keys.add(key.group(1).toUpperCase(Locale.ROOT) + "-" + Integer.valueOf(key.group(2)));
+        return keys;
+    }
+
     /** La demande a-t-elle la forme d'une clé (« OPS-35 », « ops 35 », « dans 2 ») ? Seule une clé qui existe en nomme une. */
     public static boolean mayNameAKey(String request) {
         return request != null && KEY.matcher(request).find();

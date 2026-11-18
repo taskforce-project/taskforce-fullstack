@@ -55,7 +55,9 @@ public final class EvalGrader {
             boolean absent = calls.stream().noneMatch(c -> c.tool().equals(forbidden));
             checks.add(new Check("does not call " + forbidden, absent, "called: " + called));
         }
-        String lower = answer.toLowerCase(Locale.ROOT);
+        // Les mots du modèle, sans ceux de TaskForce : un bloc de correction ne fait pas dire au modèle ce qu'il n'a pas dit
+        // (relecture R159 : le « TaskForce » qu'exige le cas 1 venait du bloc qui corrigeait sa négation).
+        String lower = ActionClaimCheck.withoutTaskForce(answer).toLowerCase(Locale.ROOT);
         for (String word : criteria.contains()) {
             checks.add(new Check("says \"" + word + "\"", lower.contains(word.toLowerCase(Locale.ROOT)), excerpt(answer)));
         }
@@ -73,9 +75,10 @@ public final class EvalGrader {
             checks.add(new Check("claims no action that no tool did", claims.isEmpty(), claims.isEmpty()
                 ? excerpt(answer)
                 : "claims: " + claims.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));
-            // R204 : un cas qui a des tours d'avant ne nie pas ce qu'ils ont fait.
+            // R204 : un cas qui a des tours d'avant ne nie pas ce qu'ils ont fait ; noté sur ce que le modèle a répondu, pas
+            // sur ce que la correction a remplacé (relecture R159 de la PR #548).
             if (!outcome.thread().isEmpty()) {
-                List<ActionClaimCheck.Claim> denials = ActionClaimCheck.denied(answer, calls.stream()
+                List<ActionClaimCheck.Claim> denials = ActionClaimCheck.denied(outcome.said(), calls.stream()
                     .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList(), outcome.thread(), Set.of());
                 checks.add(new Check("denies no action that was done", denials.isEmpty(), denials.isEmpty()
                     ? excerpt(answer)
