@@ -195,4 +195,22 @@ class TargetSystemsTest {
         assertThat(said.places()).extracting(TargetSystems.Named::name)
             .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
     }
+
+    @ParameterizedTest(name = "« {0} » : écrit dans {1}, lit ou écrit dans {2}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        // Second tour de la relecture R159 (E) : en anglais, un nom d'outil sans sa majuscule devant une chose est un
+        // adjectif ; en français, après la chose, il la nomme.
+        "Create an issue about the linear board layout                  | -         | -",
+        "Add a task for the linear scale of the chart                   | -         | -",
+        "Create a Linear issue for the login bug                        | Linear    | Linear",
+        "crée un ticket linear pour le bug du login                     | Linear    | Linear",
+    })
+    void an_english_adjective_names_no_tool_without_its_capital(String request, String targets, String places) {
+        TargetSystems.Said said = TARGETS.said(request);
+
+        assertThat(said.targets()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(targets == null ? List.of() : List.of(targets.trim().split(";")));
+        assertThat(said.places()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
+    }
 }

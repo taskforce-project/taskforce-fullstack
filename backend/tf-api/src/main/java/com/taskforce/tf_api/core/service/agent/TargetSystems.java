@@ -214,6 +214,9 @@ public class TargetSystems {
                 // Un mot courant (Notion, Make) ne nomme un outil cité ou objet qu'avec sa majuscule : « la notion de ».
                 if (COMMON_WORDS.contains(alias.alias()) && (role == Role.MENTION || role == Role.OBJECT)
                     && !capitalized(clause, m.start())) continue;
+                // En anglais, devant une chose et sans sa majuscule, un nom d'outil est un adjectif : « the linear board
+                // layout » (second tour de la relecture R159) ; après la chose, en français, il la nomme : « un ticket linear ».
+                if (role == Role.OBJECT && !capitalized(clause, m.start()) && adjective(said, m.start(), m.end())) continue;
                 found.add(new Mention(alias.tool(), m.start(), role));
             }
         }
@@ -223,6 +226,11 @@ public class TargetSystems {
 
     private static boolean capitalized(String clause, int at) {
         return at < clause.length() && Character.isUpperCase(clause.charAt(at));
+    }
+
+    /** Le nom est-il à la place d'un adjectif anglais : devant une chose (« linear board »), pas après elle ? */
+    private static boolean adjective(String said, int start, int end) {
+        return THING_AFTER.matcher(said.substring(end)).lookingAt() && !THING_BEFORE.matcher(said.substring(0, start)).find();
     }
 
     /** Ce qui fait un outil d'une proposition : sa place par rapport aux prépositions, aux choses et aux verbes. */
