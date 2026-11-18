@@ -125,8 +125,8 @@ class IntentTest {
     }
 
     @Test
-    @DisplayName("R159, troisième tour (N1) : une question ne demande d'écrire qu'explicitement ; « le nouveau » n'en demande pas un autre")
-    void a_question_asks_to_write_only_explicitly() {
+    @DisplayName("R159, troisième tour (N1) : une question au participe ne demande pas d'écrire ; « le nouveau » n'en demande pas un autre")
+    void a_question_with_a_participle_asks_nothing() {
         assertThat(Intent.writeVerbs("Tu peux me creer un nouveau projet dans Linear la ou pas ?")).containsExactly("creer");
         assertThat(Intent.writeVerbs("Est-ce que tu peux créer le projet ?")).containsExactly("creer");
         assertThat(Intent.writeVerbs("Tu crées le projet Marketing ?")).containsExactly("crees");
@@ -136,5 +136,43 @@ class IntentTest {
         assertThat(Intent.asksForMore("Et l'autre projet ?")).isFalse();
         assertThat(Intent.asksForMore("Et un nouveau projet ?")).isTrue();
         assertThat(Intent.asksForMore("Un autre ?")).isTrue();
+    }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Quatrième tour de la relecture R159 (B1) : la question de la recette tapée vite (« la » pour « l'as ») ne demande
+        // rien ; l'infinitif ou le verbe sans la marque de « tu » y tient lieu de participe.
+        "Tu la creer ou ? Je le vois pas dans linear    | false",
+        "Tu le creer ou pas ?                           | false",
+        "Tu la créer ou pas ?                           | false",
+        "Tu les creer ?                                 | false",
+        "Tu me la creer ?                               | false",
+        "Vous le creer ou pas ?                         | false",
+        "Tu la cree ?                                   | false",
+        "Tu la créé ?                                   | false",
+        "Tu l'a creer ?                                 | false",
+        "Vous l'avez creer ?                            | false",
+        // (B2) : une demande posée en question reste une demande, quoi qu'il y ait devant son verbe.
+        "Tu la crées ?                                  | true",
+        "Tu peux la créer ?                             | true",
+        "On crée aussi le projet Marketing ?            | true",
+        "Tu peux juste créer le projet Marketing ?      | true",
+        "Du coup tu crées le projet Marketing ?         | true",
+        "Tu vas créer le projet ?                       | true",
+        "Tu ne crées pas le projet Marketing ?          | true",
+        "Can we create the Marketing project?           | true",
+        "Could you just create the Marketing project?   | true",
+        "On crée une issue pour le bug du paiement ?    | true",
+        // Les voisins de N1 restent des questions.
+        "Tu l'as bien créé ? Je le vois pas dans Linear | false",
+        "Tu ne l'as pas créé ?                          | false",
+        "As-tu créé le projet ?                         | false",
+        "Did you really create it?                      | false",
+        "Le projet, créé ou pas ?                       | false",
+        "Créé ou pas ?                                  | false",
+    })
+    void a_question_asks_to_write_unless_its_verb_tells_the_past(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+        assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
     }
 }

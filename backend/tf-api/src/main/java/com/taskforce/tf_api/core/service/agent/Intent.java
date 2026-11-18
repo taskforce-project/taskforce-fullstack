@@ -144,6 +144,8 @@ final class Intent {
             String piece = pieces.get(i);
             if (piece.isBlank()) continue;
             Does does = does(piece, asked.get(i));
+            // Une question se relit avec le morceau sans verbe qui l'ouvre : « Le projet, cree ou pas ? » (quatrième tour).
+            if (does != null && !leading.isEmpty()) does = does(leading + piece, asked.get(i));
             if (does == null) {
                 // Un morceau sans verbe : il complète la proposition d'avant (« ..., assignée à Marie, dans Linear »), ou
                 // ouvre la suivante ; en tête de demande, un participe raconte (« Mergé sur GitHub, passe TF-12 en Done »).
@@ -177,36 +179,80 @@ final class Intent {
 
     /**
      * Le verbe d'écriture de chaque proposition qui écrit, sans accents (« cree », « supprime », « add ») : ce que la
-     * demande en cours demande de faire (second tour de la relecture R159 de la PR #548). Une proposition posée en question
-     * n'en demande un que de façon explicite (troisième tour) : un impératif, « peux-tu », « est-ce que tu peux », « can
-     * you », « tu crées » ; « le projet, créé ou pas ? » ne demande rien.
+     * demande en cours demande de faire (second tour de la relecture R159 de la PR #548). Les mêmes propositions que
+     * {@link #writes} : une question s'y lit pareil (quatrième tour).
      */
     static List<String> writeVerbs(String request) {
         List<String> verbs = new ArrayList<>();
         for (Clause clause : clauses(request)) {
             if (clause.does() != Does.WRITE) continue;
             List<String> words = words(clause.text());
-            int at = writeAt(words, false);
-            if (at < 0) continue;
-            if (clause.asked() && !explicit(words, at, originalWords(clause.text()))) continue;
-            verbs.add(words.get(at));
+            int at = writeAt(words, clause.asked());
+            if (at >= 0) verbs.add(words.get(at));
         }
         return verbs;
     }
 
+    /** Les modalités qui font d'un infinitif une demande : « peux-tu la créer », « tu vas la créer », « il faut la créer ». */
+    private static final Set<String> MODALS = Set.of("peux", "peut", "pouvez", "pourrais", "pourrait", "pourriez", "veux",
+        "veut", "voulez", "voudrais", "voudriez", "vas", "va", "allez", "vais", "dois", "doit", "devez", "faut");
+    /** Les sujets : « la » qui les suit est un pronom, pas un article (« tu la crées »). */
+    private static final Set<String> SUBJECTS = Set.of("je", "j", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles");
+    /** Des choses : un nom devant le verbe d'une question en fait un participe (« le projet cree ou pas ? »). */
+    private static final Set<String> NOUNS = Set.of("projet", "projets", "project", "projects", "issue", "issues", "tache",
+        "taches", "task", "tasks", "ticket", "tickets", "carte", "cartes", "card", "cards", "bug", "bugs", "page", "pages",
+        "note", "notes", "commentaire", "commentaires", "comment", "comments", "document", "documents", "doc", "docs");
+    /** Des mots de liaison, qui ne sont pas des noms : « du coup », « bon », « donc ». */
+    private static final Set<String> LINKS = Set.of("coup", "bon", "donc", "alors", "sinon", "ensuite", "puis", "enfin",
+        "bref", "ok", "okay");
+
     /**
-     * Une question qui demande d'écrire, explicitement : devant le verbe, seulement la politesse, une modalité ou le sujet
-     * (« peux-tu le créer », « tu me crées », « can you create », « est-ce que tu peux »), et le verbe n'est pas un
-     * participe (« créé ou pas ? »).
+     * Une question demande d'écrire (quatrième tour de la relecture R159 de la PR #548), sauf quand son verbe dit le passé
+     * ou qu'un nom le précède : un participe (« créé ou pas ? ») ; après « tu » ou « vous » et leurs pronoms, un verbe qui
+     * n'a pas leur marque, la question de la recette tapée vite (« tu la creer ou ? », pour « tu l'as créé ? ») ; « le
+     * projet cree ou pas ? ». « Tu la crées ? », « Tu peux la créer ? », « On crée aussi le projet ? », « Could you just
+     * create... ? » demandent.
      */
-    private static boolean explicit(List<String> words, int at, List<String> original) {
-        int from = 0;
-        if (words.size() > 2 && "est".equals(words.get(0)) && "ce".equals(words.get(1))
-            && ("que".equals(words.get(2)) || "qu".equals(words.get(2)))) from = 3;
-        for (int k = from; k < at; k++) {
-            if (!LEADS.contains(words.get(k)) && !CLITICS.contains(words.get(k))) return false;
+    private static boolean request(List<String> words, int at, List<String> original) {
+        if (at < original.size() && participle(original.get(at))) return false;
+        if (pastAfterSubject(words, at)) return false;
+        return !nounBefore(words, at);
+    }
+
+    /**
+     * Après « tu » ou « vous », et les pronoms qui les suivent, un verbe sans leur marque (« -s », « -ez ») : « tu la
+     * creer ? », « tu la cree ? », « vous le creer ou pas ? » disent le passé ; « tu la crées ? », « vous le créez ? », une
+     * modalité devant le sujet (« peux-tu la créer ? ») demandent.
+     */
+    private static boolean pastAfterSubject(List<String> words, int at) {
+        for (int k = at - 1; k >= 0; k--) {
+            String word = words.get(k);
+            if ("tu".equals(word) || "vous".equals(word)) {
+                if (k > 0 && MODALS.contains(words.get(k - 1))) return false;
+                String verb = words.get(at);
+                return "tu".equals(word) ? !verb.endsWith("s") : !verb.endsWith("ez");
+            }
+            if (!CLITICS.contains(word) && !"ne".equals(word) && !"n".equals(word)) return false;
         }
-        return at >= original.size() || !participle(original.get(at));
+        return false;
+    }
+
+    /** Un nom juste devant le verbe : une chose (« projet »), ou un mot qu'un article ouvre ; pas un pronom, ni une liaison. */
+    private static boolean nounBefore(List<String> words, int at) {
+        if (at == 0) return false;
+        String word = words.get(at - 1);
+        if (LEADS.contains(word) || CLITICS.contains(word) || BETWEEN.contains(word) || AUXILIARIES.contains(word)
+            || MODALS.contains(word) || SUBJECTS.contains(word) || LINKS.contains(word) || DETERMINERS.contains(word)) {
+            return false;
+        }
+        return NOUNS.contains(word) || at >= 2 && DETERMINERS.contains(words.get(at - 2));
+    }
+
+    /** « la » dans « tu la crées », « on la crée », « tu me la crées » : un pronom qui suit un sujet ou un autre pronom. */
+    private static boolean objectPronoun(List<String> words, int k) {
+        if (k == 0 || !Set.of("le", "la", "les", "l").contains(words.get(k))) return false;
+        String before = words.get(k - 1);
+        return SUBJECTS.contains(before) || CLITICS.contains(before) || "ne".equals(before) || "n".equals(before);
     }
 
     /** Les mots d'un morceau tels qu'il les écrit, en minuscules, accents compris : un participe s'y reconnaît. */
@@ -275,7 +321,9 @@ final class Intent {
      */
     static Does does(String piece, boolean question) {
         List<String> words = words(piece);
-        if (writeAt(words, question) >= 0) return Does.WRITE;
+        int at = writeAt(words, question);
+        // Une question demande d'écrire, sauf quand son verbe dit le passé ou qu'un nom le précède (quatrième tour).
+        if (at >= 0 && (!question || request(words, at, originalWords(piece)))) return Does.WRITE;
         boolean reads = question || !words.isEmpty() && QUESTIONS.contains(words.get(0));
         for (int i = 0; i < words.size() && !reads; i++) {
             reads = READS.contains(words.get(i)) && (i == 0 || !DETERMINERS.contains(words.get(i - 1)));
@@ -289,7 +337,7 @@ final class Intent {
         String verb = words.get(i);
         if (i > 0 && ("se".equals(words.get(i - 1)) || "s".equals(words.get(i - 1)))) return false;
         boolean infinitive = verb.length() > 4 && INFINITIVE.matcher(verb).find();
-        if (i > 0 && DETERMINERS.contains(words.get(i - 1)) && !infinitive) return false;
+        if (i > 0 && DETERMINERS.contains(words.get(i - 1)) && !infinitive && !objectPronoun(words, i - 1)) return false;
         int j = i - 1;
         while (j >= 0 && (CLITICS.contains(words.get(j)) || BETWEEN.contains(words.get(j)))) j--;
         if (j >= 0 && AUXILIARIES.contains(words.get(j))) return false;

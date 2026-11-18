@@ -3345,4 +3345,29 @@ class AgentServiceTest {
         verify(llm, Mockito.atLeastOnce()).rawChat(sent.capture(), anyList(), anyString());
         assertThat(sent.getAllValues().get(0).get(0).get("content").toString()).doesNotContain("never in TaskForce instead");
     }
+
+    @ParameterizedTest(name = "à « {0} » : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Tu la creer ou ? Je le vois pas dans linear   | Oui, je l'ai créé dans TaskForce, pas dans Linear.              | false",
+        "Tu la creer ou ? Je le vois pas dans linear   | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Could you just create the Marketing project?  | Done, I created it.                                             | true",
+        "On crée aussi le projet Marketing ?           | Je ne l'ai pas encore créé. Tu confirmes le nom ?               | false",
+    })
+    @DisplayName("R159, quatrième tour (B1, B2) : de bout en bout, une question se lit à son verbe")
+    void a_question_is_read_as_its_verb_says_through_a_turn(String request, String said, boolean corrected) throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(request, TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        if (corrected) {
+            assertThat(answer.answer()).doesNotContain(said).contains(ActionClaimCheck.SIGNATURE);
+        } else {
+            assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created")
+                .doesNotContain(ActionClaimCheck.DONE_SIGNATURE);
+        }
+    }
 }

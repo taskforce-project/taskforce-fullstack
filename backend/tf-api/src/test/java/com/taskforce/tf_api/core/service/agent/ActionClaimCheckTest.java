@@ -727,4 +727,48 @@ class ActionClaimCheckTest {
                 + "This was created in this conversation, in TaskForce: Project created: TESTTASKFO.");
         assertThat(denial.incident(List.of())).containsEntry("uncertain", true).containsEntry("rule", "R204");
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548, quatrième tour (B1, B2) : une question se lit à son verbe
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "à « {0} », TESTTASKFO créé à la réponse précédente : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        // B1 : la question de la recette tapée vite ; la réponse vraie reste, la négation fausse se corrige.
+        "Tu la creer ou ? Je le vois pas dans linear  | Oui, je l'ai créé dans TaskForce, pas dans Linear.               | false",
+        "Tu la creer ou ? Je le vois pas dans linear  | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom.  | true",
+        "Tu le creer ou ? Je le vois pas dans linear  | Oui, je l'ai créé dans TaskForce, pas dans Linear.               | false",
+        "Tu le creer ou ? Je le vois pas dans linear  | Non, je ne l'ai pas créé, il me manquait le nom.                 | true",
+        // B2 : une demande posée en question ; l'annonce inventée se corrige, la phrase vraie reste.
+        "On crée aussi le projet Marketing ?          | Je l'ai créé.                                                    | true",
+        "On crée aussi le projet Marketing ?          | Je ne l'ai pas encore créé. Tu confirmes le nom ?                | false",
+        "Tu peux juste créer le projet Marketing ?    | C'est fait, je l'ai créé.                                        | true",
+        "Tu peux juste créer le projet Marketing ?    | Je ne l'ai pas encore créé : quel modèle veux-tu ?               | false",
+        "Can we create the Marketing project?         | I created it.                                                    | true",
+        "Can we create the Marketing project?         | I haven't created it yet. Which template?                        | false",
+        "Could you just create the Marketing project?  | Done, I created it.                                              | true",
+        "Could you just create the Marketing project?  | I haven't created it yet. Which template?                        | false",
+        "Du coup tu crées le projet Marketing ?       | Je l'ai créé.                                                    | true",
+        "Du coup tu crées le projet Marketing ?       | Je ne l'ai pas encore créé. Tu confirmes ?                       | false",
+        // Le témoin : une demande explicite.
+        "Tu peux la créer ?                           | Je l'ai créé.                                                    | true",
+    })
+    void a_question_is_read_as_its_verb_says(String request, String answer, boolean corrected) {
+        Checked checked = ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request);
+
+        assertThat(checked.corrected()).isEqualTo(corrected);
+        if (!corrected) assertThat(checked.answer()).isEqualTo(answer);
+    }
+
+    @Test
+    @DisplayName("R159, quatrième tour (B2) : « On crée une issue pour le bug du paiement ? » demande l'issue, après API-12")
+    void a_request_asked_as_a_question_asks_for_the_issue() {
+        Done api12 = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".");
+        String request = "On crée une issue pour le bug du paiement ?";
+
+        assertThat(ActionClaimCheck.check("J'ai créé l'issue.", List.of(), List.of(api12), SYSTEMS, request).claims())
+            .hasSize(1);
+        assertThat(ActionClaimCheck.check("Je ne l'ai pas encore créée : dans quel projet ?", List.of(), List.of(api12),
+            SYSTEMS, request).corrected()).isFalse();
+    }
 }
