@@ -126,8 +126,12 @@ public class TargetSystems {
         return said(request).places();
     }
 
-    /** Le rôle d'un outil dans une proposition : où elle écrit ou lit, d'où elle prend, sur quoi elle agit, ou cité. */
-    enum Role { DEST, SOURCE, OBJECT, MENTION }
+    /**
+     * Le rôle d'un outil dans une proposition : où elle écrit ou lit, d'où elle prend, sur quoi elle agit, cité, ou d'où
+     * vient ce dont elle parle (« le bug remonté dans Slack », « le ticket qui est dans Linear ») : un lieu où lire pour
+     * une lecture, une citation pour une écriture (second tour de la relecture R159 de la PR #548).
+     */
+    enum Role { DEST, SOURCE, OBJECT, MENTION, ORIGIN }
 
     /** Un outil cité dans une proposition, où, et son rôle. */
     private record Mention(Named tool, int at, Role role) {
@@ -183,9 +187,11 @@ public class TargetSystems {
             for (Mention mention : mentions(clause.text())) {
                 boolean taskforce = TASKFORCE.equals(mention.tool().name());
                 if (!taskforce) mentioned.putIfAbsent(mention.tool().name(), mention.tool());
-                if (clause.does() == Intent.Does.NOTHING || mention.role() == Role.MENTION) continue;
+                Role role = mention.role() != Role.ORIGIN ? mention.role()
+                    : clause.does() == Intent.Does.READ ? Role.SOURCE : Role.MENTION;
+                if (clause.does() == Intent.Does.NOTHING || role == Role.MENTION) continue;
                 if (!taskforce) places.putIfAbsent(mention.tool().name(), mention.tool());
-                if (clause.does() == Intent.Does.WRITE && mention.role() != Role.SOURCE) {
+                if (clause.does() == Intent.Does.WRITE && role != Role.SOURCE) {
                     targeted = true;
                     if (targets.stream().noneMatch(target -> target.name().equals(mention.tool().name()))) {
                         targets.add(mention.tool());
@@ -223,6 +229,7 @@ public class TargetSystems {
     private static Role roleAt(String clause, String said, int start, int end) {
         String before = said.substring(0, start);
         String original = clause.substring(0, Math.min(start, clause.length()));
+        if (origin(before, original)) return Role.ORIGIN;
         if (DEST_BEFORE.matcher(before).find() || ACCENT_A_BEFORE.matcher(original).find()) return Role.DEST;
         if (SOURCE_BEFORE.matcher(before).find()) return Role.SOURCE;
         // Après une chose : « un projet TaskForce », « à partir du projet Linear », « ma page Notion ».
@@ -241,6 +248,7 @@ public class TargetSystems {
 
     /** Le rôle d'une chose qui porte le nom d'un outil : d'où elle vient, où elle va, ou ce sur quoi la phrase agit. */
     private static Role phraseRole(String before, String original) {
+        if (origin(before, original)) return Role.ORIGIN;
         if (SOURCE_BEFORE.matcher(before).find()) return Role.SOURCE;
         if (DEST_BEFORE.matcher(before).find() || ACCENT_A_BEFORE.matcher(original).find()) return Role.DEST;
         return Role.OBJECT;
@@ -257,6 +265,33 @@ public class TargetSystems {
     /** Ce qui précède une source : « à partir du », « depuis », « de », « from », « based on »... */
     private static final Pattern SOURCE_BEFORE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:a\\s+partir\\s+(?:de|du|des|d')|"
         + "depuis|de|du|des|d'|from|out\\s+of|based\\s+on|off)\\s*" + DET + "$");
+    /**
+     * Un lieu rattaché à un participe : « remonté dans », « reçue sur », « signalé par Marie sur le », « reported in »,
+     * « seen in ». Lu dans le texte même, ses accents compris : « poste sur Slack » (l'impératif) écrit là, « posté sur
+     * Slack » dit d'où vient la chose.
+     */
+    private static final Pattern ORIGIN_PARTICIPLE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:"
+        + "(?:remont|signal|report|rapport|post|envoy|mentionn|discut|[ée]voqu|soulev|partag|relev|not|list|publi|"
+        + "d[ée]tect|trouv|enregistr|logg|cr[ée]|remarqu|constat|identifi|rep[ée]r|captur|rencontr|observ)é(?:e|s|es)?"
+        + "|(?:re[çc]u|vu|lu|apparu|survenu|d[ée]crit|[ée]crit|ouvert)(?:e|s|es)?"
+        + "|reported|raised|seen|saw|found|received|got|sent|posted|mentioned|discussed|flagged|logged|filed|opened|shared|"
+        + "spotted|detected|noticed|described|listed|tracked|captured|created|written|noted|surfaced|(?:came|brought|"
+        + "showed|popped)\\s+up)"
+        + "(?:\\s+(?:hier|aujourd'hui|r[ée]cemment|d[ée]j[àa]|yesterday|today|earlier|recently|already))?"
+        + "(?:\\s+(?:par|by)\\s+[\\p{L}\\p{N}'-]+(?:\\s+[\\p{L}\\p{N}'-]+)?)?"
+        + "\\s+(?:dans|sur|en|au|aux|chez|via|in|on|inside|within|at)\\s+" + DET + "$",
+        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    /** Un lieu rattaché à une relative : « le ticket qui est dans », « the bug that is in », « qui traîne sur ». */
+    private static final Pattern ORIGIN_RELATIVE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:qui|that|which)\\s+(?:est|sont|"
+        + "etait|etaient|se\\s+trouvent?|trainent?|vit|vient|viennent|is|are|was|were|lives|sits|exists|came|comes)"
+        + "(?:\\s+(?:deja|encore|toujours|already|still|now|maintenant))?"
+        + "\\s+(?:dans|sur|en|au|aux|chez|via|in|on|inside|within|at)\\s+" + DET + "$");
+
+    /** Ce qui précède un outil dit-il d'où vient la chose dont parle la proposition, plutôt qu'où elle écrit ? */
+    private static boolean origin(String before, String original) {
+        return ORIGIN_PARTICIPLE.matcher(original.replace('’', '\'')).find() || ORIGIN_RELATIVE.matcher(before).find();
+    }
+
     private static final String THINGS = "(?:issues?|tickets?|taches?|tasks?|cartes?|cards?|bugs?|projets?|projects?|pages?|"
         + "documents?|docs?|commentaires?|comments?|notes?|messages?|canal|canaux|channels?|dossiers?|folders?|fichiers?|"
         + "files?|bases?|databases?|tableaux?|boards?|espaces?|workspaces?|equipes?|teams?|sprints?|cycles?|deals?|"

@@ -153,4 +153,30 @@ class TargetSystemsTest {
         assertThat(TARGETS.said(request).targets()).extracting(TargetSystems.Named::name)
             .containsExactlyElementsOf(expected);
     }
+
+    @ParameterizedTest(name = "« {0} » : écrit dans {1}, lit ou écrit dans {2}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        // Second tour de la relecture R159 (C) : un lieu après un participe ou une relative dit d'où vient la chose.
+        "Crée une issue pour le bug remonté dans Slack                  | -         | -",
+        "Create an issue for the bug reported in Slack                  | -         | -",
+        "Crée une tâche pour la demande du client reçue sur Intercom    | -         | -",
+        "Crée une issue pour le ticket qui est dans Linear              | -         | -",
+        "Crée une issue pour chaque erreur vue dans Sentry              | -         | -",
+        "Crée une issue TaskForce pour le bug signalé dans Linear       | TaskForce | -",
+        "Crée une issue pour le bug signalé par Marie sur le canal Slack | -        | -",
+        // Ses voisins : la cible que le verbe d'écriture dit reste la sienne ; une lecture lit là d'où vient la chose.
+        "Crée une issue dans Linear pour le bug signalé sur Slack       | Linear    | Linear",
+        "Écris un résumé et poste-le sur Slack                          | Slack     | Slack",
+        "Crée une issue, assignée à Marie, dans Linear                  | Linear    | Linear",
+        "Résume le bug remonté dans Slack                               | -         | Slack",
+    })
+    void a_place_after_a_participle_or_a_relative_is_where_the_thing_comes_from(String request, String targets,
+                                                                               String places) {
+        TargetSystems.Said said = TARGETS.said(request);
+
+        assertThat(said.targets()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(targets == null ? List.of() : List.of(targets.trim().split(";")));
+        assertThat(said.places()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
+    }
 }

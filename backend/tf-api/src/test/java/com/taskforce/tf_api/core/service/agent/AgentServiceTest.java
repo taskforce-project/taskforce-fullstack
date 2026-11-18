@@ -3185,4 +3185,41 @@ class AgentServiceTest {
 
         assertThat(answer.answer()).isEqualTo(said);
     }
+
+    @ParameterizedTest(name = "« {0} » : l'issue se prépare dans TaskForce, sans alerte ni bloc sur l'outil")
+    @ValueSource(strings = {
+        "Crée une issue pour le bug remonté dans Slack",
+        "Create an issue for the bug reported in Slack",
+        "Crée une tâche pour la demande du client reçue sur Intercom",
+        "Crée une issue pour le ticket qui est dans Linear",
+        "Crée une issue pour chaque erreur vue dans Sentry",
+    })
+    @DisplayName("R159, second tour (C) : un lieu d'où vient la chose n'est pas la cible")
+    void a_place_where_the_thing_comes_from_is_not_the_target(String request) throws Exception {
+        modelCalls("create_issue", "{\"title\":\"Login fails\"}", "Voici la carte.");
+        CortexGesture create = gesture("create_issue", "issue.create");
+        lenient().when(create.prepare(any(), any())).thenReturn(null);
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls().get(0).where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", null));
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString()).doesNotContain("never in TaskForce instead");
+    }
+
+    @Test
+    @DisplayName("R159, second tour (C) : une issue TaskForce pour un bug signalé dans Linear, en lecture seule : rien de plus")
+    void an_origin_in_a_tool_connected_for_reading_is_not_written() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Crée une issue TaskForce pour le bug signalé dans Linear");
+
+        assertThat(answer.answer()).isEqualTo("Voici.");
+    }
 }
