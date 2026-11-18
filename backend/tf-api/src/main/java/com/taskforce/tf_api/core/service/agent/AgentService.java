@@ -1097,7 +1097,7 @@ public class AgentService {
         String means = keys.size() == 1 ? "\"this issue\", \"this task\", \"cette tâche\" mean " + named
             : "\"these issues\", \"ces tâches\" mean them";
         return earlier
-            ? "\n\n[This message is about " + named + ", which the person attached to an earlier message: " + means + ".]"
+            ? "\n\n[This message is about " + named + ", which the person mentioned in an earlier message: " + means + ".]"
             : "\n\n[The person attached " + named + " to this message: " + means + ".]";
     }
 

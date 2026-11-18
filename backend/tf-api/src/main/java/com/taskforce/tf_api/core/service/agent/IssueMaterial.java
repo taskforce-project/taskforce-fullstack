@@ -76,10 +76,11 @@ public class IssueMaterial {
         + "\"this issue\", \"this task\", \"cette tâche\", \"celle-ci\" or \"it\", they mean the issue attached here. Use it "
         + "as it is: never add a fact it does not state.\n";
     /**
-     * L'issue d'une conversation, jointe à une demande d'avant, quand la demande la désigne sans la joindre de nouveau ni
-     * la nommer (R204 : elle reste le sujet au tour suivant).
+     * L'issue d'une conversation, dont parlait une demande d'avant (jointe, nommée par sa clé, ouverte à l'écran), quand la
+     * demande la désigne sans la joindre de nouveau ni la nommer (R204 : elle reste le sujet au tour suivant). « mentioned »,
+     * pas « attached » : une issue nommée n'a pas été jointe (second tour de la relecture R159).
      */
-    static final String EARLIER = "The issue this conversation is about: the person attached it to an earlier message, and "
+    static final String EARLIER = "The issue this conversation is about: the person mentioned it in an earlier message, and "
         + "TaskForce read it again just now. When they say \"this issue\", \"this task\", \"cette tâche\", \"dessus\" or "
         + "\"it\", they mean it. Use it as it is: never add a fact it does not state.\n";
 

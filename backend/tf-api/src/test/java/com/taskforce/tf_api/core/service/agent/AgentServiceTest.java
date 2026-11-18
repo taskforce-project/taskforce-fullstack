@@ -2745,7 +2745,7 @@ class AgentServiceTest {
         verify(llm).rawChat(sent.capture(), anyList(), anyString());
         assertThat(sent.getValue().get(0).get("content").toString()).contains(IssueMaterial.EARLIER).contains("Aïcha Diallo");
         assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
-            .startsWith("Et qui bosse dessus ?").contains("[This message is about API-3, which the person attached to an earlier message");
+            .startsWith("Et qui bosse dessus ?").contains("[This message is about API-3, which the person mentioned in an earlier message");
         assertThat(answer.subjects()).extracting(AssistantAnswer.Subject::key).containsExactly("API-3");
         assertThat(answer.read().issues()).containsExactly(new AssistantRead.IssueRead("API-3", 0));
     }
@@ -2766,7 +2766,7 @@ class AgentServiceTest {
     @ParameterizedTest(name = "cas {0} du seed : {1}")
     @CsvSource(delimiter = '|', value = {
         "5 | [The person attached API-3 to this message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
-        "6 | [This message is about API-3, which the person attached to an earlier message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
+        "6 | [This message is about API-3, which the person mentioned in an earlier message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
     })
     void the_seed_cases_of_the_attached_issue_replay_with_it(int n, String line) throws Exception {
         SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == n).findFirst().orElseThrow();
@@ -3124,8 +3124,12 @@ class AgentServiceTest {
         assertThat(answer.subjects()).containsExactly(api4);
         ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
         verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        // Second tour de la relecture R159 (G) : API-4 a été nommée par sa clé, pas jointe.
         assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
-            .contains("[This message is about API-4, which the person attached to an earlier message");
+            .contains("[This message is about API-4, which the person mentioned in an earlier message")
+            .doesNotContain("attached");
+        assertThat(sent.getValue().get(0).get("content").toString()).contains("the person mentioned it in an earlier message")
+            .doesNotContain("attached it to an earlier message");
     }
 
     @Test
