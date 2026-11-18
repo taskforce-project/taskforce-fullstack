@@ -142,20 +142,21 @@ class ThreadActsTest {
     }
 
     /**
-     * Une clé de la forme d'une clé Stripe de production, assemblée à l'exécution : aucune chaîne du dépôt n'a cette forme
-     * (la protection des secrets de GitHub refuse un push qui en porte une, même factice).
+     * Un faux jeton personnel de TaskForce : SecretScan le reconnaît à sa forme, et la protection des secrets de GitHub ne
+     * le prend pas pour le secret d'un autre éditeur.
      */
-    private static final String FAKE_KEY = "sk" + "_live_" + "51HxQ2lKXabcdefghijklmnopqrstuv";
+    private static final String FAKE_TOKEN = "tfp_FAKE0123456789abcdefghijklmnopqrstuvwxyzAB";
 
     @Test
     @DisplayName("R159 (8) : un secret ne repart jamais, ni dans les valeurs ni dans le résultat (SecretScan)")
     void a_secret_never_goes_back() {
-        Act write = new Act("create_project", "{\"name\":\"Billing\",\"note\":\"" + FAKE_KEY + "\"}",
-            "success", "Project created in TaskForce: BILL \"Billing\" (id 3). Key: " + FAKE_KEY, "h1", null);
+        Act write = new Act("create_project", "{\"name\":\"Billing\",\"note\":\"" + FAKE_TOKEN + "\"}",
+            "success", "Project created in TaskForce: BILL \"Billing\" (id 3). Key: " + FAKE_TOKEN, "h1", null);
 
         String line = ThreadActs.line(write, WHERE);
 
-        assertThat(line).contains("name: Billing").doesNotContain(FAKE_KEY).doesNotContain("Result:");
+        assertThat(com.taskforce.tf_api.core.harness.rules.SecretScan.in(FAKE_TOKEN)).isTrue();
+        assertThat(line).contains("name: Billing").doesNotContain(FAKE_TOKEN).doesNotContain("Result:");
     }
 
     @Test
