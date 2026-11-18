@@ -3016,4 +3016,40 @@ class AgentServiceTest {
 
         assertThat(answer.answer()).isEqualTo("Voici.");
     }
+
+    /** Les six outils de Notion de la sonde de la relecture R159 : chercher, lire, modifier et créer une page, ses commentaires. */
+    private List<AgentTool> notionTools() {
+        List<AgentTool> notion = new ArrayList<>();
+        for (String[] def : new String[][] {{"notion-search", "true"}, {"notion-fetch", "true"}, {"notion-update-page", "false"},
+            {"notion-create-pages", "false"}, {"notion-get-comments", "true"}, {"notion-create-comment", "false"}}) {
+            boolean read = Boolean.parseBoolean(def[1]);
+            notion.add(new ExternalMcpTool(extClient, new McpClient.ServerRef("notion", "https://mcp.notion.com/mcp", null),
+                new McpClient.ToolDef(def[0], "", json.createObjectNode().put("type", "object"), read), json,
+                read ? com.taskforce.tf_api.core.enums.ToolClass.READ : com.taskforce.tf_api.core.enums.ToolClass.WRITE,
+                com.taskforce.tf_api.core.enums.ConnectionScope.PERSONAL));
+        }
+        return notion;
+    }
+
+    @ParameterizedTest(name = "« {0} » : les outils de Notion passent au modèle")
+    @ValueSource(strings = {"Résume ma page Notion Roadmap", "Search Notion for the roadmap", "Cherche la page Roadmap dans Notion"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void the_tools_of_a_connector_the_request_cites_reach_the_model(String request) throws Exception {
+        stubWorkspace();
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        lenient().when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        lenient().when(llm.isConfigured()).thenReturn(true);
+        lenient().when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        List<AgentTool> connected = new ArrayList<>(linearTools(false));
+        connected.addAll(notionTools());
+        when(workspaceMcp.toolsFor(any())).thenReturn(connected);
+        ArgumentCaptor<List<AgentTool>> sent = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        lenient().when(tools.toolDefinitions(sent.capture())).thenReturn(List.of());
+
+        service.run("acme", 7L, request);
+
+        assertThat(sent.getValue()).extracting(AgentTool::name).contains("notion__notion-search", "notion__notion-fetch")
+            .filteredOn(name -> name.startsWith("notion__")).hasSize(6);
+    }
 }

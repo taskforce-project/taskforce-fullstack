@@ -34,12 +34,11 @@ final class ToolChoice {
     /** Ce sur quoi il porte. */
     enum Thing { ISSUE, PROJECT, COMMENT, DOCUMENT, TEAM, CYCLE, LABEL, MILESTONE, USER, STATE, WORKSPACE, ATTACHMENT }
 
-    /** Ce qu'une demande veut : ses verbes et ses choses, lus dans ses mots. */
-    record Asked(Set<Verb> verbs, Set<Thing> things) {
-        /** La demande écrit-elle quelque chose (créer, modifier, supprimer) ? */
-        boolean writes() {
-            return verbs.contains(Verb.CREATE) || verbs.contains(Verb.UPDATE) || verbs.contains(Verb.DELETE);
-        }
+    /**
+     * Ce qu'une demande veut : ses verbes et ses choses, lus dans ses mots, et si elle écrit, lu sur son verbe d'action
+     * ({@link Intent}) : « qu'est-ce qui se passe », « les nouveaux tickets » n'écrivent rien (relecture R159).
+     */
+    record Asked(Set<Verb> verbs, Set<Thing> things, boolean writes) {
     }
 
     /** Ce que fait un outil, d'après son nom : son verbe (le premier mot), et sa chose (le dernier). */
@@ -119,20 +118,26 @@ final class ToolChoice {
     static Asked asked(String request) {
         Set<Verb> verbs = EnumSet.noneOf(Verb.class);
         Set<Thing> things = EnumSet.noneOf(Thing.class);
-        if (request == null || request.isBlank()) return new Asked(verbs, things);
+        if (request == null || request.isBlank()) return new Asked(verbs, things, false);
         ASKED_VERBS.forEach((verb, pattern) -> { if (pattern.matcher(request).find()) verbs.add(verb); });
         ASKED_THINGS.forEach((thing, pattern) -> { if (pattern.matcher(request).find()) things.add(thing); });
         // Commenter, c'est créer un commentaire.
         if (things.contains(Thing.COMMENT) && verbs.isEmpty()) verbs.add(Verb.CREATE);
-        return new Asked(verbs, things);
+        return new Asked(verbs, things, Intent.writes(request));
     }
 
-    /** Ce que fait un outil, d'après son nom sur son serveur ({@code save_issue}, {@code createJiraIssue}). */
+    /**
+     * Ce que fait un outil, d'après son nom sur son serveur ({@code save_issue}, {@code createJiraIssue}). Un premier mot
+     * qui redit le connecteur ne dit pas ce qu'il fait : {@code notion__notion-search} cherche (relecture R159).
+     */
     static Does does(String tool) {
-        String bare = tool == null ? "" : tool.substring(tool.indexOf("__") < 0 ? 0 : tool.indexOf("__") + 2);
+        int sep = tool == null ? -1 : tool.indexOf("__");
+        String bare = tool == null ? "" : tool.substring(sep < 0 ? 0 : sep + 2);
         String[] words = bare.replaceAll("(\\p{Ll})(\\p{Lu})", "$1_$2").toLowerCase(Locale.ROOT).split("[^a-z]+");
         List<String> kept = new ArrayList<>();
         for (String word : words) if (!word.isEmpty()) kept.add(word);
+        String connector = sep > 0 ? tool.substring(0, sep).toLowerCase(Locale.ROOT).replaceFirst("-mcp$", "") : null;
+        if (connector != null && kept.size() > 1 && kept.get(0).equals(connector.replace("-", ""))) kept.remove(0);
         if (kept.isEmpty()) return new Does(Set.of(), null);
         Set<Verb> verbs = TOOL_VERBS.getOrDefault(kept.get(0), Set.of());
         String last = singular(kept.get(kept.size() - 1));

@@ -109,4 +109,33 @@ class ToolChoiceTest {
         @Override public Map<String, Object> parametersSchema() { return Map.of(); }
         @Override public String execute(Map<String, Object> args, AgentContext ctx) { throw new UnsupportedOperationException(); }
     }
+
+    @ParameterizedTest(name = "{0} : {1} sur {2}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        // Relecture R159 (6) : un premier mot qui redit la clé du connecteur ne dit pas ce que fait l'outil.
+        "notion__notion-search        | READ   | -",
+        "notion__notion-fetch         | READ   | -",
+        "notion__notion-update-page   | UPDATE | DOCUMENT",
+        "notion__notion-create-pages  | CREATE | DOCUMENT",
+        "notion__notion-get-comments  | READ   | COMMENT",
+    })
+    void a_first_word_that_repeats_the_connector_is_not_the_verb(String tool, Verb verb, String thing) {
+        ToolChoice.Does does = ToolChoice.does(tool);
+
+        assertThat(does.verbs()).containsExactly(verb);
+        assertThat(does.thing()).isEqualTo(thing == null ? null : Thing.valueOf(thing));
+    }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Relecture R159 (10) : l'écriture se lit sur le verbe d'action, jamais sur un mot isolé.
+        "Qu'est-ce qui se passe dans Linear ?          | false",
+        "Quels sont les nouveaux tickets dans Linear ? | false",
+        "Montre-moi ce qui a été fait dans Linear      | false",
+        "What's new in Linear?                         | false",
+        "crée une tâche dans Linear                    | true",
+    })
+    void a_request_writes_by_its_action_verb(String request, boolean writes) {
+        assertThat(ToolChoice.asked(request).writes()).isEqualTo(writes);
+    }
 }
