@@ -65,11 +65,11 @@ final class Intent {
         "etait", "etaient", "est", "sont", "sera", "seront", "has", "have", "had", "was", "were", "is", "are", "been",
         "being", "be", "ve", "d");
 
-    /** Ce qui fait d'un mot un nom : « la liste », « the post », « any change ». */
+    /** Ce qui fait d'un mot un nom : « la liste », « the post », « any change », « quel poste ». */
     private static final Set<String> DETERMINERS = Set.of("le", "la", "les", "l", "un", "une", "des", "du", "de", "the", "an",
         "this", "that", "these", "those", "my", "your", "our", "their", "ce", "cet", "cette", "ces", "mon", "ma", "mes", "ton",
         "ta", "tes", "son", "sa", "ses", "notre", "votre", "nos", "vos", "leur", "leurs", "any", "some", "no", "each", "every",
-        "all", "quelques", "aucun", "aucune", "chaque");
+        "all", "quelques", "aucun", "aucune", "chaque", "quel", "quels", "quelle", "quelles", "which", "what", "whose");
 
     /** Les pronoms qu'un verbe porte devant lui sans changer ce qu'il fait : « me crée », « l'ajoute ». */
     private static final Set<String> CLITICS = Set.of("l", "le", "la", "les", "lui", "leur", "me", "m", "te", "t", "nous",
@@ -86,6 +86,15 @@ final class Intent {
     private static final Set<String> QUESTIONS = Set.of("qu", "que", "quest", "quels", "quelles", "quel", "quelle", "quoi",
         "ou", "comment", "combien", "pourquoi", "qui", "what", "which", "where", "how", "who", "why", "when", "is", "are",
         "do", "does", "did", "y");
+
+    /**
+     * Un mot interrogatif : en tête d'une proposition, elle demande, elle n'écrit pas (« Comment avance le projet dans
+     * Linear ? », « Quel poste occupe Marie ? », « How do I create an issue? »), second tour de la relecture R159.
+     * « ou », sans accent, n'en est un que dans une question.
+     */
+    private static final Set<String> INTERROGATIVES = Set.of("comment", "quel", "quels", "quelle", "quelles", "pourquoi",
+        "combien", "quoi", "qui", "que", "qu", "quest", "ou", "what", "which", "where", "how", "who", "whom", "whose", "why",
+        "when");
 
     /** Un constat : une copule, un participe passé (« c'est mergé », « it was moved »). */
     private static final Set<String> STATEMENTS = Set.of("est", "sont", "etait", "etaient", "ete", "is", "are", "was", "were",
@@ -156,7 +165,7 @@ final class Intent {
         for (Clause clause : clauses(request)) {
             if (clause.does() != Does.WRITE) continue;
             List<String> words = words(clause.text());
-            int at = writeAt(words);
+            int at = writeAt(words, false);
             if (at >= 0) verbs.add(words.get(at));
         }
         return verbs;
@@ -183,8 +192,15 @@ final class Intent {
         return words;
     }
 
-    /** La place du premier verbe d'écriture qui demande, dans ces mots ; -1 sans lui. */
-    private static int writeAt(List<String> words) {
+    /**
+     * La place du premier verbe d'écriture qui demande, dans ces mots ; -1 sans lui, et derrière un mot interrogatif en
+     * tête. « Comment on TF-12: ... » écrit : c'est l'impératif anglais, hors d'une question.
+     */
+    private static int writeAt(List<String> words, boolean question) {
+        if (!words.isEmpty() && INTERROGATIVES.contains(words.get(0)) && (question || !"ou".equals(words.get(0)))) {
+            boolean commentOn = "comment".equals(words.get(0)) && words.size() > 1 && "on".equals(words.get(1));
+            if (question || !commentOn) return -1;
+        }
         for (int i = 0; i < words.size(); i++) {
             if (WRITES.contains(words.get(i)) && writesAt(words, i)) return i;
         }
@@ -197,7 +213,7 @@ final class Intent {
      */
     static Does does(String piece, boolean question) {
         List<String> words = words(piece);
-        if (writeAt(words) >= 0) return Does.WRITE;
+        if (writeAt(words, question) >= 0) return Does.WRITE;
         boolean reads = question || !words.isEmpty() && QUESTIONS.contains(words.get(0));
         for (int i = 0; i < words.size() && !reads; i++) {
             reads = READS.contains(words.get(i)) && (i == 0 || !DETERMINERS.contains(words.get(i - 1)));
@@ -218,6 +234,8 @@ final class Intent {
         if (AMBIGUOUS.contains(verb)) {
             for (int k = 0; k < i; k++) if (!LEADS.contains(words.get(k)) && !CLITICS.contains(words.get(k))) return false;
         }
+        // « comment » n'écrit qu'en anglais, suivi de « on » (« comment on TF-12 ») : en français, c'est « how ».
+        if ("comment".equals(verb)) return i + 1 < words.size() && "on".equals(words.get(i + 1));
         if (verb.startsWith("pass")) {
             // « passe TF-12 en Done », « passe-la à Marie » : un changement d'état ou de main, pas « passe par Linear ».
             return words.subList(i + 1, words.size()).stream()

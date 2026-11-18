@@ -3222,4 +3222,23 @@ class AgentServiceTest {
 
         assertThat(answer.answer()).isEqualTo("Voici.");
     }
+
+    @ParameterizedTest(name = "« {0} », Linear en lecture seule : rien de plus")
+    @ValueSource(strings = {
+        "Comment avance le projet dans Linear ?",
+        "Comment ça se passe dans Linear ?",
+        "Quel poste occupe Marie dans Linear ?",
+    })
+    @DisplayName("R159, second tour (D) : une question n'écrit pas dans Linear")
+    void a_question_does_not_write_in_a_tool_connected_for_reading(String request) throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.answer()).isEqualTo("Voici.");
+    }
 }

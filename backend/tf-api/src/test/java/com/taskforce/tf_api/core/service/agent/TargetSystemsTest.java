@@ -179,4 +179,20 @@ class TargetSystemsTest {
         assertThat(said.places()).extracting(TargetSystems.Named::name)
             .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
     }
+
+    @ParameterizedTest(name = "« {0} » : écrit dans {1}, lit ou écrit dans {2}")
+    @CsvSource(nullValues = "-", delimiter = '|', value = {
+        // Second tour de la relecture R159 (D) : une question ne demande pas d'écrire là où elle regarde.
+        "Comment avance le projet dans Linear ?                         | -         | Linear",
+        "Comment ça se passe dans Linear ?                              | -         | Linear",
+        "Quel poste occupe Marie dans Linear ?                          | -         | Linear",
+    })
+    void a_question_names_no_target(String request, String targets, String places) {
+        TargetSystems.Said said = TARGETS.said(request);
+
+        assertThat(said.targets()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(targets == null ? List.of() : List.of(targets.trim().split(";")));
+        assertThat(said.places()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(places == null ? List.of() : List.of(places.trim().split(";")));
+    }
 }

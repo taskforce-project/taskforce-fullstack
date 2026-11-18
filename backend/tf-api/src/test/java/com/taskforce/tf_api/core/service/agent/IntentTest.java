@@ -84,4 +84,22 @@ class IntentTest {
     void a_request_without_a_verb_may_ask_for_one_more(String request, boolean more) {
         assertThat(Intent.asksForMore(request)).isEqualTo(more);
     }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Second tour de la relecture R159 (D) : un mot interrogatif en tête n'écrit pas ; « comment » n'écrit qu'avec « on ».
+        "Comment avance le projet dans Linear ?          | false",
+        "Comment ça se passe dans Linear ?               | false",
+        "Quel poste occupe Marie dans Linear ?           | false",
+        "Comment on fait pour créer une issue ?          | false",
+        "How do I create an issue in Linear?             | false",
+        "Dis-moi quel poste occupe Marie                 | false",
+        "Comment on TF-12: the fix is merged             | true",
+        "Can you comment on TF-12?                       | true",
+        "Commente TF-12 : c'est corrigé                  | true",
+        "Poste le résumé sur Slack                       | true",
+    })
+    void a_question_word_at_the_head_writes_nothing(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+    }
 }
