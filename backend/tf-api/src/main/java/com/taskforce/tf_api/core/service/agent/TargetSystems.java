@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -118,27 +117,183 @@ public class TargetSystems {
     }
 
     /**
-     * Les outils du catalogue que cette demande nomme, dans l'ordre où elle les nomme ; TaskForce n'en est pas un. Vide
-     * pour une demande qui n'en nomme aucun.
+     * Les outils du catalogue où cette demande veut lire ou écrire, dans l'ordre où elle les nomme ; TaskForce n'en est pas
+     * un. Un outil n'y est que comme lieu (« dans Linear », « de Linear », « la page Notion », « Search Notion ») d'une
+     * proposition qui lit ou écrit : « the linear progress bar », « some slack », « c'est mergé sur GitHub » n'en nomment
+     * aucun (relecture R159 de la PR #548).
      */
     public List<Named> namedIn(String request) {
-        if (request == null || request.isBlank()) return List.of();
-        String said = plain(request);
-        Map<String, Set<String>> keysByName = new LinkedHashMap<>();
-        Map<String, Integer> firstAt = new LinkedHashMap<>();
-        for (ConnectorDescriptor connector : catalog.all()) {
-            for (String alias : aliases(connector)) {
-                int at = find(said, alias);
-                if (at < 0) continue;
-                keysByName.computeIfAbsent(connector.name(), name -> new LinkedHashSet<>()).add(connector.key());
-                firstAt.merge(connector.name(), at, Math::min);
+        return said(request).places();
+    }
+
+    /** Le rôle d'un outil dans une proposition : où elle écrit ou lit, d'où elle prend, sur quoi elle agit, ou cité. */
+    enum Role { DEST, SOURCE, OBJECT, MENTION }
+
+    /** Un outil cité dans une proposition, où, et son rôle. */
+    private record Mention(Named tool, int at, Role role) {
+    }
+
+    /**
+     * Ce qu'une demande dit des outils (relecture R159 de la PR #548) : où vont ses écritures ({@code targets}, TaskForce
+     * compris quand elle le nomme, « un projet TaskForce » ; {@code implicit} quand une écriture ne dit pas où), les
+     * outils où elle lit ou écrit ({@code places}, sans TaskForce), et ceux qu'elle cite seulement ({@code mentioned}).
+     */
+    public record Said(List<Named> targets, boolean implicit, List<Named> places, List<Named> mentioned) {
+        public static final Said NOTHING = new Said(List.of(), false, List.of(), List.of());
+
+        /**
+         * L'outil où la demande voulait une écriture qui va dans ce système ; null quand elle y va comme la demande le dit,
+         * quand la demande ne dit pas où elle écrit, et pour TaskForce quand une de ses écritures ne dit pas où.
+         */
+        public Named elsewhere(String system) {
+            if (targets.isEmpty() || system == null) return null;
+            if (targets.stream().anyMatch(target -> target.is(system))) return null;
+            if (implicit && TASKFORCE.equalsIgnoreCase(system)) return null;
+            return targets.get(0);
+        }
+
+        /** Chaque écriture de la demande dit où elle va, et aucune ne va dans TaskForce. */
+        public boolean writesOnlyElsewhere() {
+            return !implicit && !targets.isEmpty() && targets.stream().noneMatch(target -> target.is(TASKFORCE));
+        }
+
+        /** Une écriture de la demande va-t-elle dans cet outil ? */
+        public boolean writesIn(Named tool) {
+            return targets.stream().anyMatch(target -> target.name().equals(tool.name()));
+        }
+
+        /** Les outils dont la demande parle, lieux puis citations : ceux dont les outils passent d'abord au modèle. */
+        public List<Named> cited() {
+            Map<String, Named> cited = new LinkedHashMap<>();
+            places.forEach(tool -> cited.putIfAbsent(tool.name(), tool));
+            mentioned.forEach(tool -> cited.putIfAbsent(tool.name(), tool));
+            return List.copyOf(cited.values());
+        }
+    }
+
+    /** Ce que cette demande dit des outils, proposition par proposition. */
+    public Said said(String request) {
+        if (request == null || request.isBlank()) return Said.NOTHING;
+        List<Named> targets = new ArrayList<>();
+        boolean implicit = false;
+        Map<String, Named> places = new LinkedHashMap<>();
+        Map<String, Named> mentioned = new LinkedHashMap<>();
+        for (Intent.Clause clause : Intent.clauses(request)) {
+            boolean targeted = false;
+            for (Mention mention : mentions(clause.text())) {
+                boolean taskforce = TASKFORCE.equals(mention.tool().name());
+                if (!taskforce) mentioned.putIfAbsent(mention.tool().name(), mention.tool());
+                if (clause.does() == Intent.Does.NOTHING || mention.role() == Role.MENTION) continue;
+                if (!taskforce) places.putIfAbsent(mention.tool().name(), mention.tool());
+                if (clause.does() == Intent.Does.WRITE && mention.role() != Role.SOURCE) {
+                    targeted = true;
+                    if (targets.stream().noneMatch(target -> target.name().equals(mention.tool().name()))) {
+                        targets.add(mention.tool());
+                    }
+                }
+            }
+            if (clause.does() == Intent.Does.WRITE && !targeted) implicit = true;
+        }
+        return new Said(List.copyOf(targets), implicit, List.copyOf(places.values()), List.copyOf(mentioned.values()));
+    }
+
+    /** Les outils, TaskForce compris, que cette proposition cite, dans l'ordre, chacun avec son rôle. */
+    private List<Mention> mentions(String clause) {
+        String said = plain(clause);
+        List<Mention> found = new ArrayList<>();
+        for (Alias alias : aliases()) {
+            Matcher m = alias.pattern().matcher(said);
+            while (m.find()) {
+                Role role = roleAt(clause, said, m.start(), m.end());
+                // Un mot courant (Notion, Make) ne nomme un outil cité ou objet qu'avec sa majuscule : « la notion de ».
+                if (COMMON_WORDS.contains(alias.alias()) && (role == Role.MENTION || role == Role.OBJECT)
+                    && !capitalized(clause, m.start())) continue;
+                found.add(new Mention(alias.tool(), m.start(), role));
             }
         }
-        Map<Integer, List<String>> byPosition = new TreeMap<>();
-        firstAt.forEach((name, at) -> byPosition.computeIfAbsent(at, position -> new ArrayList<>()).add(name));
-        List<Named> named = new ArrayList<>();
-        byPosition.values().forEach(names -> names.forEach(name -> named.add(new Named(name, Set.copyOf(keysByName.get(name))))));
-        return named;
+        found.sort((a, b) -> Integer.compare(a.at(), b.at()));
+        return found;
+    }
+
+    private static boolean capitalized(String clause, int at) {
+        return at < clause.length() && Character.isUpperCase(clause.charAt(at));
+    }
+
+    /** Ce qui fait un outil d'une proposition : sa place par rapport aux prépositions, aux choses et aux verbes. */
+    private static Role roleAt(String clause, String said, int start, int end) {
+        String before = said.substring(0, start);
+        String original = clause.substring(0, Math.min(start, clause.length()));
+        if (DEST_BEFORE.matcher(before).find() || ACCENT_A_BEFORE.matcher(original).find()) return Role.DEST;
+        if (SOURCE_BEFORE.matcher(before).find()) return Role.SOURCE;
+        // Après une chose : « un projet TaskForce », « à partir du projet Linear », « ma page Notion ».
+        Matcher thing = THING_BEFORE.matcher(before);
+        if (thing.find()) return phraseRole(before.substring(0, thing.start()), original.substring(0, Math.min(thing.start(),
+            original.length())));
+        // Avant elle, en anglais : « a Linear issue », « from the Linear project ».
+        if (THING_AFTER.matcher(said.substring(end)).lookingAt()) return phraseRole(before, original);
+        // L'objet d'un verbe : « Search Notion for », « regarde Linear ».
+        String[] words = before.strip().split("[^\\p{L}\\p{N}]+");
+        int last = words.length - 1;
+        while (last >= 0 && Set.of("moi", "me", "m", "").contains(words[last])) last--;
+        if (last >= 0 && Intent.isVerb(words[last])) return Role.OBJECT;
+        return Role.MENTION;
+    }
+
+    /** Le rôle d'une chose qui porte le nom d'un outil : d'où elle vient, où elle va, ou ce sur quoi la phrase agit. */
+    private static Role phraseRole(String before, String original) {
+        if (SOURCE_BEFORE.matcher(before).find()) return Role.SOURCE;
+        if (DEST_BEFORE.matcher(before).find() || ACCENT_A_BEFORE.matcher(original).find()) return Role.DEST;
+        return Role.OBJECT;
+    }
+
+    private static final String DET = "(?:(?:le|la|les|l'|un|une|des|ce|cet|cette|ces|mon|ma|mes|ton|ta|tes|son|sa|ses|notre|"
+        + "votre|nos|vos|leur|leurs|the|a|an|this|that|these|those|my|your|our|their)\\s*)?";
+    /** Ce qui précède le lieu d'une action : « dans », « sur », « vers », « en », « au », « in », « on », « to »... */
+    private static final Pattern DEST_BEFORE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:dans|sur|vers|en|au|aux|chez|via|in|"
+        + "on|into|onto|to|inside|within)\\s+" + DET + "$");
+    /** « à », avec son accent, lu dans le texte même : sans lui, « a » est aussi un article anglais. */
+    private static final Pattern ACCENT_A_BEFORE = Pattern.compile("(?<![\\p{L}\\p{N}])à\\s+" + DET + "$",
+        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    /** Ce qui précède une source : « à partir du », « depuis », « de », « from », « based on »... */
+    private static final Pattern SOURCE_BEFORE = Pattern.compile("(?<![\\p{L}\\p{N}])(?:a\\s+partir\\s+(?:de|du|des|d')|"
+        + "depuis|de|du|des|d'|from|out\\s+of|based\\s+on|off)\\s*" + DET + "$");
+    private static final String THINGS = "(?:issues?|tickets?|taches?|tasks?|cartes?|cards?|bugs?|projets?|projects?|pages?|"
+        + "documents?|docs?|commentaires?|comments?|notes?|messages?|canal|canaux|channels?|dossiers?|folders?|fichiers?|"
+        + "files?|bases?|databases?|tableaux?|boards?|espaces?|workspaces?|equipes?|teams?|sprints?|cycles?|deals?|"
+        + "contacts?|leads?|evenements?|events?|reunions?|meetings?|prs?|pull\\s+requests?|repos?|branches?|scenarios?|"
+        + "workflows?|automatisations?|automations?)";
+    private static final Pattern THING_BEFORE = Pattern.compile("(?<![\\p{L}\\p{N}])" + THINGS + "\\s+$");
+    private static final Pattern THING_AFTER = Pattern.compile("\\s+" + THINGS + "(?![\\p{L}\\p{N}])");
+
+    /** Une façon de nommer un outil, son outil, et le mot entier qui le trouve. */
+    private record Alias(String alias, Named tool, Pattern pattern) {
+    }
+
+    private volatile List<Alias> aliases;
+
+    /** Les façons de nommer chaque outil du catalogue, et TaskForce, lues une fois. */
+    private List<Alias> aliases() {
+        List<Alias> known = aliases;
+        if (known != null) return known;
+        Map<String, Set<String>> keysByName = new LinkedHashMap<>();
+        Map<String, Set<String>> aliasesByName = new LinkedHashMap<>();
+        for (ConnectorDescriptor connector : catalog.all()) {
+            if (connector.name() == null || connector.name().isBlank()) continue;
+            keysByName.computeIfAbsent(connector.name(), name -> new LinkedHashSet<>()).add(connector.key());
+            aliasesByName.computeIfAbsent(connector.name(), name -> new LinkedHashSet<>()).addAll(aliases(connector));
+        }
+        List<Alias> built = new ArrayList<>();
+        built.add(new Alias("taskforce", new Named(TASKFORCE, Set.of()), word("taskforce")));
+        aliasesByName.forEach((name, names) -> {
+            Named tool = new Named(name, Set.copyOf(keysByName.get(name)));
+            names.forEach(alias -> built.add(new Alias(alias, tool, word(alias))));
+        });
+        aliases = List.copyOf(built);
+        return aliases;
+    }
+
+    private static Pattern word(String alias) {
+        return Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(alias) + "(?![\\p{L}\\p{N}])");
     }
 
     /** Les façons de nommer un outil : son nom, sa clé en mots (sans « -mcp »), sans accents ni casse. */

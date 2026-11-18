@@ -1,0 +1,55 @@
+package com.taskforce.tf_api.core.service.agent;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Ce qu'une demande veut faire, lu sur ses verbes (R204, relecture R159 de la PR #548) : l'intention d'écrire tient au
+ * verbe d'action, jamais à un mot isolé.
+ */
+@DisplayName("Ce qu'une demande veut faire (R159)")
+class IntentTest {
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "crée une tâche dans Linear                          | true",
+        "Tu peux me creer un nouveau projet dans Linear ?    | true",
+        "passe TF-12 en Done                                 | true",
+        "Résume TF-21 et poste-le sur Slack                  | true",
+        "Create an issue in Linear                           | true",
+        "please post it on Slack                             | true",
+        "Peux-tu l'archiver ?                                | true",
+        "Merci de créer le projet                            | true",
+        // Un mot isolé n'écrit rien : un pronominal, un adjectif, un passé, un nom.
+        "Qu'est-ce qui se passe dans Linear ?                | false",
+        "Quels sont les nouveaux tickets dans Linear ?       | false",
+        "Montre-moi ce qui a été fait dans Linear            | false",
+        "What's new in Linear?                               | false",
+        "Tu l'as creer ou ?                                  | false",
+        "It was set to Done yesterday                        | false",
+        "Open the PDF file attached to the post              | false",
+        "Is there any change on the board?                   | false",
+        "C'est mergé sur GitHub                              | false",
+    })
+    void a_request_writes_by_its_action_verb(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+    }
+
+    @Test
+    @DisplayName("une proposition sans verbe complète celle d'avant, ou ouvre la suivante ; un constat ne fait rien")
+    void a_piece_without_a_verb_belongs_to_a_clause() {
+        assertThat(Intent.clauses("crée une issue pour le login et le paiement dans Linear"))
+            .singleElement().satisfies(clause -> {
+                assertThat(clause.does()).isEqualTo(Intent.Does.WRITE);
+                assertThat(clause.text()).contains("dans Linear");
+            });
+        assertThat(Intent.clauses("Dans Linear, crée une tâche")).singleElement()
+            .satisfies(clause -> assertThat(clause.text()).startsWith("Dans Linear"));
+        assertThat(Intent.clauses("C'est mergé sur GitHub, passe TF-12 en Done")).extracting(Intent.Clause::does)
+            .containsExactly(Intent.Does.NOTHING, Intent.Does.WRITE);
+    }
+}

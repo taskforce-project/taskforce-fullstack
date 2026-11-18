@@ -961,9 +961,9 @@ public class AgentService {
                     reading.board(board);
                 }
             });
-        // Une demande qui nomme un outil connecté (« crée un projet dans Linear ») ne prend aucun plan de TaskForce (R204) :
-        // le plan « créer un projet » posait lui-même la question d'un projet de TaskForce, et le créait dans TaskForce.
-        CortexPlans.Plan plan = targets.namedIn(message).isEmpty() ? CortexPlans.forRequest(message).orElse(null) : null;
+        // Le plan de la demande ; « créer un projet » de TaskForce cède quand ses écritures vont ailleurs (R204, R159).
+        TargetSystems.Said said = targets.said(message);
+        CortexPlans.Plan plan = planFor(message, said);
         // Résumer une issue : TaskForce la lit et la donne au modèle avant qu'il écrive, au lieu d'espérer qu'il la lise
         // (test du CEO du 05/11/2026 : qwen3:8b commentait OPS-35 avec ce qu'elle ne dit pas). Une issue jointe se lit
         // aussi, résumé ou non.
@@ -1000,7 +1000,7 @@ public class AgentService {
         // Où travaille la conversation (R135), dit au modèle ; l'écran le renseigne, ce projet-ci décide.
         String workingIn = ctx.project() == null ? "" : screens.conversationProject(ctx);
         if (workingIn != null && !workingIn.isBlank()) seen = workingIn.strip() + (seen.isEmpty() ? "\n" : "\n\n" + seen);
-        String system = systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC), gaps);
+        String system = systemPrompt(plan, seen, hits, external, LocalDate.now(ZoneOffset.UTC), gaps, said);
         List<Map<String, Object>> toolDefs = tools.toolDefinitions(external);
         String tier = external.isEmpty() ? "fast" : mcpToolTier;
         // Le budget de la requête, contre la fenêtre de son modèle (TF-J1-13) : ce qui ne tient pas ne part pas, et
@@ -1126,11 +1126,11 @@ public class AgentService {
         List<AgentTool> connected = context.external().stream().map(this::frozen).toList();
         List<AgentTool> external = relevantExternal(connected, replayCase.question());
         // Le plan de la question, comme dans une réponse (R117, R204) : la banque dit s'il est suivi.
-        CortexPlans.Plan plan = targets.namedIn(replayCase.question()).isEmpty()
-            ? CortexPlans.forRequest(replayCase.question()).orElse(null) : null;
+        TargetSystems.Said said = targets.said(replayCase.question());
+        CortexPlans.Plan plan = planFor(replayCase.question(), said);
         List<Gap> gaps = gaps(connected, replayCase.question(), Map.of());
-        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, seen, notes, external, replayCase.askedOn(), gaps),
-            history, asked);
+        List<Map<String, Object>> messages = withHistory(systemPrompt(plan, seen, notes, external, replayCase.askedOn(), gaps,
+            said), history, asked);
         ReplayStep step = new ReplayStep(replayCase, gate.rulesFor(ctx), ctx);
         List<ActionClaimCheck.Done> thread = context.done(targets::of);
         llm.beginUsageCapture();
@@ -1555,8 +1555,11 @@ public class AgentService {
         private UUID record;
         /** L'espace de TaskForce où ses outils écrivent, que la carte d'une écriture nomme (R204). */
         private final String workspace;
-        /** Les outils que la demande nomme (« dans Linear ») : une écriture ailleurs se montre comme telle (R204). */
-        private final List<TargetSystems.Named> named;
+        /**
+         * Où vont les écritures de la demande (« dans Linear », « un projet TaskForce ») : une écriture ailleurs se montre
+         * comme telle (R204) ; un outil cité comme source (« à partir du projet Linear ») n'est pas une cible (R159).
+         */
+        private final TargetSystems.Said said;
 
         Kernel(AgentContext ctx, String question, Map<String, Object> origin, String workspace) {
             this.ctx = ctx;
@@ -1564,7 +1567,7 @@ public class AgentService {
             this.origin = origin;
             this.exposure = CortexGate.Exposure.of(origin);
             this.workspace = workspace;
-            this.named = targets.namedIn(question);
+            this.said = targets.said(question);
         }
 
         /**
@@ -1600,8 +1603,7 @@ public class AgentService {
 
         /** L'outil que la demande nomme quand cette écriture n'y écrit pas ; null quand elle y écrit, ou n'en nomme aucun. */
         private TargetSystems.Named elsewhere(String system) {
-            if (named.isEmpty() || named.stream().anyMatch(tool -> tool.is(system))) return null;
-            return named.get(0);
+            return said.elsewhere(system);
         }
 
         /**
@@ -1812,7 +1814,21 @@ public class AgentService {
      * d'abord, et parmi eux ceux qui font ce qu'elle dit, en français comme en anglais ; puis on plafonne.
      */
     private List<AgentTool> relevantExternal(List<AgentTool> external, String message) {
-        return ToolChoice.choose(external, message, targets.namedIn(message), maxExternalTools);
+        return ToolChoice.choose(external, message, targets.said(message).cited(), maxExternalTools);
+    }
+
+    /** Le plan qui crée un projet dans TaskForce, et pose lui-même la question de son nom (R135). */
+    private static final String CREATE_PROJECT_PLAN = "create-project";
+
+    /**
+     * Le plan de la demande (R117) : celui qu'elle appelle, sauf « créer un projet » de TaskForce quand chacune de ses
+     * écritures va dans un autre outil (R204 : « crée un projet dans Linear » créait un projet dans TaskForce). Les autres
+     * plans restent : « Résume TF-21 et poste-le sur Slack » garde son résumé (relecture R159 de la PR #548).
+     */
+    private static CortexPlans.Plan planFor(String message, TargetSystems.Said said) {
+        CortexPlans.Plan plan = CortexPlans.forRequest(message).orElse(null);
+        if (plan != null && CREATE_PROJECT_PLAN.equals(plan.id()) && said.writesOnlyElsewhere()) return null;
+        return plan;
     }
 
     /**
@@ -1865,16 +1881,17 @@ public class AgentService {
     static final String ABOUT_CONNECTIONS = ActionClaimCheck.SIGNATURE + " · connections";
 
     /**
-     * Les outils que la demande nomme et où Cortex ne peut pas faire ce qu'elle dit (R204) : sans outil servi pour la
-     * personne, l'état de sa connexion le dit ({@code states}, par clé de connecteur ; vide au rejeu) ; avec des outils
-     * qui ne font que lire, une demande qui écrit manque de l'écriture.
+     * Les outils où la demande veut lire ou écrire et où Cortex ne peut pas faire ce qu'elle dit (R204) : sans outil servi
+     * pour la personne, l'état de sa connexion le dit ({@code states}, par clé de connecteur ; vide au rejeu) ; avec des
+     * outils qui ne font que lire, une écriture qui va dans cet outil manque de l'écriture. Une lecture n'en manque pas
+     * (relecture R159 : « Qu'est-ce qui se passe dans Linear ? », « les nouveaux tickets »).
      */
     List<Gap> gaps(List<AgentTool> external, String message, Map<String, String> states) {
-        List<TargetSystems.Named> named = targets.namedIn(message);
-        if (named.isEmpty()) return List.of();
-        boolean writes = ToolChoice.asked(message).writes();
+        TargetSystems.Said said = targets.said(message);
+        if (said.places().isEmpty()) return List.of();
         List<Gap> gaps = new ArrayList<>();
-        for (TargetSystems.Named tool : named) {
+        for (TargetSystems.Named tool : said.places()) {
+            boolean writes = said.writesIn(tool);
             List<AgentTool> its = external.stream().filter(t -> ToolChoice.isNamed(t, List.of(tool))).toList();
             if (its.isEmpty()) {
                 String state = tool.keys().stream().map(states::get).filter(Objects::nonNull).findFirst().orElse(Gap.NOT_CONNECTED);
@@ -1934,6 +1951,32 @@ public class AgentService {
     /** Le même, avec ce que TaskForce a constaté de l'outil que la demande nomme (R204). */
     private String systemPrompt(CortexPlans.Plan plan, String screen, List<KnowledgeNode> hits, List<AgentTool> external,
                                 LocalDate today, List<Gap> gaps) {
+        return systemPrompt(plan, screen, hits, external, today, gaps, TargetSystems.Said.NOTHING);
+    }
+
+    /**
+     * Ce que le modèle lit d'où écrire (R204, relecture R159 de la PR #548) : l'outil où la demande écrit, avec ses propres
+     * outils, jamais dans TaskForce à sa place ; ou TaskForce, quand la demande le nomme, un outil cité comme source
+     * (« à partir du projet Linear ») n'étant que là où lire. Rien quand la demande ne dit pas où elle écrit.
+     */
+    static String whereToWrite(TargetSystems.Said said) {
+        List<String> elsewhere = said.targets().stream().map(TargetSystems.Named::name)
+            .filter(name -> !TargetSystems.TASKFORCE.equals(name)).toList();
+        if (!elsewhere.isEmpty() && said.writesOnlyElsewhere()) {
+            String names = String.join(" and ", elsewhere);
+            return "The person asks to write in " + names + ": do it there with " + names + "'s own tools, never in "
+                + "TaskForce instead; when a value it needs is missing (a team, a name), read it with that tool or ask. ";
+        }
+        if (said.targets().stream().anyMatch(target -> target.is(TargetSystems.TASKFORCE))) {
+            return "The person asks to write in TaskForce: do it with TaskForce's tools. A connected tool the request names "
+                + "as a source (\"from Linear\") is only where to read what you need. ";
+        }
+        return "";
+    }
+
+    /** Le même, avec où la demande écrit (R204, R159). */
+    private String systemPrompt(CortexPlans.Plan plan, String screen, List<KnowledgeNode> hits, List<AgentTool> external,
+                                LocalDate today, List<Gap> gaps, TargetSystems.Said said) {
         StringBuilder sb = new StringBuilder();
         sb.append("You are Cortex, the AI copilot of a TaskForce workspace. Answer in the user's language, ")
           .append("concisely, grounded in the real context. ")
@@ -1991,11 +2034,9 @@ public class AgentService {
               .append("For an action possible on both sides (e.g. creating an issue), target TaskForce by default; ")
               .append("target an external system only when the user names it. ")
               .append("Call an external write tool only with explicit, checked parameters and only when the user ")
-              .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ")
-              // R204 : la demande qui nomme un outil s'y fait, avec ses outils ; jamais dans TaskForce à sa place.
-              .append("When the person names a connected tool (\"in Linear\"), do it there with that tool's own tools, never ")
-              .append("in TaskForce instead; when a value it needs is missing (a team, a name), read it with that tool or ask. ");
+              .append("asked for it; it never runs directly: an owner or admin approves it in the conversation. ");
         }
+        sb.append(whereToWrite(said));
         gaps.forEach(gap -> sb.append(gap.forTheModel()));
         if (plan != null) sb.append("\n\n").append(plan.text());
         if (screen != null && !screen.isBlank()) sb.append("\n\n").append(screen.strip());
