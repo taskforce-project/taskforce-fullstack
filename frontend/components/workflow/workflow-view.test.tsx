@@ -251,6 +251,34 @@ describe("le workflow d'un projet", () => {
     await waitFor(() => expect(screen.queryByText("1 link")).toBeNull())
   })
 
+  it("Show all links sans aucun lien le dit, au lieu de ne rien montrer (R204, recette de la 1.17.0, s09)", async () => {
+    serve({ issues: [issue(1, { title: "Write the spec" }), issue(2, { title: "Build it" })] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+    expect(screen.queryByText(CONSTANTS_EN.workflow.links.none)).toBeNull()
+
+    const header = document.querySelector("[data-objective-header]") as HTMLElement
+    fireEvent.click(within(header).getByRole("button", { name: "Show all links" }))
+
+    expect(await screen.findByText(CONSTANTS_EN.workflow.links.none)).toHaveAttribute("role", "status")
+    fireEvent.click(within(header).getByRole("button", { name: "Show all links" }))
+    await waitFor(() => expect(screen.queryByText(CONSTANTS_EN.workflow.links.none)).toBeNull())
+  })
+
+  it("Show all links avec des liens ne dit pas qu'il n'y en a aucun", async () => {
+    const a = issue(1, { title: "Write the spec" })
+    const b = issue(2, { title: "Build it" })
+    serve({ issues: [a, b], relations: [relation(1, a, b)] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+
+    const header = document.querySelector("[data-objective-header]") as HTMLElement
+    fireEvent.click(within(header).getByRole("button", { name: "Show all links" }))
+
+    expect(useWorkflowViewStore.getState().allLinks["7"]).toBe(true)
+    expect(screen.queryByText(CONSTANTS_EN.workflow.links.none)).toBeNull()
+  })
+
   it("Show all links est dans l'en-tête de la vue, même large : la ligne des onglets garde « Settings » (R161, N9)", async () => {
     serve({ issues: [issue(1, { title: "Write the spec" })] })
     render(<WorkflowView slug="acme" projectId={3} />)

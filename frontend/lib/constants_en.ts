@@ -683,6 +683,8 @@ export const CONSTANTS_EN = {
     // "Show all links" (decision of the CEO, 16/11/2026): every link between the cards on screen, as a blueprint.
     links: {
       show: "Show all links",
+      // R204: an empty view says it is empty (acceptance run of 1.17.0, step s09: the switch drew nothing, and said nothing).
+      none: "No links in this project yet: a link appears when an issue blocks another.",
       more: "and {count} more links",
       countOne: "1 link",
       countMany: "{count} links",

@@ -477,6 +477,14 @@ function WorkflowBoard({ slug, projectId, load, retry }: Readonly<{
             moreLabel={allLinks ? (count) => fillText(t.links.more, { count }) : undefined}
           />
         )}
+        {/* Une vue vide dit qu'elle est vide (R204, recette de la 1.17.0, s09) : sans aucun lien, « Show all links » ne
+            dessinait rien et ne disait rien. Large comme étroite, à l'endroit où se dit ce qui ne se dessine pas. */}
+        {allLinks && !empty && everyEdge.length === 0 && (
+          <p role="status" data-links-none
+            className="pointer-events-none absolute bottom-2 left-3 z-20 bg-background/90 px-1.5 text-xs text-muted-foreground">
+            {t.links.none}
+          </p>
+        )}
         {showInspector && selected && (
           <Inspector
             slug={slug}
