@@ -2810,4 +2810,46 @@ class AgentServiceTest {
         assertThat(read.status()).isEqualTo("success");
         assertThat(read.where()).isNull();
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548 (18/11/2026) : les voisins des cas de la recette
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("R159 (1) : une lecture de TaskForce se fait d'emblée, même quand la demande nomme un outil où écrire")
+    void a_read_is_done_at_once_when_the_request_names_a_tool() throws Exception {
+        modelCalls("get_mission", "{\"issue\":\"TF-12\"}", "La mission attend.");
+        CortexGesture mission = gesture("get_mission", "issue.read");
+        when(mission.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(mission.perform(any(), any())).thenReturn(new CortexGesture.Done("The mission on TF-12 waits for the runner.",
+            null, null));
+
+        AssistantToolCall read = service.run("acme", 7L, "Où en est la mission de TF-12 ? Ensuite crée une tâche dans Linear")
+            .toolCalls().get(0);
+
+        assertThat(read.status()).isEqualTo("success");
+        assertThat(read.output()).doesNotContain("Not done");
+        verify(mission).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("R159 (1) : la lecture d'un autre outil connecté se fait d'emblée ; seule une écriture ailleurs attend sa carte")
+    @SuppressWarnings("unchecked")
+    void a_read_in_another_connected_tool_is_done_at_once() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        lenient().when(tools.get(anyString(), anyList())).thenAnswer(inv -> ((List<AgentTool>) inv.getArgument(1)).stream()
+            .filter(tool -> tool.name().equals(inv.getArgument(0))).findFirst().orElse(null));
+        when(extClient.callTool(any(), eq("list_issues"), any())).thenReturn("ENG-1 Login fails");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"linear__list_issues\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Voici les tickets.\"}"));
+
+        AssistantToolCall read = service.run("acme", 7L, "Crée une tâche dans Asana avec les tickets ouverts").toolCalls().get(0);
+
+        assertThat(read.status()).isEqualTo("success");
+        verify(extClient).callTool(any(), eq("list_issues"), any());
+    }
 }

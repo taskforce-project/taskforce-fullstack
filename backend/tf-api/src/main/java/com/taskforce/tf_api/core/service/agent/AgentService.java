@@ -1589,6 +1589,15 @@ public class AgentService {
                 asked == null ? null : asked.name());
         }
 
+        /**
+         * L'outil que la demande nomme quand ce geste est une écriture qui n'y va pas ; null pour une lecture (de TaskForce
+         * ou d'un outil connecté), et pour une écriture qui va où la demande le dit.
+         */
+        private TargetSystems.Named writesElsewhere(String name, CortexGate.Verdict verdict) {
+            if (CortexGate.READS.contains(verdict.facts().get("action"))) return null;
+            return elsewhere(targets.of(name));
+        }
+
         /** L'outil que la demande nomme quand cette écriture n'y écrit pas ; null quand elle y écrit, ou n'en nomme aucun. */
         private TargetSystems.Named elsewhere(String system) {
             if (named.isEmpty() || named.stream().anyMatch(tool -> tool.is(system))) return null;
@@ -1659,10 +1668,11 @@ public class AgentService {
                         status = "pending";
                         if (prepared != null && prepared.args() != null) shown = objectMapper.writeValueAsString(prepared.args());
                     }
-                } else if (!doneAtOnce(name, verdict) || elsewhere(targets.of(name)) != null) {
+                } else if (!doneAtOnce(name, verdict) || writesElsewhere(name, verdict) != null) {
                     // R204 : une écriture qui ne va pas dans l'outil que la demande nomme ne se fait pas d'emblée, même
-                    // quand elle se défait : sa carte dit où elle écrirait, et la personne décide.
-                    TargetSystems.Named instead = elsewhere(targets.of(name));
+                    // quand elle se défait : sa carte dit où elle écrirait, et la personne décide. Une lecture, d'ici ou
+                    // d'un outil connecté, n'écrit nulle part : elle se fait (relecture R159 de la PR #548).
+                    TargetSystems.Named instead = writesElsewhere(name, verdict);
                     String resolved = ask(tool, argsJson);
                     result = instead == null ? ASKED_TEXT : elsewhereText(instead.name(), targets.of(name));
                     status = "pending";
