@@ -139,4 +139,18 @@ class TargetSystemsTest {
         assertThat(both.writesOnlyElsewhere()).isFalse();
         assertThat(TARGETS.said("Liste les projets").elsewhere("Linear")).isNull();
     }
+
+    @ParameterizedTest(name = "« {0} » écrit dans : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Un participe qui suit l'écriture décrit ce qu'elle écrit : le lieu qui suit reste le sien.
+        "Crée une issue, assignée à Marie, dans Linear   | Linear",
+        "Create an issue, assigned to Marie, in Linear   | Linear",
+        "Merged on GitHub, move TF-12 to Done            | ",
+    })
+    void a_participle_after_a_write_keeps_its_place(String request, String targets) {
+        List<String> expected = targets == null || targets.isBlank() ? List.of() : List.of(targets.trim().split(";"));
+
+        assertThat(TARGETS.said(request).targets()).extracting(TargetSystems.Named::name)
+            .containsExactlyElementsOf(expected);
+    }
 }

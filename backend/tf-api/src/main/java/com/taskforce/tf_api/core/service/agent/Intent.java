@@ -117,8 +117,11 @@ final class Intent {
             if (piece.isBlank()) continue;
             Does does = does(piece, asked.get(i));
             if (does == null) {
-                // Un morceau sans verbe : il complète la proposition d'avant, ou ouvre la suivante.
-                if (clauses.isEmpty()) {
+                // Un morceau sans verbe : il complète la proposition d'avant (« ..., assignée à Marie, dans Linear »), ou
+                // ouvre la suivante ; en tête de demande, un participe raconte (« Mergé sur GitHub, passe TF-12 en Done »).
+                if (clauses.isEmpty() && PARTICIPLE.matcher(piece).find()) {
+                    clauses.add(new Clause(piece.strip(), Does.NOTHING));
+                } else if (clauses.isEmpty()) {
                     leading.append(piece).append(' ');
                 } else {
                     Clause last = clauses.remove(clauses.size() - 1);
@@ -144,7 +147,10 @@ final class Intent {
         return clauses(request).stream().anyMatch(clause -> clause.does() == Does.WRITE);
     }
 
-    /** Ce que fait un morceau : écrire, lire, rien (un constat) ; null pour un morceau sans verbe ni question. */
+    /**
+     * Ce que fait un morceau : écrire, lire, rien (un constat, par sa copule) ; null pour un morceau sans verbe ni question,
+     * un participe seul compris, qui décrit ce qu'écrit la proposition d'avant.
+     */
     static Does does(String piece, boolean question) {
         String[] tokens = TargetSystems.plain(piece).split("[^\\p{L}\\p{N}]+");
         List<String> words = new ArrayList<>();
@@ -157,8 +163,7 @@ final class Intent {
             reads = READS.contains(words.get(i)) && (i == 0 || !DETERMINERS.contains(words.get(i - 1)));
         }
         if (reads) return Does.READ;
-        boolean statement = words.stream().anyMatch(STATEMENTS::contains) || PARTICIPLE.matcher(piece).find();
-        return statement ? Does.NOTHING : null;
+        return words.stream().anyMatch(STATEMENTS::contains) ? Does.NOTHING : null;
     }
 
     /** Le mot à cette place est-il un verbe d'écriture qui demande, plutôt qu'un nom, un passé ou un pronominal ? */

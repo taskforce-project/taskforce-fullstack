@@ -52,4 +52,15 @@ class IntentTest {
         assertThat(Intent.clauses("C'est mergé sur GitHub, passe TF-12 en Done")).extracting(Intent.Clause::does)
             .containsExactly(Intent.Does.NOTHING, Intent.Does.WRITE);
     }
+
+    @Test
+    @DisplayName("un participe après une écriture décrit ce qu'elle écrit ; en tête de demande, c'est un constat")
+    void a_participle_after_a_write_describes_its_object() {
+        assertThat(Intent.clauses("Crée une issue, assignée à Marie, dans Linear")).singleElement().satisfies(clause -> {
+            assertThat(clause.does()).isEqualTo(Intent.Does.WRITE);
+            assertThat(clause.text()).contains("dans Linear");
+        });
+        assertThat(Intent.clauses("Merged on GitHub, move TF-12 to Done")).extracting(Intent.Clause::does)
+            .containsExactly(Intent.Does.NOTHING, Intent.Does.WRITE);
+    }
 }
