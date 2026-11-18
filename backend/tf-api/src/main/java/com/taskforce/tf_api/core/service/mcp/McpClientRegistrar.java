@@ -189,7 +189,7 @@ public class McpClientRegistrar {
             // L'éditeur refuse d'inscrire TaskForce (Dropbox, 16/11/2026 : HTTP 403 « registration_not_supported ») :
             // comme sans inscription possible, l'étape de l'administrateur (R204). Une réponse sans identifiant reste
             // REGISTRATION_REFUSED, plus bas : l'éditeur a accepté, et sa réponse est fausse.
-            if (!ConnectFailure.REGISTRATION_REFUSED.equals(refused.getErrorCode())) throw refused;
+            if (!refusesToRegister(refused)) throw refused;
             log.info("Inscription dynamique refusée par {} : l'étape de l'administrateur à la place ({})",
                 LogSafe.of(auth.issuer()), LogSafe.of(refused.getMessage()));
             throw new NoClient("This tool refuses to let TaskForce register on its own: its admin has to set up an app.");
@@ -202,6 +202,17 @@ public class McpClientRegistrar {
         registrations.save(McpOAuthRegistration.builder().issuer(auth.issuer()).redirectUri(redirectUri)
             .clientId(clientId).clientSecret(secret).build());
         return new RegisteredClient(clientId, secret, DCR);
+    }
+
+    /**
+     * L'éditeur refuse-t-il d'inscrire TaskForce, plutôt que de refuser cette demande-là (relecture R159 de la PR #548) : un
+     * 401 ou un 403, ou l'erreur {@code registration_not_supported}. Une autre erreur (une adresse de retour refusée, des
+     * métadonnées invalides) reste un échec de l'inscription, que l'écran dit comme tel.
+     */
+    private static boolean refusesToRegister(BusinessException refused) {
+        if (!ConnectFailure.REGISTRATION_REFUSED.equals(refused.getErrorCode())) return false;
+        if (!(refused instanceof McpOAuthClient.OAuthError error)) return false;
+        return error.status() == 401 || error.status() == 403 || "registration_not_supported".equals(error.error());
     }
 
     /** Le corps de l'inscription : un client public (PKCE), du type de l'app qui le présente (norme MCP). */

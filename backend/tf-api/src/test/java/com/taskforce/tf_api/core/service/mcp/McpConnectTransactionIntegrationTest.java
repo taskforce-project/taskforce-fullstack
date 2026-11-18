@@ -98,8 +98,10 @@ class McpConnectTransactionIntegrationTest extends AbstractIntegrationTest {
         when(discovery.discover(anyString())).thenReturn(new DiscoveredAuth("https://www.dropbox.com",
             "https://www.dropbox.com/oauth2/authorize", "https://api.dropboxapi.com/oauth2/token",
             "https://www.dropbox.com/oauth2/register", null));
-        when(http.postJson(anyString(), any())).thenThrow(ConnectFailure.of(ConnectFailure.REGISTRATION_REFUSED,
-            "OAuth DCR https://www.dropbox.com/oauth2/register : HTTP 403 (registration_not_supported)"));
+        // Ce que rend McpOAuthClient pour le refus de Dropbox : son statut et son erreur OAuth (relecture R159, défaut 13).
+        when(http.postJson(anyString(), any())).thenThrow(new McpOAuthClient.OAuthError(ConnectFailure.REGISTRATION_REFUSED,
+            "OAuth DCR https://www.dropbox.com/oauth2/register : HTTP 403 (registration_not_supported)",
+            "registration_not_supported", 403));
 
         ConnectOutcome outcome = connect("dropbox");
 
