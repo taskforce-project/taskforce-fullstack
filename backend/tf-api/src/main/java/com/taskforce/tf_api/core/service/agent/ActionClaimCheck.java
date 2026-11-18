@@ -615,9 +615,12 @@ public final class ActionClaimCheck {
 
     /** Une condition n'affirme rien : « si je ne l'ai pas créé », « if it wasn't created ». */
     private static final Pattern CONDITION = Pattern.compile("\\b(?:if|unless|whether|si|à\\s+moins)\\b", FLAGS);
-    /** Une autre chose que celle qui a été faite : « je n'ai pas créé d'autre projet ». */
-    private static final Pattern ANOTHER = Pattern.compile("\\b(?:another|other|others|autre|autres|second|deuxième|deuxieme)\\b",
-        FLAGS);
+    /**
+     * Une autre chose que celle qui a été faite : « je n'ai pas créé d'autre projet », « pas encore le nouveau projet »,
+     * « no duplicate » (relecture R159 de la PR #548).
+     */
+    private static final Pattern ANOTHER = Pattern.compile("\\b(?:another|other|others|autre|autres|second|deuxième|deuxieme|"
+        + "new|nouveau|nouvelle|nouveaux|nouvelles|nouvel|duplicates?|doublons?)\\b", FLAGS);
     private static final Pattern KEY_IN = Pattern.compile("\\b" + KEY + "\\b", FLAGS);
 
     /** Ce sur quoi porte un geste ou une phrase : une issue (une tâche, une carte), un projet, un commentaire, une note. */
@@ -823,13 +826,15 @@ public final class ActionClaimCheck {
         return things;
     }
 
-    /** Les systèmes que la phrase nomme, parmi ceux que TaskForce connaît ici. */
+    /**
+     * Les systèmes que la phrase nomme, parmi ceux que TaskForce connaît : un nom en un mot entier, un mot courant (Close,
+     * Notion...) seulement après un lieu (« dans Notion »), comme dans une demande.
+     */
     private static Set<String> systemsIn(String sentence, Set<String> systems) {
         Set<String> named = new LinkedHashSet<>();
         for (String system : systems) {
             if (system == null || system.isBlank()) continue;
-            Pattern word = Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(system) + "(?![\\p{L}\\p{N}])", FLAGS);
-            if (word.matcher(sentence).find()) named.add(system);
+            if (TargetSystems.names(sentence, system)) named.add(system);
         }
         return named;
     }
@@ -854,10 +859,15 @@ public final class ActionClaimCheck {
         return done;
     }
 
-    /** Les systèmes qu'une phrase peut nommer : ceux qu'on donne, TaskForce, et ceux où les gestes ont été faits. */
+    /**
+     * Les systèmes qu'une phrase peut nommer : ceux qu'on donne, TaskForce, tous les outils du catalogue, connectés ou non
+     * (relecture R159 : « pas dans Linear » ne nie rien de fait dans TaskForce, Linear connecté ou pas, au rejeu aussi), et
+     * ceux où les gestes ont été faits.
+     */
     private static Set<String> names(Set<String> systems, List<Done> done) {
         Set<String> names = new LinkedHashSet<>(systems == null ? Set.of() : systems);
         names.add(TargetSystems.TASKFORCE);
+        names.addAll(TargetSystems.catalogNames());
         done.forEach(act -> { if (act.where() != null) names.add(act.where()); });
         return names;
     }

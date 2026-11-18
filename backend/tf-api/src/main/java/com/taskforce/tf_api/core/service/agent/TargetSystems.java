@@ -68,6 +68,42 @@ public class TargetSystems {
         }
     }
 
+    /**
+     * Les noms de tous les outils du catalogue, et TaskForce : les lieux qu'une phrase de Cortex peut nommer, que l'outil
+     * soit connecté ou non (relecture R159 de la PR #548). Le catalogue livré, lu une fois.
+     */
+    static Set<String> catalogNames() {
+        return CatalogNames.NAMES;
+    }
+
+    private static final class CatalogNames {
+        private static final Set<String> NAMES = load();
+
+        private static Set<String> load() {
+            ConnectorCatalog catalog = new ConnectorCatalog();
+            catalog.build();
+            Set<String> names = new LinkedHashSet<>();
+            names.add(TASKFORCE);
+            for (ConnectorDescriptor connector : catalog.all()) {
+                if (connector.name() != null && !connector.name().isBlank()) names.add(connector.name());
+            }
+            return java.util.Collections.unmodifiableSet(names);
+        }
+    }
+
+    /**
+     * Une phrase de Cortex nomme-t-elle cet outil : en un mot entier, la casse et les accents ignorés ; un nom qui est aussi
+     * un mot courant (Close, Notion, Make...) seulement après un lieu, et avec sa majuscule : « dans Notion », pas « to
+     * close the sprint ».
+     */
+    static boolean names(String text, String name) {
+        if (text == null || text.isBlank() || name == null || name.isBlank()) return false;
+        String alias = plain(name);
+        if (!COMMON_WORDS.contains(alias)) return find(plain(text), alias) >= 0;
+        return Pattern.compile("(?<![\\p{L}\\p{N}])(?iu:" + PLACE + ")" + Pattern.quote(name) + "(?![\\p{L}\\p{N}])")
+            .matcher(text.replace('’', '\'')).find();
+    }
+
     /** Le connecteur d'un outil externe ({@code linear} pour {@code linear__save_issue}) ; null pour un outil de TaskForce. */
     public static String connectorOf(String tool) {
         int at = tool == null ? -1 : tool.indexOf("__");

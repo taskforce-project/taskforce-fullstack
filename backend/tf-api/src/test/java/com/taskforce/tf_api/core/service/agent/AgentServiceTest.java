@@ -2852,4 +2852,34 @@ class AgentServiceTest {
         assertThat(read.status()).isEqualTo("success");
         verify(extClient).callTool(any(), eq("list_issues"), any());
     }
+
+    @Test
+    @DisplayName("R159 (3) : « pas dans Linear » ne nie pas le projet créé dans TaskForce, même sans Linear connecté")
+    void a_denial_about_a_tool_that_is_not_connected_denies_nothing_done_in_taskforce() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        String said = "Je ne l'ai pas créé dans Linear : il est dans TaskForce.";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu l'as créé où ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).isEqualTo(said);
+    }
+
+    @Test
+    @DisplayName("R159 (3) : au rejeu aussi, « pas dans Linear » ne nie pas ce que les tours d'avant ont fait dans TaskForce")
+    void a_replay_knows_every_tool_of_the_catalog() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        String said = "Je ne l'ai pas créé dans Linear : il est dans TaskForce.";
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", said))));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        assertThat(outcome.answer()).isEqualTo(said);
+    }
 }

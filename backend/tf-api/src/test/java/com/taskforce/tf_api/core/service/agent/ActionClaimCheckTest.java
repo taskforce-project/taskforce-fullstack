@@ -422,4 +422,58 @@ class ActionClaimCheckTest {
         assertThat(ActionClaimCheck.check("I created the issue for the login fix.", List.of(), List.of(api12), SYSTEMS)
             .corrected()).isFalse();
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548 (3) : une phrase vraie sur une nouvelle demande n'est pas corrigée
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "« {0} », le projet TESTTASKFO créé au tour d'avant : corrigée {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Une autre chose que celle de la conversation : une nouvelle, un doublon.
+        "Je n'ai pas encore créé le nouveau projet.        | false",
+        "Je n'ai pas créé de nouveau projet.               | false",
+        "I haven't created the new project yet.            | false",
+        "Je n'ai pas créé de doublon du projet.            | false",
+        "I didn't create a duplicate project.              | false",
+        // Le projet de la conversation, nié : corrigé, comme à la recette.
+        "Je n'ai pas créé de projet.                       | true",
+    })
+    void a_denial_of_another_thing_than_the_conversation_s_is_true(String sentence, boolean corrected) {
+        assertThat(ActionClaimCheck.check(sentence, List.of(), List.of(CREATED), SYSTEMS).corrected()).isEqualTo(corrected);
+    }
+
+    @Test
+    @DisplayName("R159 (3) : « I didn't create a duplicate » reste à côté de ce qui a été fait")
+    void a_duplicate_is_another_thing() {
+        Done api12 = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".");
+
+        Checked checked = ActionClaimCheck.check("I created API-12. I didn't create a duplicate.", List.of(), List.of(api12),
+            SYSTEMS);
+
+        assertThat(checked.corrected()).isFalse();
+        assertThat(checked.answer()).isEqualTo("I created API-12. I didn't create a duplicate.");
+    }
+
+    @Test
+    @DisplayName("R159 (3) : une issue créée plus tôt que la réponse précédente ne se nie pas sans être désignée")
+    void an_older_act_is_denied_only_when_the_sentence_designates_it() {
+        Done older = new Done("create_issue", "TaskForce", "Issue created: API-12 \"Fix login\".", "{\"title\":\"Fix login\"}",
+            false);
+
+        assertThat(ActionClaimCheck.check("Je n'ai pas encore créé l'issue. Dans quel projet la mettre ?", List.of(),
+            List.of(older), SYSTEMS).corrected()).isFalse();
+        assertThat(ActionClaimCheck.check("Je n'ai pas créé API-12.", List.of(), List.of(older), SYSTEMS).denied()).isTrue();
+    }
+
+    @Test
+    @DisplayName("R159 (3) : tous les outils du catalogue sont des lieux, connectés ou non : « pas dans Linear » ne nie pas TaskForce")
+    void every_tool_of_the_catalog_is_a_place() {
+        Checked checked = ActionClaimCheck.check("Je ne l'ai pas créé dans Linear : il est dans TaskForce.", List.of(),
+            List.of(CREATED), Set.of());
+
+        assertThat(checked.corrected()).isFalse();
+        // Un mot courant ne nomme un outil qu'après un lieu : « to close the sprint » ne parle pas de Close.
+        assertThat(ActionClaimCheck.check("I created the project to close the sprint.", List.of(), List.of(CREATED), Set.of())
+            .corrected()).isFalse();
+    }
 }
