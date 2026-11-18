@@ -391,9 +391,11 @@ public class AiConversationService {
         List<AiMessage> messages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
         Map<Long, List<Act>> acts = actsOf(messages);
         // La réponse précédente : ses gestes comptent pour une phrase qui ne les désigne pas (relecture R159 de la PR #548).
+        // La dernière qui a atteint le modèle : ni la ligne de « /compact », ni l'avis d'une demande qui n'a pas tenu sa
+        // fenêtre (second tour).
         Long previous = null;
         for (AiMessage message : messages) {
-            if ("assistant".equals(message.getRole())) previous = message.getId();
+            if ("assistant".equals(message.getRole()) && reachedTheModel(message)) previous = message.getId();
         }
         List<ActionClaimCheck.Done> done = new ArrayList<>();
         for (AiMessage message : messages) {

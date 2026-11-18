@@ -741,6 +741,24 @@ class AiConversationServiceTest {
                 org.assertj.core.api.Assertions.tuple("create_project", true));
     }
 
+    @ParameterizedTest(name = "après « {1} » ({0}) : les gestes de la réponse d'avant restent récents")
+    @CsvSource(delimiter = '|', value = {
+        "compact  | Conversation compacted: the earlier exchanges are summarized.",
+        "not-sent | This request is too long for this model.",
+    })
+    @DisplayName("R159, second tour (F) : la réponse précédente est la dernière qui a atteint le modèle")
+    void the_previous_answer_is_the_last_one_that_reached_the_model(String mode, String line) {
+        AiMessage notice = msg(3L, "assistant", line);
+        notice.setMode("compact".equals(mode) ? AiConversationService.COMPACT_MODE : AssistantAnswer.NOT_SENT);
+        List<AiMessage> messages = new java.util.ArrayList<>(s17());
+        messages.add(notice);
+        when(messageRepository.findByConversationIdOrderByCreatedAtAsc(1L)).thenReturn(messages);
+        s17Record();
+
+        assertThat(service.threadDone(1L)).extracting(com.taskforce.tf_api.core.service.agent.ActionClaimCheck.Done::recent)
+            .containsExactly(true);
+    }
+
     @Test
     @DisplayName("R204 : un dossier qui ne se lit pas ne casse pas le tour ; l'historique part sans les gestes")
     void an_unreadable_record_does_not_break_the_turn() {
