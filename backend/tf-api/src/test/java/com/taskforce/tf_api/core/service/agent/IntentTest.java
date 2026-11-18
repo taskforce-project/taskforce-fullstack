@@ -192,4 +192,17 @@ class IntentTest {
         assertThat(Intent.writes(request)).isEqualTo(writes);
         assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
     }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Une sonde du quatrième tour de la relecture R159 : « recréer » demande d'écrire, comme « créer ».
+        "Bon, tu peux le recréer ?       | true",
+        "Recrée le projet dans Linear    | true",
+        "Recreate the project in Linear  | true",
+        "Tu l'as recréé ?                | false",
+    })
+    void recreating_asks_to_write(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+        assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
+    }
 }

@@ -45,10 +45,11 @@ final class Intent {
         "confie", "confier", "confiez", "delegue", "deleguer", "archive", "archiver", "archivez", "supprime", "supprimer",
         "supprimez", "efface", "effacer", "effacez", "retire", "retirer", "retirez", "enleve", "enlever", "enlevez",
         "copie", "copier", "copiez", "duplique", "dupliquer", "importe", "importer", "exporte", "exporter",
+        "recree", "recreer", "recrees", "recreez",
         // L'anglais ; « change » et « archive » sont déjà là, communs aux deux langues.
         "create", "add", "write", "post", "publish", "comment", "send", "update", "edit", "modify", "rename", "move", "set",
         "assign", "reassign", "unassign", "close", "reopen", "mark", "delegate", "delete", "remove", "trash", "file", "copy",
-        "duplicate", "import", "export", "put", "draft");
+        "duplicate", "import", "export", "put", "draft", "recreate");
 
     /** Des verbes qui sont aussi des noms (« the post », « a PDF file ») : verbes en tête de proposition, ou après « to ». */
     private static final Set<String> AMBIGUOUS = Set.of("file", "post", "comment", "copy", "change", "set", "mark", "close",
