@@ -265,6 +265,23 @@ describe("le workflow d'un projet", () => {
     await waitFor(() => expect(screen.queryByText(CONSTANTS_EN.workflow.links.none)).toBeNull())
   })
 
+  it("Show all links dit qu'il n'y a pas de lien entre ces cartes, même quand le projet en a hors d'elles (R159, défaut 14)", async () => {
+    const a = issue(1, { title: "Write the spec" })
+    const b = issue(2, { title: "Build it" })
+    // Un lien vers une issue qui n'est pas sur la vue (archivée, ou d'un autre projet) : rien à dessiner ici.
+    const elsewhere = issue(9, { title: "Archived spec" })
+    serve({ issues: [a, b], relations: [relation(1, a, elsewhere)] })
+    render(<WorkflowView slug="acme" projectId={3} />)
+    await waitFor(() => expect(card("Write the spec")).toBeInTheDocument())
+
+    const header = document.querySelector("[data-objective-header]") as HTMLElement
+    fireEvent.click(within(header).getByRole("button", { name: "Show all links" }))
+
+    const none = await screen.findByText(CONSTANTS_EN.workflow.links.none)
+    expect(none).toHaveTextContent("No links between these cards yet")
+    expect(none).not.toHaveTextContent("in this project")
+  })
+
   it("Show all links avec des liens ne dit pas qu'il n'y en a aucun", async () => {
     const a = issue(1, { title: "Write the spec" })
     const b = issue(2, { title: "Build it" })
