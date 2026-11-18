@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -2946,6 +2947,30 @@ class AgentServiceTest {
             Map.of("issueId", 5, "projectId", 12, "key", "TF-12"), Map.of("projectId", 12, "issueId", 5, "fields", Map.of())));
 
         AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("success");
+            assertThat(call.where().asked()).isNull();
+        });
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+    }
+
+    /**
+     * La sonde du quatrième tour de la relecture R159 de la PR #548 : aujourd'hui, « selon le ticket Linear » fait de
+     * Linear la cible, update_issue reste en attente et un faux bloc dit Linear non connecté. Le résultat attendu après
+     * la fusion, point 1 de la liste de la PR.
+     */
+    @Disabled("Après la fusion, point 1 de la relecture R159 : « selon le ticket Linear » dit d'où vient la demande")
+    @Test
+    @DisplayName("R159, après la fusion (1) : « Passe TF-12 en Done selon le ticket Linear ENG-12 » change la colonne d'emblée")
+    void after_the_merge_an_update_according_to_a_ticket_is_done_in_taskforce() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"status\":\"Done\"}", "TF-12 est dans Done.");
+        CortexGesture update = gesture("update_issue", "issue.update");
+        when(update.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(update.perform(any(), any())).thenReturn(new CortexGesture.Done("Updated TF-12: column to Done.",
+            Map.of("issueId", 5, "projectId", 12, "key", "TF-12"), Map.of("projectId", 12, "issueId", 5, "fields", Map.of())));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Passe TF-12 en Done selon le ticket Linear ENG-12");
 
         assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
             assertThat(call.status()).isEqualTo("success");
