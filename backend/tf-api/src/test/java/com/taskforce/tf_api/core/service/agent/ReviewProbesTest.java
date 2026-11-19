@@ -62,6 +62,12 @@ class ReviewProbesTest {
         }
     }
 
+    /** Et le bloc record dit ce qui a été fait : la clé de ce que la conversation a créé, sous la phrase gardée. */
+    private static void expect(Checked checked, String answer, Outcome outcome, String key) {
+        expect(checked, answer, outcome);
+        if (outcome == Outcome.RECORD) assertThat(checked.answer().substring(answer.length())).contains(key);
+    }
+
     // -------------------------------------------------------------------------
     // Ce qu'une demande veut faire : writes() et writeVerbs() disent la même chose
     // -------------------------------------------------------------------------
@@ -252,7 +258,7 @@ class ReviewProbesTest {
         "Can you create the Marketing project?                | I haven't created it yet. Which template?                             | KEPT",
     })
     void after_the_creation_each_answer_reads_as_the_reviewers_expect(String request, String answer, Outcome outcome) {
-        expect(ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request), answer, outcome);
+        expect(ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request), answer, outcome, "TESTTASKFO");
     }
 
     @ParameterizedTest(name = "à « {0} », API-12 créée à la réponse précédente : « {1} » {2}")
@@ -266,7 +272,7 @@ class ReviewProbesTest {
         "Tu peux me créer une issue pour le bug du paiement ? | Je ne l'ai pas encore créée : dans quel projet ?               | KEPT",
     })
     void after_an_issue_each_answer_reads_as_the_reviewers_expect(String request, String answer, Outcome outcome) {
-        expect(ActionClaimCheck.check(answer, List.of(), List.of(ISSUE), SYSTEMS, request), answer, outcome);
+        expect(ActionClaimCheck.check(answer, List.of(), List.of(ISSUE), SYSTEMS, request), answer, outcome, "API-12");
     }
 
     @Test
