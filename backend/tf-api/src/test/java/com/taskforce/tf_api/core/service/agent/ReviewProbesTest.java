@@ -147,6 +147,26 @@ class ReviewProbesTest {
         assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
     }
 
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Le point 3 de la liste d'après la fusion, réactivé au sixième tour : une défense, une question sur ce que la
+        // personne doit faire, ne demandent rien à Cortex.
+        "Ne crée pas le projet                                         | false",
+        "Should I create the project?                                  | false",
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | false",
+        "Il faut que je crée le projet ?                               | false",
+        // Restent des demandes : une question avec un sujet (B2), Cortex ou nous au plus près du verbe.
+        "Tu ne crées pas le projet Marketing ?                         | true",
+        "Tu peux créer le projet ?                                     | true",
+        "Je veux que tu crées le projet                                | true",
+        "Can you create the project?                                   | true",
+        "Shall we create the Marketing project?                        | true",
+    })
+    void a_negation_or_what_the_person_must_do_asks_nothing(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+        assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
+    }
+
     // -------------------------------------------------------------------------
     // Où va l'écriture, et où lire
     // -------------------------------------------------------------------------
@@ -256,6 +276,20 @@ class ReviewProbesTest {
         "Tu peux créer le projet Marketing ?                  | Je ne l'ai pas encore créé. Tu confirmes le nom ?                     | KEPT",
         "Can you create the Marketing project?                | I created it.                                                         | CORRECTED",
         "Can you create the Marketing project?                | I haven't created it yet. Which template?                             | KEPT",
+        "Tu ne crées pas le projet Marketing ?                | Je l'ai créé.                                                         | CORRECTED",
+        "Tu ne crées pas le projet Marketing ?                | Je ne l'ai pas encore créé. Tu confirmes le nom ?                     | KEPT",
+        "Je veux que tu crées le projet Marketing             | Je l'ai créé.                                                         | CORRECTED",
+        "Je veux que tu crées le projet Marketing             | Je ne l'ai pas encore créé. Tu confirmes le nom ?                     | KEPT",
+        "Shall we create the Marketing project?               | I created it.                                                         | CORRECTED",
+        "Shall we create the Marketing project?               | I haven't created it yet. Which template?                             | KEPT",
+        // Sixième tour : une question sur ce que la personne doit faire, une défense, ne demandent rien ; la réponse vraie
+        // reste, la négation fausse se corrige.
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Non, je l'ai créé dans TaskForce, pas dans Linear.            | KEPT",
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | CORRECTED",
+        "Should I create the project?                         | No need, I created it in TaskForce.                                   | KEPT",
+        "Should I create the project?                         | I haven't created it yet.                                             | CORRECTED",
+        "Ne crée pas le projet                                | Trop tard, je l'ai créé dans TaskForce.                               | KEPT",
+        "Ne crée pas le projet                                | D'accord, je n'ai pas créé le projet.                                 | CORRECTED",
     })
     void after_the_creation_each_answer_reads_as_the_reviewers_expect(String request, String answer, Outcome outcome) {
         expect(ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request), answer, outcome, "TESTTASKFO");
@@ -346,13 +380,6 @@ class ReviewProbesTest {
     @ValueSource(strings = {"Cree une issue et signale la dans Slack", "Crée l'issue, signale-la dans Slack"})
     void after_the_merge_each_write_has_its_own_target(String request) {
         assertThat(TARGETS.said(request).elsewhere("TaskForce")).isNull();
-    }
-
-    @Disabled("Après la fusion, point 3 : une négation, une question sur ce que la personne doit faire, ne demandent rien")
-    @ParameterizedTest(name = "« {0} » n'écrit pas")
-    @ValueSource(strings = {"Ne crée pas le projet", "Should I create the project?"})
-    void after_the_merge_a_negation_asks_nothing(String request) {
-        assertThat(Intent.writes(request)).isFalse();
     }
 
     @Disabled("Après la fusion, point 8 : « Et un projet pour le nouveau client ? » en demande un")

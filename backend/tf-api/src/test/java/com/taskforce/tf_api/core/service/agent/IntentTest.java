@@ -205,4 +205,73 @@ class IntentTest {
         assertThat(Intent.writes(request)).isEqualTo(writes);
         assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
     }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Sixième tour de la relecture R159 : quand le sujet le plus proche du verbe est la personne, la question dit ce
+        // qu'elle doit faire, elle ne demande rien à Cortex.
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | false",
+        "Should I create the project?                                  | false",
+        "Il faut que je crée le projet ?                               | false",
+        "Dois-je créer le projet ?                                     | false",
+        "Est-ce que je peux créer le projet ?                          | false",
+        "Tu veux que je le crée ?                                      | false",
+        "Tu crois que je dois le créer ?                               | false",
+        "Je te le crée ?                                               | false",
+        "C'est moi qui crée le projet ?                                | false",
+        "Do I need to create the project?                              | false",
+        "Can I create a project in Linear?                             | false",
+        // Cortex, ou nous, au plus près du verbe : la question demande.
+        "Je veux que tu crées le projet ?                              | true",
+        "Je peux te demander de créer le projet ?                      | true",
+        "Je pense que tu dois le créer ?                               | true",
+        "Tu peux me créer le projet ?                                  | true",
+        "Shall we create the Marketing project?                        | true",
+        "Can you create the project?                                   | true",
+        "Il faut créer le projet ?                                     | true",
+        "On le crée ?                                                  | true",
+    })
+    void a_question_about_what_the_person_must_do_asks_nothing(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+        assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
+    }
+
+    @ParameterizedTest(name = "« {0} » écrit : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Sixième tour de la relecture R159 : une défense ne demande rien, à l'impératif, à l'infinitif, en anglais.
+        "Ne crée pas le projet                    | false",
+        "Ne le crée pas                           | false",
+        "N'ajoute pas de commentaire sur TF-12    | false",
+        "Ne crée plus de projet dans Linear       | false",
+        "Ne supprime jamais rien                  | false",
+        "Ne crée aucun projet                     | false",
+        "Ne le supprime surtout pas               | false",
+        "Stp ne crée pas le projet                | false",
+        "S'il te plaît ne crée pas le projet      | false",
+        "Merci de ne pas créer le projet          | false",
+        "Tu peux ne pas créer le projet ?         | false",
+        "Never create a project in Linear         | false",
+        "Don't create the project                 | false",
+        // Ses voisins demandent : une question avec un sujet (B2), « ne... que », « n'oublie pas de », la proposition d'à côté.
+        "Tu ne crées pas le projet Marketing ?    | true",
+        "Ne crée que le projet                    | true",
+        "N'oublie pas de créer le projet          | true",
+        "Crée l'issue, ne crée pas le projet      | true",
+        "Ne crée pas le projet, crée une issue    | true",
+        "Je veux que tu crées le projet           | true",
+    })
+    void a_negation_forbids_it_asks_nothing(String request, boolean writes) {
+        assertThat(Intent.writes(request)).isEqualTo(writes);
+        assertThat(Intent.writeVerbs(request).isEmpty()).isEqualTo(!writes);
+    }
+
+    @Test
+    @DisplayName("R159, sixième tour : une défense est une proposition qui ne fait rien, pas un complément de celle d'avant")
+    void a_negation_is_a_clause_that_does_nothing() {
+        assertThat(Intent.clauses("Crée l'issue, ne la mets pas dans Linear")).extracting(Intent.Clause::does)
+            .containsExactly(Intent.Does.WRITE, Intent.Does.NOTHING);
+        assertThat(Intent.clauses("Ne crée pas le projet")).extracting(Intent.Clause::does)
+            .containsExactly(Intent.Does.NOTHING);
+        assertThat(Intent.writeVerbs("Ne crée pas le projet, crée une issue")).containsExactly("cree");
+    }
 }

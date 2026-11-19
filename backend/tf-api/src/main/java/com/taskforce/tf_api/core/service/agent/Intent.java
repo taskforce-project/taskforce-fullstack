@@ -213,12 +213,39 @@ final class Intent {
      * ou qu'un nom le précède : un participe (« créé ou pas ? ») ; après « tu » ou « vous » et leurs pronoms, un verbe qui
      * n'a pas leur marque, la question de la recette tapée vite (« tu la creer ou ? », pour « tu l'as créé ? ») ; « le
      * projet cree ou pas ? ». « Tu la crées ? », « Tu peux la créer ? », « On crée aussi le projet ? », « Could you just
-     * create... ? » demandent.
+     * create... ? » demandent. Une question sur ce que la personne doit faire ne demande rien à Cortex (sixième tour).
      */
     private static boolean request(List<String> words, int at, List<String> original) {
         if (at < original.size() && participle(original.get(at))) return false;
         if (pastAfterSubject(words, at)) return false;
+        if (byThePerson(words, at)) return false;
         return !nounBefore(words, at);
+    }
+
+    /** La personne elle-même, sujet d'un verbe : « je », « j' », « moi qui », « I ». */
+    private static final Set<String> PERSON = Set.of("je", "j", "moi", "i");
+    /**
+     * Les autres sujets, Cortex compris : « tu », « on », « nous », « you », « we » ; « te » et « t' » qu'on charge
+     * d'un verbe (« je peux te demander de créer »).
+     */
+    private static final Set<String> OTHERS = Set.of("tu", "toi", "te", "t", "il", "elle", "on", "nous", "vous", "ils",
+        "elles", "you", "we", "they", "he", "she");
+
+    /**
+     * Le sujet le plus proche du verbe est la personne : elle demande ce qu'elle doit faire, elle ne demande rien à
+     * Cortex (« Je dois créer le projet moi-même ? », « Should I create the project? », « Il faut que je crée le
+     * projet ? », « Tu veux que je le crée ? »), sixième tour de la relecture R159 de la PR #548. Les pronoms du verbe
+     * ne sont pas son sujet (« je te le crée ? ») ; « Je veux que tu crées le projet ? », « Je peux te demander de
+     * créer le projet ? », « Shall we create... ? » demandent.
+     */
+    private static boolean byThePerson(List<String> words, int at) {
+        int k = at - 1;
+        while (k >= 0 && CLITICS.contains(words.get(k))) k--;
+        for (; k >= 0; k--) {
+            if (PERSON.contains(words.get(k))) return true;
+            if (OTHERS.contains(words.get(k))) return false;
+        }
+        return false;
     }
 
     /**
@@ -331,12 +358,56 @@ final class Intent {
             reads = READS.contains(words.get(i)) && (i == 0 || !DETERMINERS.contains(words.get(i - 1)));
         }
         if (reads) return Does.READ;
+        // Une défense ne demande rien, et ne complète pas la proposition d'avant : « Crée l'issue, ne la mets pas dans
+        // Linear » (sixième tour de la relecture R159).
+        for (int i = 0; i < words.size(); i++) {
+            if (WRITES.contains(words.get(i)) && forbids(words, i)) return Does.NOTHING;
+        }
         return words.stream().anyMatch(STATEMENTS::contains) ? Does.NOTHING : null;
     }
 
-    /** Le mot à cette place est-il un verbe d'écriture qui demande, plutôt qu'un nom, un passé ou un pronominal ? */
+    /** Ce qui nie le verbe que « ne » précède : « ne crée pas », « n'ajoute plus », « ne crée rien ». */
+    private static final Set<String> NEGATIONS = Set.of("pas", "plus", "jamais", "rien", "aucun", "aucune");
+
+    /**
+     * Une défense, qui ne demande rien (sixième tour de la relecture R159 de la PR #548) : un impératif sans sujet pris
+     * entre « ne » et sa négation (« Ne crée pas le projet », « Ne le supprime surtout pas »), un infinitif nié
+     * (« Merci de ne pas créer le projet »), « never » en tête (« Never create a project in Linear »). Avec un sujet,
+     * une question demande : « Tu ne crées pas le projet Marketing ? » (B2) ; « ne... que » restreint, il demande
+     * (« Ne crée que le projet »).
+     */
+    private static boolean forbids(List<String> words, int i) {
+        int j = i - 1;
+        while (j >= 0 && CLITICS.contains(words.get(j))) j--;
+        if (j < 0) return false;
+        int k = j;
+        while (k >= 0 && NEGATIONS.contains(words.get(k))) k--;
+        if (k < j) return k >= 0 && ("ne".equals(words.get(k)) || "n".equals(words.get(k)));
+        if ("never".equals(words.get(j))) return noSubjectBefore(words, j);
+        if (!"ne".equals(words.get(j)) && !"n".equals(words.get(j)) || !noSubjectBefore(words, j)) return false;
+        for (int after = i + 1; after < words.size() && after <= i + 2; after++) {
+            if ("que".equals(words.get(after)) || "qu".equals(words.get(after))) return false;
+            if (NEGATIONS.contains(words.get(after))) return true;
+        }
+        return false;
+    }
+
+    /** Aucun sujet avant cette place : un impératif. « S'il te plaît » n'en est pas un. */
+    private static boolean noSubjectBefore(List<String> words, int j) {
+        for (int k = 0; k < j; k++) {
+            String word = words.get(k);
+            if ("il".equals(word) && k > 0 && "s".equals(words.get(k - 1))) continue;
+            if (SUBJECTS.contains(word) || PERSON.contains(word) || OTHERS.contains(word) && !CLITICS.contains(word)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Ce mot est-il un verbe d'écriture qui demande, plutôt qu'un nom, un passé, un pronominal ou une défense ? */
     private static boolean writesAt(List<String> words, int i) {
         String verb = words.get(i);
+        if (forbids(words, i)) return false;
         if (i > 0 && ("se".equals(words.get(i - 1)) || "s".equals(words.get(i - 1)))) return false;
         boolean infinitive = verb.length() > 4 && INFINITIVE.matcher(verb).find();
         if (i > 0 && DETERMINERS.contains(words.get(i - 1)) && !infinitive && !objectPronoun(words, i - 1)) return false;

@@ -3429,4 +3429,28 @@ class AgentServiceTest {
 
         assertThat(answer.answer()).startsWith(said).contains(ActionClaimCheck.RECORD_SIGNATURE).contains("TESTTASKFO");
     }
+
+    @ParameterizedTest(name = "à « {0} » : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Non, je l'ai créé dans TaskForce, pas dans Linear. | false",
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Should I create the project? | No need, I created it in TaskForce.     | false",
+        "Should I create the project? | I haven't created it yet.               | true",
+        "Ne crée pas le projet        | Trop tard, je l'ai créé dans TaskForce. | false",
+        "Ne crée pas le projet        | D'accord, je n'ai pas créé le projet.   | true",
+    })
+    @DisplayName("R159, sixième tour : de bout en bout, une question sur ce que la personne doit faire, une défense, ne demandent rien")
+    void a_negation_or_what_the_person_must_do_asks_nothing_through_a_turn(String request, String said, boolean corrected)
+        throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(request, TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        if (corrected) assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain(said);
+        else assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
+    }
 }

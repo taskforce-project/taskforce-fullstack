@@ -809,4 +809,40 @@ class ActionClaimCheckTest {
         assertThat(checked.corrected()).isFalse();
         assertThat(checked.answer()).startsWith(answer).contains(ActionClaimCheck.RECORD_SIGNATURE).contains("TESTTASKFO");
     }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548, sixième tour
+    // -------------------------------------------------------------------------
+
+    @ParameterizedTest(name = "à « {0} », TESTTASKFO créé à la réponse précédente : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        // Une question sur ce que la personne doit faire, une défense, ne demandent rien : la réponse vraie reste, la
+        // négation fausse se corrige.
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Non, je l'ai créé dans TaskForce, pas dans Linear. | false",
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Should I create the project?            | No need, I created it in TaskForce.           | false",
+        "Should I create the project?            | I haven't created it yet.                     | true",
+        "Il faut que je crée le projet ?         | Non, je l'ai créé dans TaskForce.             | false",
+        "Il faut que je crée le projet ?         | Je n'ai pas créé le projet.                   | true",
+        "Ne crée pas le projet                   | Trop tard, je l'ai créé dans TaskForce.       | false",
+        "Ne crée pas le projet                   | D'accord, je n'ai pas créé le projet.         | true",
+        "Ne le crée pas                          | Trop tard, je l'ai créé dans TaskForce.       | false",
+        "Ne le crée pas                          | D'accord, je ne l'ai pas créé.                | true",
+        "Merci de ne pas créer le projet         | Trop tard, je l'ai créé dans TaskForce.       | false",
+        "Merci de ne pas créer le projet         | D'accord, je n'ai pas créé le projet.         | true",
+        "Never create a project in Linear        | Understood: I created it in TaskForce.        | false",
+        "Never create a project in Linear        | Understood, I didn't create the project.      | true",
+        // Restent des demandes : l'annonce inventée se corrige, la réponse vraie reste.
+        "Je veux que tu crées le projet Marketing | Je l'ai créé.                                | true",
+        "Je veux que tu crées le projet Marketing | Je ne l'ai pas encore créé : quel modèle ?   | false",
+        "Tu ne crées pas le projet Marketing ?   | Je l'ai créé.                                 | true",
+        "Tu ne crées pas le projet Marketing ?   | Je ne l'ai pas encore créé : quel modèle ?    | false",
+    })
+    void a_negation_or_what_the_person_must_do_asks_nothing(String request, String answer, boolean corrected) {
+        Checked checked = ActionClaimCheck.check(answer, List.of(), List.of(CREATED), SYSTEMS, request);
+
+        assertThat(checked.corrected()).isEqualTo(corrected);
+        if (corrected) assertThat(checked.answer()).doesNotContain(answer);
+        else assertThat(checked.answer()).isEqualTo(answer);
+    }
 }
