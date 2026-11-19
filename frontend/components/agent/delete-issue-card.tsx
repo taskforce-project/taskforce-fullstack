@@ -11,6 +11,7 @@ import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { deletionKey, useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { issuePath } from "@/lib/window/pane"
+import { WriteTarget } from "./write-target"
 
 type Texts = TranslationKeys["cortex"]
 
@@ -76,6 +77,8 @@ export function DeleteIssueCard({ slug, call, target }: Readonly<{ slug: string;
         {what.length > 0 ? fillText(t.deleteGoesWith, { what: what.join(", ") }) : t.deleteNothingElse}
       </p>
       <p className="text-muted-foreground">{t.deleteHint}</p>
+      {/* Où la suppression a lieu (R204), et l'outil demandé quand la demande en nommait un autre. */}
+      <WriteTarget where={call.where} />
       {status === "archived" || status === "restoring" ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-foreground">{fillText(t.deleteArchived, { key })}</span>

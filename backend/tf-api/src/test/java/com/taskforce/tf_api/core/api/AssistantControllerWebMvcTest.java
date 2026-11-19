@@ -110,7 +110,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.answer").value("Done."));
         // Rien n'a changé de modèle : la personne décide d'un clic.
         org.assertj.core.api.Assertions.assertThat(used.get()).isNull();
-        verify(conversationService).appendAnswer(1L, "Done." + ModelCapabilityService.block(text), "deep", 0, null, null, null);
+        verify(conversationService).appendAnswer(1L, "Done." + ModelCapabilityService.block(text), "deep", 0, null, null, null, null);
     }
 
     @Test
@@ -132,7 +132,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.offer").doesNotExist());
         verify(capabilities, never()).offer(anyString(), any(), anyString());
         verify(conversationService).appendNotSent(1L, "Summarize", java.util.List.of());
-        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null, null);
+        verify(conversationService).appendAnswer(1L, "Too big." + ModelCapabilityService.block(text), "not_sent", 0, null, null, null, null);
     }
 
     @Test
@@ -150,7 +150,7 @@ class AssistantControllerWebMvcTest {
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:8b");
         verify(capabilities, never()).offer(anyString(), any(), anyString());
         verify(conversationService).appendAnswer(1L,
-            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null, null);
+            "Moved." + ModelCapabilityService.block(ModelCapabilityService.sentNotice("qwen3:8b")), "deep", 0, "qwen3:8b", null, null, null);
     }
 
     @Test
@@ -168,7 +168,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(jsonPath("$.data.answer.model").value("qwen3:14b"));
         org.assertj.core.api.Assertions.assertThat(used.get()).isEqualTo("qwen3:14b");
         // Le modèle qui a répondu reste avec la réponse : une conversation rouverte le montre encore.
-        verify(conversationService).appendAnswer(1L, "Hi.", "deep", 0, "qwen3:14b", null, null);
+        verify(conversationService).appendAnswer(1L, "Hi.", "deep", 0, "qwen3:14b", null, null, null);
     }
 
     @Test
@@ -285,7 +285,27 @@ class AssistantControllerWebMvcTest {
         java.util.List<com.taskforce.tf_api.core.service.ai.AttachedFile> files =
             java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("notes.md", "corps"));
         org.assertj.core.api.Assertions.assertThat(sentInput().files()).isEqualTo(files);
-        verify(conversationService).appendAsked(1L, "Lis", files);
+        verify(conversationService).appendAsked(1L, "Lis", files, java.util.List.of());
+    }
+
+    @Test
+    @DisplayName("POST assistant : l'issue dont parlait la demande reste avec elle, sujet du tour suivant (R204)")
+    void chat_keeps_the_subject_of_the_request() throws Exception {
+        answering("x");
+        when(agentService.run(anyString(), anyLong(), any(TurnInput.class))).thenReturn(
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer("API-3 est en cours.", null, "deep", java.util.List.of(),
+                java.util.List.of(), java.util.List.of(), com.taskforce.tf_api.core.dto.response.AssistantAnswer.AssistantUsage.NONE)
+                .withSubjects(java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("API-3", 21L,
+                    3L))));
+
+        mockMvc.perform(post(URL).with(auth())
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"message\":\"T'en ai a ou sur cette tache ?\",\"attach\":[{\"projectId\":3,\"issueId\":21}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.answer.subjects").doesNotExist());
+        verify(conversationService).appendAsked(1L, "T'en ai a ou sur cette tache ?", java.util.List.of(),
+            java.util.List.of(new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("API-3", 21L, 3L)));
     }
 
     @Test
@@ -298,7 +318,7 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Lis\",\"files\":[{\"name\":\"big.log\",\"text\":\"corps\"}]}"))
             .andExpect(status().isOk());
         verify(conversationService).appendAsked(1L, "Lis",
-            java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("big.log", "")));
+            java.util.List.of(new com.taskforce.tf_api.core.service.ai.AttachedFile("big.log", "")), java.util.List.of());
     }
 
     @ParameterizedTest(name = "{0} → 400")
@@ -331,7 +351,7 @@ class AssistantControllerWebMvcTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.answer.mode").value("stopped"));
         verify(capabilities, never()).offer(anyString(), any(), anyString());
-        verify(conversationService).appendAnswer(1L, "Stopped by you.", "stopped", 30, null, null, null);
+        verify(conversationService).appendAnswer(1L, "Stopped by you.", "stopped", 30, null, null, null, null);
     }
 
     @Test
@@ -348,7 +368,7 @@ class AssistantControllerWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Crée une issue Test\"}"))
             .andExpect(status().isOk());
         verify(conversationService).appendAnswer(1L, "Prête.", "deep", 0, null, null,
-            new TurnInput.LastCard("create_issue", "{\"title\":\"Test\"}"));
+            new TurnInput.LastCard("create_issue", "{\"title\":\"Test\"}"), null);
         org.assertj.core.api.Assertions.assertThat(sentInput().lastCard()).isNull();
     }
 
@@ -413,7 +433,7 @@ class AssistantControllerWebMvcTest {
         // Une issue sans son projet ne se lit pas.
         org.assertj.core.api.Assertions.assertThat(sentInput().attached())
             .containsExactly(new Screen(30L, 350L), new Screen(31L, null));
-        verify(conversationService).appendAnswer(1L, "Réponse", "fast", 0, "qwen3:8b", read, null);
+        verify(conversationService).appendAnswer(1L, "Réponse", "fast", 0, "qwen3:8b", read, null, null);
     }
 
     @Test

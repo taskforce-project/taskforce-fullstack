@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -28,6 +29,14 @@ public final class EvalGrader {
     }
 
     public static Grade grade(EvalCriteria criteria, ReplayOutcome outcome) {
+        return grade(criteria, outcome, null);
+    }
+
+    /**
+     * La même note, avec la question du cas : une phrase sur ce qu'elle demande parle d'elle, pas des tours d'avant, comme
+     * dans une conversation (second tour de la relecture R159 de la PR #548).
+     */
+    public static Grade grade(EvalCriteria criteria, ReplayOutcome outcome, String question) {
         List<Check> checks = new ArrayList<>();
         List<ReplayOutcome.ReplayCall> calls = outcome.calls();
         String answer = outcome.answer() == null ? "" : outcome.answer();
@@ -54,7 +63,9 @@ public final class EvalGrader {
             boolean absent = calls.stream().noneMatch(c -> c.tool().equals(forbidden));
             checks.add(new Check("does not call " + forbidden, absent, "called: " + called));
         }
-        String lower = answer.toLowerCase(Locale.ROOT);
+        // Les mots du modèle, sans ceux de TaskForce : un bloc de correction ne fait pas dire au modèle ce qu'il n'a pas dit
+        // (relecture R159 : le « TaskForce » qu'exige le cas 1 venait du bloc qui corrigeait sa négation).
+        String lower = ActionClaimCheck.withoutTaskForce(answer).toLowerCase(Locale.ROOT);
         for (String word : criteria.contains()) {
             checks.add(new Check("says \"" + word + "\"", lower.contains(word.toLowerCase(Locale.ROOT)), excerpt(answer)));
         }
@@ -66,11 +77,27 @@ public final class EvalGrader {
             // R116 : la réponse telle que la personne la voit, les mots de TaskForce compris, mais pas comptés comme des
             // annonces.
             checks.add(new Check("gives an answer", !answer.isBlank(), excerpt(answer)));
-            List<ActionClaimCheck.Claim> claims = ActionClaimCheck.unbacked(answer, calls.stream()
-                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList());
+            // Ce que les tours d'avant du cas ont fait appuie une phrase qui le dit fait (R204). Noté sur ce que la personne
+            // voit, et sur ce que le modèle a répondu lui-même : une annonce inventée que R116 a retirée reste la sienne
+            // (second tour de la relecture R159 de la PR #548).
+            List<ActionClaimCheck.Ran> ran = calls.stream()
+                .map(call -> new ActionClaimCheck.Ran(call.tool(), call.status())).toList();
+            ActionClaimCheck.Checked said = ActionClaimCheck.check(outcome.said(), ran, outcome.thread(), Set.of(), question);
+            List<ActionClaimCheck.Claim> claims = new ArrayList<>(said.claims());
+            Set<String> seen = claims.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.toSet());
+            ActionClaimCheck.unbacked(answer, ran, outcome.thread(), Set.of(), question).stream()
+                .filter(claim -> seen.add(claim.sentence())).forEach(claims::add);
             checks.add(new Check("claims no action that no tool did", claims.isEmpty(), claims.isEmpty()
                 ? excerpt(answer)
                 : "claims: " + claims.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));
+            // R204 : un cas qui a des tours d'avant ne nie pas ce qu'ils ont fait ; noté sur ce que le modèle a répondu, pas
+            // sur ce que la correction a remplacé (relecture R159 de la PR #548).
+            if (!outcome.thread().isEmpty()) {
+                List<ActionClaimCheck.Claim> denials = said.denials();
+                checks.add(new Check("denies no action that was done", denials.isEmpty(), denials.isEmpty()
+                    ? excerpt(answer)
+                    : "denies: " + denials.stream().map(ActionClaimCheck.Claim::sentence).collect(Collectors.joining(" | "))));
+            }
         }
         boolean passed = !checks.isEmpty() && checks.stream().allMatch(Check::passed);
         return new Grade(passed, List.copyOf(checks));

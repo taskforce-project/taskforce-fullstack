@@ -89,6 +89,8 @@ public class EvalService {
     static final String DEFAULT_MODEL = "default";
     /** D'où vient un cas, pour l'histoire de la banque (R125). */
     static final String ORIGIN_INCIDENT = "incident";
+    /** Une trace incertaine (troisième tour de la relecture R159) : TaskForce a laissé la phrase, et dit à côté ce qui a été fait. */
+    static final String ORIGIN_UNCERTAIN = "uncertain";
     static final String ORIGIN_ANSWER = "answer";
     static final String ORIGIN_UNKNOWN = "unknown";
     private static final int MAX_ANSWER = 1000;
@@ -354,7 +356,8 @@ public class EvalService {
             throw ModelRunFailure.of(model, down, "Replay it again, or replay another model.");
         }
         recordUsage(ws.getId(), outcome.usage());
-        EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome);
+        EvalGrader.Grade grade = EvalGrader.grade(read(evalCase.getCriteria(), EvalCriteria.class), outcome,
+            evalCase.getQuestion());
         Details details = new Details(grade.checks(), outcome.calls(), shorten(outcome.answer(), MAX_ANSWER), outcome.model());
         EvalResult saved;
         try {
@@ -581,10 +584,13 @@ public class EvalService {
         }
     }
 
-    private static ReplayCase replayCase(EvalCase evalCase) {
+    /** Le cas tel que le rejeu le joue : sa question, ses notes, sa cassette, et ce qui l'entourait (R204). */
+    static ReplayCase replayCase(EvalCase evalCase) {
+        String context = evalCase.getContext();
         return new ReplayCase(evalCase.getQuestion(), evalCase.getAskedOn(),
             read(evalCase.getNotes(), new TypeReference<List<FrozenNote>>() {}),
-            read(evalCase.getCassette(), new TypeReference<List<CassetteEntry>>() {}));
+            read(evalCase.getCassette(), new TypeReference<List<CassetteEntry>>() {}),
+            context == null || context.isBlank() ? ReplayContext.NONE : read(context, ReplayContext.class));
     }
 
     private static Result result(EvalResult result, EvalCase evalCase) {
@@ -625,7 +631,8 @@ public class EvalService {
             if (!sentence.asText("").isBlank()) said.add(sentence.asText());
         });
         String shown = incident.path("shown").asText("").strip();
-        return new EvalHistoryResponse.Origin(ORIGIN_INCIDENT, List.copyOf(said), shown.isEmpty() ? null : shown);
+        String kind = incident.path("uncertain").asBoolean(false) ? ORIGIN_UNCERTAIN : ORIGIN_INCIDENT;
+        return new EvalHistoryResponse.Origin(kind, List.copyOf(said), shown.isEmpty() ? null : shown);
     }
 
     /** Les notes d'un cas, dans l'ordre des rejeux. */

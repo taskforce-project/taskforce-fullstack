@@ -46,7 +46,13 @@ export function TaskForceSays({ lines, kind, children }: Readonly<{
   const m = usePreferencesStore((s) => s.t.models)
   const says = kind === "models"
     ? { label: m.saysLabel, hint: m.saysHint, what: m.saysWhat }
-    : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
+    : kind === "done"
+      ? { label: t.taskforceSaysLabel, hint: t.taskforceSaysDoneHint, what: t.taskforceSaysDoneWhat }
+      : kind === "connections"
+        ? { label: t.taskforceSaysConnectionsLabel, hint: t.taskforceSaysConnectionsHint, what: t.taskforceSaysConnectionsWhat }
+        : kind === "record"
+          ? { label: t.taskforceSaysRecordLabel, hint: t.taskforceSaysRecordHint, what: t.taskforceSaysRecordWhat }
+          : { label: t.taskforceSaysLabel, hint: t.taskforceSaysHint, what: t.taskforceSaysWhat }
   return (
     <div
       role="note"

@@ -8,10 +8,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
 
 /**
- * Un cas de la banque d'évaluations, figé : la question, sa date, les notes servies ce jour-là, et ce
- * que les outils de lecture ont rendu (la cassette). Le rejeu ne sert rien d'autre au modèle.
+ * Un cas de la banque d'évaluations, figé : la question, sa date, les notes servies ce jour-là, ce que les outils de
+ * lecture ont rendu (la cassette), et ce qui l'entourait (R204) : les tours d'avant de la conversation, avec ce que chaque
+ * réponse a fait. Le rejeu ne sert rien d'autre au modèle.
  */
-public record ReplayCase(String question, LocalDate askedOn, List<FrozenNote> notes, List<CassetteEntry> cassette) {
+public record ReplayCase(String question, LocalDate askedOn, List<FrozenNote> notes, List<CassetteEntry> cassette,
+                         ReplayContext context) {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -24,6 +26,12 @@ public record ReplayCase(String question, LocalDate askedOn, List<FrozenNote> no
     public ReplayCase {
         notes = notes == null ? List.of() : List.copyOf(notes);
         cassette = cassette == null ? List.of() : List.copyOf(cassette);
+        context = context == null ? ReplayContext.NONE : context;
+    }
+
+    /** Un cas d'une seule question, sans rien autour. */
+    public ReplayCase(String question, LocalDate askedOn, List<FrozenNote> notes, List<CassetteEntry> cassette) {
+        this(question, askedOn, notes, cassette, ReplayContext.NONE);
     }
 
     /** Une note servie à la question, telle qu'elle était. */

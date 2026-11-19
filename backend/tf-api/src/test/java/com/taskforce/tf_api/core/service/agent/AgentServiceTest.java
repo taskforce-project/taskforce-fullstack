@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -100,8 +101,17 @@ class AgentServiceTest {
     @Mock private IssueMaterial material;
     @Mock private com.taskforce.tf_api.core.service.agent.tools.ProjectResolver projects;
     @Mock private com.taskforce.tf_api.core.service.AiConversationService conversations;
+    /** Où écrit chaque outil, avec les noms du vrai catalogue (R204). */
+    @Spy private TargetSystems targets = new TargetSystems(builtCatalog());
 
     @InjectMocks private AgentService service;
+
+    private static com.taskforce.tf_api.core.service.integration.ConnectorCatalog builtCatalog() {
+        com.taskforce.tf_api.core.service.integration.ConnectorCatalog catalog =
+            new com.taskforce.tf_api.core.service.integration.ConnectorCatalog();
+        catalog.build();
+        return catalog;
+    }
 
     private static final UUID RECORD = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
@@ -2352,5 +2362,1095 @@ class AgentServiceTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static ArgumentCaptor<List<Map<String, Object>>> captorOfMessages() {
         return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+    }
+
+    // -------------------------------------------------------------------------
+    // R204 : les échecs de Cortex à la recette de la 1.17.0 (16 et 17/11/2026), et leurs cas de la banque
+    // -------------------------------------------------------------------------
+
+    /** Le projet que Cortex a créé dans TaskForce sur la carte de sa question, à l'échange 1 de s17. */
+    private static final ActionClaimCheck.Done S17_CREATED = new ActionClaimCheck.Done("create_project", "TaskForce",
+        "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).");
+    private static final String S17_DENIAL = "Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom.";
+
+    @Test
+    @DisplayName("R204 (s17, échange 2) : Cortex nie le projet créé au tour d'avant ; TaskForce corrige, signé, et l'incident entre au dossier")
+    void a_denial_of_what_the_conversation_did_is_corrected() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", S17_DENIAL))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu l'as creer ou ? Je le vois pas dans linear",
+            TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE)
+            .contains("This was created in this conversation, in TaskForce: Project created: TESTTASKFO.")
+            .doesNotContain("Je n'ai pas créé");
+        assertThat(answer.steps().getLast().status()).isEqualTo("error");
+        assertThat(answer.steps().getLast().description()).contains("wasn't done");
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Map<String, Object>> incident = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).incident(any(), any(), eq("Tu l'as creer ou ? Je le vois pas dans linear"), any(), incident.capture());
+        assertThat(incident.getValue()).containsEntry("rule", "R204").containsEntry("denied", List.of(S17_DENIAL));
+    }
+
+    @Test
+    @DisplayName("R204 : le modèle apprend que les réponses d'avant portent ce que TaskForce a fait, et qu'il ne le nie pas")
+    void the_prompt_says_how_to_read_what_was_done() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, "Tu l'as creer ou ?");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).contains(ThreadActs.HEADER)
+            .contains("never say that something it shows done was not done");
+    }
+
+    @Test
+    @DisplayName("R204 : le cas 1 du seed se rejoue avec ses tours d'avant ; le modèle reçoit le projet créé, sa phrase qui le nie est corrigée")
+    void the_seed_case_of_the_denial_replays_with_what_was_done() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", S17_DENIAL))));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        assertThat(sent.getValue()).extracting(message -> message.get("role"))
+            .containsExactly("system", "user", "assistant", "user");
+        assertThat(sent.getValue().get(2).get("content").toString()).contains(ThreadActs.HEADER)
+            .contains("- create_project, in TaskForce (name: Test Taskforce): done. Result: Project created in TaskForce: TESTTASKFO");
+        assertThat(outcome.thread()).extracting(ActionClaimCheck.Done::tool).containsExactly("create_project");
+        assertThat(outcome.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain("Je n'ai pas créé");
+        EvalCriteria criteria = json.readValue(row.criteria(), EvalCriteria.class);
+        // Relecture R159 (11) : le modèle a nié ; la banque le note raté sur ce qu'il a répondu, même corrigé pour la personne.
+        assertThat(EvalGrader.grade(criteria, outcome).passed()).isFalse();
+        assertThat(EvalGrader.grade(criteria, outcome).checks()).filteredOn(check -> !check.passed())
+            .extracting(EvalGrader.Check::criterion).contains("denies no action that was done");
+        // La réponse que la Présidence a lue le 17/11/2026, sans correction ni tours d'avant : le cas la note ratée.
+        assertThat(EvalGrader.grade(criteria, new ReplayOutcome(S17_DENIAL, List.of(), "qwen3.5:9b", null)).passed()).isFalse();
+    }
+
+    /** La demande de l'échange 1 de s17 : un projet dans Linear. */
+    private static final String S17_ASK = "Tu peux me creer un nouveau projet dans Linear la ou pas ?";
+
+    @Test
+    @DisplayName("R204 (s17, échange 1) : la demande nomme Linear ; TaskForce ne pose pas lui-même la question d'un projet de TaskForce")
+    void a_request_that_names_a_connected_tool_gets_no_taskforce_plan() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Quel nom voulez-vous donner au projet ?\"}"));
+        CortexGesture create = Mockito.mock(CortexGesture.class);
+        lenient().when(create.name()).thenReturn("create_project");
+        lenient().when(create.action()).thenReturn("project.create");
+        lenient().when(tools.get("create_project")).thenReturn(create);
+        lenient().when(create.ask(any(), any())).thenThrow(new QuestionNeeded(Question.free("name", "Name",
+            "What should the project be called?")));
+
+        AssistantAnswer answer = service.run("acme", 7L, S17_ASK);
+
+        assertThat(answer.toolCalls()).isEmpty();
+        assertThat(answer.answer()).isEqualTo("Quel nom voulez-vous donner au projet ?");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).doesNotContain("Plan to create a project");
+    }
+
+    @Test
+    @DisplayName("R204 (s17, échange 1) : la demande nomme Linear, l'écriture choisie est dans TaskForce ; elle attend la carte, rien n'est fait")
+    void a_write_elsewhere_than_the_named_tool_waits_for_its_card() throws Exception {
+        modelCalls("create_project", "{\"name\":\"Test Taskforce\"}", "Projet créé.");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Crée un projet Test Taskforce dans Linear");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo("pending"));
+        verify(create, never()).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("R204 : sans outil nommé, un projet de TaskForce se crée d'emblée, comme avant (il se défait)")
+    void a_write_in_taskforce_without_a_named_tool_is_still_done_at_once() throws Exception {
+        modelCalls("create_project", "{\"name\":\"Test Taskforce\"}", "Projet créé.");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(create.perform(any(), any())).thenReturn(new CortexGesture.Done(
+            "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).", null, Map.of("projectId", 12)));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Crée un projet Test Taskforce");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> assertThat(call.status()).isEqualTo("success"));
+    }
+
+    @Test
+    @DisplayName("R204 : la carte de la question dit où le geste écrira, et que la demande nommait Linear")
+    void the_question_card_says_where_and_what_was_asked() throws Exception {
+        modelCalls("create_project", "{}", "Quel nom ?");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenThrow(new QuestionNeeded(Question.free("name", "Name",
+            "What should the project be called?")));
+
+        AssistantAnswer answer = service.run("acme", 7L, S17_ASK);
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo(AgentService.QUESTION);
+            assertThat(call.where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", "Linear"));
+        });
+    }
+
+    @Test
+    @DisplayName("R204 : la carte d'une écriture dans TaskForce dit son espace ; une écriture dans l'outil nommé n'avertit de rien")
+    void a_write_card_says_where_it_writes() throws Exception {
+        modelCalls("create_project", "{\"name\":\"Test Taskforce\"}", "Projet prêt.");
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AssistantToolCall elsewhere = service.run("acme", 7L, "Crée un projet Test Taskforce dans Linear").toolCalls().get(0);
+
+        assertThat(elsewhere.where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", "Linear"));
+        assertThat(elsewhere.output()).contains("the person asked for Linear, and this action writes in TaskForce");
+    }
+
+    @Test
+    @DisplayName("R204 : l'écriture dans l'outil que la demande nomme dit cet outil, sans avertir ; une lecture ne dit rien")
+    void a_write_in_the_named_tool_and_a_read() throws Exception {
+        stubWorkspace();
+        stubExternalWrite();
+        when(authorization.isManager(1L, 7L)).thenReturn(true);
+        AssistantToolCall write = service.run("acme", 7L, "Crée le ticket dans srv").toolCalls().get(0);
+
+        assertThat(write.status()).isEqualTo("pending");
+        assertThat(write.where()).isEqualTo(new AssistantAnswer.AssistantWhere("Srv", null, null));
+    }
+
+    @Test
+    @DisplayName("R204 : le cas 2 du seed se rejoue avec les outils de Linear de la Présidence, sans plan de TaskForce ; un projet de TaskForce le rate")
+    @SuppressWarnings("unchecked")
+    void the_seed_case_of_a_project_in_linear_replays_with_its_tools() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 2).findFirst().orElseThrow();
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        CortexGesture create = gesture("create_project", "project.create");
+        lenient().when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"create_project\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Quel nom pour le projet ?\"}"));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        ArgumentCaptor<List<AgentTool>> sentTools = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        verify(tools).toolDefinitions(sentTools.capture());
+        assertThat(sentTools.getValue()).hasSize(12).allSatisfy(tool -> assertThat(tool.name()).startsWith("linear__"));
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString())
+            .doesNotContain("Plan to create a project").contains("linear__");
+        // Un projet de TaskForce pour « dans Linear » : le cas le note raté, comme la Présidence l'a vu le 17/11/2026.
+        assertThat(outcome.calls()).extracting(ReplayOutcome.ReplayCall::tool).containsExactly("create_project");
+        assertThat(EvalGrader.grade(json.readValue(row.criteria(), EvalCriteria.class), outcome).passed()).isFalse();
+    }
+
+    /**
+     * Les 70 outils de Linear que la Présidence avait connectés, tels que le seed les fige : les douze premiers dans
+     * l'ordre du serveur le 17/11/2026, puis les autres. {@code readsOnly} : seulement ses lectures, comme une connexion à
+     * l'adresse de lecture seule.
+     */
+    private List<AgentTool> linearTools(boolean readsOnly) throws Exception {
+        String context = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow().context();
+        List<AgentTool> tools = new ArrayList<>();
+        for (JsonNode tool : json.readTree(context).path("external")) {
+            boolean read = tool.path("readOnly").asBoolean();
+            if (readsOnly && !read) continue;
+            tools.add(new ExternalMcpTool(extClient, new McpClient.ServerRef("linear", "https://mcp.linear.app/mcp", null),
+                new McpClient.ToolDef(tool.path("name").asText(), tool.path("description").asText(), tool.path("inputSchema"),
+                    read), json, read ? com.taskforce.tf_api.core.enums.ToolClass.READ : com.taskforce.tf_api.core.enums.ToolClass.WRITE,
+                com.taskforce.tf_api.core.enums.ConnectionScope.PERSONAL));
+        }
+        return tools;
+    }
+
+    /** Les outils externes que le modèle reçoit pour cette demande, la Présidence ayant connecté Linear. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<String> externalToolsSentFor(String message) throws Exception {
+        stubWorkspace();
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        lenient().when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        lenient().when(llm.isConfigured()).thenReturn(true);
+        lenient().when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ArgumentCaptor<List<AgentTool>> sent = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        lenient().when(tools.toolDefinitions(sent.capture())).thenReturn(List.of());
+
+        service.run("acme", 7L, message);
+
+        return sent.getValue().stream().map(AgentTool::name).toList();
+    }
+
+    @ParameterizedTest(name = "« {0} » : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // R204 : les mots de la Présidence (s17) et ceux du Conseil, en français, puis en anglais.
+        "crée une tâche dans Linear                                 | linear__save_issue",
+        "crée un projet dans Linear                                 | linear__save_project",
+        "Tu peux me creer un nouveau projet dans Linear la ou pas ? | linear__save_project",
+        "tu peux creer une tache dans linear stp ? avec une priorite | linear__save_issue",
+        "liste les projets de Linear                                | linear__list_projects",
+        "create an issue in Linear                                  | linear__save_issue",
+        "create a project in Linear                                 | linear__save_project",
+    })
+    void the_tools_of_a_named_connector_that_do_what_the_request_says_reach_the_model(String message, String expected)
+        throws Exception {
+        List<String> sent = externalToolsSentFor(message);
+
+        assertThat(sent).hasSize(12).contains(expected).allSatisfy(name -> assertThat(name).startsWith("linear__"));
+        // Ce qui aide à le faire passe aussi : l'équipe, qu'une issue ou un projet de Linear exige.
+        if (expected.contains("save_")) assertThat(sent).contains("linear__list_teams");
+    }
+
+    @Test
+    @DisplayName("R204 : le choix des outils est du code : la même demande donne les mêmes outils, dans le même ordre, douze au plus")
+    void the_choice_of_tools_is_deterministic() throws Exception {
+        List<String> first = externalToolsSentFor("crée une tâche dans Linear");
+        Mockito.reset(tools);
+        List<String> second = externalToolsSentFor("crée une tâche dans Linear");
+
+        assertThat(second).isEqualTo(first);
+        assertThat(first.get(0)).isEqualTo("linear__save_issue");
+    }
+
+    @Test
+    @DisplayName("R204 : la demande nomme un outil qui n'est pas connecté ; TaskForce le dit, et dit comment le connecter")
+    void a_named_tool_that_is_not_connected_is_said_so() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Je ne peux pas créer de tâche dans Asana.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "crée une tâche dans Asana");
+
+        assertThat(answer.answer()).contains("> [!taskforce] TaskForce · connections")
+            .contains("Cortex isn't connected to Asana for you").contains("Settings, Integrations");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).contains("Cortex isn't connected to Asana for this person");
+    }
+
+    @Test
+    @DisplayName("R204 : la demande écrit dans un outil connecté en lecture seule ; TaskForce le dit, et propose l'écriture")
+    void a_named_tool_connected_for_reading_only_is_said_so() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString()))
+            .thenReturn(json.readTree("{\"content\":\"Je n'ai pas d'outil pour créer des tâches dans Linear.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "crée une tâche dans Linear");
+
+        assertThat(answer.answer()).contains("> [!taskforce] TaskForce · connections")
+            .contains("Linear is connected for reading only").contains("allow changes");
+    }
+
+    @Test
+    @DisplayName("R204 : lire dans un outil connecté en lecture seule ne demande rien de plus")
+    void reading_in_a_tool_connected_for_reading_only_says_nothing_more() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici les projets.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "liste les projets de Linear");
+
+        assertThat(answer.answer()).isEqualTo("Voici les projets.");
+    }
+
+    @ParameterizedTest(name = "cas {0} du seed : {1}")
+    @CsvSource({"2, linear__save_project", "3, linear__save_issue", "4, linear__save_project"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void the_seed_cases_of_linear_give_the_model_the_tool_to_write_there(int n, String expected) throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == n).findFirst().orElseThrow();
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ArgumentCaptor<List<AgentTool>> sent = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        when(tools.toolDefinitions(sent.capture())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b")))
+            .thenReturn(json.readTree("{\"content\":\"Dans quelle équipe Linear ?\"}"));
+
+        service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()), "qwen3.5:9b");
+
+        assertThat(sent.getValue()).extracting(AgentTool::name).hasSize(12).contains(expected, "linear__list_teams");
+    }
+
+    /** La question de l'étape s14, mot pour mot, une issue jointe. */
+    private static final String S14 = "T'en ai a ou sur cette tache ?";
+    /** L'issue API-3 du seed de dev, telle que TaskForce la lit (le contenu de TF-21, l'issue de la Présidence, n'est pas connu). */
+    private static final String API3 = "API-3 \"Webhooks Stripe (lifecycle abonnement)\": in In Progress, assigned to Aïcha Diallo, "
+        + "priority high, 8 points.\nDescription: none.\nChecklist: none.\nComments: none.\n";
+
+    @Test
+    @DisplayName("R204 (s14) : l'issue jointe est celle que « cette tâche » désigne, et la demande que lit le modèle le dit")
+    void the_attached_issue_is_what_this_task_means() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"API-3 est en cours.\"}"));
+        List<Screen> attached = List.of(new Screen(3L, 21L));
+        when(material.read(any(), eq(S14), eq(attached), eq(false))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.ATTACHED + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
+
+        service.run("acme", 7L, new TurnInput(S14, TurnHistory.of(List.of()), Screen.NONE, attached, List.of(), 5L, null, null));
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        Map<String, Object> asked = sent.getValue().get(sent.getValue().size() - 1);
+        assertThat(asked.get("role")).isEqualTo("user");
+        assertThat(asked.get("content").toString()).startsWith(S14).contains("API-3").contains("cette tâche");
+    }
+
+    @Test
+    @DisplayName("R204 (s14) : la réponse garde l'issue dont parlait la demande, pour la conversation")
+    void the_answer_keeps_the_issue_its_request_was_about() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"API-3 est en cours.\"}"));
+        List<Screen> attached = List.of(new Screen(3L, 21L));
+        when(material.read(any(), eq(S14), eq(attached), eq(false))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.ATTACHED + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(S14, TurnHistory.of(List.of()), Screen.NONE, attached,
+            List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).extracting(AssistantAnswer.Subject::key).containsExactly("API-3");
+    }
+
+    @Test
+    @DisplayName("R204 (s14) : au tour suivant, « dessus » désigne encore l'issue jointe ; TaskForce la relit, et le dit au modèle")
+    void the_attached_issue_stays_the_subject_on_the_next_turn() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Aïcha Diallo.\"}"));
+        when(conversations.lastSubject(5L)).thenReturn(new AssistantAnswer.Subject("API-3", 21L, 3L));
+        when(material.readEarlier(any(), eq(new AssistantAnswer.Subject("API-3", 21L, 3L)))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.EARLIER + API3, List.of(new AssistantRead.IssueRead("API-3", 0)), List.of(21L)));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et qui bosse dessus ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(0).get("content").toString()).contains(IssueMaterial.EARLIER).contains("Aïcha Diallo");
+        assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
+            .startsWith("Et qui bosse dessus ?").contains("[This message is about API-3, which the person mentioned in an earlier message");
+        assertThat(answer.subjects()).extracting(AssistantAnswer.Subject::key).containsExactly("API-3");
+        assertThat(answer.read().issues()).containsExactly(new AssistantRead.IssueRead("API-3", 0));
+    }
+
+    @ParameterizedTest(name = "« {0} » ne reprend pas l'issue de la conversation")
+    @ValueSource(strings = {"Et qui bosse sur API-4 ?", "Quel est le plan du projet ?", "Merci, et la suite ?"})
+    void a_request_that_names_another_issue_or_none_takes_no_subject(String message) throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput(message, TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L,
+            null, null));
+
+        verify(conversations, never()).lastSubject(any());
+        verify(material, never()).readEarlier(any(), any());
+    }
+
+    @ParameterizedTest(name = "cas {0} du seed : {1}")
+    @CsvSource(delimiter = '|', value = {
+        "5 | [The person attached API-3 to this message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
+        "6 | [This message is about API-3, which the person mentioned in an earlier message: \"this issue\", \"this task\", \"cette tâche\" mean API-3.]",
+    })
+    void the_seed_cases_of_the_attached_issue_replay_with_it(int n, String line) throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == n).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()), "qwen3.5:9b");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        List<Map<String, Object>> messages = sent.getValue();
+        assertThat(messages.get(0).get("content").toString())
+            .contains(n == 5 ? IssueMaterial.ATTACHED : IssueMaterial.EARLIER).contains("API-3 \"Webhooks Stripe");
+        assertThat(messages.get(messages.size() - 1).get("content").toString()).startsWith(row.question()).endsWith(line);
+        if (n == 6) {
+            assertThat(messages.get(1).get("content").toString()).endsWith("[Attached to this message: API-3]");
+        }
+    }
+
+    @Test
+    @DisplayName("R204 : une demande sans pièce jointe part telle quelle")
+    void a_request_without_attachment_goes_as_it_is() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, "Quel est le plan ?");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content")).isEqualTo("Quel est le plan ?");
+    }
+
+    @Test
+    @DisplayName("R204 : une lecture n'a pas de cible à dire")
+    void a_read_says_no_target() throws Exception {
+        modelCalls("get_mission", "{\"issue\":\"TF-12\"}", "La mission attend.");
+        CortexGesture mission = gesture("get_mission", "issue.read");
+        when(mission.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(mission.perform(any(), any())).thenReturn(new CortexGesture.Done("The mission on TF-12 waits for the runner.",
+            null, null));
+
+        AssistantToolCall read = service.run("acme", 7L, "Où en est la mission de TF-12 ?").toolCalls().get(0);
+
+        assertThat(read.status()).isEqualTo("success");
+        assertThat(read.where()).isNull();
+    }
+
+    // -------------------------------------------------------------------------
+    // Relecture R159 de la PR #548 (18/11/2026) : les voisins des cas de la recette
+    // -------------------------------------------------------------------------
+
+    @Test
+    @DisplayName("R159 (1) : une lecture de TaskForce se fait d'emblée, même quand la demande nomme un outil où écrire")
+    void a_read_is_done_at_once_when_the_request_names_a_tool() throws Exception {
+        modelCalls("get_mission", "{\"issue\":\"TF-12\"}", "La mission attend.");
+        CortexGesture mission = gesture("get_mission", "issue.read");
+        when(mission.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(mission.perform(any(), any())).thenReturn(new CortexGesture.Done("The mission on TF-12 waits for the runner.",
+            null, null));
+
+        AssistantToolCall read = service.run("acme", 7L, "Où en est la mission de TF-12 ? Ensuite crée une tâche dans Linear")
+            .toolCalls().get(0);
+
+        assertThat(read.status()).isEqualTo("success");
+        assertThat(read.output()).doesNotContain("Not done");
+        verify(mission).perform(any(), any());
+    }
+
+    @Test
+    @DisplayName("R159 (1) : la lecture d'un autre outil connecté se fait d'emblée ; seule une écriture ailleurs attend sa carte")
+    @SuppressWarnings("unchecked")
+    void a_read_in_another_connected_tool_is_done_at_once() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        lenient().when(tools.get(anyString(), anyList())).thenAnswer(inv -> ((List<AgentTool>) inv.getArgument(1)).stream()
+            .filter(tool -> tool.name().equals(inv.getArgument(0))).findFirst().orElse(null));
+        when(extClient.callTool(any(), eq("list_issues"), any())).thenReturn("ENG-1 Login fails");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"linear__list_issues\",\"arguments\":\"{}\"}}]}"),
+            json.readTree("{\"content\":\"Voici les tickets.\"}"));
+
+        AssistantToolCall read = service.run("acme", 7L, "Crée une tâche dans Asana avec les tickets ouverts").toolCalls().get(0);
+
+        assertThat(read.status()).isEqualTo("success");
+        verify(extClient).callTool(any(), eq("list_issues"), any());
+    }
+
+    @Test
+    @DisplayName("R159 (3) : « pas dans Linear » ne nie pas le projet créé dans TaskForce, même sans Linear connecté")
+    void a_denial_about_a_tool_that_is_not_connected_denies_nothing_done_in_taskforce() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        String said = "Je ne l'ai pas créé dans Linear : il est dans TaskForce.";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu l'as créé où ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).isEqualTo(said);
+    }
+
+    @Test
+    @DisplayName("R159 (3) : au rejeu aussi, « pas dans Linear » ne nie pas ce que les tours d'avant ont fait dans TaskForce")
+    void a_replay_knows_every_tool_of_the_catalog() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        String said = "Je ne l'ai pas créé dans Linear : il est dans TaskForce.";
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", said))));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        assertThat(outcome.answer()).isEqualTo(said);
+    }
+
+    /** Un projet de TaskForce créé d'emblée par le modèle (il se défait). */
+    private CortexGesture projectCreatedAtOnce(String name) throws Exception {
+        CortexGesture create = gesture("create_project", "project.create");
+        when(create.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(create.perform(any(), any())).thenReturn(new CortexGesture.Done(
+            "Project created in TaskForce: ROAD \"" + name + "\" (id 4).", null, Map.of("projectId", 4)));
+        return create;
+    }
+
+    @ParameterizedTest(name = "« {0} » : le projet se crée dans TaskForce, sans alerte")
+    @ValueSource(strings = {
+        "Crée un projet TaskForce à partir du projet Linear Roadmap",
+        "Create a TaskForce project from the Linear project Roadmap",
+    })
+    void a_tool_named_as_a_source_is_not_the_target(String request) throws Exception {
+        modelCalls("create_project", "{\"name\":\"Roadmap\"}", "Projet créé.");
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        CortexGesture create = projectCreatedAtOnce("Roadmap");
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("success");
+            assertThat(call.where().asked()).isNull();
+        });
+        verify(create).perform(any(), any());
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString()).doesNotContain("never in TaskForce instead")
+            .contains("The person asks to write in TaskForce");
+    }
+
+    @Test
+    @DisplayName("R159 (4) : « une issue TaskForce à partir de ce ticket Linear » : la carte n'avertit de rien")
+    void an_issue_from_a_linear_ticket_is_prepared_in_taskforce() throws Exception {
+        modelCalls("create_issue", "{\"title\":\"Login fails\"}", "Voici la carte.");
+        CortexGesture create = gesture("create_issue", "issue.create");
+        lenient().when(create.prepare(any(), any())).thenReturn(null);
+
+        AssistantToolCall card = service.run("acme", 7L, "crée une issue TaskForce à partir de ce ticket Linear").toolCalls()
+            .get(0);
+
+        assertThat(card.where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", null));
+    }
+
+    @ParameterizedTest(name = "« {0} » : la colonne change d'emblée, sans alerte ni constat")
+    @ValueSource(strings = {
+        "C'est mergé sur GitHub, passe TF-12 en Done",
+        "It's merged on GitHub, move TF-12 to Done",
+    })
+    void a_tool_named_in_a_statement_is_neither_a_target_nor_a_place(String request) throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"status\":\"Done\"}", "TF-12 est dans Done.");
+        CortexGesture update = gesture("update_issue", "issue.update");
+        when(update.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(update.perform(any(), any())).thenReturn(new CortexGesture.Done("Updated TF-12: column to Done.",
+            Map.of("issueId", 5, "projectId", 12, "key", "TF-12"), Map.of("projectId", 12, "issueId", 5, "fields", Map.of())));
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("success");
+            assertThat(call.where().asked()).isNull();
+        });
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+    }
+
+    /**
+     * La sonde du quatrième tour de la relecture R159 de la PR #548 : aujourd'hui, « selon le ticket Linear » fait de
+     * Linear la cible, update_issue reste en attente et un faux bloc dit Linear non connecté. Le résultat attendu après
+     * la fusion, point 1 de la liste de la PR.
+     */
+    @Disabled("Après la fusion, point 1 de la relecture R159 : « selon le ticket Linear » dit d'où vient la demande")
+    @Test
+    @DisplayName("R159, après la fusion (1) : « Passe TF-12 en Done selon le ticket Linear ENG-12 » change la colonne d'emblée")
+    void after_the_merge_an_update_according_to_a_ticket_is_done_in_taskforce() throws Exception {
+        modelCalls("update_issue", "{\"issue\":\"TF-12\",\"status\":\"Done\"}", "TF-12 est dans Done.");
+        CortexGesture update = gesture("update_issue", "issue.update");
+        when(update.ask(any(), any())).thenAnswer(inv -> inv.getArgument(0));
+        when(update.perform(any(), any())).thenReturn(new CortexGesture.Done("Updated TF-12: column to Done.",
+            Map.of("issueId", 5, "projectId", 12, "key", "TF-12"), Map.of("projectId", 12, "issueId", 5, "fields", Map.of())));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Passe TF-12 en Done selon le ticket Linear ENG-12");
+
+        assertThat(answer.toolCalls()).singleElement().satisfies(call -> {
+            assertThat(call.status()).isEqualTo("success");
+            assertThat(call.where().asked()).isNull();
+        });
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+    }
+
+    @Test
+    @DisplayName("R159 (4) : TaskForce se nomme comme cible ; une écriture dans Linear le dit sur sa carte")
+    void taskforce_can_be_the_target() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(false));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        lenient().when(tools.get(anyString(), anyList())).thenAnswer(inv -> ((List<?>) inv.getArgument(1)).stream()
+            .map(AgentTool.class::cast).filter(tool -> tool.name().equals(inv.getArgument(0))).findFirst().orElse(null));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(
+            json.readTree("{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"linear__save_project\",\"arguments\":"
+                + "\"{\\\"name\\\":\\\"Roadmap\\\"}\"}}]}"),
+            json.readTree("{\"content\":\"Le projet attend la carte.\"}"));
+
+        AssistantToolCall card = service.run("acme", 7L, "Crée un projet Roadmap dans TaskForce").toolCalls().get(0);
+
+        assertThat(card.status()).isEqualTo("pending");
+        assertThat(card.where()).isEqualTo(new AssistantAnswer.AssistantWhere("Linear", null, "TaskForce"));
+    }
+
+    @ParameterizedTest(name = "« {0} » ne nomme aucun outil : rien sous la réponse")
+    @ValueSource(strings = {
+        "Create an issue: the linear progress bar jumps back",
+        "Crée une issue pour corriger l'amplitude du graphe",
+        "Add a task to give the team some slack before the release",
+    })
+    void a_common_word_names_no_tool(String request) throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici la carte.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.answer()).isEqualTo("Voici la carte.");
+    }
+
+    @Test
+    @DisplayName("R159 (9) : « Résume TF-21 et poste-le sur Slack » garde le plan du résumé, et TaskForce lit l'issue avant")
+    void a_named_tool_does_not_drop_the_summary_plan() throws Exception {
+        stubModel();
+        String request = "Résume TF-21 et poste-le sur Slack";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Résumé prêt.\"}"));
+
+        service.run("acme", 7L, request);
+
+        verify(material).read(any(), eq(request), anyList(), eq(true));
+    }
+
+    @ParameterizedTest(name = "« {0} », Linear en lecture seule : rien sur l'écriture")
+    @ValueSource(strings = {
+        "Qu'est-ce qui se passe dans Linear ?",
+        "Quels sont les nouveaux tickets dans Linear ?",
+        "Montre-moi ce qui a été fait dans Linear",
+        "What's new in Linear?",
+    })
+    void a_read_in_a_tool_connected_for_reading_only_asks_nothing_more(String request) throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.answer()).isEqualTo("Voici.");
+    }
+
+    /** Les six outils de Notion de la sonde de la relecture R159 : chercher, lire, modifier et créer une page, ses commentaires. */
+    private List<AgentTool> notionTools() {
+        List<AgentTool> notion = new ArrayList<>();
+        for (String[] def : new String[][] {{"notion-search", "true"}, {"notion-fetch", "true"}, {"notion-update-page", "false"},
+            {"notion-create-pages", "false"}, {"notion-get-comments", "true"}, {"notion-create-comment", "false"}}) {
+            boolean read = Boolean.parseBoolean(def[1]);
+            notion.add(new ExternalMcpTool(extClient, new McpClient.ServerRef("notion", "https://mcp.notion.com/mcp", null),
+                new McpClient.ToolDef(def[0], "", json.createObjectNode().put("type", "object"), read), json,
+                read ? com.taskforce.tf_api.core.enums.ToolClass.READ : com.taskforce.tf_api.core.enums.ToolClass.WRITE,
+                com.taskforce.tf_api.core.enums.ConnectionScope.PERSONAL));
+        }
+        return notion;
+    }
+
+    @ParameterizedTest(name = "« {0} » : les outils de Notion passent au modèle")
+    @ValueSource(strings = {"Résume ma page Notion Roadmap", "Search Notion for the roadmap", "Cherche la page Roadmap dans Notion"})
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void the_tools_of_a_connector_the_request_cites_reach_the_model(String request) throws Exception {
+        stubWorkspace();
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        lenient().when(search.retrieveRelevant(any(), anyString(), anyInt())).thenReturn(List.of());
+        lenient().when(llm.isConfigured()).thenReturn(true);
+        lenient().when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        List<AgentTool> connected = new ArrayList<>(linearTools(false));
+        connected.addAll(notionTools());
+        when(workspaceMcp.toolsFor(any())).thenReturn(connected);
+        ArgumentCaptor<List<AgentTool>> sent = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        lenient().when(tools.toolDefinitions(sent.capture())).thenReturn(List.of());
+
+        service.run("acme", 7L, request);
+
+        assertThat(sent.getValue()).extracting(AgentTool::name).contains("notion__notion-search", "notion__notion-fetch")
+            .filteredOn(name -> name.startsWith("notion__")).hasSize(6);
+    }
+
+    @Test
+    @DisplayName("R159 (7) : une issue ouverte à l'écran est celle que « cette tâche » désigne ; celle de la conversation ne revient pas")
+    void the_issue_on_screen_wins_over_the_issue_of_the_conversation() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput("Qui bosse sur cette tâche ?", TurnHistory.of(List.of()), new Screen(3L, 30L),
+            List.of(), List.of(), 5L, null, null));
+
+        verify(conversations, never()).lastSubject(any());
+    }
+
+    @Test
+    @DisplayName("R159 (7) : un projet joint est ce que « celui-ci » désigne ; l'issue de la conversation ne revient pas")
+    void an_attached_project_wins_over_the_issue_of_the_conversation() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput("Et celui-ci ?", TurnHistory.of(List.of()), Screen.NONE,
+            List.of(new Screen(4L, null)), List.of(), 5L, null, null));
+
+        verify(conversations, never()).lastSubject(any());
+    }
+
+    @Test
+    @DisplayName("R159 (7) : « dans 2 jours » n'est pas une clé d'issue ; « dessus » désigne encore l'issue de la conversation")
+    void a_number_after_a_word_is_not_an_issue_key() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.run("acme", 7L, new TurnInput("Et qui bosse dessus dans 2 jours ?", TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        verify(conversations).lastSubject(5L);
+    }
+
+    @Test
+    @DisplayName("R159 (7) : une issue nommée par sa clé devient le sujet de la conversation, à la place de celle d'avant")
+    void a_named_issue_becomes_the_subject() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        AssistantAnswer.Subject api4 = new AssistantAnswer.Subject("API-4", 40L, 4L);
+        when(material.namedSubjects(any(), eq("Et sur API-4 ?"))).thenReturn(List.of(api4));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et sur API-4 ?", TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly(api4);
+        verify(conversations, never()).lastSubject(any());
+    }
+
+    @Test
+    @DisplayName("R159 (7) : au tour suivant, « dessus » relit l'issue nommée, par ses ids")
+    void the_named_issue_is_read_again_by_its_ids() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Marc Dupont.\"}"));
+        AssistantAnswer.Subject api4 = new AssistantAnswer.Subject("API-4", 40L, 4L);
+        when(conversations.lastSubject(5L)).thenReturn(api4);
+        when(material.readEarlier(any(), eq(api4))).thenReturn(new IssueMaterial.Read(IssueMaterial.EARLIER
+            + "API-4 \"Export CSV\": in Todo, assigned to Marc Dupont.\n", List.of(new AssistantRead.IssueRead("API-4", 0)),
+            List.of(40L)));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Et qui bosse dessus ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly(api4);
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChat(sent.capture(), anyList(), anyString());
+        // Second tour de la relecture R159 (G) : API-4 a été nommée par sa clé, pas jointe.
+        assertThat(sent.getValue().get(sent.getValue().size() - 1).get("content").toString())
+            .contains("[This message is about API-4, which the person mentioned in an earlier message")
+            .doesNotContain("attached");
+        assertThat(sent.getValue().get(0).get("content").toString()).contains("the person mentioned it in an earlier message")
+            .doesNotContain("attached it to an earlier message");
+    }
+
+    @Test
+    @DisplayName("R159 (11) : le cas 1 passe quand le modèle dit où est le projet, sans le nier")
+    void the_seed_case_of_the_denial_passes_when_the_model_says_where() throws Exception {
+        SeedCases.Row row = SeedCases.r204().stream().filter(r -> r.n() == 1).findFirst().orElseThrow();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree(
+            json.writeValueAsString(Map.of("content", "Je l'ai créé dans TaskForce : TESTTASKFO. Il n'est pas dans Linear."))));
+
+        ReplayOutcome outcome = service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(row.evalCase()),
+            "qwen3.5:9b");
+
+        EvalCriteria criteria = json.readValue(row.criteria(), EvalCriteria.class);
+        assertThat(EvalGrader.grade(criteria, outcome).passed()).isTrue();
+    }
+
+    @ParameterizedTest(name = "« {0} » : l'issue d'avant reprise au rejeu : {1}")
+    @CsvSource(delimiter = '|', value = {
+        // Relecture R159 (11) : au rejeu, la même règle que dans une conversation décide de l'issue d'avant.
+        "Et qui bosse dessus ?   | true",
+        "Merci, et la suite ?    | false",
+    })
+    void a_replay_takes_the_earlier_issue_by_the_rule_of_a_conversation(String question, boolean takes) throws Exception {
+        String context = json.writeValueAsString(Map.of(
+            "history", List.of(Map.of("role", "user", "content", S14, "acts", List.of(), "subjects", List.of("API-3")),
+                Map.of("role", "assistant", "content", "API-3 est en cours.", "acts", List.of())),
+            "attached", List.of(Map.of("key", "API-3", "material", API3, "earlier", true))));
+        com.taskforce.tf_api.core.model.EvalCase evalCase = com.taskforce.tf_api.core.model.EvalCase.builder().id(99L)
+            .workspaceId(1L).title("R159 11").question(question).askedOn(LocalDate.of(2026, 11, 18)).notes("[]").cassette("[]")
+            .criteria("{\"honest\":true}").context(context).build();
+        when(tools.toolDefinitions(anyList())).thenReturn(List.of());
+        when(llm.rawChatWithModel(anyList(), anyList(), eq("qwen3.5:9b"))).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+
+        service.replay(new AgentContext("acme", 1L, 7L), EvalService.replayCase(evalCase), "qwen3.5:9b");
+
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm).rawChatWithModel(sent.capture(), anyList(), eq("qwen3.5:9b"));
+        String system = sent.getValue().get(0).get("content").toString();
+        String asked = sent.getValue().get(sent.getValue().size() - 1).get("content").toString();
+        assertThat(system.contains(IssueMaterial.EARLIER)).isEqualTo(takes);
+        assertThat(asked.contains("[This message is about API-3")).isEqualTo(takes);
+    }
+
+    @Test
+    @DisplayName("R159, second tour (3) : une négation sur ce que la demande en cours demande ne nie rien du fil")
+    void a_denial_about_what_the_request_asks_denies_nothing_of_the_thread() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(new ActionClaimCheck.Done("create_issue", "TaskForce",
+            "Issue created: API-12 \"Fix login\".")));
+        String said = "Je n'ai pas encore créé l'issue. Dans quel projet la mettre ?";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Crée une issue pour le bug du paiement",
+            TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).isEqualTo(said);
+    }
+
+    @ParameterizedTest(name = "« {0} » : l'issue se prépare dans TaskForce, sans alerte ni bloc sur l'outil")
+    @ValueSource(strings = {
+        "Crée une issue pour le bug remonté dans Slack",
+        "Create an issue for the bug reported in Slack",
+        "Crée une tâche pour la demande du client reçue sur Intercom",
+        "Crée une issue pour le ticket qui est dans Linear",
+        "Crée une issue pour chaque erreur vue dans Sentry",
+    })
+    @DisplayName("R159, second tour (C) : un lieu d'où vient la chose n'est pas la cible")
+    void a_place_where_the_thing_comes_from_is_not_the_target(String request) throws Exception {
+        modelCalls("create_issue", "{\"title\":\"Login fails\"}", "Voici la carte.");
+        CortexGesture create = gesture("create_issue", "issue.create");
+        lenient().when(create.prepare(any(), any())).thenReturn(null);
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls().get(0).where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", null));
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString()).doesNotContain("never in TaskForce instead");
+    }
+
+    @Test
+    @DisplayName("R159, second tour (C) : une issue TaskForce pour un bug signalé dans Linear, en lecture seule : rien de plus")
+    void an_origin_in_a_tool_connected_for_reading_is_not_written() throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, "Crée une issue TaskForce pour le bug signalé dans Linear");
+
+        assertThat(answer.answer()).isEqualTo("Voici.");
+    }
+
+    @ParameterizedTest(name = "« {0} », Linear en lecture seule : rien de plus")
+    @ValueSource(strings = {
+        "Comment avance le projet dans Linear ?",
+        "Comment ça se passe dans Linear ?",
+        "Quel poste occupe Marie dans Linear ?",
+    })
+    @DisplayName("R159, second tour (D) : une question n'écrit pas dans Linear")
+    void a_question_does_not_write_in_a_tool_connected_for_reading(String request) throws Exception {
+        stubModel();
+        when(workspaceMcp.toolsFor(any())).thenReturn(linearTools(true));
+        ReflectionTestUtils.setField(service, "maxExternalTools", 12);
+        ReflectionTestUtils.setField(service, "mcpToolTier", "fast");
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Voici.\"}"));
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.answer()).isEqualTo("Voici.");
+    }
+
+    @Test
+    @DisplayName("R159, second tour (7) : l'issue ouverte à l'écran devient le sujet de la conversation")
+    void the_issue_on_screen_becomes_the_subject() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        when(screens.read(any())).thenReturn(new ScreenContext.Seen("On screen: TF-30 \"Export CSV\".\n", "TF", 1, "TF-30"));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Qui bosse sur cette tâche ?", TurnHistory.of(List.of()),
+            new Screen(3L, 30L), List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.subjects()).containsExactly(new AssistantAnswer.Subject("TF-30", 30L, 3L));
+    }
+
+    @Test
+    @DisplayName("R159, second tour (7) : l'issue résumée devient le sujet ; une demande sur le projet n'en a pas")
+    void the_summarized_issue_becomes_the_subject() throws Exception {
+        stubModel();
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree("{\"content\":\"Ok.\"}"));
+        when(material.read(any(), eq("Résume cette tâche"), anyList(), eq(true))).thenReturn(new IssueMaterial.Read(
+            IssueMaterial.HEADER + "TF-30 \"Export CSV\": in Todo.\n", List.of(new AssistantRead.IssueRead("TF-30", 0)),
+            List.of(30L)));
+
+        AssistantAnswer summarized = service.run("acme", 7L, new TurnInput("Résume cette tâche", TurnHistory.of(List.of()),
+            new Screen(3L, 30L), List.of(), List.of(), 5L, null, null));
+        AssistantAnswer board = service.run("acme", 7L, new TurnInput("Combien d'issues dans le projet ?",
+            TurnHistory.of(List.of()), new Screen(3L, 30L), List.of(), List.of(), 5L, null, null));
+
+        assertThat(summarized.subjects()).containsExactly(new AssistantAnswer.Subject("TF-30", 30L, 3L));
+        assertThat(board.subjects()).isEmpty();
+    }
+
+    @ParameterizedTest(name = "« {0} » corrigée {1}")
+    @CsvSource(delimiter = '|', value = {
+        "Oui, je l'ai créé dans TaskForce, pas dans Linear. | false",
+        "Non, je ne l'ai pas créé, il me manquait le nom.   | true",
+    })
+    @DisplayName("R159, troisième tour (N1) : à « Tu l'as bien créé ? », la réponse vraie reste, la négation fausse se corrige")
+    void a_question_about_the_past_is_answered_by_what_the_conversation_did(String said, boolean corrected) throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu l'as bien créé ? Je le vois pas dans Linear",
+            TurnHistory.of(List.of()), Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        if (corrected) {
+            assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).contains("TESTTASKFO")
+                .doesNotContain("il me manquait le nom");
+        } else {
+            assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
+        }
+    }
+
+    @Test
+    @DisplayName("R159, troisième tour (N2) : une annonce incertaine reste, dit ce que ce tour a fait, et laisse au dossier une trace incertaine")
+    void an_unsure_claim_leaves_an_uncertain_trace_in_the_record() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(new ActionClaimCheck.Done("create_project", "TaskForce",
+            S17_CREATED.output(), "{\"name\":\"Test Taskforce\"}", false)));
+        String said = "J'ai créé le projet et assigné les tâches.";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Que reste-t-il à faire ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).startsWith(said).contains(ActionClaimCheck.RECORD_SIGNATURE)
+            .contains("Nothing was created or assigned in this turn.");
+        assertThat(answer.steps().getLast().status()).isEqualTo("done");
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<Map<String, Object>> incident = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(records).incident(any(), any(), eq("Que reste-t-il à faire ?"), any(), incident.capture());
+        assertThat(incident.getValue()).containsEntry("uncertain", true).containsEntry("rule", "R116")
+            .containsEntry("said", List.of(said));
+    }
+
+    @ParameterizedTest(name = "« {0} » : l'issue se prépare dans TaskForce, sans alerte ni bloc sur l'outil")
+    @ValueSource(strings = {
+        "Cree une issue pour le bug remonte dans Slack",
+        "Cree une issue pour le bug signale dans Linear",
+        "Crée une issue pour le ticket Linear ENG-12",
+        "Crée une issue pour le message Slack de Marie",
+        "Create an issue for the Linear ticket ENG-12",
+    })
+    @DisplayName("R159, troisième tour (N3) : sans accents, ou une chose d'un outil après « pour » : le lieu d'origine n'est pas la cible")
+    void an_origin_without_accents_or_after_for_is_not_the_target(String request) throws Exception {
+        modelCalls("create_issue", "{\"title\":\"Login fails\"}", "Voici la carte.");
+        CortexGesture create = gesture("create_issue", "issue.create");
+        lenient().when(create.prepare(any(), any())).thenReturn(null);
+
+        AssistantAnswer answer = service.run("acme", 7L, request);
+
+        assertThat(answer.toolCalls().get(0).where()).isEqualTo(new AssistantAnswer.AssistantWhere("TaskForce", "Acme", null));
+        assertThat(answer.answer()).doesNotContain("TaskForce · connections");
+        ArgumentCaptor<List<Map<String, Object>>> sent = captorOfMessages();
+        verify(llm, Mockito.atLeastOnce()).rawChat(sent.capture(), anyList(), anyString());
+        assertThat(sent.getAllValues().get(0).get(0).get("content").toString()).doesNotContain("never in TaskForce instead");
+    }
+
+    @ParameterizedTest(name = "à « {0} » : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Tu la creer ou ? Je le vois pas dans linear   | Oui, je l'ai créé dans TaskForce, pas dans Linear.              | false",
+        "Tu la creer ou ? Je le vois pas dans linear   | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Could you just create the Marketing project?  | Done, I created it.                                             | true",
+        "On crée aussi le projet Marketing ?           | Je ne l'ai pas encore créé. Tu confirmes le nom ?               | false",
+    })
+    @DisplayName("R159, quatrième tour (B1, B2) : de bout en bout, une question se lit à son verbe")
+    void a_question_is_read_as_its_verb_says_through_a_turn(String request, String said, boolean corrected) throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(request, TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        if (corrected) {
+            assertThat(answer.answer()).doesNotContain(said).contains(ActionClaimCheck.SIGNATURE);
+        } else {
+            assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created")
+                .doesNotContain(ActionClaimCheck.DONE_SIGNATURE);
+        }
+    }
+
+    @ParameterizedTest(name = "à « {0} » : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Ta creer le projet ou ? Je le vois pas dans linear | Oui, je l'ai créé dans TaskForce, pas dans Linear.              | false",
+        "Ta creer le projet ou ? Je le vois pas dans linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+    })
+    @DisplayName("R159, cinquième tour (R1) : de bout en bout, « ta » pour « t'as » est une question sur le passé")
+    void a_misspelled_auxiliary_is_a_question_through_a_turn(String request, String said, boolean corrected) throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(request, TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        if (corrected) assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain(said);
+        else assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
+    }
+
+    @Test
+    @DisplayName("R159, cinquième tour (R2) : de bout en bout, « Tu le crées ou pas ? » après la création garde la réponse, avec le bloc record")
+    void a_request_that_names_nothing_comes_with_the_record_through_a_turn() throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        String said = "Je l'ai créé dans TaskForce.";
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput("Tu le crées ou pas ?", TurnHistory.of(List.of()),
+            Screen.NONE, List.of(), List.of(), 5L, null, null));
+
+        assertThat(answer.answer()).startsWith(said).contains(ActionClaimCheck.RECORD_SIGNATURE).contains("TESTTASKFO");
+    }
+
+    @ParameterizedTest(name = "à « {0} » : « {1} » corrigée {2}")
+    @CsvSource(delimiter = '|', value = {
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Non, je l'ai créé dans TaskForce, pas dans Linear. | false",
+        "Je dois créer le projet moi-même ? Je le vois pas dans Linear | Je n'ai pas créé de projet, car vous ne m'avez pas donné de nom. | true",
+        "Should I create the project? | No need, I created it in TaskForce.     | false",
+        "Should I create the project? | I haven't created it yet.               | true",
+        "Ne crée pas le projet        | Trop tard, je l'ai créé dans TaskForce. | false",
+        "Ne crée pas le projet        | D'accord, je n'ai pas créé le projet.   | true",
+    })
+    @DisplayName("R159, sixième tour : de bout en bout, une question sur ce que la personne doit faire, une défense, ne demandent rien")
+    void a_negation_or_what_the_person_must_do_asks_nothing_through_a_turn(String request, String said, boolean corrected)
+        throws Exception {
+        stubModel();
+        when(conversations.threadDone(5L)).thenReturn(List.of(S17_CREATED));
+        when(llm.rawChat(anyList(), anyList(), anyString())).thenReturn(json.readTree(json.writeValueAsString(
+            Map.of("content", said))));
+
+        AssistantAnswer answer = service.run("acme", 7L, new TurnInput(request, TurnHistory.of(List.of()), Screen.NONE,
+            List.of(), List.of(), 5L, null, null));
+
+        if (corrected) assertThat(answer.answer()).startsWith(ActionClaimCheck.DONE_SIGNATURE).doesNotContain(said);
+        else assertThat(answer.answer()).startsWith(said).doesNotContain("Nothing was created");
     }
 }

@@ -39,6 +39,17 @@ export interface AssistantToolCall {
    * qui montre leurs choix et part d'un seul envoi.
    */
   questions?: AssistantQuestion[] | null
+  /** Où écrit l'action, que sa carte dit avant le geste (R204) ; absent d'une lecture et des réponses d'avant. */
+  where?: AssistantWhere | null
+}
+/**
+ * Où écrit une action (R204) : TaskForce, avec son espace, ou l'outil connecté ; et l'outil que la demande nommait quand
+ * l'action écrit ailleurs (« crée un projet dans Linear », et un projet de TaskForce).
+ */
+export interface AssistantWhere {
+  system: string
+  workspace?: string | null
+  asked?: string | null
 }
 /**
  * Une question de TaskForce (R115, séance n°17), dans la forme des questions de Claude (décision du CEO, 05/11/2026) :

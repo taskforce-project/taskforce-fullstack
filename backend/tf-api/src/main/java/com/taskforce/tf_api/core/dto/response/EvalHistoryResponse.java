@@ -40,9 +40,10 @@ public record EvalHistoryResponse(List<Run> runs, List<Case> cases) {
 
     /**
      * D'où vient un cas. {@code incident} : TaskForce a corrigé la réponse (R116), l'incident de confiance d'E17, avec
-     * ce que le modèle avait dit ({@code said}) et ce que TaskForce a montré ({@code shown}). {@code answer} : une réponse
-     * de Cortex dans une conversation. {@code unknown} : le dossier de la réponse n'est plus là, ou le cas a été écrit à
-     * la main ; la question et son jour restent.
+     * ce que le modèle avait dit ({@code said}) et ce que TaskForce a montré ({@code shown}). {@code uncertain} : TaskForce
+     * a laissé une phrase qu'il ne rattachait à aucun geste, et dit à côté ce qui a été fait (relecture R159), avec les
+     * mêmes {@code said} et {@code shown}. {@code answer} : une réponse de Cortex dans une conversation. {@code unknown} :
+     * le dossier de la réponse n'est plus là, ou le cas a été écrit à la main ; la question et son jour restent.
      */
     public record Origin(String kind, List<String> said, String shown) {
     }
