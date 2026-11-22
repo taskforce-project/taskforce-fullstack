@@ -123,7 +123,21 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
 
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
 
-    await waitFor(() => expect(discardRun).toHaveBeenCalledWith("acme", 28, 100));
+    await waitFor(() => expect(discardRun).toHaveBeenCalledWith("acme", 28, 100, undefined));
+  });
+
+  it("the reason of a gesture, if the person gives one, goes with it into the record (TF-J2-7)", async () => {
+    discardRun.mockResolvedValue(true);
+    applyRun.mockResolvedValue(true);
+    show();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Why, in one line" }), { target: { value: "  Wrong approach  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(discardRun).toHaveBeenCalledWith("acme", 28, 100, "Wrong approach"));
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Why, in one line" }), { target: { value: "Reviewed the diff" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(applyRun).toHaveBeenCalledWith("acme", 28, 100, "Reviewed the diff"));
   });
 
   it("Try again asks for a note, then sends it", async () => {
@@ -219,9 +233,10 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
       useDeliveryStore.setState({ runs: { 28: NO_CHANGE }, markRunDone });
       show();
 
+      fireEvent.change(screen.getByRole("textbox", { name: "Why, in one line" }), { target: { value: "Already fixed by #210" } });
       fireEvent.click(screen.getByRole("button", { name: "Mark as done" }));
 
-      await waitFor(() => expect(markRunDone).toHaveBeenCalledWith("acme", 28, 100));
+      await waitFor(() => expect(markRunDone).toHaveBeenCalledWith("acme", 28, 100, "Already fixed by #210"));
       const { toast } = await import("sonner");
       expect(toast.success).toHaveBeenCalledWith("Marked as done");
     });

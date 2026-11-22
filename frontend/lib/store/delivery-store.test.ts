@@ -455,7 +455,7 @@ describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
     await act(async () => { ok = await useDeliveryStore.getState().markRunDone('acme', 28, 100); });
 
     expect(ok).toBe(true);
-    expect(svc.markRunDone).toHaveBeenCalledWith('acme', 100);
+    expect(svc.markRunDone).toHaveBeenCalledWith('acme', 100, undefined);
     expect(useDeliveryStore.getState().runs[28]?.outcome).toBe('MARKED_DONE');
     expect(useDeliveryStore.getState().resultErrors[100]).toBeUndefined();
   });
@@ -483,6 +483,18 @@ describe('delivery-store : les gestes de la carte de résultat (R78)', () => {
     await act(async () => { await useDeliveryStore.getState().discardRun('acme', 28, 100); });
 
     expect(useDeliveryStore.getState().resultErrors[100]).toBeUndefined();
+  });
+
+  it('discardRun et markRunDone : la raison du geste part au service, pour le dossier (TF-J2-7)', async () => {
+    vi.mocked(svc.discardRun).mockResolvedValue(undefined);
+    vi.mocked(svc.markRunDone).mockResolvedValue(undefined);
+    vi.mocked(svc.getIssueRun).mockResolvedValue(null);
+
+    await act(async () => { await useDeliveryStore.getState().discardRun('acme', 28, 100, 'Wrong approach'); });
+    await act(async () => { await useDeliveryStore.getState().markRunDone('acme', 28, 100, 'Already fixed'); });
+
+    expect(svc.discardRun).toHaveBeenCalledWith('acme', 100, 'Wrong approach');
+    expect(svc.markRunDone).toHaveBeenCalledWith('acme', 100, 'Already fixed');
   });
 
   it('stopRun : la mission se relit, sa chronologie et ce qui attend aussi', async () => {

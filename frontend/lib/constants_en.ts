@@ -2376,6 +2376,9 @@ export const CONSTANTS_EN = {
       testsFailedApplyOff: "The tests failed, so Apply is off.",
       applyAnyway: "Apply anyway",
       applyAnywayReason: "Why apply although the tests failed? Your reason goes on the issue and stays with the result.",
+      // TF-J2-7: the reason of a gesture goes into the record of the mission, with the gesture.
+      gestureReason: "Why, in one line",
+      gestureReasonHint: "Why (optional): it stays in the mission's record",
       onlyDelegator: "Only the person who delegated this task can apply, discard or try again.",
       howItWasDone: "How it was done",
       howItWasDoneValue: "Rules v{version} · {actions} actions · {asked} requests, {answered} answered",

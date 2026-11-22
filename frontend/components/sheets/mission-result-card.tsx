@@ -19,8 +19,9 @@ import { cn } from "@/lib/utils"
  * qui a délégué tranche : les gestes ne s'affichent que pour elle, le serveur le vérifie, et la carte dit pourquoi il refuse.
  * Des tests en échec éteignent « Apply » (R87, séance n°14) : on ne passe outre que par « Apply anyway », en écrivant
  * pourquoi. Une mission qui n'a rien changé n'a rien à appliquer : le geste principal devient « Mark as done », qui termine
- * l'issue (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). `embedded` : dans la vue du travail,
- * dont l'en-tête dit déjà le titre et l'état.
+ * l'issue (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). Une ligne facultative dit pourquoi
+ * l'on écarte, termine ou applique : la raison entre au dossier de la mission avec le geste (TF-J2-7). `embedded` : dans la
+ * vue du travail, dont l'en-tête dit déjà le titre et l'état.
  */
 export function MissionResultCard({ slug, issueId, issueKey, issueTitle, responsible, embedded = false }: Readonly<{
   slug: string
@@ -46,6 +47,8 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   const [note, setNote] = useState("")
   const [overriding, setOverriding] = useState(false)
   const [reason, setReason] = useState("")
+  // Pourquoi la personne écarte, termine ou applique : facultatif, il entre au dossier avec le geste (TF-J2-7).
+  const [why, setWhy] = useState("")
 
   if (!run || run.status !== "DONE" || run.outcome) return null
   const r = t.result
@@ -62,9 +65,10 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   async function act(kind: Gesture) {
     if (!run) return
     setBusy(kind)
-    const ok = kind === "apply" ? await applyRun(slug, issueId, run.id, overriding ? reason : undefined)
-      : kind === "discard" ? await discardRun(slug, issueId, run.id)
-      : kind === "done" ? await markRunDone(slug, issueId, run.id)
+    const said = why.trim() || undefined
+    const ok = kind === "apply" ? await applyRun(slug, issueId, run.id, overriding ? reason : said)
+      : kind === "discard" ? await discardRun(slug, issueId, run.id, said)
+      : kind === "done" ? await markRunDone(slug, issueId, run.id, said)
       : (await retryRun(slug, issueId, run.id, note)) !== null
     setBusy(null)
     if (ok) toast.success({ apply: r.apply, discard: r.discard, done: r.markedDone, retry: r.tryAgain }[kind])
@@ -160,6 +164,9 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
           </div>
         ) : (
           <>
+            <input type="text" aria-label={r.gestureReason} placeholder={r.gestureReasonHint} value={why} maxLength={2000}
+              onChange={(e) => setWhy(e.target.value)}
+              className="h-7 w-full border border-input bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40" />
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" size="sm" className="h-8 text-xs" disabled={busy !== null} onClick={() => void act("discard")}>
                 {busy === "discard" ? <Loader2 className="size-3 animate-spin" /> : r.discard}

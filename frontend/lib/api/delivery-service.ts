@@ -191,14 +191,20 @@ export async function applyRun(slug: string, runId: number, reason = ""): Promis
   await apiClient.post(DELIVERY_ROUTES.APPLY(slug, runId), reason.trim() ? { reason: reason.trim() } : {});
 }
 
-/** « Discard » : la pull request est fermée, sa branche supprimée. */
-export async function discardRun(slug: string, runId: number): Promise<void> {
-  await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), {});
+/**
+ * « Discard » : la pull request est fermée, sa branche supprimée. La raison, si la personne en donne une, entre au dossier
+ * de la mission (TF-J2-7), sans ses blancs.
+ */
+export async function discardRun(slug: string, runId: number, reason = ""): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DISCARD(slug, runId), reason.trim() ? { reason: reason.trim() } : {});
 }
 
-/** « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue se termine. */
-export async function markRunDone(slug: string, runId: number): Promise<void> {
-  await apiClient.post(DELIVERY_ROUTES.DONE(slug, runId), {});
+/**
+ * « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue se termine. La raison, si la personne
+ * en donne une, entre au dossier de la mission (TF-J2-7).
+ */
+export async function markRunDone(slug: string, runId: number, reason = ""): Promise<void> {
+  await apiClient.post(DELIVERY_ROUTES.DONE(slug, runId), reason.trim() ? { reason: reason.trim() } : {});
 }
 
 /** « Try again » : le résultat écarté, la remarque postée sur l'issue, une nouvelle mission ; rend cette mission. */
