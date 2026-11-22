@@ -32,6 +32,17 @@ const WORKFLOW_ELSEWHERE = [
   "lib/store/workflow-view-store.ts",
 ];
 
+/**
+ * La page de vérification d'une mission (TF-J2-7, R212) : son modèle tiré du dossier, ses mots, sa page exportée et sa vue.
+ * Chacun tient les seuils à lui seul, comme la vue du workflow.
+ */
+const VERIFICATION = [
+  "lib/delivery/verification.ts",
+  "lib/delivery/verification-words.ts",
+  "lib/delivery/verification-html.ts",
+  "components/delivery/verification-view.tsx",
+];
+
 export default defineConfig({
   plugins: [react()],
   test: {
@@ -77,6 +88,8 @@ export default defineConfig({
         "components/workflow/**/*.{ts,tsx}",
         // Sa carte dans la conversation (R159, L11).
         "components/agent/node-in-chat.tsx",
+        // La page de vérification d'une mission (TF-J2-7) : elle se remplit depuis le dossier, par du code.
+        "components/delivery/verification-view.tsx",
       ],
       // Objectifs de couverture.
       // Vitest 4 (18/10/2026) compte les branches et les instructions sur l'AST (`??`, `?.`,
@@ -94,6 +107,7 @@ export default defineConfig({
         ...eachFile("components/workflow"),
         ...eachFile("lib/workflow"),
         ...Object.fromEntries(WORKFLOW_ELSEWHERE.map((file) => [file, OWN_FILE])),
+        ...Object.fromEntries(VERIFICATION.map((file) => [file, OWN_FILE])),
         // Services API - CRITIQUE
         'lib/api/auth-service.ts': {
           lines: 90,

@@ -29,6 +29,7 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 import { elapsedMinutes, isActiveRun, isMine, runState } from "@/lib/window/missions"
+import { verificationPath } from "@/lib/window/address"
 import { issuePath } from "@/lib/window/pane"
 import { proofOf } from "@/lib/window/work-view"
 
@@ -120,10 +121,15 @@ function ApprovalsRow({ run, approvals, you, showCommands }: Readonly<{
   )
 }
 
-/** La preuve, repliée en une ligne (R138) : le nombre d'événements, scellés, et le téléchargement du dossier. */
+/**
+ * La preuve, repliée en une ligne (R138) : le nombre d'événements, scellés, la page de vérification de la mission (R212),
+ * et le téléchargement du dossier.
+ */
 function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId: number; count: number; sealed: boolean }>) {
   const t = usePreferencesStore((s) => s.t.missionSequence.proof)
+  const page = usePreferencesStore((s) => s.t.verification)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
+  const { openVerification } = usePaneNavigation()
   const said = count === 0 ? t.none
     : sealed ? (count === 1 ? t.sealedOne : fillText(t.sealed, { count }))
     : (count === 1 ? t.buildingOne : fillText(t.building, { count }))
@@ -138,6 +144,12 @@ function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId
         <FileCheck2 className="size-4" aria-hidden="true" />
       </span>
       <span className="tabular-nums text-foreground">{said}</span>
+      {count > 0 && (
+        <PaneLink href={verificationPath(slug, runId)} open={() => openVerification(runId)} title={page.openHint}
+          className="text-foreground underline underline-offset-2">
+          {page.open}
+        </PaneLink>
+      )}
       {count > 0 && (
         <span className="ml-auto flex items-center gap-1.5">
           {t.download}

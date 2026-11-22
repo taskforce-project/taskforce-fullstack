@@ -31,11 +31,13 @@ describe("usePaneNavigation", () => {
     const { result } = renderHook(() => usePaneNavigation())
 
     result.current.openMission(100)
+    result.current.openVerification(100)
     result.current.openBoard(5)
     result.current.openWaiting()
     result.current.closePane()
     expect(nav.push.mock.calls).toEqual([
       ["/acme/missions/100?c=9", { scroll: false }],
+      ["/acme/missions/100/verification?c=9", { scroll: false }],
       ["/acme/projects/5?c=9", { scroll: false }],
       ["/acme/inbox?c=9", { scroll: false }],
       ["/acme?c=9", { scroll: false }],

@@ -324,6 +324,15 @@ describe("WorkView", () => {
       expect(screen.queryByRole("button", { name: "JSON" })).toBeNull()
     })
 
+    it("opens the verification page of the mission (R212)", () => {
+      render(<WorkView runId={100} />)
+
+      const link = screen.getByRole("link", { name: "Verification page" })
+      expect(link).toHaveAttribute("href", "/acme/missions/100/verification")
+      fireEvent.click(link)
+      expect(nav.push).toHaveBeenCalledWith("/acme/missions/100/verification", { scroll: false })
+    })
+
     it("downloads the record", () => {
       downloadEvidence.mockResolvedValue(true)
       render(<WorkView runId={100} />)
