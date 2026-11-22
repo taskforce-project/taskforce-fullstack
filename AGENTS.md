@@ -57,7 +57,9 @@ Run the checks of every part you changed before calling the work done. The CI ru
 
 - Coverage thresholds apply to each file, not to the total: a new file needs its own tests.
 - `npm run test:coverage` starts Vitest in watch mode outside CI; `npx vitest run --coverage` runs once.
-- Run one Maven build at a time: two builds in the same `target/` fail at random.
+- Run one Maven build at a time: two builds in the same `target/` fail at random. `scripts/it.ps1` keeps to it: it
+  waits for every other container named `*-mvn` to finish before it starts its own build, so give any other Maven
+  container a name ending in `-mvn`.
 - The runner decides with the rules engine of `backend/tf-api` (`core/harness`), compiled to JavaScript: after a change
   there, run `mvn -B process-classes` in `backend/rules-engine-js` and commit `taskforce-runner/src/harness/engine` with
   it. Never edit that folder by hand; the CI compiles it again and refuses a difference.
