@@ -177,6 +177,14 @@ taskforce:
 delivery:
   local-runner:
     enabled: true
+  # La clé qui scelle les dossiers des missions (TF-J2-7) : un fichier du dossier de données, créé au premier lancement.
+  # Le runner et Claude Code tournent sous le même compte, sur la même machine : l'agent peut lire ce fichier. La garde
+  # le dit donc toujours (same-machine), et la page de vérification aussi. Ce qui manquerait pour que ce ne soit plus vrai
+  # (un compte de service, l'isolement des runs d'ADR-028) n'est pas construit.
+  evidence:
+    signing-key: ${DELIVERY_EVIDENCE_SIGNING_KEY:}
+    signing-key-file: ${DELIVERY_EVIDENCE_SIGNING_KEY_FILE:${desktop.data-dir}/evidence/signing-key.pem}
+    key-custody: same-machine
 
 # Une personne sur sa machine : la fenêtre, le runner et Claude Code partagent 127.0.0.1, un quota par adresse les
 # bloquerait ensemble. L'API n'admet de toute façon que les jetons de la coque.

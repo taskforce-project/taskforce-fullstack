@@ -214,6 +214,11 @@ services:
       # Runner local « Claude Code » (ADR-013), coupé par défaut. L'accès anticipé se règle dans .env.prod
       # (DELIVERY_LOCAL_RUNNER_ENABLED=true) : valeur durable, reprise à chaque rebuild, sans override hors dépôt.
       DELIVERY_LOCAL_RUNNER_ENABLED: ${DELIVERY_LOCAL_RUNNER_ENABLED:-false}
+      # La clé qui scelle les dossiers des missions (TF-J2-7) : Ed25519 en PKCS#8 (PEM), à garder dans .env.prod. Vide :
+      # une clé tirée à chaque démarrage. La garde (separate-machine si aucun agent ne tourne sur ce serveur) va dans
+      # chaque sceau.
+      DELIVERY_EVIDENCE_SIGNING_KEY: ${DELIVERY_EVIDENCE_SIGNING_KEY:-}
+      DELIVERY_EVIDENCE_KEY_CUSTODY: ${DELIVERY_EVIDENCE_KEY_CUSTODY:-same-machine}
 
       # Plafonds IA (0 = désactivé, défaut). Le conteneur ne reçoit QUE les variables listées ici
       # (--env-file ne sert qu'à l'interpolation compose) : une instance adossée à une API payante

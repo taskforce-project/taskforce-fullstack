@@ -114,6 +114,19 @@ Each person can delegate issues to Claude Code running on their own computer: Se
 runner", then follow the steps shown (see [`taskforce-runner`](./taskforce-runner/README.md)). The runner only
 talks to the API, at `TF_API_URL`.
 
+Each mission keeps an evidence file, signed when the mission ends. Give the server a signing key that it keeps from
+one start to the next, and keep it with your backups:
+
+```bash
+openssl genpkey -algorithm ed25519 | sed -n 2p
+```
+
+Put that line (the key, in base64) in `DELIVERY_EVIDENCE_SIGNING_KEY` in `.env`. Without it, the server draws a key at
+each start, and a seal can no longer be compared with a key you publish. If no coding agent runs on the machine of the
+server, set `DELIVERY_EVIDENCE_KEY_CUSTODY=separate-machine`: each seal, and each verification page, says where the key
+lives. TaskForce cannot check this; leave the default (`same-machine`) when in doubt. Anyone can check an exported
+file without TaskForce: `npm run verify -- evidence-run-42.json --key <key id>` in `taskforce-runner`.
+
 ## Integrations
 
 GitHub and Slack need an OAuth app of your own; `.env.selfhost.example` lists the callback URLs and the Slack scopes.

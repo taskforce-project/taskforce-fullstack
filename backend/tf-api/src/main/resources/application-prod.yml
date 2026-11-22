@@ -196,6 +196,14 @@ delivery:
     enabled: ${DELIVERY_LOCAL_RUNNER_ENABLED:false}
     session-ttl-minutes: ${DELIVERY_RUNNER_SESSION_TTL_MINUTES:120}
     heartbeat-timeout-minutes: ${DELIVERY_RUNNER_HEARTBEAT_TIMEOUT_MINUTES:10}
+  # La clé qui scelle les dossiers des missions (TF-J2-7, SELF_HOSTING.md) : une clé Ed25519 en PKCS#8 (PEM), par la
+  # variable ou par un fichier. Sans l'une ni l'autre, une clé tirée au démarrage, perdue à l'arrêt, et le journal le dit.
+  # La garde : same-machine (défaut) tant que l'exploitant ne déclare pas separate-machine, c'est-à-dire qu'aucun agent
+  # ne tourne sur la machine du serveur ; chaque sceau la porte, la page de vérification la dit.
+  evidence:
+    signing-key: ${DELIVERY_EVIDENCE_SIGNING_KEY:}
+    signing-key-file: ${DELIVERY_EVIDENCE_SIGNING_KEY_FILE:}
+    key-custody: ${DELIVERY_EVIDENCE_KEY_CUSTODY:same-machine}
 
 # Logging Configuration
 logging:
