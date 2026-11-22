@@ -345,16 +345,25 @@ public class GitHubIntegrationService implements ProjectRepoHost {
     private record IssueLinks(List<IssueGitHubLink> links, Long workspaceId) {}
 
     /** PR relues, à enregistrer, et celles d'entre elles qui viennent d'être fusionnées. */
-    private record Refresh(List<IssueGitHubLink> refreshed, List<IssueGitHubLink> merged) {}
+    private record Refresh(List<IssueGitHubLink> refreshed, List<Merged> merged) {}
 
-    /** Enregistre les PR relues, puis termine les tickets de celles qui viennent d'être fusionnées (hors transaction). */
+    /** Une PR que GitHub dit fusionnée : par quel compte, et quand, quand GitHub le dit. */
+    private record Merged(IssueGitHubLink link, String mergedBy, String mergedAt) {}
+
+    /**
+     * Enregistre les PR relues, puis, pour celles qui viennent d'être fusionnées, le dit au dossier de la mission qui les a
+     * ouvertes et termine leurs tickets (hors transaction).
+     */
     private int applyRefresh(Refresh refresh) {
         if (!refresh.refreshed().isEmpty()) {
             tx.executeWithoutResult(status -> issueGitHubLinkRepository.saveAll(refresh.refreshed()));
         }
         int completed = 0;
-        for (IssueGitHubLink link : refresh.merged()) {
+        for (Merged merged : refresh.merged()) {
+            IssueGitHubLink link = merged.link();
             if (link.getIssue() == null) continue;
+            mergedPullRequests.mergedOnGitHub(link.getIssue().getId(), link.getRepoFullName(), link.getPrNumber(),
+                merged.mergedBy(), merged.mergedAt());
             Long linkedBy = link.getLinkedBy() == null ? null : link.getLinkedBy().getId();
             if (mergedPullRequests.completeIssue(link.getIssue().getId(), linkedBy)) completed++;
         }
@@ -389,7 +398,7 @@ public class GitHubIntegrationService implements ProjectRepoHost {
         headers.setBearerAuth(token);
         headers.set("Accept", "application/vnd.github+json");
         List<IssueGitHubLink> refreshed = new ArrayList<>();
-        List<IssueGitHubLink> merged = new ArrayList<>();
+        List<Merged> merged = new ArrayList<>();
         for (IssueGitHubLink link : links) {
             if (refreshed.size() >= budget) break;
             if (link.getLinkType() != GitHubLinkType.PR || link.getPrNumber() == null) continue;
@@ -403,7 +412,11 @@ public class GitHubIntegrationService implements ProjectRepoHost {
                     new ParameterizedTypeReference<Map<String, Object>>() {}).getBody();
                 if (pr != null) {
                     GitHubLinkStatus status = pullRequestStatus(pr);
-                    if (status == GitHubLinkStatus.MERGED) merged.add(link);
+                    if (status == GitHubLinkStatus.MERGED) {
+                        Object by = pr.get("merged_by");
+                        String login = by instanceof Map<?, ?> user ? str(user.get("login")) : null;
+                        merged.add(new Merged(link, login, str(pr.get("merged_at"))));
+                    }
                     link.setStatus(status);
                     String title = str(pr.get("title"));
                     if (title != null && !title.isBlank()) link.setTitle(truncate(title, 500));

@@ -109,4 +109,24 @@ class MergedPullRequestsTest {
 
         assertThat(merged.completeIssue(12L, 9L)).isFalse();
     }
+
+    @Test
+    @DisplayName("une fusion faite sur GitHub s'annonce au dossier de la mission qui a ouvert la PR (TF-J2-7) ; un échec ne gêne rien")
+    void a_merge_on_github_is_announced() {
+        org.springframework.context.ApplicationEventPublisher events = org.mockito.Mockito.mock(
+            org.springframework.context.ApplicationEventPublisher.class);
+        MergedPullRequests announcing = new MergedPullRequests(issueServiceProvider, issueRepository, issueStatusRepository,
+            transactionManager, events);
+        // Le ticket se termine comme avant.
+        assertThat(announcing.completeIssue(12L, 9L)).isTrue();
+
+        announcing.mergedOnGitHub(12L, "acme/website", 212, "octocat", "2026-11-22T10:00:00Z");
+
+        verify(events).publishEvent(new MergedPullRequests.PullRequestMerged(12L, "acme/website", 212, "octocat",
+            "2026-11-22T10:00:00Z"));
+        org.mockito.Mockito.doThrow(new IllegalStateException("no listener")).when(events).publishEvent(any(Object.class));
+        announcing.mergedOnGitHub(12L, "acme/website", 212, null, null);
+        // Sans annonceur (le constructeur d'avant), rien ne part.
+        merged.mergedOnGitHub(12L, "acme/website", 212, null, null);
+    }
 }

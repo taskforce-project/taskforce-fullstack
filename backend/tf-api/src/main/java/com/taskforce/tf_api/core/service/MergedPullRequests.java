@@ -1,6 +1,8 @@
 package com.taskforce.tf_api.core.service;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -28,16 +30,45 @@ public class MergedPullRequests {
     private final IssueRepository issueRepository;
     private final IssueStatusRepository issueStatusRepository;
     private final TransactionTemplate tx;
+    private final ApplicationEventPublisher events;
 
     /** Où va le ticket, et au nom de qui. */
     private record Move(String workspaceSlug, Long projectId, Long issueId, Long statusId, Long actorId) {}
 
+    /**
+     * Une pull request liée à un ticket a été fusionnée sur GitHub, hors de TaskForce : la mission qui l'a ouverte garde
+     * cette décision de fin à son dossier, avec qui l'a prise et quand, d'après GitHub (TF-J2-7, R212 rubrique 6).
+     *
+     * @param mergedBy le compte GitHub qui a fusionné, s'il est connu
+     * @param mergedAt l'heure de la fusion selon GitHub (ISO-8601), si elle est connue
+     */
+    public record PullRequestMerged(Long issueId, String repo, int number, String mergedBy, String mergedAt) {}
+
+    @Autowired
     public MergedPullRequests(ObjectProvider<IssueService> issueService, IssueRepository issueRepository,
-                              IssueStatusRepository issueStatusRepository, PlatformTransactionManager transactionManager) {
+                              IssueStatusRepository issueStatusRepository, PlatformTransactionManager transactionManager,
+                              ApplicationEventPublisher events) {
         this.issueService = issueService;
         this.issueRepository = issueRepository;
         this.issueStatusRepository = issueStatusRepository;
         this.tx = new TransactionTemplate(transactionManager);
+        this.events = events;
+    }
+
+    /** Sans annonce de la fusion aux dossiers des missions. */
+    public MergedPullRequests(ObjectProvider<IssueService> issueService, IssueRepository issueRepository,
+                              IssueStatusRepository issueStatusRepository, PlatformTransactionManager transactionManager) {
+        this(issueService, issueRepository, issueStatusRepository, transactionManager, null);
+    }
+
+    /** Annonce une fusion faite sur GitHub ; un échec ne gêne jamais la relecture des PR. */
+    public void mergedOnGitHub(Long issueId, String repo, int number, String mergedBy, String mergedAt) {
+        if (events == null) return;
+        try {
+            events.publishEvent(new PullRequestMerged(issueId, repo, number, mergedBy, mergedAt));
+        } catch (RuntimeException e) {
+            log.warn("Fusion de {}#{} non gardée au dossier de sa mission : {}", repo, number, e.getMessage());
+        }
     }
 
     /** @return vrai si le ticket a été terminé */
