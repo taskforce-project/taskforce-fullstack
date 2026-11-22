@@ -1,0 +1,1234 @@
+{
+  "format" : "taskforce-evidence/1",
+  "mission" : {
+    "id" : 42,
+    "workspace" : "acme",
+    "project" : 12,
+    "issue" : "WEB-48",
+    "requestedBy" : "ada@example.com",
+    "agent" : {
+      "kind" : "claude-code",
+      "model" : "claude-sonnet-5-20261001",
+      "version" : "2.1.300"
+    },
+    "rules" : {
+      "version" : 1,
+      "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8"
+    },
+    "runner" : "tf-runner-ada",
+    "taskforce" : null
+  },
+  "events" : [ {
+    "seq" : 1,
+    "at" : "2026-11-22T16:43:12.230Z",
+    "type" : "mission.started",
+    "actor" : {
+      "kind" : "server",
+      "id" : "taskforce"
+    },
+    "data" : {
+      "accountable" : "ada@example.com",
+      "agent" : {
+        "kind" : "claude-code",
+        "model" : "sonnet"
+      },
+      "delegatedAt" : "2026-11-22T08:00:00.000Z",
+      "issue" : "WEB-48",
+      "mission" : 42,
+      "origin" : {
+        "channel" : "app",
+        "run" : null
+      },
+      "project" : 12,
+      "request" : {
+        "createdAt" : "2026-11-20T09:30:00.000Z",
+        "description" : {
+          "chars" : 96,
+          "sha256" : "sha256:82cf039ae99ce9011ed6d4803e7df9ddb8d0e3d6e9966ce6aeb10b458bf8edcc"
+        },
+        "importedFrom" : null,
+        "reporter" : "grace@example.com",
+        "title" : {
+          "chars" : 20,
+          "sha256" : "sha256:e895eb9c8351caaaa52aa947a7aa8c571bdae3ae4f667768d9a6892e56609a4a"
+        }
+      },
+      "requestedBy" : "ada@example.com",
+      "rules" : {
+        "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8",
+        "layers" : [ ],
+        "version" : 1
+      },
+      "runner" : "tf-runner-ada",
+      "taskforce" : null,
+      "workspace" : "acme"
+    },
+    "prev" : "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "hash" : "sha256:7046a1accaecbc50bdafd3b54a2b1b136ef0499b490cd8e60122c7f5a826dea1"
+  }, {
+    "seq" : 2,
+    "at" : "2026-11-22T16:43:12.283Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "runner",
+      "id" : "tf-runner-ada"
+    },
+    "data" : {
+      "brief" : {
+        "chars" : 85,
+        "sha256" : "sha256:df2bf22e6466de0b881089d50be1ad1b4581783bb8ca6635b06b91e1b089ef14"
+      },
+      "kind" : "brief"
+    },
+    "prev" : "sha256:7046a1accaecbc50bdafd3b54a2b1b136ef0499b490cd8e60122c7f5a826dea1",
+    "hash" : "sha256:f0864c62c455d55f7d5e6d2f98ba4a752ca69dcc8c2374c8e0bcb44d969b050c"
+  }, {
+    "seq" : 3,
+    "at" : "2026-11-22T16:43:12.284Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "agent",
+      "id" : "claude-code"
+    },
+    "data" : {
+      "fingerprint" : null,
+      "kind" : "agent",
+      "model" : "claude-sonnet-5-20261001",
+      "provider" : "anthropic",
+      "session" : "4f1c9a52-1b7e-4c38-9a0e-5d2f6b8c1e77",
+      "text" : "Claude Code 2.1.300 with claude-sonnet-5-20261001",
+      "version" : "2.1.300"
+    },
+    "prev" : "sha256:f0864c62c455d55f7d5e6d2f98ba4a752ca69dcc8c2374c8e0bcb44d969b050c",
+    "hash" : "sha256:3126d861dfb7cc7d4f7b9fcfb804d610068cc08c921fd78e6f18be8c7b9afc0b"
+  }, {
+    "seq" : 4,
+    "at" : "2026-11-22T16:43:12.285Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "agent",
+      "id" : "claude-code"
+    },
+    "data" : {
+      "kind" : "text",
+      "text" : {
+        "chars" : 39,
+        "sha256" : "sha256:8177f98d36ca893e7b879bdf1594b3651ff892691e1938ba31c4b08f89bee541"
+      }
+    },
+    "prev" : "sha256:3126d861dfb7cc7d4f7b9fcfb804d610068cc08c921fd78e6f18be8c7b9afc0b",
+    "hash" : "sha256:b350a29b1dfbc9cea53c30482595eeb20bd8b493d095ec8414f5cfcc2c488f71"
+  }, {
+    "seq" : 5,
+    "at" : "2026-11-22T16:43:12.297Z",
+    "type" : "action.decided",
+    "actor" : {
+      "kind" : "rule",
+      "id" : "read-files"
+    },
+    "data" : {
+      "effect" : "allow",
+      "facts" : [ {
+        "action" : "file.read",
+        "actor" : "agent",
+        "path" : "src/components/footer.tsx",
+        "tool" : "Read"
+      } ],
+      "input" : "sha256:d5d85060aae57db7a713f85afb24d2efa5eed102feb9d7731662ec033f53e9d8",
+      "kind" : "decision",
+      "text" : "src/components/footer.tsx",
+      "tool" : "Read"
+    },
+    "prev" : "sha256:b350a29b1dfbc9cea53c30482595eeb20bd8b493d095ec8414f5cfcc2c488f71",
+    "hash" : "sha256:371d95ca00c341246e631f16e780fe3635d79b323626615c1437f2bf32c4fd0e"
+  }, {
+    "seq" : 6,
+    "at" : "2026-11-22T16:43:12.298Z",
+    "type" : "action.requested",
+    "actor" : {
+      "kind" : "agent",
+      "id" : "claude-code"
+    },
+    "data" : {
+      "kind" : "tool",
+      "text" : "src/components/footer.tsx",
+      "tool" : "Read"
+    },
+    "prev" : "sha256:371d95ca00c341246e631f16e780fe3635d79b323626615c1437f2bf32c4fd0e",
+    "hash" : "sha256:72f191719ff10e17ba736e57c18bfae593347f19580aa117e60a102c57bf8285"
+  }, {
+    "seq" : 7,
+    "at" : "2026-11-22T16:43:12.300Z",
+    "type" : "action.decided",
+    "actor" : {
+      "kind" : "rule",
+      "id" : "write-sandbox-files"
+    },
+    "data" : {
+      "effect" : "allow",
+      "facts" : [ {
+        "action" : "file.write",
+        "actor" : "agent",
+        "path" : "src/components/footer.tsx",
+        "tool" : "Edit"
+      } ],
+      "input" : "sha256:d5d85060aae57db7a713f85afb24d2efa5eed102feb9d7731662ec033f53e9d8",
+      "kind" : "decision",
+      "text" : "src/components/footer.tsx",
+      "tool" : "Edit",
+      "written" : {
+        "bytes" : 1830,
+        "path" : "src/components/footer.tsx",
+        "sha256" : "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    },
+    "prev" : "sha256:72f191719ff10e17ba736e57c18bfae593347f19580aa117e60a102c57bf8285",
+    "hash" : "sha256:651e404b26b5b519c27693d21cfedcaea2aaa81ea2668821762fa0f4691c0329"
+  }, {
+    "seq" : 8,
+    "at" : "2026-11-22T16:43:12.300Z",
+    "type" : "action.requested",
+    "actor" : {
+      "kind" : "agent",
+      "id" : "claude-code"
+    },
+    "data" : {
+      "kind" : "tool",
+      "text" : "src/components/footer.tsx",
+      "tool" : "Edit"
+    },
+    "prev" : "sha256:651e404b26b5b519c27693d21cfedcaea2aaa81ea2668821762fa0f4691c0329",
+    "hash" : "sha256:2ed9b294d19f6d1633c9237183317a72abcfa5883bad5b5c8d3454cdc6fb13c3"
+  }, {
+    "seq" : 9,
+    "at" : "2026-11-22T16:43:12.301Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "agent",
+      "id" : "claude-code"
+    },
+    "data" : {
+      "done" : true,
+      "item" : 1,
+      "kind" : "checklist.checked",
+      "text" : {
+        "chars" : 48,
+        "sha256" : "sha256:f4b8faeb10b749728141ae011d443a05ac6c580808dade24c3ab87837de9c1b2"
+      }
+    },
+    "prev" : "sha256:2ed9b294d19f6d1633c9237183317a72abcfa5883bad5b5c8d3454cdc6fb13c3",
+    "hash" : "sha256:6149c1fbacaab56ee892be5b3509f06b88c0d49caedc48dc94f610407085edb5"
+  }, {
+    "seq" : 10,
+    "at" : "2026-11-22T16:43:12.302Z",
+    "type" : "action.decided",
+    "actor" : {
+      "kind" : "rule",
+      "id" : "search-web"
+    },
+    "data" : {
+      "effect" : "ask",
+      "facts" : [ {
+        "action" : "web.search",
+        "actor" : "agent",
+        "tool" : "WebSearch"
+      } ],
+      "input" : "sha256:d48d4ee556e2f3bf2cbcac3dd748f33fe54d8decfd5a711d38614b25f1afd069",
+      "kind" : "decision",
+      "text" : "docs.example.com footer links",
+      "tool" : "WebSearch"
+    },
+    "prev" : "sha256:6149c1fbacaab56ee892be5b3509f06b88c0d49caedc48dc94f610407085edb5",
+    "hash" : "sha256:1bc3ddf156fb30ac56a8e35b689cf4cee5bf5eec044bd3e971e1f1b78fbe9726"
+  }, {
+    "seq" : 11,
+    "at" : "2026-11-22T16:43:12.302Z",
+    "type" : "action.decided",
+    "actor" : {
+      "kind" : "server",
+      "id" : "taskforce"
+    },
+    "data" : {
+      "action" : "web.search",
+      "approval" : 9,
+      "asked" : "ada@example.com",
+      "askedBy" : "agent",
+      "effect" : "ask",
+      "facts" : [ {
+        "action" : "web.search",
+        "actor" : "agent",
+        "tool" : "WebSearch"
+      } ],
+      "input" : "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "rule" : "search-web",
+      "summary" : "docs.example.com footer links",
+      "tool" : "WebSearch"
+    },
+    "prev" : "sha256:1bc3ddf156fb30ac56a8e35b689cf4cee5bf5eec044bd3e971e1f1b78fbe9726",
+    "hash" : "sha256:964a6e8f45182862e2d69571bcf141e82a02a7d3892bde8c4629a646fc1c05c2"
+  }, {
+    "seq" : 12,
+    "at" : "2026-11-22T16:43:12.307Z",
+    "type" : "human.decision",
+    "actor" : {
+      "kind" : "person",
+      "id" : "ada@example.com"
+    },
+    "data" : {
+      "action" : "web.search",
+      "approval" : 9,
+      "decision" : "ALLOWED",
+      "reason" : "Only the public docs site, to check the new addresses.",
+      "rule" : "search-web",
+      "scope" : "ONCE",
+      "summary" : "docs.example.com footer links",
+      "tool" : "WebSearch"
+    },
+    "prev" : "sha256:964a6e8f45182862e2d69571bcf141e82a02a7d3892bde8c4629a646fc1c05c2",
+    "hash" : "sha256:7208a6d7ac5507b4f80afc3abcb9b1b3e5ea9f3605b223968cbc1048c7e5ea82"
+  }, {
+    "seq" : 13,
+    "at" : "2026-11-22T16:43:12.308Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "server",
+      "id" : "taskforce"
+    },
+    "data" : {
+      "from" : 9,
+      "kind" : "gap",
+      "text" : "Event 9 from the runner never arrived.",
+      "to" : 9
+    },
+    "prev" : "sha256:7208a6d7ac5507b4f80afc3abcb9b1b3e5ea9f3605b223968cbc1048c7e5ea82",
+    "hash" : "sha256:60fcaef460f5a084aab285b894039ad9fbb182f948864dc8a6596a8fa8861bf9"
+  }, {
+    "seq" : 14,
+    "at" : "2026-11-22T16:43:12.308Z",
+    "type" : "action.requested",
+    "actor" : {
+      "kind" : "agent",
+      "id" : "claude-code"
+    },
+    "data" : {
+      "kind" : "tool",
+      "text" : "docs.example.com footer links",
+      "tool" : "WebSearch"
+    },
+    "prev" : "sha256:60fcaef460f5a084aab285b894039ad9fbb182f948864dc8a6596a8fa8861bf9",
+    "hash" : "sha256:e264224125aa00130d34ddba105d9c252202f4618c807649acea38fd6e87e75c"
+  }, {
+    "seq" : 15,
+    "at" : "2026-11-22T16:43:12.308Z",
+    "type" : "exit.result",
+    "actor" : {
+      "kind" : "runner",
+      "id" : "tf-runner-ada"
+    },
+    "data" : {
+      "effect" : "allow",
+      "kind" : "exit",
+      "rule" : "push-agent-branch-private",
+      "text" : "allowed by the rule push-agent-branch-private",
+      "tool" : "git push"
+    },
+    "prev" : "sha256:e264224125aa00130d34ddba105d9c252202f4618c807649acea38fd6e87e75c",
+    "hash" : "sha256:222671ecc15f4fe84049de9fbae9c4a1dbba9d6b9ac6cea0b1c32ccf0e4d0e03"
+  }, {
+    "seq" : 16,
+    "at" : "2026-11-22T16:43:12.308Z",
+    "type" : "exit.result",
+    "actor" : {
+      "kind" : "runner",
+      "id" : "tf-runner-ada"
+    },
+    "data" : {
+      "effect" : "allow",
+      "kind" : "exit",
+      "rule" : "open-pull-request",
+      "text" : "allowed by the rule open-pull-request",
+      "tool" : "gh pr create"
+    },
+    "prev" : "sha256:222671ecc15f4fe84049de9fbae9c4a1dbba9d6b9ac6cea0b1c32ccf0e4d0e03",
+    "hash" : "sha256:a7feefeffff82620a48d3b9127efd3be264a349c2d1ca5af13ba27ba98d14936"
+  }, {
+    "seq" : 17,
+    "at" : "2026-11-22T16:43:12.309Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "runner",
+      "id" : "tf-runner-ada"
+    },
+    "data" : {
+      "added" : 3,
+      "base" : "3333333333333333333333333333333333333333",
+      "files" : [ {
+        "added" : 3,
+        "path" : "src/components/footer.tsx",
+        "removed" : 3,
+        "revision" : "77777777777777777777777777777777",
+        "sha256" : "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+        "status" : "modified"
+      } ],
+      "kind" : "changes",
+      "mode" : "repo",
+      "more" : 0,
+      "removed" : 3
+    },
+    "prev" : "sha256:a7feefeffff82620a48d3b9127efd3be264a349c2d1ca5af13ba27ba98d14936",
+    "hash" : "sha256:d78e93d82a7f692cf7c723c8b430bcb07ad41e94b07f4d08b48623f237cb83a9"
+  }, {
+    "seq" : 18,
+    "at" : "2026-11-22T16:43:12.329Z",
+    "type" : "test.result",
+    "actor" : {
+      "kind" : "runner",
+      "id" : "tf-runner-ada"
+    },
+    "data" : {
+      "command" : "npm test",
+      "configured" : true,
+      "kind" : "test",
+      "output" : {
+        "bytes" : 20480,
+        "kept" : "runner",
+        "sha256" : "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "passed" : true,
+      "passedCount" : 48,
+      "ran" : true,
+      "text" : "Tests passed: `npm test` (12 s).",
+      "tool" : "npm test",
+      "total" : 48
+    },
+    "prev" : "sha256:d78e93d82a7f692cf7c723c8b430bcb07ad41e94b07f4d08b48623f237cb83a9",
+    "hash" : "sha256:f016129c3d1b978a6abb573d697efdbb341e08faa265abbf33cb8633401d0784"
+  }, {
+    "seq" : 19,
+    "at" : "2026-11-22T16:43:12.347Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "runner",
+      "id" : "tf-runner-ada"
+    },
+    "data" : {
+      "head" : "2222222222222222222222222222222222222222",
+      "kind" : "runner",
+      "received" : 13,
+      "sent" : 13,
+      "session" : {
+        "bytes" : 182340,
+        "id" : "4f1c9a52-1b7e-4c38-9a0e-5d2f6b8c1e77",
+        "kept" : "runner",
+        "sha256" : "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+      }
+    },
+    "prev" : "sha256:f016129c3d1b978a6abb573d697efdbb341e08faa265abbf33cb8633401d0784",
+    "hash" : "sha256:053cf190a2bcbad24298037065b9037619805b0e917f9a2fd6e2406ed4f61663"
+  }, {
+    "seq" : 20,
+    "at" : "2026-11-22T16:43:12.347Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "server",
+      "id" : "taskforce"
+    },
+    "data" : {
+      "items" : [ {
+        "done" : true,
+        "id" : 1,
+        "text" : {
+          "chars" : 48,
+          "sha256" : "sha256:f4b8faeb10b749728141ae011d443a05ac6c580808dade24c3ab87837de9c1b2"
+        }
+      }, {
+        "done" : false,
+        "id" : 2,
+        "text" : {
+          "chars" : 35,
+          "sha256" : "sha256:064ef1ff63b675f5555c3096660f7730668f20078427afde5439105166bcee74"
+        }
+      } ],
+      "kind" : "checklist"
+    },
+    "prev" : "sha256:053cf190a2bcbad24298037065b9037619805b0e917f9a2fd6e2406ed4f61663",
+    "hash" : "sha256:22e16c1730febe993e6eca5045c67474d27dd3948becc194944508878dfb5ff0"
+  }, {
+    "seq" : 21,
+    "at" : "2026-11-22T16:43:12.348Z",
+    "type" : "mission.ended",
+    "actor" : {
+      "kind" : "server",
+      "id" : "taskforce"
+    },
+    "data" : {
+      "branch" : "tf/web-48-fix-the-footer-links",
+      "commits" : 1,
+      "error" : null,
+      "resultUrl" : "https://github.com/acme/website/pull/212",
+      "status" : "DONE",
+      "summary" : {
+        "chars" : 227,
+        "sha256" : "sha256:77c85712df6a20b239b0230d1623619023206ecf083b403e82fb3972a5f26035"
+      }
+    },
+    "prev" : "sha256:22e16c1730febe993e6eca5045c67474d27dd3948becc194944508878dfb5ff0",
+    "hash" : "sha256:686fadd6adb0aaf93b6f404da5f07201b51f77ae449039dfdef5fec37f099081"
+  }, {
+    "seq" : 22,
+    "at" : "2026-11-22T16:43:12.439Z",
+    "type" : "note",
+    "actor" : {
+      "kind" : "server",
+      "id" : "taskforce"
+    },
+    "data" : {
+      "comment" : "https://github.com/acme/website/pull/212#issuecomment-1",
+      "kind" : "witness",
+      "pullRequest" : "https://github.com/acme/website/pull/212",
+      "root" : "sha256:686fadd6adb0aaf93b6f404da5f07201b51f77ae449039dfdef5fec37f099081",
+      "seq" : 21,
+      "where" : "github-pull-request",
+      "written" : true
+    },
+    "prev" : "sha256:686fadd6adb0aaf93b6f404da5f07201b51f77ae449039dfdef5fec37f099081",
+    "hash" : "sha256:7eb519bf2e2971bdfcfae87ca0859adb4fed6ca96c086fce7f7fc26a1da2ce03"
+  }, {
+    "seq" : 23,
+    "at" : "2026-11-22T16:43:12.443Z",
+    "type" : "human.decision",
+    "actor" : {
+      "kind" : "person",
+      "id" : "ada@example.com"
+    },
+    "data" : {
+      "decision" : "APPLY",
+      "merged" : true,
+      "pullRequest" : "https://github.com/acme/website/pull/212",
+      "reason" : "The links are right; staging is checked by the release.",
+      "testsFailed" : false,
+      "where" : "taskforce"
+    },
+    "prev" : "sha256:7eb519bf2e2971bdfcfae87ca0859adb4fed6ca96c086fce7f7fc26a1da2ce03",
+    "hash" : "sha256:7caacdbdec904607425fc4e61b088ddf0816b00143d4c8102bf96acd06f4cbde"
+  } ],
+  "root" : "sha256:7caacdbdec904607425fc4e61b088ddf0816b00143d4c8102bf96acd06f4cbde",
+  "rules" : {
+    "format" : "taskforce-rules/1",
+    "workspace" : "acme",
+    "project" : 12,
+    "version" : 1,
+    "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8",
+    "issuedAt" : null,
+    "rules" : [ {
+      "id" : "read-files",
+      "when" : {
+        "action" : "file.read",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Reading leaves a trace and changes nothing (R7').",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "search-files",
+      "when" : {
+        "action" : "file.search",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Searching leaves a trace and changes nothing (R7').",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "read-issues",
+      "when" : {
+        "action" : "issue.read",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Reading leaves a trace and changes nothing (R7').",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "search-knowledge",
+      "when" : {
+        "action" : "knowledge.search",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "The search returns only what the person may read: a private project's notes stay with the people who can see the project.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "search-web",
+      "when" : {
+        "action" : "web.search",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "ask",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A web search sends its query out of the machine, where it cannot be taken back.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "fetch-web",
+      "when" : {
+        "action" : "web.fetch",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "ask",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "An address can carry the mission's data out of the machine, where it cannot be taken back.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "read-company-tools",
+      "when" : {
+        "action" : "mcp.read",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Read by default in the company's tools (session 2).",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "write-sandbox-files",
+      "when" : {
+        "action" : "file.write",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "sandbox-write",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Free but supervised: the copy is the agent's to change.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "commit-locally",
+      "when" : {
+        "action" : "git.commit",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "sandbox-write",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A local commit stays in the copy.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "start-mission",
+      "when" : {
+        "action" : "mission.start",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "sandbox-write",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A mission starts in its own copy; what leaves it follows its own rules.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "no-mission-public-repo",
+      "when" : {
+        "action" : "mission.start",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : "public",
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "deny",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "TaskForce doesn't start missions on public repositories yet: link a private repository to delegate this task.",
+      "review" : "2026-11-30",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "no-agent-scripts",
+      "when" : {
+        "action" : "shell",
+        "tool" : null,
+        "command" : "{npm,yarn,pnpm} {test,run}**",
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "deny",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "While the computer isn't isolated, the agent doesn't run the repository's scripts: TaskForce runs the project's tests after the agent.",
+      "review" : "2026-11-30",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "run-git-reads",
+      "when" : {
+        "action" : "shell",
+        "tool" : null,
+        "command" : "git {status,diff,log,show,add}{, **}",
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "sandbox-write",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Local git commands that stay in the copy.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "run-git-info",
+      "when" : {
+        "action" : "shell",
+        "tool" : null,
+        "command" : "git {rev-parse **,ls-files,ls-files **,blame **,branch,branch --show-current,branch -a,branch -r,branch -v,branch -vv,branch --list,branch --list **,remote -v}",
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Git's read-only forms show the branches, the remotes and the tracked files and change nothing; creating, renaming or deleting a branch still asks.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "run-reads",
+      "when" : {
+        "action" : "shell",
+        "tool" : null,
+        "command" : "{cd,pwd,ls,cat,head,tail,wc,grep,stat,diff,echo}{, **}",
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "read",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Reading in the copy, or printing a line without redirecting it, leaves a trace and changes nothing (R7').",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "no-agent-push",
+      "when" : {
+        "action" : "shell",
+        "tool" : null,
+        "command" : "git push**",
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "deny",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Exits go through the runner, after the tests and under these rules, never through the agent's own shell.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "no-agent-gh",
+      "when" : {
+        "action" : "shell",
+        "tool" : null,
+        "command" : "gh **",
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "deny",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "The GitHub CLI acts outside the copy; the runner does it under these rules.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "push-agent-branch-private",
+      "when" : {
+        "action" : "git.push",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : "tf/**",
+        "repoVisibility" : "private",
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "delete-branch",
+      "owner" : "ada@example.com",
+      "reason" : "The agent's branch can be deleted, and a private repository exposes nothing.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "push-public-repo",
+      "when" : {
+        "action" : "git.push",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : "public",
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "ask",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "Pushing to a public repository exposes the code; it cannot be taken back.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "open-pull-request",
+      "when" : {
+        "action" : "pr.open",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "close-pull-request",
+      "owner" : "ada@example.com",
+      "reason" : "A pull request is closed in one gesture; nothing is merged.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "open-pull-request-public",
+      "when" : {
+        "action" : "pr.open",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : "public",
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "ask",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A pull request on a public repository is public at once.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "create-issue",
+      "when" : {
+        "action" : "issue.create",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "close-issue",
+      "owner" : "ada@example.com",
+      "reason" : "An issue in the mission's project is closed in one gesture.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "create-project",
+      "when" : {
+        "action" : "project.create",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "archive-project",
+      "owner" : "ada@example.com",
+      "reason" : "A project the person asks for in the conversation is created at once; it is archived in one gesture.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "update-issue",
+      "when" : {
+        "action" : "issue.update",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "restore-issue",
+      "owner" : "ada@example.com",
+      "reason" : "The issue keeps its history; a change is put back from it.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "delete-issue",
+      "when" : {
+        "action" : "issue.delete",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "ask",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A deleted issue takes its comments, its checklist and its mission with it; archiving it can be undone.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "comment",
+      "when" : {
+        "action" : "comment.create",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "delete-comment",
+      "owner" : "ada@example.com",
+      "reason" : "A comment is deleted in one gesture.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "create-note",
+      "when" : {
+        "action" : "knowledge.create",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "reversible-exit",
+      "effect" : "allow",
+      "inverse" : "delete-note",
+      "owner" : "ada@example.com",
+      "reason" : "A note the person asks for in the conversation is created at once; it is deleted in one gesture.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "write-company-tools",
+      "when" : {
+        "action" : "mcp.write",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : null,
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "ask",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A change in a company tool has no way back that TaskForce knows: a person decides.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "change-rules",
+      "when" : {
+        "action" : "harness.change",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : "person",
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "allow",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "A person who may change the rules writes a new version of them, in their own name; every version stays in the record.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    }, {
+      "id" : "no-harness-change",
+      "when" : {
+        "action" : "harness.change",
+        "tool" : null,
+        "command" : null,
+        "path" : null,
+        "branch" : null,
+        "repoVisibility" : null,
+        "server" : null,
+        "sensitivity" : null,
+        "actor" : "agent",
+        "over" : null
+      },
+      "class" : "irreversible",
+      "effect" : "deny",
+      "inverse" : null,
+      "owner" : "ada@example.com",
+      "reason" : "No agent changes the rules.",
+      "review" : "2027-01-31",
+      "layer" : null,
+      "text" : null,
+      "require" : null
+    } ],
+    "process" : null,
+    "layers" : null
+  },
+  "texts" : {
+    "sha256:e895eb9c8351caaaa52aa947a7aa8c571bdae3ae4f667768d9a6892e56609a4a" : "Fix the footer links",
+    "sha256:82cf039ae99ce9011ed6d4803e7df9ddb8d0e3d6e9966ce6aeb10b458bf8edcc" : "The footer still links to the old documentation site. Point the three links to docs.example.com.",
+    "sha256:df2bf22e6466de0b881089d50be1ad1b4581783bb8ca6635b06b91e1b089ef14" : "You are working on a task delegated from TaskForce: WEB-48 - Fix the footer links\n...",
+    "sha256:8177f98d36ca893e7b879bdf1594b3651ff892691e1938ba31c4b08f89bee541" : "I will read the footer component first.",
+    "sha256:f4b8faeb10b749728141ae011d443a05ac6c580808dade24c3ab87837de9c1b2" : "Point the three footer links to docs.example.com",
+    "sha256:064ef1ff63b675f5555c3096660f7730668f20078427afde5439105166bcee74" : "Check the links on the staging site",
+    "sha256:77c85712df6a20b239b0230d1623619023206ecf083b403e82fb3972a5f26035" : "## What I did\nI pointed the three footer links to docs.example.com in `src/components/footer.tsx`.\n\n## What to check\n- `src/components/footer.tsx:12`: the addresses.\n\n## What I'm not sure about\nI did not check the staging site."
+  },
+  "seal" : {
+    "payload" : "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiZm9ybWF0IjoidGFza2ZvcmNlLWV2aWRlbmNlLzEiLCJrZXkiOnsiYWxnb3JpdGhtIjoiZWQyNTUxOSIsImN1c3RvZHkiOiJzYW1lLW1hY2hpbmUiLCJpZCI6InNoYTI1NjoyYjE3OTRhN2VhNGMzZmYwZWY2ZDgwZGZlNTE2MGY0ZTEwODJkM2RmMWRjNjhmYTcwN2FmNzU0ZmUyN2E4ZWM2Iiwia2VwdCI6ZmFsc2UsInB1YmxpY0tleSI6Ik1Db3dCUVlESzJWd0F5RUFlYTlKZDZpaWh0YXlsRFpObW9rVkpERHZQdkZyWlpNa3BsRzRtZnZGanJvPSJ9LCJtaXNzaW9uIjp7ImFnZW50Ijp7ImtpbmQiOiJjbGF1ZGUtY29kZSIsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC01LTIwMjYxMDAxIiwidmVyc2lvbiI6IjIuMS4zMDAifSwiaWQiOjQyLCJpc3N1ZSI6IldFQi00OCIsInByb2plY3QiOjEyLCJyZXF1ZXN0ZWRCeSI6ImFkYUBleGFtcGxlLmNvbSIsInJ1bGVzIjp7ImRpZ2VzdCI6InNoYTI1NjphMjcyYzBkZWQ0Mjg2MThlM2I3NTY0NjhkODY3NDIwY2MxMzEwMzIyZjU2ODVjMTZlNDBjMjM4MmU4ZGU4Y2I4IiwidmVyc2lvbiI6MX0sInJ1bm5lciI6InRmLXJ1bm5lci1hZGEiLCJ0YXNrZm9yY2UiOm51bGwsIndvcmtzcGFjZSI6ImFjbWUifSwicm9vdCI6InNoYTI1Njo3Y2FhY2RiZGVjOTA0NjA3NDI1ZmM0ZTYxYjA4OGRkZjA4MTZiMDAxNDNkNGM4MTAyYmY5NmFjZDA2ZjRjYmRlIiwic2VhbGVkQXQiOiIyMDI2LTExLTIyVDE2OjQzOjEyLjQ0NFoiLCJzZXEiOjIzfSwicHJlZGljYXRlVHlwZSI6Imh0dHBzOi8vdGFza2ZvcmNlLXByb2plY3QuZnIvY29udHJhY3RzL3Rhc2tmb3JjZS1ldmlkZW5jZS8xIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjdjYWFjZGJkZWM5MDQ2MDc0MjVmYzRlNjFiMDg4ZGRmMDgxNmIwMDE0M2Q0YzgxMDJiZjk2YWNkMDZmNGNiZGUifSwibmFtZSI6InRhc2tmb3JjZS1taXNzaW9uLTQyIn1dfQ==",
+    "payloadType" : "application/vnd.in-toto+json",
+    "signatures" : [ {
+      "keyid" : "sha256:2b1794a7ea4c3ff0ef6d80dfe5160f4e1082d3df1dc68fa707af754fe27a8ec6",
+      "sig" : "ja18sJWTEHAg6Sind+XHkfBs5xLhqHmcARIJ/kjgr7glZTRqQ256PeYllfJsN/wPQuNOXAij0dr5v+OkvgOWAw=="
+    } ]
+  }
+}

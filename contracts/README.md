@@ -59,6 +59,77 @@ compiles the module again from the Java sources and refuses a difference with th
    0x20 and any lone surrogate as `\u` with four lowercase hex digits, everything else as is.
 5. The file's `root` is the `hash` of its last event. Changing or removing any event changes `root`.
 
+### Canonical JSON and RFC 8785
+
+On every value TaskForce writes, the canonical JSON above is RFC 8785 (JSON Canonicalization Scheme): a standard JCS
+library finds the same bytes, hence the same hashes. The two cases of `chain-cases.json` named "RFC 8785" are the
+examples of the RFC, replayed on both sides. Compared on the cases an evidence file holds:
+
+| Case | RFC 8785 | TaskForce |
+| --- | --- | --- |
+| Object keys | Sorted by UTF-16 code units | Same |
+| Strings | `\"`, `\\`, `\b`, `\f`, `\n`, `\r`, `\t`, other controls as lowercase `\u00xx`, the rest as is | Same |
+| `true`, `false`, `null`, arrays, nesting, no whitespace | | Same |
+| Integers within ±(2^53−1) | ECMAScript number form: the digits | Same |
+| A lone surrogate | Refused: not I-JSON | Never written: the server writes U+FFFD in its place when an event comes in (`EvidenceIntake`). A file written before 1.18 may hold one, escaped as `JSON.stringify` does, and still checks |
+| An integer beyond ±(2^53−1) | Written as the double it rounds to | Never written: it comes in as a string |
+| A decimal number | ECMAScript number form | Never written: it comes in as a string; an event holding one cannot be checked |
+
+### The header comes from the chain
+
+The export's `mission` is not written beside the chain: `mission.started` carries `mission` (the id), `workspace`,
+`project`, `issue`, `requestedBy`, `agent` (`kind`, the `model` chosen), `rules` (`version`, `digest`), `runner` and
+`taskforce`, and the last `note` of kind `agent` gives the model that really ran and the agent's `version`. Anyone
+rebuilds the header from the events and compares (`EvidenceHeader` in Java, `headerOf` in `taskforce-runner`). A file
+opened before 1.18 covers only part of its header; the verifier says which fields are not covered.
+
+### What the file carries besides the chain
+
+- `rules`: the rules bundle as the mission received it (`taskforce-rules/1`). Its digest is the one `mission.started`
+  holds; anyone judges each `action.decided` of kind `decision` again with the `facts` it keeps.
+- `texts`: the texts kept beside the chain, by their hash (`sha256:` and the SHA-256 of the UTF-8 text). The chain holds
+  only `{ "sha256": ..., "chars": ... }` for the request's title and description, the brief, what the agent says and
+  its summary. A text can be erased: its hash stays, the chain still holds, and a `human.decision` of kind `erased`
+  says who and when.
+- `seal`: the last seal (below).
+
+### Gaps
+
+The runner numbers its events (`n`: 1, 2, 3...) and sends a batch again until it gets through. The server keeps the
+last number it received: a number already received is dropped, a number that skips first leaves a `note` of kind
+`gap` (`from`, `to`). At the end, the runner says how many events it numbered; the ones that never came are marked too.
+
+### Seal
+
+No format of TaskForce's own (E34): the seal is an in-toto Statement v1 whose subject is the head of the chain
+(`taskforce-mission-<id>`, `sha256` digest of the root), with predicate type
+`https://taskforce-project.fr/contracts/taskforce-evidence/1` and the predicate `{ format, mission, root, seq,
+sealedAt, key: { id, algorithm, publicKey, custody, kept } }`. The payload is the canonical JSON of the statement. It is
+signed in Ed25519 over the DSSE pre-authentication encoding, `DSSEv1 <len> application/vnd.in-toto+json <len>
+<payload>` (lengths in bytes), and kept in a DSSE envelope: `{ payload (base64), payloadType, signatures: [{ keyid, sig
+(base64) }] }`. The key id is `sha256:` and the SHA-256 of the public key in SubjectPublicKeyInfo DER. The server seals
+at the end of the mission, and again after each later gesture; `GET .../evidence?format=dsse` gives the envelope alone.
+
+`custody` says where the private key lives: `same-machine` (the default, and always in the desktop app) when an agent
+may run on the machine that holds it, `separate-machine` when the operator declares that none does. A seal proves that
+the key saw this chain up to `seq`; it proves nothing more than the custody of its key. Check a seal without TaskForce:
+
+```bash
+npm run verify -- evidence-run-42.json --key sha256:<the key id the operator publishes>
+```
+
+or with OpenSSL alone: write the PAE bytes to a file, the signature (`sig`, base64-decoded) to another, and the public
+key (`publicKey`, base64-decoded, as DER) to a third, then
+`openssl pkeyutl -verify -pubin -keyform DER -inkey key.der -rawin -in pae.bin -sigfile sig.bin`.
+
+### Witness
+
+At the end of the mission, the server writes the sealed head in the mission's pull request, with the link of the
+verification page and nothing else, then keeps a `note` of kind `witness` (`root`, `seq`, `pullRequest`, `comment`, or
+`written: false` and its `reason`). GitHub dates the comment and keeps its edits: a chain rewritten afterwards no longer
+holds that head. A mission without a pull request has no witness. `example-mission.json` is the export of a whole
+mission, sealed by a key drawn for it; both sides check it.
+
 ## Mission steps: two codes, one set of cases
 
 A mission goes through five steps: `understand`, `plan`, `do`, `check`, `handover`. The screen draws them from a
