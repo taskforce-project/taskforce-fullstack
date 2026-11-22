@@ -38,9 +38,42 @@ public record AssistantAnswer(
     String record,
     String model,
     AssistantRead read,
-    @JsonIgnore ChatTurnResponse.Escalation offer
+    @JsonIgnore ChatTurnResponse.Escalation offer,
+    @JsonIgnore List<Subject> subjects
 ) {
     public static final String NOT_SENT = "not_sent";
+
+    /**
+     * Une issue dont parle une demande (R204) : sa clé, et ses ids, que la conversation garde pour la relire au tour suivant
+     * avec les droits de la personne, même si sa clé change (relecture R159 de la PR #548).
+     */
+    public record Subject(String key, Long issueId, Long projectId) {
+        /** Une issue connue par sa clé seule. */
+        public Subject(String key) {
+            this(key, null, null);
+        }
+    }
+
+    /**
+     * {@code subjects} : les issues dont parle la demande, jointes par la personne, nommées par leur clé, ou reprises de la
+     * conversation (R204, R159) : la conversation les garde avec la demande, et elles restent le sujet au tour suivant.
+     * Jamais dans la réponse.
+     */
+    public AssistantAnswer {
+        subjects = subjects == null ? List.of() : List.copyOf(subjects);
+    }
+
+    /** Une réponse avec sa proposition d'un autre modèle, sans issue jointe. */
+    public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
+                           List<AssistantStep> steps, List<AssistantToolCall> toolCalls, AssistantUsage usage,
+                           String record, String model, AssistantRead read, ChatTurnResponse.Escalation offer) {
+        this(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer, List.of());
+    }
+
+    /** La même réponse, avec les issues dont parlait sa demande. */
+    public AssistantAnswer withSubjects(List<Subject> issues) {
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer, issues);
+    }
 
     /** Une réponse sans proposition d'un autre modèle. */
     public AssistantAnswer(String answer, String reasoning, String mode, List<AssistantSource> sources,
@@ -71,7 +104,8 @@ public record AssistantAnswer(
 
     /** La même réponse, avec ce que TaskForce a donné à lire au modèle. */
     public AssistantAnswer withRead(AssistantRead read) {
-        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer);
+        return new AssistantAnswer(answer, reasoning, mode, sources, steps, toolCalls, usage, record, model, read, offer,
+            subjects);
     }
 
     /**
@@ -159,20 +193,35 @@ public record AssistantAnswer(
      * {@code runId} de sa mission), dont la conversation montre les cartes (ADR-024). {@code questions} : ce que
      * TaskForce demande à la personne avant le geste (R115), deux questions au plus dans la même carte, avec un statut
      * question ; la carte montre leurs choix, et {@code ref} nomme alors la carte à laquelle les réponses se rattachent.
+     * {@code where} : où écrit l'appel, que sa carte dit avant le geste (R204) ; null pour une lecture.
      */
     public record AssistantToolCall(String name, String status, String input, String output, String record, String ref,
-                                    Map<String, Object> target, List<AssistantQuestion> questions) {
+                                    Map<String, Object> target, List<AssistantQuestion> questions, AssistantWhere where) {
+        /** Un appel dont la cible n'est pas dite : une lecture, ou une réponse d'avant R204. */
+        public AssistantToolCall(String name, String status, String input, String output, String record, String ref,
+                                 Map<String, Object> target, List<AssistantQuestion> questions) {
+            this(name, status, input, output, record, ref, target, questions, null);
+        }
+
         /** Un appel sans question de TaskForce. */
         public AssistantToolCall(String name, String status, String input, String output, String record, String ref,
                                  Map<String, Object> target) {
-            this(name, status, input, output, record, ref, target, null);
+            this(name, status, input, output, record, ref, target, null, null);
         }
 
         /** Un appel sans empreinte ni issue : une proposition, ou une réponse d'avant les gestes. */
         public AssistantToolCall(String name, String status, String input, String output, String record) {
-            this(name, status, input, output, record, null, null, null);
+            this(name, status, input, output, record, null, null, null, null);
         }
     }
+
+    /**
+     * Où écrit une action, que sa carte dit avant le geste (R204, R201 « demander ») : {@code system}, « TaskForce » ou
+     * l'outil connecté (« Linear ») ; {@code workspace}, l'espace de TaskForce où elle écrit, null ailleurs ; {@code asked},
+     * l'outil que la demande nommait quand l'action écrit ailleurs (« crée un projet dans Linear » et un projet de
+     * TaskForce), null sinon. Null pour une lecture.
+     */
+    public record AssistantWhere(String system, String workspace, String asked) {}
 
     /**
      * Une question de TaskForce avant un geste (R115), dans la forme des questions de Claude : l'argument que la réponse

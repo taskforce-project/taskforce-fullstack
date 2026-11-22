@@ -85,8 +85,17 @@ class ConnectorInjectionAttackTest {
     @Mock private IssueMaterial material;
     @Mock private com.taskforce.tf_api.core.service.agent.tools.ProjectResolver projects;
     @Mock private com.taskforce.tf_api.core.service.AiConversationService conversations;
+    /** Où écrit chaque outil et ce qu'une demande nomme, avec le vrai catalogue (R204) : Cortex le lit à chaque demande. */
+    @Spy private TargetSystems targets = new TargetSystems(builtCatalog());
 
     @InjectMocks private AgentService service;
+
+    private static com.taskforce.tf_api.core.service.integration.ConnectorCatalog builtCatalog() {
+        com.taskforce.tf_api.core.service.integration.ConnectorCatalog catalog =
+            new com.taskforce.tf_api.core.service.integration.ConnectorCatalog();
+        catalog.build();
+        return catalog;
+    }
 
     private FakeVendor vendor;
     private final ObjectMapper json = new ObjectMapper();

@@ -62,6 +62,30 @@ describe("splitAnswer : ce que Cortex écrit, ce que TaskForce dit (R116)", () =
     ])
   })
 
+  it("reads what was done in the conversation apart from a correction of an action never done (R204)", () => {
+    const answer = "> [!taskforce] TaskForce · done\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\".\n\nQuel nom ?"
+    expect(splitAnswer(answer)).toEqual([
+      { by: "taskforce", lines: ["This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."], kind: "done" },
+      { by: "cortex", text: "Quel nom ?" },
+    ])
+  })
+
+  it("reads what TaskForce says of the tool the request named apart from a correction (R204)", () => {
+    const answer = "Je peux le faire dès qu'Asana est là.\n\n> [!taskforce] TaskForce · connections\n> Cortex isn't connected to Asana for you yet."
+    expect(splitAnswer(answer)).toEqual([
+      { by: "cortex", text: "Je peux le faire dès qu'Asana est là." },
+      { by: "taskforce", lines: ["Cortex isn't connected to Asana for you yet."], kind: "connections" },
+    ])
+  })
+
+  it("reads what the conversation did next to a sentence that stays, apart from a correction (R159)", () => {
+    const answer = "J'ai bien créé le projet pour la démo.\n\n> [!taskforce] TaskForce · record\n> This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."
+    expect(splitAnswer(answer)).toEqual([
+      { by: "cortex", text: "J'ai bien créé le projet pour la démo." },
+      { by: "taskforce", lines: ["This was created in this conversation, in TaskForce: Project created: TESTTASKFO \"Test Taskforce\"."], kind: "record" },
+    ])
+  })
+
   it("gives nothing for an empty answer", () => {
     expect(splitAnswer("")).toEqual([])
   })

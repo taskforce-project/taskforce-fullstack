@@ -31,7 +31,8 @@ import lombok.extern.slf4j.Slf4j;
  * <ul>
  *   <li>{@code /no_think} au dernier message d'un modèle Qwen3 qui ne doit pas raisonner, et sur Ollama le réglage natif
  *       ({@code think: false}), qu'Ollama 0.40 suit quand il ignore la directive (même appel d'outil : 2,9 s puis 0,5 s,
- *       mesuré le 29/10/2026) ;</li>
+ *       mesuré le 29/10/2026) ; un Qwen3 que seule sa fiche d'Ollama dit (mimo-v2.6:9b, 16/11/2026) reçoit le réglage
+ *       natif seul ;</li>
  *   <li>avec Ollama, la conversation passe par son API ({@code /api/chat}), la seule où une requête choisit sa fenêtre
  *       de contexte : elle est taillée à chaque requête ({@link OllamaProtocol}), au lieu des 4 096 jetons par défaut
  *       où le prompt de Cortex perdait son début (J1-4, 04/11/2026) ;</li>
@@ -116,25 +117,32 @@ public class ModelGateway {
     /**
      * Ce que la fiche d'un modèle dit de lui chez son fournisseur, telle qu'Ollama la donne : sa taille (« 8.2B »), sa
      * fenêtre de contexte en jetons, s'il prend des outils, sa famille (« qwen3 »), s'il sait converser ({@code chat},
-     * {@link OllamaProtocol#chats}), et sa place sur le disque en octets ; chaque valeur est {@code null} quand la fiche ne
-     * la dit pas. Ce n'est pas une mesure : la table des capacités la montre comme telle tant que le modèle n'est pas mesuré
-     * ici (R113, R125, R142).
+     * {@link OllamaProtocol#chats}), sa place sur le disque en octets, et l'analyseur qu'Ollama applique à ses réponses
+     * ({@code parser}, « qwen3.5 ») ; chaque valeur est {@code null} quand la fiche ne la dit pas. Ce n'est pas une mesure :
+     * la table des capacités la montre comme telle tant que le modèle n'est pas mesuré ici (R113, R125, R142).
      */
-    public record ModelCard(String parameters, Integer contextLength, Boolean tools, String family, Boolean chat, Long diskBytes) {
+    public record ModelCard(String parameters, Integer contextLength, Boolean tools, String family, Boolean chat, Long diskBytes,
+                            String parser) {
 
         static final ModelCard NONE = new ModelCard(null, null, null);
 
         /** Une fiche réduite à ce que disent la liste des modèles ou un fournisseur hébergé. */
         public ModelCard(String parameters, Integer contextLength, Boolean tools) {
-            this(parameters, contextLength, tools, null, null, null);
+            this(parameters, contextLength, tools, null, null, null, null);
+        }
+
+        /** Une fiche qui ne dit pas l'analyseur de ses réponses. */
+        public ModelCard(String parameters, Integer contextLength, Boolean tools, String family, Boolean chat, Long diskBytes) {
+            this(parameters, contextLength, tools, family, chat, diskBytes, null);
         }
 
         boolean empty() {
-            return parameters == null && contextLength == null && tools == null && family == null && chat == null;
+            return parameters == null && contextLength == null && tools == null && family == null && chat == null
+                && parser == null;
         }
 
         ModelCard onDisk(Long bytes) {
-            return new ModelCard(parameters, contextLength, tools, family, chat, bytes);
+            return new ModelCard(parameters, contextLength, tools, family, chat, bytes, parser);
         }
     }
 
@@ -384,10 +392,12 @@ public class ModelGateway {
         String model = call.model();
         String base = OllamaProtocol.nativeBase(settings.baseUrl());
         Map<String, String> headers = openAiHeaders(settings.apiKey());
-        ObjectNode body = OllamaProtocol.request(mapper, call.messages(), model, call.think(), call.jsonMode(), TEMPERATURE);
+        // Sa fiche, lue une fois : sa fenêtre, et sa famille quand son nom ne la dit pas (OllamaProtocol#qwen3).
+        ModelCard card = card(base, headers, model);
+        ObjectNode body = OllamaProtocol.request(mapper, call.messages(), model, card, call.think(), call.jsonMode(), TEMPERATURE);
         List<JsonNode> attempt = tools;
         withTools(body, attempt, AiProvider.OLLAMA);
-        int window = sizeWindow(settings, base, headers, call, body);
+        int window = sizeWindow(settings, base, headers, call, body, card);
         ((ObjectNode) body.path("options")).put("num_ctx", window);
         while (true) {
             ModelHttp.Reply reply = send(base + "/api/chat", headers, body, settings.timeout());
@@ -407,9 +417,9 @@ public class ModelGateway {
 
     /** La fenêtre de la requête (cf. {@link OllamaProtocol#window}) ; une requête qui la dépasse est signalée au journal. */
     private int sizeWindow(AiProviderSettings settings, String base, Map<String, String> headers, ChatCall call,
-                           ObjectNode body) {
+                           ObjectNode body, ModelCard card) {
         String model = call.model();
-        int ceiling = OllamaProtocol.ceiling(settings.ollamaMaxContext(), modelMaximum(base, headers, model));
+        int ceiling = OllamaProtocol.ceiling(settings.ollamaMaxContext(), card.contextLength() == null ? 0 : card.contextLength());
         int loaded = loadedWindow(base, headers, model);
         int tokens = ContextBudget.tokens(write(body.path("messages")))
             + (body.has("tools") ? ContextBudget.tokens(write(body.path("tools"))) : 0);

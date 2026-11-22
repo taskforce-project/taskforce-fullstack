@@ -106,6 +106,15 @@ describe("caseOrigin", () => {
       })
   })
 
+  it("tells a trust incident where TaskForce left Cortex's sentence and said what was done next to it (R159)", () => {
+    expect(caseOrigin({ ...CASE, origin: { kind: "uncertain", said: ["J'ai créé le projet."], shown: "Nothing was created in this turn." } }, T))
+      .toEqual({
+        origin: "From a trust incident on 2 Nov: TaskForce couldn't tie what Cortex said to what was done, and said what was done next to it.",
+        said: "Cortex said: J'ai créé le projet.",
+        shown: "TaskForce showed: Nothing was created in this turn.",
+      })
+  })
+
   it("clips a long sentence, and leaves out what the incident doesn't keep", () => {
     const origin = caseOrigin({ ...CASE, origin: { kind: "incident", said: ["x".repeat(400)], shown: null } }, T)
 

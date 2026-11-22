@@ -230,4 +230,55 @@ class ConnectFailureTest {
             .isInstanceOf(BusinessException.class)
             .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ConnectFailure.REGISTRATION_REFUSED));
     }
+
+    @Test
+    @DisplayName("R159 (13) : une inscription trop sollicitée (429) ne refuse rien : l'éditeur ne répond pas pour l'instant")
+    void aRegistrationThatIsRateLimited() throws IOException {
+        vendor = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        vendor.createContext("/register", exchange -> {
+            byte[] body = "{\"error\":\"rate_limited\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(429, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        vendor.start();
+        String url = "http://127.0.0.1:" + vendor.getAddress().getPort() + "/register";
+
+        BusinessException busy = (BusinessException) catchThrowable(() -> new McpOAuthClient(om, 5000L, true).postJson(url, Map.of()));
+
+        assertThat(busy.getErrorCode()).isEqualTo(ConnectFailure.SIGN_IN_UNREACHABLE);
+        assertThat(busy).hasMessageContaining("HTTP 429");
+    }
+
+    /** L'inscription d'un éditeur qui la refuse, avec ce statut et cette erreur OAuth. */
+    private McpClientRegistrar refusing(int status, String error) {
+        McpOAuthClient client = Mockito.mock(McpOAuthClient.class);
+        when(client.postJson(anyString(), any())).thenThrow(new McpOAuthClient.OAuthError(ConnectFailure.REGISTRATION_REFUSED,
+            "OAuth DCR https://as.ex/r : HTTP " + status + " (" + error + ")", error, status));
+        McpOAuthRegistrationRepository registrations = Mockito.mock(McpOAuthRegistrationRepository.class);
+        when(registrations.findByIssuerAndRedirectUri(anyString(), anyString())).thenReturn(Optional.empty());
+        McpOAuthSettings settings = new McpOAuthSettings("https://api.example.test", "", "https://app.example.test",
+            "TaskForce", "web", "");
+        return new McpClientRegistrar(Mockito.mock(ConnectorAppRepository.class), registrations, client, settings,
+            new MockEnvironment());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest(name = "HTTP {0} ({1}) : {2}")
+    @org.junit.jupiter.params.provider.CsvSource(delimiter = '|', value = {
+        // Relecture R159 (13) : seul un refus d'inscrire mène à l'étape de l'administrateur.
+        "403 | registration_not_supported | CONNECT_NO_CLIENT",
+        "401 | unauthorized_client        | CONNECT_NO_CLIENT",
+        "400 | registration_not_supported | CONNECT_NO_CLIENT",
+        "400 | invalid_redirect_uri       | CONNECT_REGISTRATION_REFUSED",
+        "422 | invalid_client_metadata    | CONNECT_REGISTRATION_REFUSED",
+    })
+    void onlyARefusalToRegisterLeadsToTheAdminStep(int status, String error, String code) {
+        DiscoveredAuth auth = new DiscoveredAuth("https://as.ex", "https://as.ex/a", "https://as.ex/t", "https://as.ex/r", null);
+
+        Throwable thrown = catchThrowable(() -> refusing(status, error).clientFor(1L, "custom-docs", auth,
+            "https://api.example.test/cb", false, false));
+
+        assertThat(((BusinessException) thrown).getErrorCode()).isEqualTo(code);
+    }
 }

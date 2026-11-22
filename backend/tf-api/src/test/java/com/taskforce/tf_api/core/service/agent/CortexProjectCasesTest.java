@@ -123,7 +123,15 @@ class CortexProjectCasesTest {
         service = new AgentService(access, search, tools, llm, json, aiUsage, workspaceMcp, authorization,
             new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json),
             new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), records, undo, screens, material,
-            resolver, conversations);
+            resolver, conversations, targets());
+    }
+
+    /** Où écrit chaque outil, avec les noms du vrai catalogue (R204). */
+    private static TargetSystems targets() {
+        com.taskforce.tf_api.core.service.integration.ConnectorCatalog catalog =
+            new com.taskforce.tf_api.core.service.integration.ConnectorCatalog();
+        catalog.build();
+        return new TargetSystems(catalog);
     }
 
     private static ProjectResponse project(Long id, String key, String name) {

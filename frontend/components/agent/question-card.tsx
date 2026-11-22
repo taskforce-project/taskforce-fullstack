@@ -14,6 +14,7 @@ import {
 import { fillText } from "@/lib/delivery/result-card"
 import { useCortexStore } from "@/lib/store/cortex-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
+import { WriteTarget } from "./write-target"
 
 /**
  * La carte des questions de Cortex avant un geste (R115, R136 : une seule voix), dans la forme des questions de Claude (décision
@@ -73,6 +74,8 @@ export function QuestionCard({ slug, call, then }: Readonly<{
         void send()
       }}
     >
+      {/* Où le geste écrira une fois les réponses envoyées (R204) : la dernière chose à voir avant qu'il se fasse. */}
+      <WriteTarget where={call.where} />
       {call.questions.map((question) => (
         <QuestionField
           key={question.field}

@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.service.AiStatusService.AiStatus;
 import com.taskforce.tf_api.core.service.ai.AiProviderSettings;
 import com.taskforce.tf_api.core.service.ai.ChosenModel;
 import com.taskforce.tf_api.core.service.ai.ModelDeadline;
+import com.taskforce.tf_api.core.service.ai.ModelFailure;
 import com.taskforce.tf_api.core.service.ai.ModelGateway;
 import com.taskforce.tf_api.core.service.ai.ModelWindow;
 import com.taskforce.tf_api.core.service.ai.ModelProviderException;
@@ -29,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -253,6 +255,58 @@ class AiGatewayClientTest {
         assertThat(client.isConfigured()).isFalse();
         assertThatThrownBy(() -> client.chatCompletion("s", "u", false, "fast"))
             .isInstanceOf(AiGatewayClient.LlmException.class);
+        verifyNoInteractions(gateway);
+    }
+
+    /**
+     * Le 16/11/2026, sur le poste du CEO : les réglages nomment qwen3:8b, qu'il a désinstallé ; le banc passe mimo-v2.6:9b,
+     * installé. L'appel refusait le modèle nommé parce que celui des réglages manquait, sans rien demander à Ollama.
+     */
+    @Test
+    @DisplayName("un modèle nommé que le fournisseur sert répond, même quand le modèle des réglages n'y est plus")
+    void aNamedServedModelAnswersWithoutTheInstanceModel() {
+        AiStatus missing = new AiStatus(true, false, "qwen3:8b", "qwen3:8b", true, "bge-m3:latest");
+        when(status.snapshot()).thenReturn(new AiStatusService.Snapshot(SETTINGS, missing, true,
+            List.of("mimo-v2.6:9b", "qwen3.5:9b", "qwen3-embedding:0.6b", "bge-m3:latest"), List.of()));
+        when(gateway.chat(any(), any())).thenReturn(reply("mimo-v2.6:9b", "ok"));
+        ArgumentCaptor<ModelGateway.ChatCall> call = ArgumentCaptor.forClass(ModelGateway.ChatCall.class);
+
+        assertThat(client.rawChatWithModel(List.of(Map.of("role", "user", "content", "q")), List.of(), "mimo-v2.6:9b")
+            .path("content").asText()).isEqualTo("ok");
+
+        verify(gateway).chat(same(SETTINGS), call.capture());
+        assertThat(call.getValue().model()).isEqualTo("mimo-v2.6:9b");
+        // Le palier, lui, répond avec le modèle des réglages : sans lui, rien ne part.
+        assertThatThrownBy(() -> client.chatCompletion("s", "u", false, "fast")).isInstanceOf(AiGatewayClient.LlmException.class);
+        verify(gateway, times(1)).chat(any(), any());
+    }
+
+    @Test
+    @DisplayName("un modèle nommé que le fournisseur ne sert pas : échec immédiat, qui dit pourquoi, sans appel")
+    void aNamedModelNotServedFailsFastAndSaysWhy() {
+        when(status.snapshot()).thenReturn(new AiStatusService.Snapshot(SETTINGS, READY, true, List.of("qwen3.5:9b"), List.of()));
+
+        assertThatThrownBy(() -> client.rawChatWithModel(List.of(), List.of(), "mimo-v2.6:9b"))
+            .isInstanceOf(AiGatewayClient.LlmException.class)
+            .hasMessage("AI provider doesn't serve mimo-v2.6:9b")
+            .satisfies(failure -> {
+                ModelFailure why = ModelFailure.of(failure);
+                assertThat(why.why()).isEqualTo(ModelProviderException.Why.MODEL_MISSING);
+                assertThat(why.model()).isEqualTo("mimo-v2.6:9b");
+            });
+        verifyNoInteractions(gateway);
+        verify(status, never()).invalidate();
+    }
+
+    @Test
+    @DisplayName("un modèle nommé quand le fournisseur ne répond pas : échec immédiat, qui dit « injoignable »")
+    void aNamedModelWithoutTheProvider() {
+        when(status.snapshot()).thenReturn(new AiStatusService.Snapshot(SETTINGS, AiStatus.UNREACHABLE, false, List.of(), List.of()));
+
+        assertThatThrownBy(() -> client.rawChatWithModel(List.of(), List.of(), "mimo-v2.6:9b"))
+            .isInstanceOf(AiGatewayClient.LlmException.class)
+            .hasMessage("AI is not available on this instance")
+            .satisfies(failure -> assertThat(ModelFailure.of(failure).why()).isEqualTo(ModelProviderException.Why.UNREACHABLE));
         verifyNoInteractions(gateway);
     }
 

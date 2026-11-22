@@ -391,4 +391,31 @@ class CortexRecordServiceTest {
         assertThat(found.get(corrected).path("said").get(0).asText()).isEqualTo("I deleted TESTTA-2.");
         assertThat(service.incidents(List.of())).isEmpty();
     }
+
+    @Test
+    @DisplayName("R204 : les gestes d'une réponse, dans l'ordre, la réponse donnée sur sa carte après elle comprise")
+    void the_acts_of_an_answer_include_what_came_after_it() {
+        // L'échange 1 de s17 : TaskForce demande le nom du projet, la personne répond sur la carte, le projet se crée.
+        UUID id = service.open(ctx, "Tu peux me creer un nouveau projet dans Linear la ou pas ?", Map.of());
+        service.append(id, "action.requested", Actor.CORTEX, Map.of("tool", "create_project", "arguments", "{}"));
+        service.append(id, "action.decided", Actor.rule("create-project"), Map.of("effect", "allow"));
+        String card = service.append(id, "action.result", Actor.SERVER, Map.of("tool", "create_project", "status", "question",
+            "output", "Nothing was done: TaskForce asks the person first.", "arguments", "{}")).orElseThrow();
+        service.answer(id, "create_project", card, 7L, Map.of("name", "Test Taskforce"));
+        service.append(id, "action.requested", Actor.CORTEX, Map.of("tool", "create_project",
+            "arguments", "{\"name\":\"Test Taskforce\"}"));
+        service.append(id, "action.decided", Actor.rule("create-project"), Map.of("effect", "allow"));
+        String done = service.append(id, "action.result", Actor.SERVER, Map.of("tool", "create_project", "status", "success",
+            "output", "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).")).orElseThrow();
+        when(eventRepository.findByRecordIdInOrderByRecordIdAscSeqAsc(List.of(id))).thenReturn(List.copyOf(stored));
+
+        Map<UUID, List<CortexRecordService.Act>> acts = service.acts(List.of(id));
+
+        assertThat(acts.get(id)).containsExactly(
+            new CortexRecordService.Act("create_project", "{}", "question", "Nothing was done: TaskForce asks the person first.",
+                card, null),
+            new CortexRecordService.Act("create_project", "{\"name\":\"Test Taskforce\"}", "success",
+                "Project created in TaskForce: TESTTASKFO \"Test Taskforce\" (id 12).", done, null));
+        assertThat(service.acts(List.of())).isEmpty();
+    }
 }

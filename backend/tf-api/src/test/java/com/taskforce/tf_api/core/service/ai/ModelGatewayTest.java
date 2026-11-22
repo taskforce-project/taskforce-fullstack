@@ -391,6 +391,26 @@ class ModelGatewayTest {
             assertThat(reply.usage()).isEqualTo(new LlmUsage(3, 1, 4));
         }
 
+        /**
+         * mimo-v2.6:9b le 16/11/2026 : un Qwen3.5 sous un autre nom, qui raisonnait à chaque appel. Sa fiche le dit, lue une
+         * fois pour sa famille comme pour sa fenêtre.
+         */
+        @Test
+        @DisplayName("un Qwen3 que seule sa fiche dit ne raisonne que quand on le lui demande, sans directive dans son texte")
+        void aQwen3ByItsCard() {
+            http.read("/api/show", FakeOllama.MIMO_SHOW).reply(200, NATIVE);
+
+            chat(OLLAMA, FakeOllama.MIMO, false, 0);
+            chat(OLLAMA, FakeOllama.MIMO, true, 0);
+
+            JsonNode fast = http.sent.get(0).body();
+            assertThat(fast.path("think").isBoolean()).isTrue();
+            assertThat(fast.path("think").asBoolean()).isFalse();
+            assertThat(fast.path("messages").get(1).path("content").asText()).isEqualTo("hi");
+            assertThat(http.sent.get(1).body().has("think")).isFalse();
+            assertThat(http.reads).extracting(FakeHttp.Sent::url).filteredOn(url -> url.endsWith("/api/show")).hasSize(1);
+        }
+
         static Stream<Arguments> windows() {
             return Stream.of(
                 // Le prompt de Cortex : 8 192, le maximum du modèle ne compte pas.
