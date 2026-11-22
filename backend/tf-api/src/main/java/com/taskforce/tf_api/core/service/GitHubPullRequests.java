@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service;
 
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -13,6 +14,8 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 import lombok.extern.slf4j.Slf4j;
@@ -62,7 +65,25 @@ public class GitHubPullRequests {
         }
     }
 
-    private void send(Long workspaceId, String repo, String path, HttpMethod method, Object body, String what) {
+    /**
+     * Commente la pull request (le témoin du dossier d'une mission, TF-J2-7) et rend l'adresse du commentaire, ou vide
+     * quand GitHub ne la donne pas.
+     */
+    public Optional<String> comment(Long workspaceId, String repo, int number, String body) {
+        String answer = send(workspaceId, repo, "/issues/" + number + "/comments", HttpMethod.POST, Map.of("body", body),
+            "comment on pull request #" + number);
+        if (answer == null || answer.isBlank()) return Optional.empty();
+        try {
+            String url = JSON.readTree(answer).path("html_url").asText("");
+            return url.startsWith("https://") ? Optional.of(url) : Optional.empty();
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private String send(Long workspaceId, String repo, String path, HttpMethod method, Object body, String what) {
         if (!GitHubRepoNames.isFullName(repo)) throw new BusinessException("This result's repository is not a GitHub repository.");
         String token = tokens.token(workspaceId).orElseThrow(() -> new BusinessException(tokens.missingHint()));
         HttpHeaders headers = new HttpHeaders();
@@ -70,7 +91,7 @@ public class GitHubPullRequests {
         headers.set("Accept", "application/vnd.github+json");
         headers.setContentType(MediaType.APPLICATION_JSON);
         try {
-            http.exchange(API + repo + path, method, new HttpEntity<>(body, headers), String.class);
+            return http.exchange(API + repo + path, method, new HttpEntity<>(body, headers), String.class).getBody();
         } catch (HttpStatusCodeException e) {
             int status = e.getStatusCode().value();
             if (status == 405 || status == 409 || status == 422) {
