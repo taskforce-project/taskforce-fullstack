@@ -26,6 +26,25 @@ class DelegatedAgentTest {
         SecurityContextHolder.clearContext();
     }
 
+    @Test
+    @DisplayName("la mission d'une session déléguée, lue dans son jeton ; aucune pour une personne ou un autre jeton (TF-J2-7)")
+    void reads_the_mission_of_a_delegated_session() {
+        SecurityContextHolder.getContext().setAuthentication(token(person().claim(DeliverySessionFilter.RUN_CLAIM, 100L)));
+        assertThat(DelegatedAgent.missionRun()).contains(100L);
+
+        SecurityContextHolder.getContext().setAuthentication(token(person().claim(DeliverySessionFilter.RUN_CLAIM, "101")));
+        assertThat(DelegatedAgent.missionRun()).contains(101L);
+
+        SecurityContextHolder.getContext().setAuthentication(token(person().claim(DeliverySessionFilter.RUN_CLAIM, "x")));
+        assertThat(DelegatedAgent.missionRun()).isEmpty();
+
+        SecurityContextHolder.getContext().setAuthentication(token(person()));
+        assertThat(DelegatedAgent.missionRun()).isEmpty();
+
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("pierre", "x"));
+        assertThat(DelegatedAgent.missionRun()).isEmpty();
+    }
+
     private static JwtAuthenticationToken token(Jwt.Builder claims) {
         return new JwtAuthenticationToken(claims.build(), List.of(), "pierre@acme.dev");
     }

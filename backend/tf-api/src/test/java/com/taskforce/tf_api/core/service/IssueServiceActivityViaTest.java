@@ -123,6 +123,8 @@ class IssueServiceActivityViaTest {
         assertThat(activity.getNewValue()).isEqualTo("Update the README");
         assertThat(activity.getActor()).isEqualTo(pierre);
         assertThat(activity.getVia()).isEqualTo("Claude Code");
+        // L'agent le déclare, au dossier de sa mission : la page distingue ce qu'il déclare de ce qu'on vérifie (TF-J2-7).
+        org.mockito.Mockito.verify(events).publishEvent(new IssueService.ChecklistDeclared(100L, item));
     }
 
     @Test
