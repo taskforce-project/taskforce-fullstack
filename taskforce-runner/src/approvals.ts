@@ -7,6 +7,7 @@ import type { Approval, AskedBy, Ruling } from "./api.js";
 import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/engine/rules-engine.js";
 import type { Exposure } from "./harness/exposure.js";
 import { changesTaskForce, toolFacts } from "./harness/facts.js";
+import { inputHash, written, type Written } from "./harness/written.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
 
@@ -37,8 +38,11 @@ export interface ApprovalApi {
 export interface ApprovalServerOptions {
   /** Les règles de la mission : le hook `PreToolUse` juge chaque action avec elles, sur place. */
   rules?: RulesBundle;
-  /** Chaque décision prise sur place, avec l'entrée de l'outil, pour la trace. */
-  onDecision?: (tool: string, decision: Decision, input: unknown) => void;
+  /**
+   * Chaque décision prise sur place, avec l'entrée de l'outil et les faits jugés, pour la trace : le dossier les garde
+   * pour qu'un tiers rejuge l'action avec le paquet exporté (TF-J2-7).
+   */
+  onDecision?: (tool: string, decision: Decision, input: unknown, facts: Facts[]) => void;
   /** Avant d'ouvrir une demande dans TaskForce : la trace en attente part d'abord, le dossier garde l'ordre réel. */
   beforeAsk?: () => Promise<void>;
   /** Une action que la personne a déjà autorisée pour toute la mission (R46) passe sans redemander : la trace le dit. */
@@ -176,6 +180,16 @@ export function missionScopes(rules: RulesBundle | undefined, factsList: Facts[]
     if (decision.effect === "ask") scopes.add(partScope(decision, facts, tool));
   }
   return scopes.size > 0 ? [...scopes] : [tool];
+}
+
+/**
+ * L'action exacte d'un appel (TF-J2-7) : l'empreinte de l'entrée de l'outil, et pour une écriture de fichier ce que le
+ * fichier contiendra. La décision et la demande la portent : on accorde cette action-là, pas une autre.
+ */
+export function exactAction(tool: string, toolInput: unknown, workDir: string): { input?: string; written?: Written } {
+  const input = inputHash(toolInput);
+  const file = written(tool, toolInput, workDir);
+  return { ...(input ? { input } : {}), ...(file ? { written: file } : {}) };
 }
 
 /** Réponse du hook `PermissionRequest`, au format de Claude Code. */
@@ -366,11 +380,10 @@ export class ApprovalServer {
   judge(input: Record<string, unknown>): Decision {
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
     const rules = this.options.rules;
-    const ruled: Decision = rules
-      ? decideAll(rules, this.factsOf(tool, input.tool_input))
-      : { effect: "ask", rule: null };
+    const facts = this.factsOf(tool, input.tool_input);
+    const ruled: Decision = rules ? decideAll(rules, facts) : { effect: "ask", rule: null };
     const decision = this.capped(tool, ruled);
-    this.options.onDecision?.(tool, decision, input.tool_input);
+    this.options.onDecision?.(tool, decision, input.tool_input, facts);
     return decision;
   }
 
@@ -403,8 +416,10 @@ export class ApprovalServer {
   ruling(tool: string, toolInput: unknown, judged?: Decision): Ruling & { scopes: string[]; binds: boolean } {
     const facts = this.factsOf(tool, toolInput);
     const action = facts.find((f) => f.action)?.action;
+    // L'action exacte que la personne accorde : l'empreinte de l'entrée, et pour une écriture celle du contenu (TF-J2-7).
+    const exact = exactAction(tool, toolInput, this.workDir);
     if (judged?.rule?.id === CHANGES_CAP) {
-      return { ...(action ? { action } : {}), rule: CHANGES_CAP, reason: judged.rule.reason, scopes: [CHANGES_CAP],
+      return { ...(action ? { action } : {}), rule: CHANGES_CAP, reason: judged.rule.reason, ...exact, scopes: [CHANGES_CAP],
         binds: false };
     }
     const rules = this.options.rules;
@@ -414,6 +429,7 @@ export class ApprovalServer {
       ...(decision.rule ? { rule: decision.rule.id, reason: decision.rule.text ?? decision.rule.reason } : {}),
       // Les faits jugés, pour que TaskForce rejuge l'action avec les mêmes règles et sache qui peut accorder (R98).
       ...(facts.length > 0 ? { facts } : {}),
+      ...exact,
       scopes: missionScopes(rules, facts, tool),
       // Une décision qui lie : l'accord ne vaut que pour cet appel.
       binds: bindingCall(rules, facts, judged ?? decision),

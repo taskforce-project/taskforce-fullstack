@@ -24,6 +24,24 @@ export interface AgentOutcome {
   sessionId?: string | null;
   /** La session à reprendre n'existe plus sur ce poste (dossier `.claude` vidé, autre ordinateur). */
   sessionLost?: boolean;
+  /** La session brute telle que le runner l'a lue, gardée sur ce poste : son identifiant, son empreinte, sa taille. */
+  session?: { id?: string; sha256: string; bytes: number };
+}
+
+/**
+ * Ce que Claude Code dit de lui-même au démarrage (la ligne `system/init`) : sa version, le modèle réellement lancé, sa
+ * session ; null pour toute autre ligne. Le fournisseur ne donne pas d'empreinte du modèle : la version datée en tient lieu.
+ */
+export function agentInfo(message: unknown): { version?: string; model?: string; session?: string } | null {
+  if (!message || typeof message !== "object") return null;
+  const line = message as Record<string, unknown>;
+  if (line.type !== "system" || line.subtype !== "init") return null;
+  const text = (value: unknown, max: number): string | undefined =>
+    typeof value === "string" && value.trim() ? value.trim().slice(0, max) : undefined;
+  const version = text(line.claude_code_version, 80);
+  const model = text(line.model, 120);
+  const session = text(line.session_id, 64);
+  return { ...(version ? { version } : {}), ...(model ? { model } : {}), ...(session ? { session } : {}) };
 }
 
 /** Les outils qui peuvent changer un fichier : après chacun, le relevé des changements repart. */

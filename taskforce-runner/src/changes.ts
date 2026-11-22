@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs"
 import { dirname, join } from "node:path";
 
 import type { RunnerChanges, RunnerFileChange } from "./api.js";
+import { contentHash, sha256 } from "./harness/written.js";
 import { log } from "./log.js";
 import { run, runOrThrow } from "./proc.js";
 
@@ -147,15 +148,18 @@ export async function repoChanges(dir: string, base: string, liveIndex?: string)
     const section = known ? (sections[index] ?? "") : "";
     const binary = added === null || removed === null;
     const withheld = isSensitive(path);
+    const status = known ? statusOf(section) : "modified";
     const { body, truncated } = binary || withheld || !known
       ? { body: null, truncated: !known && !binary && !withheld }
       : clipped(hunksOf(section));
+    // L'état final, relu dans les commits : l'empreinte du contenu qui reste, qu'une écriture jugée porte aussi (TF-J2-7).
+    const content = !liveIndex && !withheld && status !== "deleted" ? contentHash(join(dir, path)) : null;
     return {
-      path, added, removed, binary, withheld, truncated,
-      status: known ? statusOf(section) : "modified",
+      path, added, removed, binary, withheld, truncated, status,
       // L'empreinte d'un fichier sensible ne doit rien dire de son contenu.
       revision: withheld ? `withheld-${added}-${removed}` : hash(section || `${added}/${removed}`),
       body: body === "" ? null : body,
+      ...(content ? { sha256: content.sha256 } : {}),
     };
   });
   return summed("repo", base, files);
@@ -205,6 +209,7 @@ export function scratchChanges(dir: string): ChangeSnapshot {
       status: "written",
       revision: withheld ? `withheld-${lines}` : big ? `big-${size}` : hash(bytes),
       body: body === "" ? null : body,
+      ...(withheld || big ? {} : { sha256: sha256(bytes) }),
     };
   });
   return summed("scratch", null, files);

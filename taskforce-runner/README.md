@@ -166,7 +166,18 @@ recomputing every hash:
 
 ```bash
 npm run verify -- evidence-run-42.json
+npm run verify -- evidence-run-42.json --key sha256:<the key id the operator publishes>
 ```
+
+Offline, it checks every hash, the header against the chain, each text kept beside the chain, the rules bundle and
+each decision judged again with it, the gaps, the seal (its Ed25519 signature, the head and header it names, its key,
+and where the key lives), and the witness written in the pull request. Each line says what holds (`[ok]`), what the
+record does not prove (`[!!]`) and what fails (`[KO]`).
+
+The runner numbers every event of a run and sends a batch again until it gets through: a batch that never arrives
+leaves a gap the record marks. What the record holds only by its hash stays on your computer, in
+`~/.taskforce-runner/evidence/run-<id>/`: the agent's raw session (`session.jsonl`) and the whole output of the
+project's tests (`tests.log`).
 
 ## The rules engine
 

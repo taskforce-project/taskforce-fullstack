@@ -1,8 +1,9 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import type { Claim } from "./api.js";
-import { ApprovalServer, type ApprovalApi } from "./approvals.js";
+import { ApprovalServer, exactAction, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
 import type { RulesBundle } from "./harness/engine/rules-engine.js";
@@ -10,7 +11,7 @@ import type { Exposure } from "./harness/exposure.js";
 import { log } from "./log.js";
 import { run, type StdinChannel } from "./proc.js";
 import { buildFollowUpPrompt, buildPrompt, buildReplyPrompt } from "./prompt.js";
-import { describeToolInput, parseAgentOutput, toEvents, toolLabel, WriteWatcher, type AgentOutcome } from "./stream.js";
+import { agentInfo, describeToolInput, parseAgentOutput, toEvents, toolLabel, WriteWatcher, type AgentOutcome } from "./stream.js";
 
 export type { AgentOutcome } from "./stream.js";
 export { parseAgentOutput } from "./stream.js";
@@ -235,6 +236,49 @@ export interface AgentRunOptions {
   onWrite?: () => void;
   /** Le moyen de parler à l'agent pendant son travail, le temps qu'il tourne (R140). */
   onConversation?: (tell: ((text: string) => boolean) | null) => void;
+  /**
+   * La chronologie de la mission, numérotée d'un bout à l'autre du run (TF-J2-7) : le runner la tient, l'agent y ajoute.
+   * Absente, l'agent a la sienne, fermée à sa fin.
+   */
+  relay?: EventRelay;
+  /** Où garder la session brute de l'agent sur ce poste ; le dossier la référence par son empreinte (R212). */
+  sessionFile?: string;
+}
+
+/** Le plus long brief que le dossier garde à côté de sa chaîne. */
+const MAX_BRIEF = 200_000;
+
+/**
+ * La session brute de l'agent telle que le runner la lit (sa sortie `stream-json`, ligne à ligne) : gardée sur ce poste,
+ * à part, et référencée au dossier par son empreinte (R212). Elle sert à l'enquête, pas à la lecture.
+ */
+export class SessionRecord {
+  private readonly hash = createHash("sha256");
+  private bytes = 0;
+
+  constructor(private readonly file?: string) {
+    if (file) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "", { encoding: "utf8", mode: 0o600 });
+    }
+  }
+
+  line(text: string): void {
+    const data = `${text}\n`;
+    this.hash.update(data, "utf8");
+    this.bytes += Buffer.byteLength(data, "utf8");
+    if (this.file) {
+      try {
+        appendFileSync(this.file, data, "utf8");
+      } catch {
+        // le disque plein ne coûte pas la mission : l'empreinte dit encore ce qui a été lu
+      }
+    }
+  }
+
+  digest(): { sha256: string; bytes: number } {
+    return { sha256: `sha256:${this.hash.copy().digest("hex")}`, bytes: this.bytes };
+  }
 }
 
 /**
@@ -253,7 +297,7 @@ export async function runAgent(
   const mcpConfigPath = join(tmp, `run-${claim.runId}-mcp.json`);
   const settingsPath = join(tmp, `run-${claim.runId}-settings.json`);
 
-  const relay = new EventRelay(api, claim.runId);
+  const relay = opts.relay ?? new EventRelay(api, claim.runId);
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
     rules: opts.rules,
@@ -261,20 +305,23 @@ export async function runAgent(
     allowedInAdvance: config.agent.extraAllowedTools,
     // Au-delà de ce nombre de changements dans TaskForce sur la mission, chacun se demande (R110).
     maxTaskForceChanges: config.agent.maxTaskForceChanges,
-    // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
-    onDecision: (tool, d, input) => {
+    // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie),
+    // avec les faits jugés et l'action exacte : un tiers la rejuge avec le paquet exporté (TF-J2-7).
+    onDecision: (tool, d, input, facts) => {
       log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);
       relay.push([{
         kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
         effect: d.effect, ...(d.rule ? { rule: d.rule.id } : {}),
+        ...(facts.length > 0 ? { facts } : {}), ...exactAction(tool, input, workDir),
       }]);
     },
     beforeAsk: () => relay.flush(),
     // Déjà autorisée pour toute la mission (R46) : la décision de la personne s'applique encore, et le dossier le garde.
     onMissionAllowed: (tool, scope, input) => {
+      const rule = `allowed for this mission (${scope})`;
       relay.push([{
         kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
-        effect: "allow", rule: `allowed for this mission (${scope})`,
+        effect: "allow", rule: rule.length > 80 ? `${rule.slice(0, 78)}.)` : rule, ...exactAction(tool, input, workDir),
       }]);
     },
   });
@@ -286,6 +333,10 @@ export async function runAgent(
   const prompt = opts.mode === "repoless" ? buildReplyPrompt(claim)
     : claim.followUp ? buildFollowUpPrompt(claim, opts.branch ?? "", claim.followUp.comments)
     : buildPrompt(claim, opts.branch ?? "");
+  // Le brief tel qu'il part à l'agent entre au dossier par son empreinte, son texte à côté de la chaîne (R198).
+  relay.push([{ kind: "brief", text: "The brief given to Claude Code", body: prompt.slice(0, MAX_BRIEF) }]);
+  const session = new SessionRecord(opts.sessionFile);
+  let announced = false;
 
   /** Un passage de l'agent ; `resume` : la session à continuer. */
   const attempt = async (resume: string | null): Promise<AgentOutcome> => {
@@ -303,8 +354,16 @@ export async function runAgent(
           opts.onConversation?.((text) => conversation?.tell(text) ?? false);
         },
         onStdoutLine: (line) => {
+          session.line(line);
           try {
             const message: unknown = JSON.parse(line);
+            // L'agent réellement lancé, tel qu'il se présente : sa version, son modèle, sa session (R198).
+            const info = agentInfo(message);
+            if (info) {
+              relay.push([{ kind: "agent", text: `Claude Code ${info.version ?? ""} with ${info.model ?? "its default model"}`.replace(/\s+/g, " "),
+                agent: { ...info, provider: "anthropic" } }]);
+              announced = true;
+            }
             relay.push(toEvents(message, workDir));
             if (watcher.wrote(message)) opts.onWrite?.();
             (conversation as AgentConversation | null)?.heard(message);
@@ -327,16 +386,19 @@ export async function runAgent(
   };
 
   try {
-    const session = claim.followUp?.sessionId ?? null;
-    const outcome = await attempt(session);
-    if (session && outcome.sessionLost) {
+    const resumed = claim.followUp?.sessionId ?? null;
+    let outcome = await attempt(resumed);
+    if (resumed && outcome.sessionLost) {
       // Le brief d'une reprise se suffit à lui-même : l'agent repart de lui, sans sa conversation d'avant.
       log.warn("The agent's session is no longer on this computer: it starts again from the comments alone.");
-      return await attempt(null);
+      outcome = await attempt(null);
     }
-    return outcome;
+    if (!announced) log.warn("Claude Code did not say which model it ran: the evidence will say so.");
+    return { ...outcome, session: { ...(outcome.sessionId ? { id: outcome.sessionId } : {}), ...session.digest() } };
   } finally {
-    await relay.close().catch((e: unknown) => log.warn(`Live timeline: ${(e as Error).message}`));
+    // La chronologie du runner continue après l'agent (les sorties, les tests) : il la ferme lui-même.
+    const done = opts.relay ? relay.flush() : relay.close();
+    await done.catch((e: unknown) => log.warn(`Live timeline: ${(e as Error).message}`));
     await approvals.stop();
     rmSync(mcpConfigPath, { force: true });
     rmSync(settingsPath, { force: true });

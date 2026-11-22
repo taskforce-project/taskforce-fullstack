@@ -1,4 +1,5 @@
-import { bundleDigest, firstBrokenLink, type ChainedEvent, type RulesBundle } from "./engine/rules-engine.js";
+import { chainOf, readDossier, type Line } from "./dossier.js";
+import { bundleDigest, type RulesBundle } from "./engine/rules-engine.js";
 
 /**
  * Ce que le runner vérifie avec les empreintes du moteur de règles (celui du serveur, compilé en JavaScript :
@@ -22,36 +23,42 @@ export function verifiedBundle(value: unknown): RulesBundle {
 
 /**
  * Vérifie un dossier de preuve exporté (`taskforce-evidence/1`, contracts/evidence) sans TaskForce : chaque empreinte
- * est recalculée, et la racine doit être celle du dernier événement. Une ligne de verdict, jamais d'exception.
+ * est recalculée et la racine doit être celle du dernier événement ; puis l'en-tête, les textes, le paquet de règles et
+ * chaque décision rejugée, les trous, le sceau et le témoin ({@link readDossier}). Un verdict, jamais d'exception : la
+ * première ligne dit si la chaîne tient, les suivantes ce que le reste prouve ou ne prouve pas.
  */
 export interface Verdict {
   ok: boolean;
   message: string;
+  lines: Line[];
 }
 
-export function verifyEvidence(text: string): Verdict {
-  let file: { format?: unknown; events?: unknown; root?: unknown };
+export interface VerifyOptions {
+  /** La clé que l'on croit : son identifiant `sha256:...`, ou sa clé publique. */
+  key?: string;
+}
+
+const MARK: Record<Line["level"], string> = { ok: "[ok]", info: "[--]", warn: "[!!]", fail: "[KO]" };
+
+export function verifyEvidence(text: string, options: VerifyOptions = {}): Verdict {
+  let file: unknown;
   try {
-    file = JSON.parse(text) as typeof file;
+    file = JSON.parse(text);
   } catch {
-    return { ok: false, message: "Not a JSON file." };
+    return { ok: false, message: "Not a JSON file.", lines: [] };
   }
-  if (file.format !== "taskforce-evidence/1" || !Array.isArray(file.events) || file.events.length === 0) {
-    return { ok: false, message: "Not a TaskForce evidence file (taskforce-evidence/1) with events." };
+  if (!file || typeof file !== "object" || Array.isArray(file)) {
+    return { ok: false, message: "Not a TaskForce evidence file (taskforce-evidence/1) with events.", lines: [] };
   }
-  const events = file.events as ChainedEvent[];
-  let broken: number;
-  try {
-    broken = firstBrokenLink(events);
-  } catch (e) {
-    // Un événement que le moteur ne sait pas lire (autre chose qu'un objet, un nombre décimal) : rien ne tient.
-    return { ok: false, message: `The chain cannot be checked: ${(e as Error).message}` };
-  }
-  if (broken >= 0) {
-    return { ok: false, message: `The chain breaks at event ${events[broken]?.seq ?? broken + 1}: the file was changed after it was written.` };
-  }
-  if (events.at(-1)?.hash !== file.root) {
-    return { ok: false, message: "Every event holds, but the root is not the hash of the last event: an event was removed at the end." };
-  }
-  return { ok: true, message: `Every hash holds: ${events.length} events, root ${String(file.root)}.` };
+  const record = file as Record<string, unknown>;
+  const chain = chainOf(record);
+  if (!chain.ok) return { ok: false, message: chain.message, lines: [] };
+  const head = `Every hash holds: ${chain.events.length} events, root ${String(record.root)}.`;
+  const lines = readDossier(record, options);
+  const ok = lines.every((line) => line.level !== "fail");
+  return {
+    ok,
+    message: [head, ...lines.map((line) => `${MARK[line.level]} ${line.text}`)].join("\n"),
+    lines,
+  };
 }
