@@ -443,11 +443,19 @@ export interface MissionEvidenceEvent {
   hash: string;
 }
 
-/** Le dossier de preuve d'une mission, tel qu'il se construit : ses événements et l'empreinte du dernier. */
+/**
+ * Le dossier de preuve d'une mission, tel qu'il se construit : ses événements et l'empreinte du dernier ; puis, depuis
+ * TF-J2-7, l'en-tête tiré de la chaîne, le paquet de règles de la mission, les textes gardés à côté de la chaîne et le
+ * dernier sceau (contracts/evidence). La page de vérification le lit, et lui seul (`lib/delivery/verification.ts`).
+ */
 export interface MissionEvidence {
   format: string;
   events: MissionEvidenceEvent[];
   root: string;
+  mission?: Record<string, unknown>;
+  rules?: Record<string, unknown>;
+  texts?: Record<string, string>;
+  seal?: Record<string, unknown>;
 }
 
 /**
