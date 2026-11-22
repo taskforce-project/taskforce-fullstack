@@ -35,7 +35,7 @@
       "canonical": "{\"s\":\"\\u0001\\u001f\"}"
     },
     {
-      "name": "a lone surrogate is escaped",
+      "name": "a lone surrogate is escaped, as JSON.stringify does: only read in files written before 1.18, TaskForce writes U+FFFD instead (RFC 8785 refuses lone surrogates)",
       "value": {
         "s": "\ud800"
       },
@@ -71,6 +71,27 @@
         "z": 0
       },
       "canonical": "{\"n\":-12,\"z\":0}"
+    },
+    {
+      "name": "RFC 8785, 3.2.3: property names sort by their UTF-16 code units",
+      "value": {
+        "\u20ac": "Euro Sign",
+        "\r": "Carriage Return",
+        "\ufb33": "Hebrew Letter Dalet With Dagesh",
+        "1": "One",
+        "\ud83d\ude00": "Emoji: Grinning Face",
+        "\u0080": "Control",
+        "\u00f6": "Latin Small Letter O With Diaeresis"
+      },
+      "canonical": "{\"\\r\":\"Carriage Return\",\"1\":\"One\",\"\u0080\":\"Control\",\"\u00f6\":\"Latin Small Letter O With Diaeresis\",\"\u20ac\":\"Euro Sign\",\"\ud83d\ude00\":\"Emoji: Grinning Face\",\"\ufb33\":\"Hebrew Letter Dalet With Dagesh\"}"
+    },
+    {
+      "name": "RFC 8785, 3.2.2.2 and appendix B: strings and literals",
+      "value": {
+        "string": "\u20ac$\u000F\u000aA'\u0042\u0022\u005c\\\"\/",
+        "literals": [null, true, false]
+      },
+      "canonical": "{\"literals\":[null,true,false],\"string\":\"\u20ac$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}"
     }
   ],
   "chain": {
