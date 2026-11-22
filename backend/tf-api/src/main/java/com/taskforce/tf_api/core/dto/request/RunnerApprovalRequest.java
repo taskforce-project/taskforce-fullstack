@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.dto.request;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -34,7 +35,13 @@ public record RunnerApprovalRequest(
     @Size(max = 500)
     String reason,
     @Size(max = 20)
-    List<@Size(max = 30) Map<@Size(max = 60) String, @Size(max = 4000) String>> facts
+    List<@Size(max = 30) Map<@Size(max = 60) String, @Size(max = 4000) String>> facts,
+    /** L'empreinte de l'entrée de l'outil (son JSON canonique) : l'action exacte que la personne accorde (TF-J2-7). */
+    @Pattern(regexp = RunnerEventsRequest.SHA256, message = "input must be a sha256 digest")
+    String input,
+    /** Pour une écriture de fichier : le fichier et l'empreinte de ce qui s'y écrira si la personne accorde. */
+    @Valid
+    RunnerEventsRequest.Written written
 ) {
 
     /** Une demande de l'agent. */
@@ -50,6 +57,12 @@ public record RunnerApprovalRequest(
     /** Une demande avec la règle, sans les faits, comme les envoie un runner d'avant les couches. */
     public RunnerApprovalRequest(String tool, String summary, String askedBy, String action, String rule, String reason) {
         this(tool, summary, askedBy, action, rule, reason, null);
+    }
+
+    /** Une demande avec les faits, sans l'empreinte de l'action, comme les envoie un runner d'avant la 1.18. */
+    public RunnerApprovalRequest(String tool, String summary, String askedBy, String action, String rule, String reason,
+                                 List<Map<String, String>> facts) {
+        this(tool, summary, askedBy, action, rule, reason, facts, null, null);
     }
 
     public boolean byRunner() {

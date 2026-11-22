@@ -45,7 +45,22 @@ public record RunnerResultRequest(
 
     /** La session de l'agent, pour qu'une reprise la continue (R139) ; un runner plus ancien ne l'envoie pas. */
     @Pattern(regexp = "[0-9a-fA-F-]{8,64}", message = "agentSession must be a session id")
-    String agentSession
+    String agentSession,
+
+    /**
+     * Combien d'événements le runner a numérotés pour ce run (TF-J2-7) : moins sont arrivés, le dossier marque le trou.
+     * Absent d'un runner plus ancien.
+     */
+    @Min(0)
+    Integer events,
+
+    /** La session brute de l'agent, gardée à part sur le poste, et que le dossier référence par son empreinte (R212). */
+    @Valid
+    Session session,
+
+    /** Le dernier commit de la branche de l'agent, quand il en a fait. */
+    @Pattern(regexp = "[0-9a-f]{40,64}", message = "head must be a commit hash")
+    String head
 ) {
 
     /** Un résultat sans les faits de la carte, comme les envoie un runner plus ancien. */
@@ -58,6 +73,22 @@ public record RunnerResultRequest(
                                String branch, Integer commits, Tests tests) {
         this(status, summary, resultUrl, error, refused, branch, commits, tests, null);
     }
+
+    /** Un résultat comme l'envoie un runner d'avant la 1.18 : sans compte d'événements, ni session brute, ni commit. */
+    public RunnerResultRequest(String status, String summary, String resultUrl, String error, Boolean refused,
+                               String branch, Integer commits, Tests tests, String agentSession) {
+        this(status, summary, resultUrl, error, refused, branch, commits, tests, agentSession, null, null, null);
+    }
+
+    /**
+     * La session brute de l'agent telle que le runner l'a lue (sa sortie {@code stream-json}), gardée sur le poste : son
+     * identifiant, son empreinte, sa taille.
+     */
+    public record Session(
+        @Pattern(regexp = "[0-9a-fA-F-]{8,64}", message = "session id must be a session id") String id,
+        @NotBlank @Pattern(regexp = RunnerEventsRequest.SHA256, message = "sha256 must be a sha256 digest") String sha256,
+        @Min(0) long bytes
+    ) {}
 
     /**
      * @param passedCount combien ont passé, et {@code total} sur combien, quand la sortie des tests le dit

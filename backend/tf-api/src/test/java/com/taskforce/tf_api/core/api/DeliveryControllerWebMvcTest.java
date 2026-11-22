@@ -67,6 +67,7 @@ class DeliveryControllerWebMvcTest {
     @MockitoBean private MissionResultService missionResults;
     @MockitoBean private MissionChangesService missionChanges;
     @MockitoBean private ProjectDeliveryService projectDelivery;
+    @MockitoBean private com.taskforce.tf_api.core.service.delivery.MissionDossierAccess dossierAccess;
     @MockitoBean private UserRepository userRepository;
     @MockitoBean private WorkspaceRepository workspaceRepository;             // WorkspaceAccessInterceptor
     @MockitoBean private WorkspaceMemberRepository workspaceMemberRepository; // WorkspaceAccessInterceptor
@@ -286,12 +287,14 @@ class DeliveryControllerWebMvcTest {
 
     @ParameterizedTest(name = "GET /runs/100/evidence?format={0} : {1}, sans enveloppe")
     @CsvSource({
-        "json, application/json, evidence-run-100.json, false",
-        "md, text/markdown, evidence-run-100.md, true",
+        "json, application/json, evidence-run-100.json, JSON",
+        "md, text/markdown, evidence-run-100.md, MARKDOWN",
+        "dsse, application/json, evidence-run-100.dsse.json, DSSE",
     })
-    void evidence_200(String format, String type, String file, boolean markdown) throws Exception {
+    void evidence_200(String format, String type, String file,
+                      com.taskforce.tf_api.core.service.delivery.MissionDossierAccess.Format wanted) throws Exception {
         var a = auth();
-        when(activityService.dossier("acme", 100L, 7L, markdown)).thenReturn(Optional.of("FILE"));
+        when(dossierAccess.export("acme", 100L, 7L, wanted)).thenReturn(Optional.of("FILE"));
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/evidence").param("format", format).with(a))
             .andExpect(status().isOk())
@@ -305,10 +308,38 @@ class DeliveryControllerWebMvcTest {
     @DisplayName("GET /runs/{id}/evidence : 404 pour un run sans dossier")
     void evidence_404_without_file() throws Exception {
         var a = auth();
-        when(activityService.dossier("acme", 100L, 7L, false)).thenReturn(Optional.empty());
+        when(dossierAccess.export("acme", 100L, 7L, com.taskforce.tf_api.core.service.delivery.MissionDossierAccess.Format.JSON))
+            .thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/runs/100/evidence").with(a))
             .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("DELETE /runs/{id}/evidence/texts/{hash} : le texte s'efface, son empreinte reste")
+    void erase_evidence_text_200() throws Exception {
+        String hash = "sha256:" + "a".repeat(64);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .delete("/api/workspaces/acme/delivery/runs/100/evidence/texts/" + hash).with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.message").value("Text erased: its digest stays in the evidence"));
+
+        verify(dossierAccess).eraseText("acme", 100L, hash, 7L);
+    }
+
+    @Test
+    @DisplayName("GET /evidence/key : la clé publique qui scelle les dossiers, et sa garde")
+    void evidence_key_200() throws Exception {
+        when(dossierAccess.key("acme", 7L)).thenReturn(new com.taskforce.tf_api.core.harness.evidence.EvidenceSeal.Key(
+            "sha256:" + "b".repeat(64), "MCowBQYDK2VwAyEA", "same-machine", true));
+
+        mockMvc.perform(get("/api/workspaces/acme/delivery/evidence/key").with(auth()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value("sha256:" + "b".repeat(64)))
+            .andExpect(jsonPath("$.data.algorithm").value("ed25519"))
+            .andExpect(jsonPath("$.data.custody").value("same-machine"))
+            .andExpect(jsonPath("$.data.kept").value(true));
     }
 
     @ParameterizedTest(name = "POST approval : {0} {1} -> autorisé={2}, pour la mission={3}, enregistré {4}")
@@ -425,7 +456,17 @@ class DeliveryControllerWebMvcTest {
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/discard").with(auth()))
             .andExpect(status().isOk());
 
-        verify(missionResults).discard("acme", 100L, 7L);
+        verify(missionResults).discard("acme", 100L, 7L, null);
+    }
+
+    @Test
+    @DisplayName("POST /runs/{id}/discard avec une raison : elle part au dossier avec le geste")
+    void discard_with_a_reason_200() throws Exception {
+        mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/discard").with(auth())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"reason\":\"Not the right approach\"}"))
+            .andExpect(status().isOk());
+
+        verify(missionResults).discard("acme", 100L, 7L, "Not the right approach");
     }
 
     @Test
@@ -434,7 +475,7 @@ class DeliveryControllerWebMvcTest {
         mockMvc.perform(post("/api/workspaces/acme/delivery/runs/100/done").with(auth()))
             .andExpect(status().isOk());
 
-        verify(missionResults).markDone("acme", 100L, 7L);
+        verify(missionResults).markDone("acme", 100L, 7L, null);
     }
 
     @Test

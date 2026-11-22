@@ -1,0 +1,181 @@
+package com.taskforce.tf_api.core.service.delivery;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
+import com.taskforce.tf_api.core.model.MissionDossier;
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.User;
+import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
+import com.taskforce.tf_api.core.repository.ProjectRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.shared.exception.ForbiddenException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
+
+/**
+ * Qui lit un dossier qui survit à son issue et à son projet, et qui en efface un texte : tant que le projet existe, qui le
+ * voit ; ensuite, la personne qui a délégué et les responsables de l'espace.
+ */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("Lire et effacer un dossier qui survit à son issue")
+class MissionDossierAccessTest {
+
+    private static final String HASH = "sha256:" + "a".repeat(64);
+
+    @Mock private MissionEvidenceService evidence;
+    @Mock private ProjectRepository projects;
+    @Mock private ProjectVisibilityGuard visibilityGuard;
+    @Mock private WorkspaceMemberRepository members;
+    @Mock private UserRepository users;
+    @Mock private WorkspaceRepository workspaces;
+    @Mock private EvidenceSigner signer;
+    @InjectMocks private MissionDossierAccess access;
+
+    private Workspace workspace;
+    private MissionDossier dossier;
+    private User ada;
+
+    @BeforeEach
+    void setUp() {
+        ada = User.builder().id(7L).email("ada@taskforce.dev").build();
+        workspace = Workspace.builder().id(3L).slug("acme").build();
+        dossier = MissionDossier.builder().runId(100L).workspace(workspace).projectId(12L).delegatedBy(ada).build();
+        lenient().when(evidence.dossier(100L)).thenReturn(Optional.of(dossier));
+        lenient().when(evidence.dossierJson(100L)).thenReturn(Optional.of("{}"));
+    }
+
+    private void role(Long userId, WorkspaceRole role) {
+        when(members.findByWorkspaceIdAndUserId(3L, userId))
+            .thenReturn(Optional.of(WorkspaceMember.builder().role(role).build()));
+    }
+
+    @Test
+    @DisplayName("le projet existe : le lit qui voit le projet")
+    void while_the_project_lives_its_viewers_read() {
+        Project project = Project.builder().id(12L).build();
+        when(projects.findById(12L)).thenReturn(Optional.of(project));
+
+        assertThat(access.export("acme", 100L, 8L, MissionDossierAccess.Format.JSON)).contains("{}");
+        verify(visibilityGuard).assertCanView(project, 8L);
+    }
+
+    @Test
+    @DisplayName("le projet existe, la personne ne le voit pas : refusé")
+    void a_private_project_stays_private() {
+        Project project = Project.builder().id(12L).build();
+        when(projects.findById(12L)).thenReturn(Optional.of(project));
+        doThrow(new ForbiddenException("no")).when(visibilityGuard).assertCanView(project, 8L);
+
+        assertThatThrownBy(() -> access.export("acme", 100L, 8L, MissionDossierAccess.Format.JSON)).isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    @DisplayName("le projet n'existe plus : la personne qui a délégué lit encore")
+    void after_the_project_the_delegator_reads() {
+        when(projects.findById(12L)).thenReturn(Optional.empty());
+
+        assertThat(access.export("acme", 100L, 7L, MissionDossierAccess.Format.JSON)).contains("{}");
+    }
+
+    @ParameterizedTest(name = "le projet n'existe plus, un {0} de l'espace lit encore")
+    @EnumSource(value = WorkspaceRole.class, names = {"OWNER", "ADMIN"})
+    void after_the_project_the_managers_read(WorkspaceRole role) {
+        when(projects.findById(12L)).thenReturn(Optional.empty());
+        role(9L, role);
+
+        assertThat(access.export("acme", 100L, 9L, MissionDossierAccess.Format.JSON)).contains("{}");
+    }
+
+    @Test
+    @DisplayName("le projet n'existe plus : un membre ordinaire ne lit plus")
+    void after_the_project_a_member_does_not() {
+        when(projects.findById(12L)).thenReturn(Optional.empty());
+        role(9L, WorkspaceRole.MEMBER);
+
+        assertThatThrownBy(() -> access.export("acme", 100L, 9L, MissionDossierAccess.Format.JSON)).isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    @DisplayName("un dossier d'un autre espace, ou une mission sans dossier, n'existe pas")
+    void other_workspaces_do_not_see_it() {
+        assertThatThrownBy(() -> access.export("other", 100L, 7L, MissionDossierAccess.Format.JSON))
+            .isInstanceOf(ResourceNotFoundException.class);
+        when(evidence.dossier(101L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> access.export("acme", 101L, 7L, MissionDossierAccess.Format.JSON))
+            .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("les trois formes : le dossier, sa page technique, son sceau seul")
+    void the_three_forms() {
+        when(projects.findById(12L)).thenReturn(Optional.empty());
+        when(evidence.dossierMarkdown(100L)).thenReturn(Optional.of("# md"));
+        when(evidence.envelope(100L)).thenReturn(Optional.of("{\"payloadType\":\"application/vnd.in-toto+json\"}"));
+
+        assertThat(access.export("acme", 100L, 7L, MissionDossierAccess.Format.MARKDOWN)).contains("# md");
+        assertThat(access.export("acme", 100L, 7L, MissionDossierAccess.Format.DSSE)).get().asString().contains("in-toto");
+    }
+
+    @Test
+    @DisplayName("effacer un texte : la personne qui a délégué")
+    void the_delegator_erases_a_text() {
+        when(projects.findById(12L)).thenReturn(Optional.of(Project.builder().id(12L).build()));
+        when(users.findById(7L)).thenReturn(Optional.of(ada));
+
+        access.eraseText("acme", 100L, HASH, 7L);
+
+        verify(evidence).eraseText(100L, HASH, ada);
+    }
+
+    @Test
+    @DisplayName("effacer un texte : un membre qui voit le projet ne le peut pas")
+    void a_member_does_not_erase() {
+        when(projects.findById(12L)).thenReturn(Optional.of(Project.builder().id(12L).build()));
+        role(9L, WorkspaceRole.MEMBER);
+
+        assertThatThrownBy(() -> access.eraseText("acme", 100L, HASH, 9L)).isInstanceOf(ForbiddenException.class);
+        verify(evidence, never()).eraseText(anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("la clé qui scelle les dossiers : un membre de l'espace la lit, une autre personne non")
+    void the_key_is_read_by_the_members() {
+        EvidenceSeal.Key key = new EvidenceSeal.Key("sha256:" + "b".repeat(64), "MCowBQYDK2VwAyEA", "same-machine", true);
+        when(workspaces.findBySlug("acme")).thenReturn(Optional.of(workspace));
+        when(signer.key()).thenReturn(key);
+        role(9L, WorkspaceRole.MEMBER);
+
+        assertThat(access.key("acme", 9L)).isEqualTo(key);
+
+        when(members.findByWorkspaceIdAndUserId(3L, 11L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> access.key("acme", 11L)).isInstanceOf(ForbiddenException.class);
+        when(workspaces.findBySlug("other")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> access.key("other", 9L)).isInstanceOf(ResourceNotFoundException.class);
+    }
+}

@@ -1,6 +1,7 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -103,9 +104,26 @@ class MissionResultServiceTest {
         DeliveryRun next = DeliveryRun.builder().id(200L).issue(run.getIssue()).providerKey("claude-code").build();
         var response = new DeliveryRunResponse(200L, 55L, "WEB-1", "t", 12L, "p", "claude-code", "sonnet", "QUEUED",
             null, null, null, false, 7L, null, null);
-        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L)).thenReturn(response);
+        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L, DeliveryService.Origin.followUp(100L)))
+            .thenReturn(response);
         when(runRepository.findById(200L)).thenReturn(Optional.of(next));
         return next;
+    }
+
+    /** Ce que le dernier geste de la personne a mis au dossier de la mission (TF-J2-7). */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Map<String, Object> gesture() {
+        ArgumentCaptor<Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(evidenceService, org.mockito.Mockito.atLeastOnce()).appendAfterEnd(eq(run), eq("human.decision"),
+            eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        return data.getValue();
+    }
+
+    /** La mission qu'une relance fait partir : elle vient de la mission 100 (TF-J2-7). */
+    private void retried() {
+        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L, DeliveryService.Origin.retry(100L)))
+            .thenReturn(new DeliveryRunResponse(201L, 55L, "WEB-1", "t", 12L, "p", "claude-code", "sonnet", "QUEUED",
+                null, null, null, false, 7L, null, null));
     }
 
     @Test
@@ -141,7 +159,7 @@ class MissionResultServiceTest {
 
         assertThatThrownBy(() -> service.askForChanges("acme", 100L, 7L, COMMENTS)).isInstanceOf(BusinessException.class);
 
-        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong());
+        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong(), any());
         assertThat(run.getOutcome()).isNull();
     }
 
@@ -154,7 +172,7 @@ class MissionResultServiceTest {
         assertThatThrownBy(() -> service.askForChanges("acme", 100L, 7L, COMMENTS))
             .isInstanceOf(BusinessException.class).hasMessageContaining("already merged or closed");
 
-        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong());
+        verify(deliveryService, never()).delegate(any(), anyLong(), any(), any(), anyLong(), any());
     }
 
     @Test
@@ -179,6 +197,30 @@ class MissionResultServiceTest {
         assertThat(run.getOutcomeBy()).isEqualTo(delegator);
         assertThat(run.getOutcomeAt()).isNotNull();
         verify(mergedPullRequests).completeIssue(55L, 7L);
+        // La décision de fin au dossier : qui (l'acteur), où, sur quelle pull request (TF-J2-7, R212 rubrique 6).
+        assertThat(gesture()).containsEntry("decision", "APPLY").containsEntry("where", "taskforce")
+            .containsEntry("pullRequest", "https://github.com/acme/website/pull/212").containsEntry("merged", true)
+            .containsEntry("testsFailed", false).doesNotContainKey("reason");
+    }
+
+    @Test
+    @DisplayName("Discard et Mark as done : la raison que la personne donne entre au dossier avec le geste")
+    void gestures_keep_their_reason() {
+        service.discard("acme", 100L, 7L, "  Not the right approach.  ");
+
+        assertThat(gesture()).containsEntry("decision", "DISCARD").containsEntry("reason", "Not the right approach.")
+            .containsEntry("pullRequest", "https://github.com/acme/website/pull/212");
+    }
+
+    @Test
+    @DisplayName("Mark as done : le geste et sa raison entrent au dossier")
+    void mark_done_keeps_its_reason() {
+        run.setResultUrl(null);
+        run.setCommits(0);
+
+        service.markDone("acme", 100L, 7L, "Already fixed in #210");
+
+        assertThat(gesture()).containsEntry("decision", "MARK_DONE").containsEntry("reason", "Already fixed in #210");
     }
 
     @Test
@@ -282,12 +324,17 @@ class MissionResultServiceTest {
                 run.setResultUrl(null);
                 service.markDone("acme", 100L, 7L);
             }
-            default -> service.retry("acme", 100L, 7L, null);
+            default -> {
+                retried();
+                service.retry("acme", 100L, 7L, null);
+            }
         }
 
         verify(issueService).logActivity(run.getIssue(), delegator, expected, null, null, null);
         // Le geste change la mission : le topic des missions du projet le dit (R166).
         verify(feed).run(run);
+        // Et il entre au dossier de la mission, où il a été pris (TF-J2-7).
+        assertThat(gesture()).containsEntry("where", "taskforce");
     }
 
     @ParameterizedTest(name = "branche [{0}], {1} commits : l'issue terminée, sans rien fusionner ni fermer")
@@ -418,29 +465,36 @@ class MissionResultServiceTest {
     @Test
     @DisplayName("Try again : le résultat est écarté, la remarque va sur l'issue, une nouvelle mission part")
     void retry_posts_the_note_and_delegates_again() {
+        retried();
+
         service.retry("acme", 100L, 7L, "  Keep the old link for Privacy.  ");
 
         verify(pullRequests).close(1L, "acme/website", 212);
         ArgumentCaptor<CreateIssueCommentRequest> comment = ArgumentCaptor.forClass(CreateIssueCommentRequest.class);
         verify(issueService).addComment(eq("acme"), eq(12L), eq(55L), comment.capture(), eq(7L));
         assertThat(comment.getValue().getContent()).isEqualTo("Try again: Keep the old link for Privacy.");
-        verify(deliveryService).delegate("acme", 55L, "claude-code", "sonnet", 7L);
         assertThat(run.getOutcome()).isEqualTo(DeliveryRunOutcome.RETRIED);
+        // Le geste et sa raison entrent au dossier de la mission, avec la mission qui repart (TF-J2-7).
+        Map<String, Object> gesture = gesture();
+        assertThat(gesture).containsEntry("decision", "RETRY").containsEntry("where", "taskforce")
+            .containsEntry("reason", "Keep the old link for Privacy.").containsEntry("nextRun", 201L);
     }
 
     @Test
     @DisplayName("Try again sans remarque : rien n'est posté, la mission repart")
     void retry_without_a_note() {
+        retried();
+
         service.retry("acme", 100L, 7L, " ");
 
         verify(issueService, never()).addComment(any(), any(), any(), any(), any());
-        verify(deliveryService).delegate("acme", 55L, "claude-code", "sonnet", 7L);
+        assertThat(gesture()).containsEntry("decision", "RETRY").doesNotContainKey("reason");
     }
 
     @Test
     @DisplayName("Try again refusé par l'agent : la pull request reste ouverte, le résultat reste à trancher")
     void retry_refused_by_the_agent_keeps_the_pull_request() {
-        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L))
+        when(deliveryService.delegate("acme", 55L, "claude-code", "sonnet", 7L, DeliveryService.Origin.retry(100L)))
             .thenThrow(new BusinessException("Start the runner on your computer first."));
 
         assertThatThrownBy(() -> service.retry("acme", 100L, 7L, "Keep the Privacy link"))

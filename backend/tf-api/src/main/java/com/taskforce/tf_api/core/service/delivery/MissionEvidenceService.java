@@ -2,6 +2,8 @@ package com.taskforce.tf_api.core.service.delivery;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -9,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,21 +19,51 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceHeader;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceIntake;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.DeliveryRunEvidence;
+import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.IssueChecklistItem;
+import com.taskforce.tf_api.core.model.MissionDossier;
+import com.taskforce.tf_api.core.model.MissionDossierSeal;
+import com.taskforce.tf_api.core.model.MissionDossierText;
+import com.taskforce.tf_api.core.model.Project;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.DeliveryRunEvidenceRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
+import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
+import com.taskforce.tf_api.shared.exception.BusinessException;
+import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Le dossier de preuve d'une mission (spécification de la v2, §9 ; {@code contracts/evidence/}) : un journal chaîné,
- * calculé ici, à la réception, dans l'ordre. Chaque ajout verrouille le run : deux ajouts ne se croisent jamais, et
- * le runner ne peut pas réécrire l'histoire.
+ * Le dossier de preuve d'une mission (spécification de la v2, §9 ; {@code contracts/evidence/} ; TF-J2-7) : un journal
+ * chaîné, calculé ici, à la réception, dans l'ordre. Chaque ajout verrouille la mission et son dossier : deux ajouts ne
+ * se croisent jamais, et le runner ne peut pas réécrire l'histoire.
+ *
+ * <p>Ce que le dossier garde (R198, R198 amendée, R212) : la demande telle qu'elle était au départ, le modèle réellement
+ * lancé, la règle de chaque action et sa version, chaque accord sur l'action exacte, les vérifications, les gestes de la
+ * personne sur le résultat, et le résultat. Il pend à sa propre ligne ({@link MissionDossier}) : supprimer l'issue ne
+ * l'efface pas, et la base refuse de le modifier (V135). Un texte sensible (la demande, ce que l'agent raconte, son
+ * résumé) n'y entre que par son empreinte ; il vit à côté, et s'efface sans casser la chaîne. Un lot d'événements perdu
+ * en route laisse une marque. Chaque fin, et chaque geste après elle, pose un sceau : l'en-tête et la tête de la chaîne,
+ * signés ({@link EvidenceSeal}). L'en-tête d'un export se tire de la chaîne ({@link EvidenceHeader}).</p>
  *
  * <p>Jackson 2, comme {@link EvidenceChain} : le dossier sort en texte, jamais comme arbre rendu par un contrôleur.</p>
  */
@@ -39,20 +72,119 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MissionEvidenceService {
 
-    public static final String FORMAT = "taskforce-evidence/1";
+    public static final String FORMAT = EvidenceSeal.FORMAT;
     /** Plafond du dossier d'un run, bien au-delà de la chronologie affichée : atteint, un dernier événement le dit. */
     static final int MAX_EVENTS = 10_000;
     static final String LIMIT_REACHED = "limit.reached";
+    /** Ce qu'un événement garde d'un texte en clair (une commande, une erreur), et d'un fait jugé. */
+    static final int MAX_TEXT = 2_000;
+    /** Ce que le dossier garde du résumé de l'agent, à côté de la chaîne. */
+    static final int MAX_SUMMARY = 8_000;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    /** Type de l'événement du dossier pour chaque sorte d'événement du runner. */
+    private static final Map<String, String> RUNNER_TYPE = Map.ofEntries(
+        Map.entry("start", "note"), Map.entry("text", "note"), Map.entry("tool", "action.requested"),
+        Map.entry("error", "action.result"), Map.entry("denied", "action.decided"), Map.entry("decision", "action.decided"),
+        Map.entry("exit", "exit.result"), Map.entry("limit", "limit.reached"), Map.entry("test", "test.result"),
+        Map.entry("brief", "note"), Map.entry("agent", "note"));
+
     private final DeliveryRunEvidenceRepository repository;
     private final DeliveryRunRepository runRepository;
+    private final MissionDossierRepository dossiers;
+    private final MissionDossierSealRepository seals;
+    private final MissionDossierTextRepository texts;
+    private final HarnessRuleSetRepository ruleSets;
+    private final IssueChecklistItemRepository checklist;
+    private final EvidenceSigner signer;
+    private final ApplicationEventPublisher publisher;
 
     /** Qui agit : {@code agent}, {@code person}, {@code rule}, {@code runner} ou {@code server}, et son identifiant. */
     public record Actor(String kind, String id) {
         public static final Actor SERVER = new Actor("server", "taskforce");
     }
+
+    // --------------------------------------------------------------------- ouvrir
+
+    /**
+     * Ouvre le dossier d'une mission qui part : sa ligne, avec le paquet de règles tel qu'il part avec elle, puis
+     * {@code mission.started}, qui porte tout l'en-tête et la demande telle qu'elle est au départ (R198) : le titre et la
+     * description par leur empreinte (leur texte à côté), qui a écrit la demande et quand, d'où vient la mission, la
+     * personne qui a délégué et qui en répond, l'agent et le modèle choisis, les règles avec l'auteur de chaque couche.
+     *
+     * @param extras ce qu'une reprise ajoute (la mission qu'elle continue, ses commentaires), ou vide
+     */
+    @Transactional
+    public void open(DeliveryRun run, RulesBundle rules, String runner, Map<String, Object> extras) {
+        Issue issue = run.getIssue();
+        Project project = issue.getProject();
+        MissionDossier dossier = dossiers.findById(run.getId()).orElse(null);
+        String bundle = rules == null ? null : json(rules);
+        if (dossier == null) {
+            // Écrite tout de suite : les textes et les événements, insérés aussitôt, la désignent.
+            dossiers.saveAndFlush(newDossier(run, bundle));
+        } else if (dossier.getRulesBundle() == null && bundle != null) {
+            dossier.setRulesBundle(bundle);
+            dossiers.saveAndFlush(dossier);
+        }
+        String delegator = run.getStartedBy() == null ? null : run.getStartedBy().getEmail();
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("title", ref(run.getId(), "title", issue.getTitle()));
+        request.put("description", ref(run.getId(), "description", blankToNull(issue.getDescription())));
+        request.put("reporter", issue.getReporter() == null ? null : issue.getReporter().getEmail());
+        request.put("createdAt", utc(issue.getCreatedAt()));
+        request.put("importedFrom", issue.getImportedFrom());
+        Map<String, Object> origin = new LinkedHashMap<>();
+        origin.put("channel", run.getOrigin());
+        origin.put("run", run.getOriginRunId());
+        Map<String, Object> agent = new LinkedHashMap<>();
+        agent.put("kind", run.getProviderKey());
+        agent.put("model", run.getModel());
+        Map<String, Object> started = new LinkedHashMap<>();
+        started.put("mission", run.getId());
+        started.put("workspace", project.getWorkspace().getSlug());
+        started.put("project", project.getId());
+        started.put("issue", key(issue));
+        started.put("request", request);
+        started.put("requestedBy", delegator);
+        // Seule la personne qui a délégué tranche le résultat : c'est elle qui répond de la mission.
+        started.put("accountable", delegator);
+        started.put("delegatedAt", utc(run.getCreatedAt()));
+        started.put("origin", origin);
+        started.put("agent", agent);
+        started.put("rules", rules == null ? null : rulesData(rules, project.getWorkspace().getId()));
+        started.put("runner", runner);
+        started.put("taskforce", null);
+        if (extras != null) {
+            started.putAll(extras);
+        }
+        append(run, "mission.started", Actor.SERVER, started);
+    }
+
+    /** Les règles de la mission telles que le dossier les garde : version, empreinte, et chaque couche avec son auteur. */
+    private Map<String, Object> rulesData(RulesBundle rules, Long workspaceId) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("version", rules.version());
+        data.put("digest", rules.digest());
+        List<Map<String, Object>> layers = new ArrayList<>();
+        if (rules.layers() != null) {
+            for (RulesBundle.Layer layer : rules.layers()) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("scope", layer.scope());
+                entry.put("ref", layer.ref());
+                entry.put("version", layer.version());
+                entry.put("digest", layer.digest());
+                entry.put("author", ruleSets.findByWorkspaceIdAndVersion(workspaceId, layer.version())
+                    .map(set -> set.getCreatedBy() == null ? null : set.getCreatedBy().getEmail()).orElse(null));
+                layers.add(entry);
+            }
+        }
+        data.put("layers", layers);
+        return data;
+    }
+
+    // --------------------------------------------------------------------- ajouter
 
     /**
      * Ajoute un événement à la suite du dossier et rend son empreinte. Le dossier plein, l'avant-dernière place reste
@@ -61,62 +193,334 @@ public class MissionEvidenceService {
     @Transactional
     public Optional<String> append(DeliveryRun run, String type, Actor actor, Map<String, ?> data) {
         runRepository.findByIdForUpdate(run.getId());
-        Optional<DeliveryRunEvidence> last = repository.findTopByRunIdOrderBySeqDesc(run.getId());
+        ensureDossier(run);
+        return appendTo(run.getId(), type, actor, data);
+    }
+
+    /** L'ajout lui-même, sur le dossier verrouillé : la mission peut ne plus exister. */
+    private Optional<String> appendTo(Long runId, String type, Actor actor, Map<String, ?> data) {
+        dossiers.findByIdForUpdate(runId);
+        Optional<DeliveryRunEvidence> last = repository.findTopByRunIdOrderBySeqDesc(runId);
         int seq = last.map(DeliveryRunEvidence::getSeq).orElse(0) + 1;
         if (seq > MAX_EVENTS) {
             return Optional.empty();
         }
         if (seq == MAX_EVENTS && !LIMIT_REACHED.equals(type)) {
-            log.warn("Run {} : dossier de preuve plein ({} événements)", run.getId(), MAX_EVENTS);
+            log.warn("Run {} : dossier de preuve plein ({} événements)", runId, MAX_EVENTS);
             type = LIMIT_REACHED;
             actor = Actor.SERVER;
             data = Map.of("max", MAX_EVENTS, "text", "The evidence of this mission is full: later events are not kept.");
         }
         String prev = last.map(DeliveryRunEvidence::getHash).orElse(EvidenceChain.ZERO_HASH);
         String at = EvidenceChain.AT.format(Instant.now());
-        ObjectNode content = JSON.valueToTree(data);
-        String hash = EvidenceChain.link(prev, EvidenceChain.event(seq, at, type, actor.kind(), actor.id(), content)).get("hash").asText();
+        // Ce qui entre dans l'empreinte est du I-JSON : la RFC 8785 et tout outil JCS y retrouvent la même chaîne.
+        JsonNode content = EvidenceIntake.of(JSON.valueToTree(data == null ? Map.of() : data));
+        String actorId = EvidenceIntake.clip(EvidenceIntake.text(actor.id()), 255);
+        String hash = EvidenceChain.link(prev, EvidenceChain.event(seq, at, type, actor.kind(), actorId, content)).get("hash").asText();
         repository.save(DeliveryRunEvidence.builder()
-            .run(run).seq(seq).at(at).type(type).actorKind(actor.kind()).actorId(actor.id())
+            .runId(runId).seq(seq).at(at).type(type).actorKind(actor.kind()).actorId(actorId)
             .data(CanonicalJson.of(content)).prev(prev).hash(hash)
             .build());
         return Optional.of(hash);
     }
 
     /**
-     * Fin de mission : l'événement qui la clôt, puis l'empreinte racine posée sur le run, qui scelle le dossier. Rien
-     * pour un run sans dossier (autres fournisseurs, runs de la v1).
+     * Un événement du runner (TF-J2-7) : numéroté chez lui, il dit s'il en manque. Un numéro déjà reçu (un lot renvoyé
+     * après une réponse perdue) n'est gardé ni au dossier ni à la chronologie ; un numéro qui saute laisse d'abord au
+     * dossier la marque des événements qui ne sont jamais arrivés. Rend faux pour un doublon.
+     */
+    @Transactional
+    public boolean runnerEvent(DeliveryRun run, RunnerEventsRequest.Event event) {
+        ensureDossier(run);
+        Integer n = event.n();
+        if (n != null) {
+            int last = run.getEvidenceRunnerSeq();
+            if (n <= last) {
+                return false;
+            }
+            if (n > last + 1) {
+                gap(run, last + 1, n - 1);
+            }
+            run.setEvidenceRunnerSeq(n);
+        }
+        append(run, RUNNER_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event), dataOf(run.getId(), event));
+        return true;
+    }
+
+    /** Ce que le runner dit à la fin : combien d'événements il a numérotés, la session brute de l'agent, son dernier commit. */
+    @Transactional
+    public void runnerReport(DeliveryRun run, RunnerResultRequest result) {
+        if (repository.findTopByRunIdOrderBySeqDesc(run.getId()).isEmpty()) {
+            return;
+        }
+        Integer sent = result.events();
+        int received = run.getEvidenceRunnerSeq();
+        if (sent != null && sent > received) {
+            gap(run, received + 1, sent);
+            run.setEvidenceRunnerSeq(sent);
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "runner");
+        data.put("sent", sent);
+        data.put("received", received);
+        if (result.session() != null) {
+            Map<String, Object> session = new LinkedHashMap<>();
+            session.put("id", result.session().id());
+            session.put("sha256", result.session().sha256());
+            session.put("bytes", result.session().bytes());
+            session.put("kept", "runner");
+            data.put("session", session);
+        }
+        data.put("head", result.head());
+        append(run, "note", runnerActor(run), data);
+    }
+
+    /** La marque d'un trou : les numéros du runner qui ne sont jamais arrivés. */
+    private void gap(DeliveryRun run, int from, int to) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "gap");
+        data.put("from", from);
+        data.put("to", to);
+        data.put("text", to == from
+            ? "Event " + from + " from the runner never arrived."
+            : "Events " + from + " to " + to + " from the runner never arrived.");
+        log.warn("Run {} : événements {} à {} du runner jamais reçus", run.getId(), from, to);
+        append(run, "note", Actor.SERVER, data);
+    }
+
+    /** Qui agit : la règle pour ses décisions, le runner pour les sorties, les tests, le brief et le plafond, l'agent pour le reste. */
+    private static Actor actorOf(DeliveryRun run, RunnerEventsRequest.Event event) {
+        return switch (event.kind()) {
+            case "decision" -> new Actor("rule", event.rule() == null || event.rule().isBlank() ? "none" : event.rule().strip());
+            case "exit", "limit", "test", "brief" -> runnerActor(run);
+            default -> new Actor("agent", run.getProviderKey());
+        };
+    }
+
+    /**
+     * Ce que le dossier garde d'un événement du runner. Ce que l'agent raconte, et le brief, n'y entrent que par leur
+     * empreinte ; une décision garde les faits jugés et l'empreinte de l'action exacte ; les tests, leur résultat et
+     * l'empreinte de leur sortie.
+     */
+    private Map<String, Object> dataOf(Long runId, RunnerEventsRequest.Event event) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", event.kind());
+        switch (event.kind()) {
+            case "text" -> data.put("text", ref(runId, "text", event.text()));
+            case "brief" -> data.put("brief", ref(runId, "brief", event.body() != null ? event.body() : event.text()));
+            case "agent" -> {
+                RunnerEventsRequest.Agent agent = event.agent();
+                data.put("version", agent == null ? null : blankToNull(agent.version()));
+                data.put("model", agent == null ? null : blankToNull(agent.model()));
+                data.put("session", agent == null ? null : blankToNull(agent.session()));
+                data.put("provider", agent == null ? null : blankToNull(agent.provider()));
+                // Anthropic ne donne pas d'empreinte du modèle servi : la version datée du modèle en tient lieu.
+                data.put("fingerprint", null);
+                data.put("text", EvidenceIntake.clip(event.text(), MAX_TEXT));
+            }
+            default -> {
+                data.put("tool", blankToNull(event.tool()));
+                data.put("text", EvidenceIntake.clip(event.text() == null ? "" : event.text().strip(), MAX_TEXT));
+            }
+        }
+        if (event.effect() != null) data.put("effect", event.effect());
+        // La règle d'une sortie (git push, la pull request) : celle d'une décision est son acteur.
+        if (event.rule() != null && !event.rule().isBlank() && !"decision".equals(event.kind())) data.put("rule", event.rule().strip());
+        if ("denied".equals(event.kind())) data.put("effect", "deny");
+        if ("error".equals(event.kind())) data.put("ok", false);
+        if (event.facts() != null && !event.facts().isEmpty()) data.put("facts", facts(event.facts()));
+        if (event.input() != null) data.put("input", event.input());
+        if (event.written() != null) data.put("written", written(event.written()));
+        if (event.test() != null) {
+            RunnerEventsRequest.Test test = event.test();
+            data.put("command", EvidenceIntake.clip(test.command(), 500));
+            // Aucune commande de test pour le projet : rien n'a été testé, et la page le dit (R212, rubrique 5).
+            data.put("configured", !Boolean.FALSE.equals(test.configured()));
+            data.put("ran", test.ran());
+            data.put("passed", test.passed());
+            data.put("passedCount", test.passedCount());
+            data.put("total", test.total());
+            if (test.output() != null) {
+                Map<String, Object> output = new LinkedHashMap<>();
+                output.put("sha256", test.output());
+                output.put("bytes", test.outputBytes());
+                output.put("kept", "runner");
+                data.put("output", output);
+            }
+        }
+        return data;
+    }
+
+    /** Les faits jugés, bornés : de quoi rejuger l'action avec le paquet exporté. */
+    static List<Map<String, String>> facts(List<Map<String, String>> facts) {
+        List<Map<String, String>> out = new ArrayList<>();
+        for (Map<String, String> part : facts) {
+            Map<String, String> clean = new LinkedHashMap<>();
+            if (part != null) {
+                part.forEach((k, v) -> {
+                    if (k != null && v != null) clean.put(k, EvidenceIntake.clip(v, MAX_TEXT));
+                });
+            }
+            out.add(clean);
+        }
+        return out;
+    }
+
+    static Map<String, Object> written(RunnerEventsRequest.Written written) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("path", written.path());
+        data.put("sha256", written.sha256());
+        data.put("bytes", written.bytes());
+        return data;
+    }
+
+    /**
+     * Un texte gardé à côté de la chaîne : la chaîne n'en porte que l'empreinte et la longueur. Un texte vide ou absent
+     * n'a pas de référence.
+     */
+    Map<String, Object> ref(Long runId, String kind, String text) {
+        if (text == null) {
+            return null;
+        }
+        String clean = EvidenceIntake.text(text);
+        String hash = EvidenceChain.sha256(clean);
+        if (!texts.existsByRunIdAndHash(runId, hash)) {
+            texts.save(MissionDossierText.builder().runId(runId).hash(hash).kind(kind).body(clean).build());
+        }
+        Map<String, Object> ref = new LinkedHashMap<>();
+        ref.put("sha256", hash);
+        ref.put("chars", clean.codePointCount(0, clean.length()));
+        return ref;
+    }
+
+    // --------------------------------------------------------------------- finir, sceller
+
+    /**
+     * Fin de mission : l'état de la liste de l'issue, l'événement qui la clôt, puis l'empreinte racine posée sur le run et
+     * le sceau. Rien pour un run sans dossier (autres fournisseurs, runs de la v1).
      */
     @Transactional
     public void end(DeliveryRun run, DeliveryPoll poll) {
         if (repository.findTopByRunIdOrderBySeqDesc(run.getId()).isEmpty()) {
             return;
         }
+        checklistAtEnd(run);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", poll.status().name());
-        data.put("summary", clip(poll.summary()));
+        // Le seul texte de l'agent que la page montre (R212, rubrique 2), gardé à côté de la chaîne.
+        data.put("summary", ref(run.getId(), "summary", EvidenceIntake.clip(blankToNull(poll.summary()), MAX_SUMMARY)));
         data.put("resultUrl", poll.resultUrl());
-        data.put("error", clip(poll.error()));
+        data.put("error", EvidenceIntake.clip(poll.error(), MAX_TEXT));
+        data.put("branch", run.getBranch());
+        data.put("commits", run.getCommits());
         String root = append(run, "mission.ended", Actor.SERVER, data)
             .or(() -> repository.findTopByRunIdOrderBySeqDesc(run.getId()).map(DeliveryRunEvidence::getHash))
             .orElse(null);
         run.setEvidenceRoot(root);
+        seal(run.getId(), true);
     }
 
     /**
-     * Un geste qui vient après la fin de la mission (R139 : un fichier remis, des changements demandés) : il s'ajoute à la
-     * suite de la chaîne, et le sceau passe à ce dernier maillon. Une copie exportée avant reste un début exact du dossier :
-     * rien n'est réécrit, chaque empreinte tient toujours.
+     * La liste de l'issue à la fin de la mission : chaque ligne, cochée ou non, son texte par son empreinte. Avec les
+     * coches que l'agent a faites pendant la mission (au dossier, {@link #checked}), la page distingue ce que l'agent
+     * déclare de ce qu'une personne a coché.
+     */
+    private void checklistAtEnd(DeliveryRun run) {
+        Issue issue = run.getIssue();
+        if (issue == null || issue.getId() == null) {
+            return;
+        }
+        List<IssueChecklistItem> items = checklist.findByIssueIdOrderByPositionAscIdAsc(issue.getId());
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (IssueChecklistItem item : items) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", item.getId());
+            entry.put("text", ref(run.getId(), "checklist", item.getContent()));
+            entry.put("done", item.isDone());
+            list.add(entry);
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "checklist");
+        data.put("items", list);
+        append(run, "note", Actor.SERVER, data);
+    }
+
+    /** L'agent d'une mission vient de cocher, ou de décocher, une ligne de la liste de son issue : il le déclare. */
+    @Transactional
+    public void checked(DeliveryRun run, IssueChecklistItem item) {
+        if (repository.findTopByRunIdOrderBySeqDesc(run.getId()).isEmpty()) {
+            return;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "checklist.checked");
+        data.put("item", item.getId());
+        data.put("text", ref(run.getId(), "checklist", item.getContent()));
+        data.put("done", item.isDone());
+        append(run, "note", new Actor("agent", run.getProviderKey()), data);
+    }
+
+    /**
+     * Un geste qui vient après la fin de la mission (R139 : un fichier remis, des changements demandés ; TF-J2-7 : Apply,
+     * Discard, Try again, Mark as done, le témoin) : il s'ajoute à la suite de la chaîne, le sceau passe à ce dernier
+     * maillon, et un nouveau sceau le couvre. Une copie exportée avant reste un début exact du dossier : rien n'est
+     * réécrit, chaque empreinte tient toujours.
      */
     @Transactional
     public void appendAfterEnd(DeliveryRun run, String type, Actor actor, Map<String, ?> data) {
         Optional<String> hash = append(run, type, actor, data);
-        if (run.getEvidenceRoot() != null) hash.ifPresent(run::setEvidenceRoot);
+        if (run.getEvidenceRoot() != null && hash.isPresent()) {
+            run.setEvidenceRoot(hash.get());
+            seal(run.getId(), false);
+        }
     }
 
-    private static String clip(String text) {
-        return text == null || text.length() <= 2000 ? text : text.substring(0, 1997) + "...";
+    /** La même chose sur un dossier dont la mission peut ne plus exister (un texte effacé, le témoin). */
+    @Transactional
+    public void appendToDossier(Long runId, String type, Actor actor, Map<String, ?> data) {
+        DeliveryRun run = runRepository.findByIdForUpdate(runId).orElse(null);
+        if (run != null) {
+            appendAfterEnd(run, type, actor, data);
+            return;
+        }
+        Optional<String> hash = appendTo(runId, type, actor, data);
+        if (hash.isPresent() && seals.findTopByRunIdOrderBySeqDesc(runId).isPresent()) {
+            seal(runId, false);
+        }
     }
+
+    /**
+     * Scelle le dossier à sa tête : l'énoncé in-toto (l'en-tête, la tête, son rang, l'heure, la clé et sa garde) signé
+     * en Ed25519 sous une enveloppe DSSE. Un sceau par rang, jamais réécrit. Celui de la fin annonce la mission scellée :
+     * sa tête s'écrit chez un témoin.
+     */
+    void seal(Long runId, boolean atEnd) {
+        MissionDossier dossier = dossiers.findById(runId).orElse(null);
+        List<ObjectNode> events = events(runId);
+        if (dossier == null || events.isEmpty()) {
+            return;
+        }
+        ObjectNode last = events.getLast();
+        int seq = last.get("seq").asInt();
+        String root = last.get("hash").asText();
+        if (seals.existsByRunIdAndSeq(runId, seq)) {
+            return;
+        }
+        String at = EvidenceChain.AT.format(Instant.now());
+        ObjectNode statement = EvidenceSeal.statement(header(dossier, events), root, seq, at, signer.key());
+        byte[] payload = EvidenceSeal.payload(statement);
+        byte[] signature = signer.sign(EvidenceSeal.pae(EvidenceSeal.PAYLOAD_TYPE, payload));
+        ObjectNode envelope = EvidenceSeal.envelope(payload, signer.key().id(), signature);
+        seals.save(MissionDossierSeal.builder().runId(runId).seq(seq).root(root).sealedAt(at).keyId(signer.key().id())
+            .envelope(envelope.toString()).build());
+        if (atEnd) {
+            publisher.publishEvent(new MissionSealed(runId, root, seq));
+        }
+    }
+
+    // --------------------------------------------------------------------- lire, exporter
 
     /** Les événements du dossier tels qu'un export les montre : avec {@code prev} et {@code hash}. */
     @Transactional(readOnly = true)
@@ -131,43 +535,69 @@ public class MissionEvidenceService {
         return events;
     }
 
-    /** Le dossier au format {@code taskforce-evidence/1}, ou vide si la mission n'a pas d'événement (run de la v1). */
+    /** Le dossier d'une mission, s'il en a un : il peut survivre à la mission. */
     @Transactional(readOnly = true)
-    public Optional<String> dossierJson(DeliveryRun run) {
-        List<ObjectNode> events = events(run.getId());
-        if (events.isEmpty()) {
+    public Optional<MissionDossier> dossier(Long runId) {
+        return dossiers.findById(runId);
+    }
+
+    /**
+     * Le dossier au format {@code taskforce-evidence/1}, ou vide si la mission n'en a pas (run de la v1) : l'en-tête tiré
+     * de la chaîne, les événements, la racine, le paquet de règles de la mission, les textes gardés à côté (sauf ceux qu'on
+     * a effacés), et le dernier sceau. Rien n'y est lu de la mission ni de son issue : il s'exporte encore après elles.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> dossierJson(Long runId) {
+        MissionDossier dossier = dossiers.findById(runId).orElse(null);
+        List<ObjectNode> events = events(runId);
+        if (dossier == null || events.isEmpty()) {
             return Optional.empty();
         }
         ObjectNode file = JSON.createObjectNode();
         file.put("format", FORMAT);
-        file.set("mission", mission(run));
+        file.set("mission", header(dossier, events));
         ArrayNode list = file.putArray("events");
         events.forEach(list::add);
         file.put("root", events.getLast().get("hash").asText());
-        try {
-            return Optional.of(JSON.writerWithDefaultPrettyPrinter().writeValueAsString(file));
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Evidence file could not be written", e);
+        if (dossier.getRulesBundle() != null) {
+            file.set("rules", parse(dossier.getRulesBundle()));
         }
+        ObjectNode kept = JSON.createObjectNode();
+        for (MissionDossierText text : texts.findByRunIdOrderByIdAsc(runId)) {
+            if (text.getBody() != null) kept.put(text.getHash(), text.getBody());
+        }
+        file.set("texts", kept);
+        seals.findTopByRunIdOrderBySeqDesc(runId).ifPresent(seal -> file.set("seal", parse(seal.getEnvelope())));
+        return Optional.of(write(file));
+    }
+
+    /** Le dernier sceau du dossier, seul : l'enveloppe DSSE de l'énoncé in-toto, que les outils standard lisent. */
+    @Transactional(readOnly = true)
+    public Optional<String> envelope(Long runId) {
+        return seals.findTopByRunIdOrderBySeqDesc(runId).map(MissionDossierSeal::getEnvelope)
+            .map(envelope -> write(parse(envelope)));
     }
 
     /** Le même dossier, lisible par une personne, avec le résultat du recalcul de la chaîne au moment de l'export. */
     @Transactional(readOnly = true)
-    public Optional<String> dossierMarkdown(DeliveryRun run) {
-        List<ObjectNode> events = events(run.getId());
-        if (events.isEmpty()) {
+    public Optional<String> dossierMarkdown(Long runId) {
+        MissionDossier dossier = dossiers.findById(runId).orElse(null);
+        List<ObjectNode> events = events(runId);
+        if (dossier == null || events.isEmpty()) {
             return Optional.empty();
         }
-        ObjectNode mission = mission(run);
+        ObjectNode mission = header(dossier, events);
         int broken = EvidenceChain.firstBrokenLink(events);
+        Optional<MissionDossierSeal> seal = seals.findTopByRunIdOrderBySeqDesc(runId);
         StringBuilder md = new StringBuilder();
-        md.append("# Evidence of mission ").append(run.getId());
+        md.append("# Evidence of mission ").append(runId);
         if (!mission.path("issue").isNull()) md.append(": ").append(mission.path("issue").asText());
         md.append("\n\n");
         md.append("- Workspace: ").append(mission.path("workspace").asText()).append('\n');
         md.append("- Requested by: ").append(mission.path("requestedBy").asText()).append('\n');
         md.append("- Agent: ").append(mission.path("agent").path("kind").asText());
         if (!mission.path("agent").path("model").isNull()) md.append(", model ").append(mission.path("agent").path("model").asText());
+        if (!mission.path("agent").path("version").isNull()) md.append(", version ").append(mission.path("agent").path("version").asText());
         md.append('\n');
         md.append("- Rules: version ").append(mission.path("rules").path("version").asText())
             .append(", `").append(mission.path("rules").path("digest").asText()).append("`\n");
@@ -175,7 +605,9 @@ public class MissionEvidenceService {
         md.append("- Durations: ").append(durations(events)).append('\n');
         md.append("- Chain: ").append(broken < 0
             ? "checked when exported, every hash holds."
-            : "BROKEN at event " + events.get(broken).get("seq").asInt() + ": this file was changed after it was written.").append("\n\n");
+            : "BROKEN at event " + events.get(broken).get("seq").asInt() + ": this file was changed after it was written.").append('\n');
+        md.append("- Seal: ").append(seal.map(s -> "event " + s.getSeq() + ", signed by key `" + s.getKeyId() + "` at "
+            + s.getSealedAt() + " (" + custodyWords() + ")").orElse("none yet: the mission has not ended.")).append("\n\n");
         md.append("| # | At (UTC) | Type | Actor | What |\n| --- | --- | --- | --- | --- |\n");
         for (ObjectNode e : events) {
             md.append("| ").append(e.get("seq").asInt())
@@ -186,31 +618,122 @@ public class MissionEvidenceService {
                 .append(" |\n");
         }
         md.append("\nTo check this file without TaskForce: each `hash` is the SHA-256 of `prev`, a line feed, then the ")
-            .append("canonical JSON of the event without its `hash` (contracts/README.md). The last one is the root.\n");
+            .append("canonical JSON of the event without its `hash` (contracts/README.md). The last one is the root. ")
+            .append("The JSON export carries the signed seal: `npm run verify -- evidence-run-").append(runId)
+            .append(".json` in taskforce-runner checks both.\n");
         return Optional.of(md.toString());
+    }
+
+    private String custodyWords() {
+        return EvidenceSeal.SEPARATE_MACHINE.equals(signer.key().custody())
+            ? "the operator declares the key is kept where no agent runs"
+            : "the key is on the same machine as the agent";
+    }
+
+    /**
+     * L'en-tête de l'export : ce que la chaîne en dit ({@link EvidenceHeader}), et pour un dossier ouvert avant la 1.18,
+     * ce qu'elle ne couvre pas, tiré de sa ligne.
+     */
+    ObjectNode header(MissionDossier dossier, List<ObjectNode> events) {
+        EvidenceHeader.Projection projection = EvidenceHeader.of(events);
+        ObjectNode from = projection.header();
+        ObjectNode header = JSON.createObjectNode();
+        header.set("id", projection.covered().contains("id") ? from.get("id") : JsonNodeFactory.instance.numberNode(dossier.getRunId()));
+        header.set("workspace", projection.covered().contains("workspace") ? from.get("workspace")
+            : JsonNodeFactory.instance.textNode(dossier.getWorkspace().getSlug()));
+        header.set("project", projection.covered().contains("project") ? from.get("project")
+            : dossier.getProjectId() == null ? JsonNodeFactory.instance.nullNode() : JsonNodeFactory.instance.numberNode(dossier.getProjectId()));
+        header.set("issue", projection.covered().contains("issue") ? from.get("issue")
+            : dossier.getIssueKey() == null ? JsonNodeFactory.instance.nullNode() : JsonNodeFactory.instance.textNode(dossier.getIssueKey()));
+        User delegator = dossier.getDelegatedBy();
+        header.set("requestedBy", projection.covered().contains("requestedBy") ? from.get("requestedBy")
+            : JsonNodeFactory.instance.textNode(delegator != null && delegator.getEmail() != null ? delegator.getEmail() : "unknown"));
+        header.set("agent", projection.covered().contains("agent") ? from.get("agent") : JSON.createObjectNode().putNull("kind"));
+        header.set("rules", projection.covered().contains("rules") ? from.get("rules") : JSON.createObjectNode());
+        header.set("runner", projection.covered().contains("runner") ? from.get("runner") : JsonNodeFactory.instance.nullNode());
+        header.set("taskforce", projection.covered().contains("taskforce") ? from.get("taskforce") : JsonNodeFactory.instance.nullNode());
+        return header;
+    }
+
+    // --------------------------------------------------------------------- effacer un texte
+
+    /**
+     * Efface un texte gardé à côté de la chaîne (R198 amendée, précision 4) : son empreinte reste dans la chaîne, qui
+     * tient toujours, et l'effacement s'y ajoute, avec qui et quand. Un texte déjà effacé ne change plus.
+     */
+    @Transactional
+    public void eraseText(Long runId, String hash, User by) {
+        MissionDossierText text = texts.findByRunIdAndHash(runId, hash)
+            .orElseThrow(() -> new ResourceNotFoundException("This text is not in the mission's evidence."));
+        if (text.getBody() == null) {
+            throw new BusinessException("This text was already erased.");
+        }
+        text.setBody(null);
+        text.setErasedAt(LocalDateTime.now());
+        text.setErasedBy(by);
+        texts.save(text);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "erased");
+        data.put("text", hash);
+        data.put("what", text.getKind());
+        appendToDossier(runId, "human.decision", new Actor("person", by.getEmail()), data);
     }
 
     // ---------------------------------------------------------------------
 
-    private ObjectNode mission(DeliveryRun run) {
-        var issue = run.getIssue();
-        var project = issue.getProject();
-        ObjectNode mission = JSON.createObjectNode();
-        mission.put("id", run.getId());
-        mission.put("workspace", project.getWorkspace().getSlug());
-        mission.put("project", project.getId());
-        mission.put("issue", project.getIdentifier() + "-" + issue.getSequenceNumber());
-        mission.put("requestedBy", run.getStartedBy() != null ? run.getStartedBy().getEmail() : "unknown");
-        ObjectNode agent = mission.putObject("agent");
-        agent.put("kind", run.getProviderKey());
-        agent.putNull("version");
-        agent.put("model", run.getModel());
-        ObjectNode rules = mission.putObject("rules");
-        rules.put("version", run.getRulesVersion());
-        rules.put("digest", run.getRulesDigest());
-        mission.put("runner", run.getClaimedBy());
-        mission.putNull("taskforce");
-        return mission;
+    private void ensureDossier(DeliveryRun run) {
+        if (!dossiers.existsById(run.getId())) {
+            dossiers.saveAndFlush(newDossier(run, null));
+        }
+    }
+
+    private static MissionDossier newDossier(DeliveryRun run, String rulesBundle) {
+        Issue issue = run.getIssue();
+        Project project = issue.getProject();
+        return MissionDossier.builder()
+            .runId(run.getId())
+            .workspace(project.getWorkspace())
+            .projectId(project.getId())
+            .issueId(issue.getId())
+            .issueKey(key(issue))
+            .delegatedBy(run.getStartedBy())
+            .rulesBundle(rulesBundle)
+            .createdAt(LocalDateTime.now())
+            .build();
+    }
+
+    private static String key(Issue issue) {
+        Project project = issue.getProject();
+        return project == null || issue.getSequenceNumber() == null ? null : project.getIdentifier() + "-" + issue.getSequenceNumber();
+    }
+
+    private static Actor runnerActor(DeliveryRun run) {
+        return new Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
+    }
+
+    /** Une date du serveur (UTC sans fuseau, comme l'API) au format de la chaîne. */
+    private static String utc(LocalDateTime at) {
+        return at == null ? null : EvidenceChain.AT.format(at.toInstant(ZoneOffset.UTC));
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private static String json(Object value) {
+        try {
+            return JSON.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Evidence value could not be written", e);
+        }
+    }
+
+    private static String write(JsonNode file) {
+        try {
+            return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(file);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Evidence file could not be written", e);
+        }
     }
 
     private static JsonNode parse(String json) {

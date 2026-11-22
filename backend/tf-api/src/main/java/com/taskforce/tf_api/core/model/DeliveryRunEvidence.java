@@ -2,12 +2,9 @@ package com.taskforce.tf_api.core.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,6 +15,9 @@ import lombok.NoArgsConstructor;
  * Un événement du dossier de preuve d'une mission (spécification de la v2, §9 ; contracts/evidence), ajouté et jamais
  * modifié. {@code at} et {@code data} sont gardés tels qu'ils entrent dans l'empreinte : texte ISO-8601 et JSON
  * canonique. Pas d'audit Spring : un événement n'a ni auteur technique ni mise à jour, son acteur fait partie du contenu.
+ *
+ * <p>Il pend au dossier de la mission ({@link MissionDossier}), pas à la mission : une issue supprimée emporte sa
+ * mission, jamais son dossier (V135). La base refuse de le modifier ou de l'effacer seul.</p>
  */
 @Entity
 @Table(name = "delivery_run_evidence")
@@ -31,9 +31,9 @@ public class DeliveryRunEvidence {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "run_id", nullable = false, updatable = false)
-    private DeliveryRun run;
+    /** La mission du dossier : un identifiant, plus une relation, puisque la mission peut ne plus exister. */
+    @Column(name = "run_id", nullable = false, updatable = false)
+    private Long runId;
 
     @Column(nullable = false, updatable = false)
     private Integer seq;

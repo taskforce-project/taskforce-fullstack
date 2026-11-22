@@ -17,4 +17,7 @@ public interface HarnessRuleSetRepository extends JpaRepository<HarnessRuleSet, 
      * première de sa couche dans cette liste. Un espace en écrit peu ; le paquet de chaque mission en dépend.
      */
     List<HarnessRuleSet> findByWorkspaceIdOrderByVersionDesc(Long workspaceId);
+
+    /** Une version de couche de l'espace par son numéro (unique dans l'espace) : le dossier d'une mission nomme son auteur. */
+    Optional<HarnessRuleSet> findByWorkspaceIdAndVersion(Long workspaceId, int version);
 }

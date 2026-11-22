@@ -50,6 +50,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.security.DelegatedAgent;
 import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.ProjectService;
@@ -997,7 +998,10 @@ public class IssueGestures {
             throw new BusinessException(named(issue) + " already has a mission at work: follow it with get_mission, or "
                 + "wait for its result before delegating again.");
         }
-        DeliveryRunResponse run = deliveryService.delegate(slug, issueId, provider.key(), null, userId);
+        // D'où vient la mission, pour son dossier : Cortex dans la conversation, ou un client du serveur MCP (Claude Code).
+        DeliveryService.Origin origin = CORTEX.equals(DelegatedAgent.current().orElse(null))
+            ? DeliveryService.Origin.CONVERSATION : DeliveryService.Origin.MCP;
+        DeliveryRunResponse run = deliveryService.delegate(slug, issueId, provider.key(), null, userId, origin);
         deliveryRunner.execute(run.id());
         return new Gesture("Delegated " + named(issue) + " to " + provider.displayName() + ". It starts when the runner "
             + "picks it up; what it asks and its result come to the person on the card below.",

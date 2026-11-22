@@ -7,6 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,10 +27,12 @@ import com.taskforce.tf_api.core.dto.response.MissionChangesResponse;
 import com.taskforce.tf_api.core.dto.response.MissionFileChangeResponse;
 import com.taskforce.tf_api.core.dto.response.ProjectRunResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.service.delivery.DeliveryActivityService;
 import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
+import com.taskforce.tf_api.core.service.delivery.MissionDossierAccess;
 import com.taskforce.tf_api.core.service.delivery.MissionResultService;
 import com.taskforce.tf_api.core.service.delivery.DeliveryRunner;
 import com.taskforce.tf_api.core.service.delivery.DeliveryService;
@@ -40,6 +43,7 @@ import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 
@@ -64,6 +68,7 @@ public class DeliveryController {
     private final MissionResultService missionResults;
     private final MissionChangesService missionChanges;
     private final ProjectDeliveryService projectDelivery;
+    private final MissionDossierAccess dossierAccess;
     private final UserRepository userRepository;
 
     /**
@@ -249,10 +254,12 @@ public class DeliveryController {
     }
 
     /**
-     * GET /api/workspaces/{slug}/delivery/runs/{runId}/evidence?format=json|md : le dossier de preuve de la mission
-     * (spécification de la v2, §9). En JSON, le fichier {@code taskforce-evidence/1} tel quel, sans enveloppe : il se
-     * vérifie sans TaskForce, par recalcul des empreintes. En Markdown, le même, lisible, avec le résultat de ce recalcul.
-     * 404 pour un run sans dossier (antérieur à la v2).
+     * GET /api/workspaces/{slug}/delivery/runs/{runId}/evidence?format=json|md|dsse : le dossier de preuve de la mission
+     * (spécification de la v2, §9 ; TF-J2-7). En JSON, le fichier {@code taskforce-evidence/1} tel quel, sans enveloppe
+     * d'API : l'en-tête tiré de la chaîne, les événements, le paquet de règles, les textes gardés à côté et le dernier
+     * sceau ; il se vérifie sans TaskForce ({@code npm run verify}). En Markdown, le même, lisible, avec le résultat du
+     * recalcul. En DSSE, le dernier sceau seul : l'enveloppe signée de l'énoncé in-toto, pour les outils standard. Le
+     * dossier survit à son issue : il se lit encore après sa suppression. 404 pour un run sans dossier.
      */
     @GetMapping("/runs/{runId}/evidence")
     public ResponseEntity<String> evidence(
@@ -261,14 +268,59 @@ public class DeliveryController {
         @PathVariable Long runId,
         @RequestParam(defaultValue = "json") String format
     ) {
-        boolean markdown = "md".equalsIgnoreCase(format);
-        String file = activityService.dossier(slug, runId, resolveUserId(jwt), markdown)
+        MissionDossierAccess.Format wanted = "md".equalsIgnoreCase(format) ? MissionDossierAccess.Format.MARKDOWN
+            : "dsse".equalsIgnoreCase(format) ? MissionDossierAccess.Format.DSSE : MissionDossierAccess.Format.JSON;
+        String file = dossierAccess.export(slug, runId, resolveUserId(jwt), wanted)
             .orElseThrow(() -> new ResourceNotFoundException("This run has no evidence file"));
+        String name = "evidence-run-" + runId + switch (wanted) {
+            case MARKDOWN -> ".md";
+            case DSSE -> ".dsse.json";
+            case JSON -> ".json";
+        };
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-run-" + runId + (markdown ? ".md\"" : ".json\""))
-            .contentType(markdown ? MediaType.parseMediaType("text/markdown; charset=UTF-8") : MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+            .contentType(wanted == MissionDossierAccess.Format.MARKDOWN
+                ? MediaType.parseMediaType("text/markdown; charset=UTF-8") : MediaType.APPLICATION_JSON)
             .body(file);
     }
+
+    /**
+     * DELETE /api/workspaces/{slug}/delivery/runs/{runId}/evidence/texts/{hash} : efface un texte gardé à côté de la
+     * chaîne du dossier (la demande, ce que l'agent a raconté, son résumé). L'empreinte reste, la chaîne et son sceau
+     * tiennent, et l'effacement entre au dossier avec qui et quand (R198 amendée, précision 4). La personne qui a délégué
+     * la mission, ou un responsable de l'espace.
+     */
+    @DeleteMapping("/runs/{runId}/evidence/texts/{hash}")
+    public ResponseEntity<ApiResponse<Void>> eraseEvidenceText(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String slug,
+        @PathVariable Long runId,
+        @PathVariable @Pattern(regexp = "sha256:[0-9a-f]{64}", message = "hash must be a sha256 digest") String hash
+    ) {
+        dossierAccess.eraseText(slug, runId, hash, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Text erased: its digest stays in the evidence", null));
+    }
+
+    /**
+     * GET /api/workspaces/{slug}/delivery/evidence/key : la clé qui scelle les dossiers de ce serveur, à comparer à celle
+     * d'un sceau ({@code npm run verify -- --key}) : son identifiant, sa clé publique, et où vit la clé privée. Un membre
+     * de l'espace.
+     */
+    @GetMapping("/evidence/key")
+    public ResponseEntity<ApiResponse<EvidenceKeyResponse>> evidenceKey(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug) {
+        var key = dossierAccess.key(slug, resolveUserId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Evidence signing key",
+            new EvidenceKeyResponse(key.id(), EvidenceSeal.ALGORITHM, key.publicKey(), key.custody(), key.kept())));
+    }
+
+    /**
+     * La clé publique qui scelle les dossiers.
+     *
+     * @param publicKey SubjectPublicKeyInfo en DER, en base64
+     * @param custody   {@code same-machine} ou {@code separate-machine}, tel que l'exploitant le déclare
+     * @param kept      gardée d'un démarrage à l'autre
+     */
+    public record EvidenceKeyResponse(String id, String algorithm, String publicKey, String custody, boolean kept) {}
 
     /**
      * POST /api/workspaces/{slug}/delivery/runs/{runId}/apply : « Apply » sur la carte de résultat (R78) : la pull
@@ -289,24 +341,33 @@ public class DeliveryController {
 
     /**
      * POST .../runs/{runId}/done : « Mark as done » : la mission n'a rien changé (ni pull request ni commit), l'issue
-     * se termine et son activité le dit (rejeu de la 1.8.0). Seule la personne qui a délégué tranche.
+     * se termine et son activité le dit (rejeu de la 1.8.0). Seule la personne qui a délégué tranche ; sa raison, si
+     * elle en donne une, entre au dossier avec le geste (TF-J2-7).
      */
     @PostMapping("/runs/{runId}/done")
     public ResponseEntity<ApiResponse<Void>> markDone(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody(required = false) MissionReasonRequest request
     ) {
-        missionResults.markDone(slug, runId, resolveUserId(jwt));
+        missionResults.markDone(slug, runId, resolveUserId(jwt), request == null ? null : request.reason());
         return ResponseEntity.ok(ApiResponse.success("Marked as done: no change was needed", null));
     }
 
-    /** POST .../runs/{runId}/discard : « Discard » : la pull request est fermée, sa branche supprimée. */
+    /**
+     * POST .../runs/{runId}/discard : « Discard » : la pull request est fermée, sa branche supprimée. La raison, si la
+     * personne en donne une, entre au dossier avec le geste (TF-J2-7).
+     */
     @PostMapping("/runs/{runId}/discard")
     public ResponseEntity<ApiResponse<Void>> discard(
-        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId
+        @AuthenticationPrincipal Jwt jwt, @PathVariable String slug, @PathVariable Long runId,
+        @Valid @RequestBody(required = false) MissionReasonRequest request
     ) {
-        missionResults.discard(slug, runId, resolveUserId(jwt));
+        missionResults.discard(slug, runId, resolveUserId(jwt), request == null ? null : request.reason());
         return ResponseEntity.ok(ApiResponse.success("Discarded", null));
     }
+
+    /** Pourquoi la personne fait ce geste ; facultatif, il entre au dossier de la mission. */
+    public record MissionReasonRequest(@Size(max = 2000) String reason) {}
 
     /**
      * POST .../runs/{runId}/retry : « Try again » : le résultat est écarté, la remarque postée sur l'issue, et une

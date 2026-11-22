@@ -176,9 +176,10 @@ class TrialAgentLoopTest {
         DeliveryPoll poll = finished();
         assertThat(poll.status()).isEqualTo(DeliveryRunStatus.DONE);
         assertThat(poll.summary()).isEqualTo("Cortex · qwen3:8b answered in a comment on TESTTA-4.");
-        assertThat(kinds()).containsExactly("start", "tool", "decision", "text");
+        // Le brief et le modèle lancé vont au dossier, à côté de la chronologie (TF-J2-7).
+        assertThat(kinds()).containsExactly("start", "brief", "agent", "tool", "decision", "text");
         verify(runRepository).recordRules(90L, 3, "sha256:" + "a".repeat(64));
-        verify(evidence).append(eq(run), eq("mission.started"), eq(MissionEvidenceService.Actor.SERVER), any());
+        verify(evidence).open(eq(run), any(), eq(null), any());
 
         // Le modèle lit l'issue, sa liste, ses commentaires, les autres issues et les notes ; jamais l'issue deux fois.
         @SuppressWarnings("unchecked")
@@ -206,7 +207,7 @@ class TrialAgentLoopTest {
         DeliveryPoll poll = finished();
         assertThat(poll.status()).isEqualTo(DeliveryRunStatus.FAILED);
         assertThat(poll.error()).startsWith("The rules of this workspace refuse a comment, so nothing was posted.");
-        assertThat(kinds()).containsExactly("start", "tool", "decision", "denied");
+        assertThat(kinds()).containsExactly("start", "brief", "agent", "tool", "decision", "denied");
     }
 
     @Test

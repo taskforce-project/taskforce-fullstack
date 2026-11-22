@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -185,16 +184,8 @@ public class TrialAgentLoop {
             project.getWorkspace().getSlug(), run.getStartedBy().getId(), person, run.getStartedBy().getEmail(),
             run.getModel(), project.getIdentifier() + "-" + issue.getSequenceNumber(), rules);
         runRepository.recordRules(runId, rules.version(), rules.digest());
-        Map<String, Object> agent = new LinkedHashMap<>();
-        agent.put("kind", TrialAgentProvider.KEY);
-        agent.put("model", mission.model());
-        Map<String, Object> started = new LinkedHashMap<>();
-        started.put("issue", mission.issueKey());
-        started.put("requestedBy", mission.email());
-        started.put("agent", agent);
-        started.put("rules", Map.of("version", rules.version(), "digest", rules.digest()));
-        runRepository.findById(runId).ifPresent(fresh ->
-            evidence.append(fresh, "mission.started", MissionEvidenceService.Actor.SERVER, started));
+        // Le dossier s'ouvre avec la demande telle qu'elle part et le paquet de règles de la mission (TF-J2-7).
+        runRepository.findById(runId).ifPresent(fresh -> evidence.open(fresh, rules, null, Map.of()));
         return mission;
     }
 
@@ -213,9 +204,16 @@ public class TrialAgentLoop {
         String query = issue.getTitle() + (issue.getDescription() == null ? "" : " " + issue.getDescription());
         List<KnowledgeNode> notes = notes(m, query);
 
+        String system = systemPrompt(m.model(), m.person());
+        String task = taskPrompt(issue, checklist, comments, others, notes);
         List<Map<String, Object>> messages = List.of(
-            Map.of("role", "system", "content", systemPrompt(m.model(), m.person())),
-            Map.of("role", "user", "content", taskPrompt(issue, checklist, comments, others, notes)));
+            Map.of("role", "system", "content", system),
+            Map.of("role", "user", "content", task));
+        // Le dossier garde le brief tel qu'il part au modèle, par son empreinte, et le modèle lancé (TF-J2-7).
+        record(m, new RunnerEventsRequest.Event("brief", null, "The brief given to " + name, null, null, null, null, null,
+            null, system + "\n\n" + task, null, null));
+        record(m, new RunnerEventsRequest.Event("agent", null, name + " answers with " + m.model(), null, null, null, null,
+            null, null, null, new RunnerEventsRequest.Agent(null, m.model(), null, null), null));
         String answer = meter.metered(m.workspaceId(),
             () -> llm.rawChatWithModel(messages, List.of(), m.model()).path("content").asText("")).strip();
         if (answer.isEmpty()) {
@@ -280,11 +278,15 @@ public class TrialAgentLoop {
 
     /** Un événement de la chronologie et du dossier de la mission. */
     private void event(Mission m, String kind, String tool, String text, String effect, String rule) {
+        record(m, new RunnerEventsRequest.Event(kind, tool, text, effect, rule));
+    }
+
+    private void record(Mission m, RunnerEventsRequest.Event event) {
         try {
             tx.executeWithoutResult(status -> runRepository.findById(m.runId()).ifPresent(run ->
-                activity.appendEvents(run, List.of(new RunnerEventsRequest.Event(kind, tool, text, effect, rule)))));
+                activity.appendEvents(run, List.of(event))));
         } catch (RuntimeException e) {
-            log.warn("Agent à l'essai : événement {} non gardé (run {}) : {}", kind, m.runId(), LogSafe.of(e.getMessage()));
+            log.warn("Agent à l'essai : événement {} non gardé (run {}) : {}", event.kind(), m.runId(), LogSafe.of(e.getMessage()));
         }
     }
 

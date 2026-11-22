@@ -27,6 +27,9 @@ public interface DeliveryRunRepository extends JpaRepository<DeliveryRun, Long> 
     /** Dernier run d'une issue (pour afficher l'état de délégation courant). */
     Optional<DeliveryRun> findTopByIssueIdOrderByCreatedAtDesc(Long issueId);
 
+    /** Les missions d'une issue, la plus récente d'abord : celle dont une pull request a été fusionnée sur GitHub. */
+    List<DeliveryRun> findByIssueIdOrderByCreatedAtDesc(Long issueId);
+
     /**
      * Runs de délégation des projets donnés (issue → projet), les plus récents d'abord. Sert la vue
      * « workflow » au niveau workspace : on borne aux projets que l'utilisateur peut voir (calculés en

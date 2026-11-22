@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
@@ -83,12 +82,11 @@ public class DeliveryActivityService {
     private final WorkspaceMemberRepository workspaceMembers;
     private final ProjectDeliveryFeed feed;
 
-    /** Type de l'événement du dossier de preuve pour chaque sorte d'événement du runner. */
-    private static final Map<String, String> EVIDENCE_TYPE = Map.of(
-        "start", "note", "text", "note", "tool", "action.requested", "error", "action.result", "denied", "action.decided",
-        "decision", "action.decided", "exit", "exit.result", "limit", "limit.reached", "test", "test.result");
-    /** Les décisions des règles vont au dossier, pas à la chronologie affichée : une ligne par action la noierait. */
-    private static final Set<String> EVIDENCE_ONLY = Set.of("decision");
+    /**
+     * Ce qui va au dossier sans aller à la chronologie affichée : les décisions des règles (une ligne par action la
+     * noierait), le brief remis à l'agent et ce que l'agent dit de lui-même au démarrage.
+     */
+    private static final Set<String> EVIDENCE_ONLY = Set.of("decision", "brief", "agent");
 
     /** La portée d'un accord : une fois, ou pour le reste de la mission (R46). */
     public static final String SCOPE_ONCE = "ONCE";
@@ -101,15 +99,16 @@ public class DeliveryActivityService {
     /**
      * Ajoute des événements à la suite de la chronologie et du dossier de preuve ; le run est verrouillé par
      * l'appelant. La chronologie a son plafond d'affichage ; le dossier, le sien, plus haut, et le dit quand il est atteint.
-     * Quand la chronologie avance, le topic du projet le dit, une fois par lot, avec la nouvelle étape en cours.
+     * Un événement que le dossier a déjà reçu (un lot renvoyé par le runner) ne revient pas à la chronologie ; un lot
+     * perdu y laisse sa marque ({@link MissionEvidenceService#runnerEvent}). Quand la chronologie avance, le topic du
+     * projet le dit, une fois par lot, avec la nouvelle étape en cours.
      */
     @Transactional
     public void appendEvents(DeliveryRun run, List<RunnerEventsRequest.Event> events) {
         int seq = eventRepository.maxSeq(run.getId());
         DeliveryRunEvent last = null;
         for (RunnerEventsRequest.Event event : events) {
-            evidenceService.append(run, EVIDENCE_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event), evidenceData(event));
-            if (EVIDENCE_ONLY.contains(event.kind())) {
+            if (!evidenceService.runnerEvent(run, event) || EVIDENCE_ONLY.contains(event.kind())) {
                 continue;
             }
             if (seq >= MAX_EVENTS_PER_RUN) {
@@ -125,26 +124,6 @@ public class DeliveryActivityService {
                 .build());
         }
         if (last != null) feed.step(run, last);
-    }
-
-    /** Qui agit : la règle pour ses décisions, le runner pour les sorties et le plafond, l'agent pour le reste. */
-    private static MissionEvidenceService.Actor actorOf(DeliveryRun run, RunnerEventsRequest.Event event) {
-        return switch (event.kind()) {
-            case "decision" -> new MissionEvidenceService.Actor("rule", event.rule() == null || event.rule().isBlank() ? "none" : event.rule().strip());
-            case "exit", "limit", "test" -> new MissionEvidenceService.Actor("runner", run.getClaimedBy() == null ? "runner" : run.getClaimedBy());
-            default -> new MissionEvidenceService.Actor("agent", run.getProviderKey());
-        };
-    }
-
-    private static Map<String, Object> evidenceData(RunnerEventsRequest.Event event) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("kind", event.kind());
-        data.put("tool", blankToNull(event.tool()));
-        data.put("text", clip(event.text()));
-        if (event.effect() != null) data.put("effect", event.effect());
-        if ("denied".equals(event.kind())) data.put("effect", "deny");
-        if ("error".equals(event.kind())) data.put("ok", false);
-        return data;
     }
 
     /** Ouvre une demande de l'agent et prévient la personne qui a délégué. */
@@ -200,6 +179,11 @@ public class DeliveryActivityService {
             asked.put("require", Map.of("approvers", require.approvers(), "signatures", require.signatures(),
                 "separate", require.separate()));
         }
+        // L'action exacte que la personne accordera (TF-J2-7) : l'empreinte de l'entrée de l'outil et, pour une écriture,
+        // celle du contenu que le fichier aura ; les faits jugés, pour qu'un tiers rejuge la demande.
+        if (ruling != null && ruling.input() != null) asked.put("input", ruling.input());
+        if (ruling != null && ruling.written() != null) asked.put("written", MissionEvidenceService.written(ruling.written()));
+        if (facts != null) asked.put("facts", MissionEvidenceService.facts(facts));
         evidenceService.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, asked);
         if (!refused) {
             for (User signer : signers(run, approval.obligations())) {
@@ -446,14 +430,6 @@ public class DeliveryActivityService {
             canSign(run, a, userId), a.getAskedBy(), a.getAction(), a.getRuleId(), a.getRuleReason(), a.getScope(),
             approvers.labels(require, workspaceId), require == null ? 1 : require.signatures(),
             require != null && require.separate(), signedBy, a.isBinding(), signedAt);
-    }
-
-    /** Le dossier de preuve du run, en JSON ou en Markdown, si le projet est visible ; vide pour un run de la v1. */
-    @Transactional(readOnly = true)
-    public Optional<String> dossier(String slug, Long runId, Long userId, boolean markdown) {
-        DeliveryRun run = scopedRun(slug, runId);
-        visibilityGuard.assertCanView(run.getIssue().getProject(), userId);
-        return markdown ? evidenceService.dossierMarkdown(run) : evidenceService.dossierJson(run);
     }
 
     /** Autorise une fois, ou refuse, une action de l'agent. */

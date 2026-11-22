@@ -1,62 +1,108 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
+import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
+import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
+import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
+import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.DeliveryRunEvidence;
+import com.taskforce.tf_api.core.model.HarnessRuleSet;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.IssueChecklistItem;
+import com.taskforce.tf_api.core.model.MissionDossier;
+import com.taskforce.tf_api.core.model.MissionDossierSeal;
+import com.taskforce.tf_api.core.model.MissionDossierText;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunEvidenceRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
+import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
+import com.taskforce.tf_api.shared.exception.BusinessException;
 
 /**
- * Dossier de preuve d'une mission (spécification de la v2, §9) : chaîné à l'ajout, vérifiable par recalcul à l'export,
- * jamais tronqué en silence, scellé à la fin.
+ * Dossier de preuve d'une mission (spécification de la v2, §9 ; TF-J2-7) : chaîné à l'ajout, vérifiable par recalcul à
+ * l'export, jamais tronqué en silence, scellé à la fin ; la demande telle qu'elle part, le modèle lancé, les trous
+ * marqués, les textes sensibles à côté de la chaîne, l'en-tête tiré de la chaîne, et un export qui se passe de la mission.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Dossier de preuve d'une mission")
 class MissionEvidenceServiceTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String DIGEST = "sha256:" + "a".repeat(64);
 
     @Mock private DeliveryRunEvidenceRepository repository;
     @Mock private DeliveryRunRepository runRepository;
+    @Mock private MissionDossierRepository dossiers;
+    @Mock private MissionDossierSealRepository sealRepository;
+    @Mock private MissionDossierTextRepository textRepository;
+    @Mock private HarnessRuleSetRepository ruleSets;
+    @Mock private IssueChecklistItemRepository checklist;
+    @Mock private ApplicationEventPublisher publisher;
 
     /** Ce que la base garde, dans l'ordre. */
     private final List<DeliveryRunEvidence> stored = new ArrayList<>();
+    private final Map<Long, MissionDossier> rows = new HashMap<>();
+    private final List<MissionDossierSeal> seals = new ArrayList<>();
+    private final List<MissionDossierText> texts = new ArrayList<>();
     private MissionEvidenceService service;
     private DeliveryRun run;
+    private Issue issue;
+    private User ada;
 
     @BeforeEach
     void setUp() {
-        service = new MissionEvidenceService(repository, runRepository);
-        Workspace workspace = Workspace.builder().slug("acme").build();
+        service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository, textRepository, ruleSets,
+            checklist, new EvidenceSigner("", "", ""), publisher);
+        ada = User.builder().id(7L).email("ada@taskforce.dev").build();
+        User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
+        Workspace workspace = Workspace.builder().id(3L).slug("acme").owner(ada).build();
         Project project = Project.builder().id(12L).identifier("WEB").workspace(workspace).build();
-        Issue issue = Issue.builder().id(55L).sequenceNumber(12).title("Fix the footer").project(project).build();
+        issue = Issue.builder().id(55L).sequenceNumber(12).title("Fix the footer").description("The links point to the old site.")
+            .reporter(bob).createdAt(LocalDateTime.of(2026, 11, 20, 9, 30)).project(project).build();
         run = DeliveryRun.builder().id(100L).issue(issue).providerKey("claude-code").model("claude-sonnet-5")
-            .status(DeliveryRunStatus.RUNNING).startedBy(User.builder().id(7L).email("ada@taskforce.dev").build())
-            .claimedBy("tf-runner-ada").rulesVersion(1).rulesDigest("sha256:" + "a".repeat(64)).build();
+            .status(DeliveryRunStatus.RUNNING).startedBy(ada).claimedBy("tf-runner-ada").rulesVersion(1).rulesDigest(DIGEST)
+            .origin("mcp").build();
+        run.setCreatedAt(LocalDateTime.of(2026, 11, 22, 8, 0));
         lenient().when(repository.save(any())).thenAnswer(inv -> {
             stored.add(inv.getArgument(0));
             return inv.getArgument(0);
@@ -64,6 +110,46 @@ class MissionEvidenceServiceTest {
         lenient().when(repository.findTopByRunIdOrderBySeqDesc(100L))
             .thenAnswer(inv -> stored.isEmpty() ? Optional.empty() : Optional.of(stored.getLast()));
         lenient().when(repository.findByRunIdOrderBySeqAsc(100L)).thenAnswer(inv -> List.copyOf(stored));
+        lenient().when(runRepository.findByIdForUpdate(100L)).thenAnswer(inv -> Optional.of(run));
+        lenient().when(dossiers.existsById(anyLong())).thenAnswer(inv -> rows.containsKey(inv.<Long>getArgument(0)));
+        lenient().when(dossiers.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(rows.get(inv.<Long>getArgument(0))));
+        lenient().when(dossiers.findByIdForUpdate(anyLong())).thenAnswer(inv -> Optional.ofNullable(rows.get(inv.<Long>getArgument(0))));
+        lenient().when(dossiers.saveAndFlush(any())).thenAnswer(inv -> {
+            MissionDossier row = inv.getArgument(0);
+            rows.put(row.getRunId(), row);
+            return row;
+        });
+        lenient().when(sealRepository.save(any())).thenAnswer(inv -> {
+            seals.add(inv.getArgument(0));
+            return inv.getArgument(0);
+        });
+        lenient().when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenAnswer(inv -> seals.isEmpty() ? Optional.empty() : Optional.of(seals.getLast()));
+        lenient().when(sealRepository.existsByRunIdAndSeq(anyLong(), anyInt()))
+            .thenAnswer(inv -> seals.stream().anyMatch(s -> s.getSeq().equals(inv.getArgument(1))));
+        lenient().when(textRepository.save(any())).thenAnswer(inv -> {
+            MissionDossierText text = inv.getArgument(0);
+            if (!texts.contains(text)) texts.add(text);
+            return text;
+        });
+        lenient().when(textRepository.existsByRunIdAndHash(anyLong(), anyString()))
+            .thenAnswer(inv -> texts.stream().anyMatch(t -> t.getHash().equals(inv.getArgument(1))));
+        lenient().when(textRepository.findByRunIdOrderByIdAsc(100L)).thenAnswer(inv -> List.copyOf(texts));
+        lenient().when(textRepository.findByRunIdAndHash(anyLong(), anyString()))
+            .thenAnswer(inv -> texts.stream().filter(t -> t.getHash().equals(inv.getArgument(1))).findFirst());
+    }
+
+    private static RulesBundle rules() {
+        return new RulesBundle("taskforce-rules/1", "acme", 12L, 3, DIGEST, null, List.of(), null,
+            List.of(new RulesBundle.Layer("project", "12", 3, "sha256:" + "b".repeat(64))));
+    }
+
+    private JsonNode data(int index) throws Exception {
+        return JSON.readTree(stored.get(index).getData());
+    }
+
+    private JsonNode file() throws Exception {
+        return JSON.readTree(service.dossierJson(100L).orElseThrow());
     }
 
     private void startAndAct() {
@@ -72,30 +158,352 @@ class MissionEvidenceServiceTest {
             Map.of("tool", "Read", "effect", "allow", "text", "src/app.ts"));
     }
 
-    @Test
-    @DisplayName("un geste après la fin de la mission : à la suite de la chaîne, le sceau passe au dernier maillon, rien n'est réécrit (R139)")
-    void a_gesture_after_the_end_moves_the_seal() {
-        startAndAct();
-        service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
-        String sealed = run.getEvidenceRoot();
-        String firstHash = stored.getFirst().getHash();
-
-        service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@taskforce.dev"),
-            Map.of("decision", "REVERT_FILE", "path", "a.txt"));
-
-        assertThat(run.getEvidenceRoot()).isNotEqualTo(sealed).isEqualTo(stored.getLast().getHash());
-        assertThat(stored.getLast().getPrev()).isEqualTo(sealed);
-        assertThat(stored.getFirst().getHash()).isEqualTo(firstHash);
+    private static RunnerEventsRequest.Event numbered(int n, String kind, String text) {
+        return new RunnerEventsRequest.Event(kind, null, text, null, null, n, null, null, null, null, null, null);
     }
 
-    @Test
-    @DisplayName("sans sceau, un geste s'ajoute sans en poser un (mission encore en cours)")
-    void a_gesture_during_the_mission_seals_nothing() {
-        startAndAct();
+    @Nested
+    @DisplayName("la demande telle qu'elle part")
+    class Opening {
 
-        service.appendAfterEnd(run, "action.result", MissionEvidenceService.Actor.SERVER, Map.of("kind", "correction"));
+        @Test
+        @DisplayName("mission.started porte tout l'en-tête, la demande par l'empreinte de ses textes, d'où elle vient et qui en répond")
+        void the_start_carries_the_request() throws Exception {
+            when_layer_author("carol@taskforce.dev");
 
-        assertThat(run.getEvidenceRoot()).isNull();
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+
+            JsonNode started = data(0);
+            assertThat(stored.getFirst().getType()).isEqualTo("mission.started");
+            assertThat(started.get("mission").asLong()).isEqualTo(100L);
+            assertThat(started.get("workspace").asText()).isEqualTo("acme");
+            assertThat(started.get("project").asLong()).isEqualTo(12L);
+            assertThat(started.get("issue").asText()).isEqualTo("WEB-12");
+            assertThat(started.get("requestedBy").asText()).isEqualTo("ada@taskforce.dev");
+            assertThat(started.get("accountable").asText()).isEqualTo("ada@taskforce.dev");
+            assertThat(started.get("delegatedAt").asText()).isEqualTo("2026-11-22T08:00:00.000Z");
+            assertThat(started.get("origin").get("channel").asText()).isEqualTo("mcp");
+            assertThat(started.get("agent").get("model").asText()).isEqualTo("claude-sonnet-5");
+            assertThat(started.get("rules").get("layers").get(0).get("author").asText()).isEqualTo("carol@taskforce.dev");
+            JsonNode request = started.get("request");
+            assertThat(request.get("reporter").asText()).isEqualTo("bob@taskforce.dev");
+            assertThat(request.get("createdAt").asText()).isEqualTo("2026-11-20T09:30:00.000Z");
+            // Le texte n'entre pas dans la chaîne : son empreinte, sa longueur ; il vit à côté.
+            assertThat(request.get("title").get("sha256").asText()).isEqualTo(EvidenceChain.sha256("Fix the footer"));
+            assertThat(request.get("title").get("chars").asInt()).isEqualTo(14);
+            assertThat(stored.getFirst().getData()).doesNotContain("Fix the footer").doesNotContain("old site");
+            assertThat(texts).extracting(MissionDossierText::getKind).containsExactly("title", "description");
+            assertThat(rows.get(100L).getRulesBundle()).contains("\"digest\":\"" + DIGEST + "\"");
+        }
+
+        private void when_layer_author(String email) {
+            lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3))
+                .thenReturn(Optional.of(HarnessRuleSet.builder().version(3).createdBy(User.builder().email(email).build()).build()));
+        }
+
+        @Test
+        @DisplayName("une reprise garde la mission qu'elle continue")
+        void a_follow_up_names_what_it_continues() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of("followUpOf", 99L, "comments", 2));
+
+            assertThat(data(0).get("followUpOf").asLong()).isEqualTo(99L);
+        }
+    }
+
+    @Nested
+    @DisplayName("un trou se voit")
+    class Gaps {
+
+        @Test
+        @DisplayName("un numéro déjà reçu n'est gardé ni au dossier ni à la chronologie ; un numéro qui saute laisse sa marque")
+        void a_lost_batch_leaves_a_mark() throws Exception {
+            assertThat(service.runnerEvent(run, numbered(1, "tool", "Read src/a.ts"))).isTrue();
+            assertThat(service.runnerEvent(run, numbered(2, "tool", "Read src/b.ts"))).isTrue();
+            // Le lot 1-2 renvoyé après une réponse perdue.
+            assertThat(service.runnerEvent(run, numbered(2, "tool", "Read src/b.ts"))).isFalse();
+            // Les événements 3 et 4 ne sont jamais arrivés.
+            assertThat(service.runnerEvent(run, numbered(5, "tool", "Edit src/c.ts"))).isTrue();
+
+            assertThat(stored).hasSize(4);
+            JsonNode gap = data(2);
+            assertThat(stored.get(2).getType()).isEqualTo("note");
+            assertThat(stored.get(2).getActorKind()).isEqualTo("server");
+            assertThat(gap.get("kind").asText()).isEqualTo("gap");
+            assertThat(gap.get("from").asInt()).isEqualTo(3);
+            assertThat(gap.get("to").asInt()).isEqualTo(4);
+            assertThat(gap.get("text").asText()).isEqualTo("Events 3 to 4 from the runner never arrived.");
+            assertThat(run.getEvidenceRunnerSeq()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("à la fin, les événements que le runner a numérotés et qui ne sont pas arrivés se marquent aussi")
+        void the_last_lost_events_are_marked_at_the_end() throws Exception {
+            service.runnerEvent(run, numbered(1, "tool", "Read src/a.ts"));
+
+            service.runnerReport(run, new RunnerResultRequest("DONE", "done", null, null, null, null, null, null, null, 4,
+                new RunnerResultRequest.Session("1b2c3d4e-0000-4000-8000-000000000001", "sha256:" + "d".repeat(64), 1200L), null));
+
+            assertThat(data(1).get("kind").asText()).isEqualTo("gap");
+            assertThat(data(1).get("text").asText()).isEqualTo("Events 2 to 4 from the runner never arrived.");
+            JsonNode report = data(2);
+            assertThat(report.get("kind").asText()).isEqualTo("runner");
+            assertThat(report.get("sent").asInt()).isEqualTo(4);
+            assertThat(report.get("received").asInt()).isEqualTo(1);
+            assertThat(report.get("session").get("sha256").asText()).isEqualTo("sha256:" + "d".repeat(64));
+        }
+
+        @Test
+        @DisplayName("un runner d'avant la 1.18 ne numérote pas : rien n'est compté")
+        void an_older_runner_counts_nothing() {
+            assertThat(service.runnerEvent(run, new RunnerEventsRequest.Event("tool", "Read", "src/a.ts"))).isTrue();
+            assertThat(service.runnerEvent(run, new RunnerEventsRequest.Event("tool", "Read", "src/a.ts"))).isTrue();
+
+            assertThat(stored).hasSize(2);
+            assertThat(run.getEvidenceRunnerSeq()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("ce que le runner rapporte")
+    class RunnerEvents {
+
+        @Test
+        @DisplayName("ce que l'agent raconte et le brief n'entrent que par leur empreinte ; leur texte vit à côté")
+        void conversation_enters_by_its_digest() throws Exception {
+            service.runnerEvent(run, numbered(1, "text", "I will read the footer first."));
+            service.runnerEvent(run, new RunnerEventsRequest.Event("brief", null, "The brief given to Claude Code", null, null, 2,
+                null, null, null, "You are working on a task delegated from TaskForce: WEB-12", null, null));
+
+            assertThat(stored.get(0).getData()).doesNotContain("footer");
+            assertThat(data(0).get("text").get("sha256").asText()).isEqualTo(EvidenceChain.sha256("I will read the footer first."));
+            assertThat(data(1).get("brief").get("sha256").asText())
+                .isEqualTo(EvidenceChain.sha256("You are working on a task delegated from TaskForce: WEB-12"));
+            assertThat(texts).extracting(MissionDossierText::getKind).containsExactly("text", "brief");
+        }
+
+        @Test
+        @DisplayName("l'agent réellement lancé : sa version, son modèle, sa session")
+        void the_agent_that_ran() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300 with claude-sonnet-5-20261001",
+                null, null, 1, null, null, null, null,
+                new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "anthropic"), null));
+
+            JsonNode agent = data(0);
+            assertThat(stored.getFirst().getActorKind()).isEqualTo("agent");
+            assertThat(agent.get("kind").asText()).isEqualTo("agent");
+            assertThat(agent.get("version").asText()).isEqualTo("2.1.300");
+            assertThat(agent.get("model").asText()).isEqualTo("claude-sonnet-5-20261001");
+            assertThat(agent.get("provider").asText()).isEqualTo("anthropic");
+            assertThat(agent.get("fingerprint").isNull()).isTrue();
+        }
+
+        @Test
+        @DisplayName("une décision garde les faits jugés et l'action exacte : l'empreinte de l'entrée et du contenu écrit")
+        void a_decision_keeps_its_facts_and_its_exact_action() throws Exception {
+            String input = "sha256:" + "e".repeat(64);
+            String content = "sha256:" + "f".repeat(64);
+            service.runnerEvent(run, new RunnerEventsRequest.Event("decision", "Write", "src/footer.tsx", "allow", "write-sandbox-files", 1,
+                List.of(Map.of("action", "file.write", "tool", "Write", "path", "src/footer.tsx")), input,
+                new RunnerEventsRequest.Written("src/footer.tsx", content, 120L), null, null, null));
+
+            JsonNode decision = data(0);
+            assertThat(stored.getFirst().getActorId()).isEqualTo("write-sandbox-files");
+            assertThat(decision.get("facts").get(0).get("path").asText()).isEqualTo("src/footer.tsx");
+            assertThat(decision.get("input").asText()).isEqualTo(input);
+            assertThat(decision.get("written").get("sha256").asText()).isEqualTo(content);
+        }
+
+        @Test
+        @DisplayName("les tests : ce que le runner a lancé, leur résultat, et l'empreinte de leur sortie entière")
+        void the_tests_keep_the_digest_of_their_output() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null,
+                new RunnerEventsRequest.Test("npm test", true, true, 42, 42, "sha256:" + "1".repeat(64), 5000L)));
+
+            JsonNode test = data(0);
+            assertThat(stored.getFirst().getType()).isEqualTo("test.result");
+            assertThat(stored.getFirst().getActorKind()).isEqualTo("runner");
+            assertThat(test.get("passed").asBoolean()).isTrue();
+            assertThat(test.get("passedCount").asInt()).isEqualTo(42);
+            assertThat(test.get("output").get("sha256").asText()).isEqualTo("sha256:" + "1".repeat(64));
+            assertThat(test.get("output").get("kept").asText()).isEqualTo("runner");
+        }
+
+        @Test
+        @DisplayName("une moitié de paire de substitution, coupée en route, entre en U+FFFD : la chaîne reste du I-JSON")
+        void a_cut_surrogate_enters_as_a_replacement() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("tool", "Bash", "echo \uD83D"));
+
+            assertThat(data(0).get("text").asText()).isEqualTo("echo �");
+        }
+    }
+
+    @Nested
+    @DisplayName("la fin, le sceau")
+    class Sealing {
+
+        @Test
+        @DisplayName("la fin garde la liste de l'issue, clôt le dossier, pose sa racine et le scelle ; le sceau annonce la mission scellée")
+        void the_end_seals_the_file() throws Exception {
+            lenient().when(checklist.findByIssueIdOrderByPositionAscIdAsc(55L)).thenReturn(List.of(
+                IssueChecklistItem.builder().id(1L).issueId(55L).content("Update the links").done(true).build(),
+                IssueChecklistItem.builder().id(2L).issueId(55L).content("Add a test").done(false).build()));
+            startAndAct();
+
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "## What I did\nThe footer links.", null, null));
+
+            assertThat(data(2).get("kind").asText()).isEqualTo("checklist");
+            assertThat(data(2).get("items").get(0).get("done").asBoolean()).isTrue();
+            assertThat(stored.getLast().getType()).isEqualTo("mission.ended");
+            assertThat(data(3).get("summary").get("sha256").asText()).isEqualTo(EvidenceChain.sha256("## What I did\nThe footer links."));
+            assertThat(run.getEvidenceRoot()).isEqualTo(stored.getLast().getHash());
+            assertThat(seals).hasSize(1);
+            assertThat(seals.getFirst().getSeq()).isEqualTo(4);
+            assertThat(seals.getFirst().getRoot()).isEqualTo(run.getEvidenceRoot());
+            ArgumentCaptor<MissionSealed> sealed = ArgumentCaptor.forClass(MissionSealed.class);
+            verify(publisher).publishEvent(sealed.capture());
+            assertThat(sealed.getValue()).isEqualTo(new MissionSealed(100L, run.getEvidenceRoot(), 4));
+        }
+
+        @Test
+        @DisplayName("un geste après la fin : à la suite de la chaîne, le sceau passe au dernier maillon, un sceau de plus, rien n'est réécrit (R139)")
+        void a_gesture_after_the_end_moves_the_seal() {
+            startAndAct();
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            String sealed = run.getEvidenceRoot();
+            String firstHash = stored.getFirst().getHash();
+
+            service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@taskforce.dev"),
+                Map.of("decision", "APPLY", "where", "taskforce"));
+
+            assertThat(run.getEvidenceRoot()).isNotEqualTo(sealed).isEqualTo(stored.getLast().getHash());
+            assertThat(stored.getLast().getPrev()).isEqualTo(sealed);
+            assertThat(stored.getFirst().getHash()).isEqualTo(firstHash);
+            assertThat(seals).extracting(MissionDossierSeal::getSeq).containsExactly(3, 4);
+            // Seul le sceau de la fin s'écrit chez le témoin.
+            verify(publisher).publishEvent(any(MissionSealed.class));
+        }
+
+        @Test
+        @DisplayName("sans sceau, un geste s'ajoute sans en poser un (mission encore en cours)")
+        void a_gesture_during_the_mission_seals_nothing() {
+            startAndAct();
+
+            service.appendAfterEnd(run, "action.result", MissionEvidenceService.Actor.SERVER, Map.of("kind", "correction"));
+
+            assertThat(run.getEvidenceRoot()).isNull();
+            assertThat(seals).isEmpty();
+            verify(publisher, never()).publishEvent(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("l'export")
+    class Export {
+
+        @Test
+        @DisplayName("l'en-tête vient de la chaîne ; le paquet de règles, les textes et le sceau partent avec le dossier")
+        void the_file_carries_everything() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", null, "anthropic"), null));
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+
+            JsonNode file = file();
+
+            assertThat(file.get("format").asText()).isEqualTo("taskforce-evidence/1");
+            assertThat(file.get("mission").get("id").asLong()).isEqualTo(100L);
+            assertThat(file.get("mission").get("workspace").asText()).isEqualTo("acme");
+            assertThat(file.get("mission").get("agent").get("model").asText()).isEqualTo("claude-sonnet-5-20261001");
+            assertThat(file.get("mission").get("agent").get("version").asText()).isEqualTo("2.1.300");
+            assertThat(file.get("rules").get("digest").asText()).isEqualTo(DIGEST);
+            assertThat(file.get("texts").get(EvidenceChain.sha256("Fix the footer")).asText()).isEqualTo("Fix the footer");
+            List<ObjectNode> events = new ArrayList<>();
+            file.get("events").forEach(e -> events.add((ObjectNode) e));
+            assertThat(EvidenceChain.firstBrokenLink(events)).isEqualTo(-1);
+            EvidenceSeal.Opened seal = EvidenceSeal.open(file.get("seal"));
+            assertThat(seal.valid()).isTrue();
+            assertThat(seal.statement().get("predicate").get("root").asText()).isEqualTo(file.get("root").asText());
+            assertThat(CanonicalJson.of(seal.statement().get("predicate").get("mission"))).isEqualTo(CanonicalJson.of(file.get("mission")));
+            assertThat(service.envelope(100L).orElseThrow()).contains("\"payloadType\" : \"application/vnd.in-toto+json\"");
+        }
+
+        @Test
+        @DisplayName("l'export ne lit ni la mission ni son issue : il se fait encore quand elles n'existent plus")
+        void the_export_needs_neither_the_mission_nor_its_issue() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.empty());
+            run.setIssue(null);
+
+            JsonNode file = file();
+
+            assertThat(file.get("mission").get("issue").asText()).isEqualTo("WEB-12");
+            assertThat(EvidenceSeal.open(file.get("seal")).valid()).isTrue();
+            assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("# Evidence of mission 100: WEB-12")
+                .contains("- Seal: event 2, signed by key `sha256:");
+        }
+
+        @Test
+        @DisplayName("un dossier d'avant la 1.18 : ce que la chaîne ne couvre pas vient de sa ligne")
+        void an_older_dossier_takes_the_rest_from_its_row() throws Exception {
+            startAndAct();
+
+            JsonNode mission = file().get("mission");
+
+            assertThat(mission.get("id").asLong()).isEqualTo(100L);
+            assertThat(mission.get("workspace").asText()).isEqualTo("acme");
+            assertThat(mission.get("issue").asText()).isEqualTo("WEB-12");
+            assertThat(mission.get("requestedBy").asText()).isEqualTo("ada@taskforce.dev");
+        }
+
+        @Test
+        @DisplayName("un texte s'efface : son empreinte reste, la chaîne tient, l'effacement entre au dossier, qui se scelle de nouveau")
+        void a_text_is_erased_without_breaking_the_chain() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            String title = EvidenceChain.sha256("Fix the footer");
+
+            service.eraseText(100L, title, ada);
+
+            JsonNode file = file();
+            assertThat(file.get("texts").has(title)).isFalse();
+            assertThat(stored.getLast().getType()).isEqualTo("human.decision");
+            assertThat(data(stored.size() - 1).get("kind").asText()).isEqualTo("erased");
+            assertThat(data(stored.size() - 1).get("text").asText()).isEqualTo(title);
+            List<ObjectNode> events = new ArrayList<>();
+            file.get("events").forEach(e -> events.add((ObjectNode) e));
+            assertThat(EvidenceChain.firstBrokenLink(events)).isEqualTo(-1);
+            assertThat(EvidenceSeal.open(file.get("seal")).statement().get("predicate").get("seq").asInt()).isEqualTo(stored.size());
+            assertThatThrownBy(() -> service.eraseText(100L, title, ada)).isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("l'export se vérifie par recalcul, et une donnée changée en base se voit, au bon endroit")
+        void the_export_checks_and_a_change_shows() {
+            startAndAct();
+            assertThat(EvidenceChain.firstBrokenLink(service.events(100L))).isEqualTo(-1);
+
+            DeliveryRunEvidence second = stored.get(1);
+            stored.set(1, DeliveryRunEvidence.builder().runId(100L).seq(2).at(second.getAt()).type(second.getType())
+                .actorKind(second.getActorKind()).actorId(second.getActorId())
+                .data(second.getData().replace("allow", "deny")).prev(second.getPrev()).hash(second.getHash()).build());
+
+            assertThat(EvidenceChain.firstBrokenLink(service.events(100L))).isEqualTo(1);
+            assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("BROKEN at event 2");
+        }
+
+        @Test
+        @DisplayName("un run sans dossier (v1, autre fournisseur) n'a ni export ni clôture")
+        void no_evidence_no_file() {
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+
+            assertThat(stored).isEmpty();
+            assertThat(run.getEvidenceRoot()).isNull();
+            assertThat(service.dossierJson(100L)).isEmpty();
+            assertThat(service.dossierMarkdown(100L)).isEmpty();
+            assertThat(service.envelope(100L)).isEmpty();
+        }
     }
 
     @Test
@@ -107,64 +515,19 @@ class MissionEvidenceServiceTest {
         assertThat(stored.get(0).getPrev()).isEqualTo(EvidenceChain.ZERO_HASH);
         assertThat(stored.get(1).getPrev()).isEqualTo(stored.get(0).getHash());
         assertThat(stored.get(1).getData()).isEqualTo("{\"effect\":\"allow\",\"text\":\"src/app.ts\",\"tool\":\"Read\"}");
+        assertThat(rows).containsKey(100L);
     }
 
     @Test
-    @DisplayName("l'export se vérifie par recalcul, et une donnée changée en base se voit, au bon endroit")
-    void the_export_checks_and_a_change_shows() {
-        startAndAct();
-        assertThat(EvidenceChain.firstBrokenLink(service.events(100L))).isEqualTo(-1);
-
-        DeliveryRunEvidence second = stored.get(1);
-        stored.set(1, DeliveryRunEvidence.builder().run(run).seq(2).at(second.getAt()).type(second.getType())
-            .actorKind(second.getActorKind()).actorId(second.getActorId())
-            .data(second.getData().replace("allow", "deny")).prev(second.getPrev()).hash(second.getHash()).build());
-
-        assertThat(EvidenceChain.firstBrokenLink(service.events(100L))).isEqualTo(1);
-        assertThat(service.dossierMarkdown(run).orElseThrow()).contains("BROKEN at event 2");
-    }
-
-    @Test
-    @DisplayName("le fichier suit taskforce-evidence/1 : la mission, les événements, la racine")
-    void the_file_follows_the_contract() throws Exception {
+    @DisplayName("l'agent qui coche une ligne de la liste le déclare, au dossier de sa mission")
+    void the_agent_declares_what_it_checks() throws Exception {
         startAndAct();
 
-        JsonNode file = JSON.readTree(service.dossierJson(run).orElseThrow());
+        service.checked(run, IssueChecklistItem.builder().id(1L).issueId(55L).content("Update the links").done(true).build());
 
-        assertThat(file.get("format").asText()).isEqualTo("taskforce-evidence/1");
-        assertThat(file.get("mission").get("issue").asText()).isEqualTo("WEB-12");
-        assertThat(file.get("mission").get("requestedBy").asText()).isEqualTo("ada@taskforce.dev");
-        assertThat(file.get("mission").get("rules").get("version").asInt()).isEqualTo(1);
-        assertThat(file.get("events")).hasSize(2);
-        assertThat(file.get("root").asText()).isEqualTo(stored.getLast().getHash());
-        List<ObjectNode> events = new ArrayList<>();
-        file.get("events").forEach(e -> events.add((ObjectNode) e));
-        assertThat(EvidenceChain.firstBrokenLink(events)).isEqualTo(-1);
-    }
-
-    @Test
-    @DisplayName("un run sans dossier (v1, autre fournisseur) n'a ni export ni clôture")
-    void no_evidence_no_file() {
-        service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
-
-        assertThat(stored).isEmpty();
-        assertThat(run.getEvidenceRoot()).isNull();
-        assertThat(service.dossierJson(run)).isEmpty();
-        assertThat(service.dossierMarkdown(run)).isEmpty();
-    }
-
-    @Test
-    @DisplayName("la fin de mission clôt le dossier et pose sa racine sur le run")
-    void the_end_seals_the_file() {
-        startAndAct();
-
-        service.end(run, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Runner lost"));
-
-        assertThat(stored.getLast().getType()).isEqualTo("mission.ended");
-        assertThat(stored.getLast().getData()).contains("\"error\":\"Runner lost\"").contains("\"status\":\"FAILED\"");
-        assertThat(run.getEvidenceRoot()).isEqualTo(stored.getLast().getHash());
-        assertThat(service.dossierMarkdown(run).orElseThrow()).contains("every hash holds").contains("| 3 |")
-            .contains("- Durations: mission ");
+        assertThat(stored.getLast().getActorKind()).isEqualTo("agent");
+        assertThat(data(2).get("kind").asText()).isEqualTo("checklist.checked");
+        assertThat(data(2).get("done").asBoolean()).isTrue();
     }
 
     @Test
@@ -193,7 +556,8 @@ class MissionEvidenceServiceTest {
     @Test
     @DisplayName("plein, le dossier le dit par un dernier événement, puis ne garde plus rien")
     void a_full_file_says_so() {
-        stored.add(DeliveryRunEvidence.builder().run(run).seq(MissionEvidenceService.MAX_EVENTS - 1).at("2026-10-28T10:00:00.000Z")
+        rows.put(100L, MissionDossier.builder().runId(100L).build());
+        stored.add(DeliveryRunEvidence.builder().runId(100L).seq(MissionEvidenceService.MAX_EVENTS - 1).at("2026-10-28T10:00:00.000Z")
             .type("note").actorKind("agent").actorId("claude-code").data("{}").prev(EvidenceChain.ZERO_HASH)
             .hash("sha256:" + "b".repeat(64)).build());
 

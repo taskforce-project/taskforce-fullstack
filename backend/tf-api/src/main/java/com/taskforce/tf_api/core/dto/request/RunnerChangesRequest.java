@@ -65,6 +65,21 @@ public record RunnerChangesRequest(
         String revision,
 
         @Size(max = 70_000)
-        String body
-    ) {}
+        String body,
+
+        /**
+         * L'empreinte du contenu du fichier tel qu'il reste ({@code sha256:}) : une écriture jugée par les règles porte la
+         * même quand c'est elle qui a écrit ce contenu (TF-J2-7). Absente d'un fichier supprimé, d'un fichier sensible, ou
+         * d'un runner plus ancien.
+         */
+        @Pattern(regexp = RunnerEventsRequest.SHA256, message = "sha256 must be a sha256 digest")
+        String sha256
+    ) {
+
+        /** Un fichier comme l'envoie un runner d'avant la 1.18 : sans l'empreinte de son contenu. */
+        public File(String path, String status, Integer added, Integer removed, boolean binary, boolean truncated,
+                    boolean withheld, String revision, String body) {
+            this(path, status, added, removed, binary, truncated, withheld, revision, body, null);
+        }
+    }
 }

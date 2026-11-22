@@ -87,34 +87,58 @@ public class MissionResultService {
             comment(slug, run.getIssue(), "Applied although the tests failed: " + why, userId);
         }
         decided(run, DeliveryRunOutcome.APPLIED, userId);
+        Map<String, Object> facts = new LinkedHashMap<>();
+        facts.put("pullRequest", "https://github.com/" + pr.repo() + "/pull/" + pr.number());
+        facts.put("merged", true);
+        facts.put("testsFailed", testsFailed);
+        gesture(run, "APPLY", why, facts);
         mergedPullRequests.completeIssue(run.getIssue().getId(), userId);
         log.info("Run {} : résultat appliqué ({}#{}) par {}{}", runId, pr.repo(), pr.number(), userId,
             testsFailed ? ", malgré les tests" : "");
+    }
+
+    /** « Mark as done », sans raison dite. */
+    @Transactional
+    public void markDone(String slug, Long runId, Long userId) {
+        markDone(slug, runId, userId, null);
     }
 
     /**
      * « Mark as done » : la mission n'a rien changé, ni pull request ni commit, parce que le travail était déjà fait
      * (rejeu de la 1.8.0, TESTTA-2 : « Apply » restait éteint sans dire pourquoi). L'issue se termine au nom de la
      * personne, et son activité le dit : « Pierre marked the issue done: no change was needed ». Un résultat qui change
-     * quelque chose s'applique ou s'écarte.
+     * quelque chose s'applique ou s'écarte. La raison, si la personne en donne une, entre au dossier (TF-J2-7).
      */
     @Transactional
-    public void markDone(String slug, Long runId, Long userId) {
+    public void markDone(String slug, Long runId, Long userId, String reason) {
         DeliveryRun run = decidable(slug, runId, userId);
         if (changed(run)) {
             throw new BusinessException("This result changes the code: apply it or discard it.");
         }
         decided(run, DeliveryRunOutcome.MARKED_DONE, userId);
+        gesture(run, "MARK_DONE", reason, Map.of());
         mergedPullRequests.completeIssue(run.getIssue().getId(), userId);
         log.info("Run {} : issue terminée sans changement par {}", runId, userId);
     }
 
-    /** Ferme la pull request de l'agent et supprime sa branche ; sans pull request, le résultat est seulement écarté. */
+    /** « Discard », sans raison dite. */
     @Transactional
     public void discard(String slug, Long runId, Long userId) {
+        discard(slug, runId, userId, null);
+    }
+
+    /**
+     * Ferme la pull request de l'agent et supprime sa branche ; sans pull request, le résultat est seulement écarté. La
+     * raison, si la personne en donne une, entre au dossier (TF-J2-7).
+     */
+    @Transactional
+    public void discard(String slug, Long runId, Long userId, String reason) {
         DeliveryRun run = decidable(slug, runId, userId);
         withdraw(run);
         decided(run, DeliveryRunOutcome.DISCARDED, userId);
+        Map<String, Object> facts = new LinkedHashMap<>();
+        pullRequest(run).ifPresent(pr -> facts.put("pullRequest", "https://github.com/" + pr.repo() + "/pull/" + pr.number()));
+        gesture(run, "DISCARD", reason, facts);
         log.info("Run {} : résultat écarté par {}", runId, userId);
     }
 
@@ -127,10 +151,12 @@ public class MissionResultService {
     public DeliveryRunResponse retry(String slug, Long runId, Long userId, String note) {
         DeliveryRun run = decidable(slug, runId, userId);
         Issue issue = run.getIssue();
-        DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId);
+        DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId,
+            DeliveryService.Origin.retry(run.getId()));
         withdraw(run);
         decided(run, DeliveryRunOutcome.RETRIED, userId);
         if (note != null && !note.isBlank()) comment(slug, issue, "Try again: " + note.strip(), userId);
+        gesture(run, "RETRY", note, Map.of("nextRun", next.id()));
         log.info("Run {} : relancé par {}", runId, userId);
         return next;
     }
@@ -147,7 +173,8 @@ public class MissionResultService {
             comments.stream().map(MissionFollowUpRequest.Comment::path).collect(Collectors.toSet()));
         pullRequest(run).ifPresent(pr -> assertStillOpen(run, pr));
         Issue issue = run.getIssue();
-        DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId);
+        DeliveryRunResponse next = deliveryService.delegate(slug, issue.getId(), run.getProviderKey(), run.getModel(), userId,
+            DeliveryService.Origin.followUp(run.getId()));
         List<Map<String, Object>> asked = comments.stream().map(MissionResultService::commentData).toList();
         DeliveryRun followUp = runRepository.findById(next.id())
             .orElseThrow(() -> new ResourceNotFoundException("Run not found"));
@@ -160,6 +187,7 @@ public class MissionResultService {
         comment(slug, issue, askedComment(comments), userId);
         Map<String, Object> decision = new LinkedHashMap<>();
         decision.put("decision", "ASK_FOR_CHANGES");
+        decision.put("where", WHERE_TASKFORCE);
         decision.put("followUpRun", next.id());
         decision.put("comments", asked);
         evidenceService.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), decision);
@@ -209,7 +237,7 @@ public class MissionResultService {
         // Une mission encore en file n'a pas de dossier : il s'ouvre quand un runner la prend.
         if (working) {
             evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", person.getEmail()),
-                Map.of("decision", "STOP"));
+                Map.of("decision", "STOP", "where", WHERE_TASKFORCE));
         }
         LocalDateTime now = LocalDateTime.now();
         run.setOutcome(DeliveryRunOutcome.STOPPED);
@@ -279,6 +307,23 @@ public class MissionResultService {
         runRepository.save(run);
         issueService.logActivity(run.getIssue(), person, ACTIVITY.get(outcome), null, null, null);
         feed.run(run);
+    }
+
+    /** Où la décision de fin se prend quand la personne tranche dans l'app. */
+    static final String WHERE_TASKFORCE = "taskforce";
+
+    /**
+     * Le geste entre au dossier de la mission (R198 : les gestes de la personne sur le résultat, avec leur raison ; R212,
+     * rubrique 6 : la décision de fin, qui, quand, où) : à la suite de sa chaîne, qui se scelle de nouveau.
+     */
+    private void gesture(DeliveryRun run, String decision, String reason, Map<String, Object> facts) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("decision", decision);
+        data.put("where", WHERE_TASKFORCE);
+        if (reason != null && !reason.isBlank()) data.put("reason", reason.strip());
+        data.putAll(facts);
+        evidenceService.appendAfterEnd(run, "human.decision",
+            new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), data);
     }
 
     /** Ce que l'activité de l'issue garde de chaque geste. */

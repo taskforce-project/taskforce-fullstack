@@ -319,7 +319,10 @@ public class MissionChangesService {
             && row.binary() == file.binary() && row.truncated() == file.truncated() && row.withheld() == file.withheld();
     }
 
-    /** Ce que le dossier garde d'un relevé : chaque fichier, ses lignes et son empreinte, jamais son texte. */
+    /**
+     * Ce que le dossier garde d'un relevé : chaque fichier, ses lignes et son empreinte, jamais son texte. L'empreinte du
+     * contenu qui reste ({@code sha256}) retrouve l'écriture jugée par les règles qui l'a laissé (TF-J2-7, R198).
+     */
     private static Map<String, Object> snapshotData(RunnerChangesRequest request) {
         List<Map<String, Object>> files = new ArrayList<>();
         for (RunnerChangesRequest.File file : request.files()) {
@@ -329,6 +332,7 @@ public class MissionChangesService {
             entry.put("added", file.added());
             entry.put("removed", file.removed());
             entry.put("revision", file.revision());
+            if (file.sha256() != null) entry.put("sha256", file.sha256());
             files.add(entry);
         }
         Map<String, Object> data = new LinkedHashMap<>();
