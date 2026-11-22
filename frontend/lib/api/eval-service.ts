@@ -127,11 +127,13 @@ export interface EvalHistoryRun {
 }
 
 /**
- * D'où vient un cas. `incident` : TaskForce a corrigé la réponse (R116, l'incident de confiance d'E17) ; `answer` : une
- * réponse de Cortex dans une conversation ; `unknown` : le dossier n'est plus là, ou le cas a été écrit à la main.
+ * D'où vient un cas. `incident` : TaskForce a corrigé la réponse (R116, l'incident de confiance d'E17) ; `uncertain` :
+ * TaskForce a laissé une phrase qu'il ne rattachait à aucun geste, et dit à côté ce qui a été fait (relecture R159) ;
+ * `answer` : une réponse de Cortex dans une conversation ; `unknown` : le dossier n'est plus là, ou le cas a été écrit à
+ * la main.
  */
 export interface EvalCaseOrigin {
-  kind: "incident" | "answer" | "unknown"
+  kind: "incident" | "uncertain" | "answer" | "unknown"
   /** Ce que le modèle avait dit, que TaskForce a retiré. */
   said: string[]
   /** Ce que TaskForce a montré à la place. */

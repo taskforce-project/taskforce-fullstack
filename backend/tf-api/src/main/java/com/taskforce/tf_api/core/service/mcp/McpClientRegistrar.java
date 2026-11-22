@@ -53,7 +53,11 @@ public class McpClientRegistrar {
     /** Le client choisi : son identifiant, son secret (nul pour un client public) et sa provenance. */
     public record RegisteredClient(String clientId, String clientSecret, String source) {}
 
-    /** Aucun chemin d'inscription : ni client enregistré, ni CIMD, ni DCR. */
+    /**
+     * Aucun chemin d'inscription : ni client enregistré, ni CIMD, ni DCR, ou l'éditeur refuse l'inscription automatique.
+     * L'appelant le dit à la personne (l'étape de l'administrateur) : ce n'est pas un échec de la transaction, qu'il ne
+     * marque jamais pour l'annulation (R204 : « wasn't connected, and TaskForce can't tell why », 17/11/2026).
+     */
     public static class NoClient extends BusinessException {
         public NoClient(String message) {
             super(ConnectFailure.NO_CLIENT, message);
@@ -79,7 +83,7 @@ public class McpClientRegistrar {
      * administrateur ({@code manager}), qui l'épingle en aboutissant ({@link #pinCompanyIssuer}). Tout autre émetteur passe
      * par CIMD ou l'inscription dynamique, sans secret de l'entreprise ni de TaskForce.
      */
-    @Transactional
+    @Transactional(noRollbackFor = NoClient.class)
     public RegisteredClient clientFor(Long workspaceId, String connectorKey, DiscoveredAuth auth, String redirectUri,
                                       boolean officialServer, boolean manager) {
         // 1. Un client enregistré d'avance, chez l'émetteur épinglé seulement : celui de l'entreprise, puis le nôtre.
@@ -100,7 +104,7 @@ public class McpClientRegistrar {
         if (auth.cimdSupported() && cimd != null && cimdServes(cimd, redirectUri)) {
             return new RegisteredClient(cimd, null, CIMD);
         }
-        // 3. L'inscription dynamique, gardée par émetteur.
+        // 3. L'inscription dynamique, gardée par émetteur ; un éditeur qui la refuse mène à l'étape de l'administrateur.
         if (auth.registrationEndpoint() != null) return dynamic(auth, redirectUri);
         throw new NoClient("This tool doesn't let TaskForce register on its own: its admin has to set up an app.");
     }
@@ -111,7 +115,7 @@ public class McpClientRegistrar {
      * {@code <préfixe>_CLIENT_SECRET} ({@code TF_GOOGLE}, {@code TF_MICROSOFT} ; jamais dans le dépôt) ; sinon
      * {@link NoClient}.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = NoClient.class)
     public RegisteredClient clientForApi(Long workspaceId, String connectorKey, String envPrefix) {
         ConnectorApp company = connectorKey == null ? null
             : apps.findByWorkspaceIdAndConnectorKey(workspaceId, connectorKey).orElse(null);
@@ -178,7 +182,18 @@ public class McpClientRegistrar {
     private RegisteredClient dynamic(DiscoveredAuth auth, String redirectUri) {
         McpOAuthRegistration known = registrations.findByIssuerAndRedirectUri(auth.issuer(), redirectUri).orElse(null);
         if (known != null) return new RegisteredClient(known.getClientId(), blankToNull(known.getClientSecret()), DCR);
-        JsonNode reg = client.postJson(auth.registrationEndpoint(), dcrBody(redirectUri));
+        JsonNode reg;
+        try {
+            reg = client.postJson(auth.registrationEndpoint(), dcrBody(redirectUri));
+        } catch (BusinessException refused) {
+            // L'éditeur refuse d'inscrire TaskForce (Dropbox, 16/11/2026 : HTTP 403 « registration_not_supported ») :
+            // comme sans inscription possible, l'étape de l'administrateur (R204). Une réponse sans identifiant reste
+            // REGISTRATION_REFUSED, plus bas : l'éditeur a accepté, et sa réponse est fausse.
+            if (!refusesToRegister(refused)) throw refused;
+            log.info("Inscription dynamique refusée par {} : l'étape de l'administrateur à la place ({})",
+                LogSafe.of(auth.issuer()), LogSafe.of(refused.getMessage()));
+            throw new NoClient("This tool refuses to let TaskForce register on its own: its admin has to set up an app.");
+        }
         String clientId = reg.path("client_id").asText(null);
         if (clientId == null || clientId.isBlank()) {
             throw ConnectFailure.of(ConnectFailure.REGISTRATION_REFUSED, "The DCR response has no client_id");
@@ -187,6 +202,17 @@ public class McpClientRegistrar {
         registrations.save(McpOAuthRegistration.builder().issuer(auth.issuer()).redirectUri(redirectUri)
             .clientId(clientId).clientSecret(secret).build());
         return new RegisteredClient(clientId, secret, DCR);
+    }
+
+    /**
+     * L'éditeur refuse-t-il d'inscrire TaskForce, plutôt que de refuser cette demande-là (relecture R159 de la PR #548) : un
+     * 401 ou un 403, ou l'erreur {@code registration_not_supported}. Une autre erreur (une adresse de retour refusée, des
+     * métadonnées invalides) reste un échec de l'inscription, que l'écran dit comme tel.
+     */
+    private static boolean refusesToRegister(BusinessException refused) {
+        if (!ConnectFailure.REGISTRATION_REFUSED.equals(refused.getErrorCode())) return false;
+        if (!(refused instanceof McpOAuthClient.OAuthError error)) return false;
+        return error.status() == 401 || error.status() == 403 || "registration_not_supported".equals(error.error());
     }
 
     /** Le corps de l'inscription : un client public (PKCE), du type de l'app qui le présente (norme MCP). */

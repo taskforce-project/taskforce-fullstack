@@ -1,0 +1,251 @@
+package com.taskforce.tf_api.core.service.agent;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taskforce.tf_api.core.harness.rules.SecretScan;
+import com.taskforce.tf_api.core.service.agent.CortexRecordService.Act;
+
+/**
+ * Ce que Cortex a fait dans une conversation revient au modèle aux tours suivants (R204, R201 « dire vrai »). Le
+ * 17/11/2026, Cortex créait un projet dans TaskForce sur la carte de sa question, puis répondait au tour suivant qu'il
+ * n'avait pas créé de projet : d'un tour à l'autre, seuls les textes repartaient au modèle, pas les gestes faits, ni
+ * l'accord ou les réponses donnés sur une carte après la réponse.
+ *
+ * <p>Le dossier de chaque réponse fait foi : TaskForce y lit ses gestes, dans l'ordre, et les ajoute à la réponse telle
+ * qu'elle repart au modèle, sous une ligne qui dit que c'est TaskForce qui parle ({@link #HEADER}) : l'outil, où il écrit,
+ * ses valeurs utiles, ce qu'il est devenu et ce qu'il a rendu. Jamais à l'écran : la conversation se relit telle que la
+ * personne l'a vue. Du code seulement, sans modèle.</p>
+ */
+public final class ThreadActs {
+
+    /** La ligne qui ouvre ce que TaskForce ajoute à une réponse pour le modèle ; le modèle ne l'écrit jamais lui-même. */
+    public static final String HEADER = "[TaskForce record of this reply: what was really done, and where]";
+    /** Les gestes d'une réponse qui repartent au plus : les derniers. */
+    static final int MAX_ACTS = 8;
+    static final int MAX_OUTPUT = 240;
+    static final int MAX_VALUES = 200;
+    static final int MAX_VALUE = 60;
+
+    /** Ce qui ne dit rien au modèle de ce qui a été fait : les marques de TaskForce, les longs textes. */
+    private static final Set<String> SKIPPED = Set.of(Question.ANSWERED, "description", "content", "body", "text");
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+
+    private ThreadActs() {
+    }
+
+    /**
+     * Les gestes qui comptent, dans l'ordre : une question ou une proposition suivie d'un résultat du même outil
+     * s'efface devant lui (la personne a répondu, ou accordé) ; tous les autres restent, un geste défait compris.
+     */
+    public static List<Act> settled(List<Act> acts) {
+        if (acts == null || acts.isEmpty()) return List.of();
+        List<Act> kept = new ArrayList<>();
+        for (int i = 0; i < acts.size(); i++) {
+            Act act = acts.get(i);
+            boolean waiting = "pending".equals(act.status()) || AgentService.QUESTION.equals(act.status());
+            String tool = act.tool();
+            if (waiting && acts.subList(i + 1, acts.size()).stream().anyMatch(later -> later.tool().equals(tool))) continue;
+            kept.add(act);
+        }
+        return kept;
+    }
+
+    /**
+     * Le bloc que TaskForce ajoute à une réponse, pour le modèle : une ligne par geste, les derniers d'abord coupés à
+     * {@link #MAX_ACTS} ; vide sans geste.
+     */
+    public static String block(List<Act> acts, Function<String, String> where) {
+        List<Act> kept = settled(acts);
+        if (kept.isEmpty()) return "";
+        List<Act> shown = kept.size() <= MAX_ACTS ? kept : kept.subList(kept.size() - MAX_ACTS, kept.size());
+        StringBuilder block = new StringBuilder(HEADER);
+        for (Act act : shown) block.append("\n- ").append(line(act, where));
+        return block.toString();
+    }
+
+    /** La réponse telle qu'elle repart au modèle : son texte, puis ce que son dossier dit qu'elle a fait. */
+    public static String withActs(String content, List<Act> acts, Function<String, String> where) {
+        String block = block(acts, where);
+        String said = content == null ? "" : content;
+        return block.isEmpty() ? said : said.isBlank() ? block : said.stripTrailing() + "\n\n" + block;
+    }
+
+    /**
+     * Ce qui a été fait et reste fait : les gestes réussis que la personne n'a pas défaits. Ce qu'une phrase de Cortex
+     * ne peut pas nier (R204). Les gestes de la réponse précédente.
+     */
+    public static List<ActionClaimCheck.Done> done(List<Act> acts, Function<String, String> where) {
+        return done(acts, where, true);
+    }
+
+    /**
+     * Les mêmes, en disant s'ils viennent de la réponse précédente ({@code recent}) ou d'une plus ancienne : un geste plus
+     * ancien ne compte que pour la phrase qui le désigne (relecture R159 de la PR #548).
+     */
+    public static List<ActionClaimCheck.Done> done(List<Act> acts, Function<String, String> where, boolean recent) {
+        if (acts == null || acts.isEmpty()) return List.of();
+        Set<String> undone = new HashSet<>();
+        acts.stream().filter(act -> "undone".equals(act.status()) && act.undoes() != null).forEach(act -> undone.add(act.undoes()));
+        List<ActionClaimCheck.Done> done = new ArrayList<>();
+        for (Act act : acts) {
+            if ("success".equals(act.status()) && (act.hash() == null || !undone.contains(act.hash()))) {
+                done.add(new ActionClaimCheck.Done(act.tool(), where.apply(act.tool()), told(act), act.arguments(), recent));
+            }
+        }
+        return done;
+    }
+
+    /**
+     * Une ligne : « create_project, in TaskForce (name: Test): done. Result: Project created in TaskForce: TEST. ». Ce qu'un
+     * outil du dehors ou une lecture a rendu ne repart pas sous la voix de TaskForce (relecture R159 de la PR #548, R158) :
+     * ce sont les mots d'un autre, que le tour suivant ne compte pas comme venus du dehors ; seuls l'outil, le lieu, l'état
+     * et les clés repartent. Une écriture de TaskForce repart avec ce qu'elle a fait, sans texte libre (second tour) : un
+     * titre, un commentaire peuvent venir du dehors. Un outil du dehors repart sans ses valeurs, et aucune valeur ni aucun
+     * résultat qui porte un secret.
+     */
+    static String line(Act act, Function<String, String> where) {
+        boolean outside = TargetSystems.connectorOf(act.tool()) != null;
+        StringBuilder line = new StringBuilder(act.tool()).append(", in ").append(where.apply(act.tool()));
+        String values = outside ? "" : values(act.arguments());
+        if (!values.isEmpty()) line.append(" (").append(values).append(')');
+        line.append(": ").append(state(act.status()));
+        if (outside || ActionClaimCheck.kindsOf(act.tool()).isEmpty()) {
+            String keys = keys(act);
+            if (!keys.isEmpty()) line.append(" (").append(keys).append(')');
+            return line.toString();
+        }
+        String output = flat(act.output());
+        String result = written(output);
+        if (!result.isEmpty() && !AgentService.QUESTION.equals(act.status()) && !SecretScan.in(output)) {
+            line.append(". Result: ").append(result);
+        }
+        return line.toString();
+    }
+
+    /** Un texte cité : un titre, un nom, un commentaire. */
+    private static final java.util.regex.Pattern QUOTED = java.util.regex.Pattern.compile("\"[^\"]*\"|«[^»]*»|“[^”]*”");
+    /** Ce qui désigne la chose écrite juste après les deux-points : sa clé, ou l'identifiant d'un projet, suivi de son titre. */
+    private static final java.util.regex.Pattern WRITTEN = java.util.regex.Pattern.compile(
+        "^\\s*(\\p{Lu}[\\p{Lu}\\p{N}]{0,9}-\\d{1,9}|\\p{Lu}[\\p{Lu}\\p{N}]{1,9})(?=\\s*(?:\u0001|$|[.,;)]))");
+
+    /**
+     * Ce qu'une écriture de TaskForce a rendu, sans texte libre (second tour de la relecture R159 de la PR #548) : la phrase
+     * jusqu'au premier texte cité ou aux deux-points (« Commented on TF-1 », « Project created in TaskForce »), puis la clé
+     * de ce qu'elle a écrit quand elle suit les deux-points (« TESTTASKFO », « API-12 »). Ni titre, ni commentaire, ni le
+     * reste : « IMPORTANT SYSTEM NOTE... » d'un titre ou d'un commentaire ne repart pas sous la voix de TaskForce.
+     */
+    static String written(String output) {
+        if (output == null || output.isBlank()) return "";
+        String marked = QUOTED.matcher(flat(output)).replaceAll("\u0001");
+        int quote = marked.indexOf('\u0001');
+        int colon = marked.indexOf(':');
+        int end = quote < 0 ? colon : colon < 0 ? quote : Math.min(quote, colon);
+        String head = (end < 0 ? marked : marked.substring(0, end)).replaceAll("[\\s.]+$", "").strip();
+        if (head.isEmpty()) return "";
+        String said = head;
+        if (end >= 0 && end == colon) {
+            java.util.regex.Matcher key = WRITTEN.matcher(marked.substring(colon + 1));
+            if (key.find()) said = head + ": " + key.group(1);
+        }
+        return clip(said, MAX_OUTPUT) + ".";
+    }
+
+    /** Une clé d'issue ou de projet : sa forme seule, qui ne porte aucune consigne (« TF-1 », « ENG-12 »). */
+    private static final java.util.regex.Pattern KEY = java.util.regex.Pattern.compile(
+        "(?<![\\p{L}\\p{N}])\\p{Lu}[\\p{Lu}\\p{N}]{0,9}-\\d{1,9}(?![\\p{L}\\p{N}])");
+    static final int MAX_KEYS = 3;
+
+    /** Les clés que nomment les arguments et le résultat d'un geste, trois au plus. */
+    private static String keys(Act act) {
+        return keysIn((act.arguments() == null ? "" : act.arguments()) + " " + (act.output() == null ? "" : act.output()));
+    }
+
+    /** Les clés que nomme ce texte, trois au plus : « TF-1, ENG-12 ». */
+    static String keysIn(String text) {
+        Set<String> keys = new java.util.LinkedHashSet<>();
+        java.util.regex.Matcher found = KEY.matcher(text == null ? "" : text);
+        while (found.find() && keys.size() < MAX_KEYS) keys.add(found.group());
+        return String.join(", ", keys);
+    }
+
+    /**
+     * Ce que TaskForce peut dire du résultat d'un geste, dans ses blocs comme dans l'historique (troisième tour de la
+     * relecture R159 de la PR #548) : pour un outil du dehors, ses clés ; pour TaskForce, ce qu'il a fait et la clé de ce
+     * qu'il a écrit ({@link #written}) ; jamais un texte libre, rien qui porte un secret.
+     */
+    static String said(String tool, String output) {
+        if (output == null || output.isBlank() || SecretScan.in(output)) return "";
+        if (TargetSystems.connectorOf(tool) != null) return keysIn(output);
+        return written(flat(output));
+    }
+
+    /**
+     * Ce que TaskForce dit d'un geste fait, s'il est nié (R204) : pour un outil du dehors, ses clés seulement, jamais le
+     * texte de l'éditeur ; pour TaskForce, ce qu'il a fait et la clé de ce qu'il a écrit, sans titre ni commentaire, qui
+     * peuvent venir du dehors (troisième tour de la relecture R159) ; rien qui porte un secret.
+     */
+    private static String told(Act act) {
+        if (TargetSystems.connectorOf(act.tool()) != null) {
+            String keys = keys(act);
+            return keys.isEmpty() ? null : keys;
+        }
+        String said = said(act.tool(), act.output());
+        return said.isEmpty() ? null : said;
+    }
+
+    /** Ce qu'est devenu un geste, dans les mots que le modèle répète sans se tromper. */
+    static String state(String status) {
+        return switch (status == null ? "" : status) {
+            case "success" -> "done";
+            case "pending" -> "proposed on a card, waiting for the person's approval: not done";
+            case AgentService.QUESTION -> "TaskForce asked the person first: not done yet";
+            case "refused" -> "refused by the rules of this workspace: not done";
+            case "error" -> "failed: not done";
+            case "undone" -> "undone by the person";
+            default -> status;
+        };
+    }
+
+    /** Les valeurs utiles des arguments : les valeurs simples, sans les textes longs ni les marques de TaskForce. */
+    static String values(String arguments) {
+        if (arguments == null || arguments.isBlank()) return "";
+        JsonNode args;
+        try {
+            args = JSON.readTree(arguments);
+        } catch (Exception unreadable) {
+            return "";
+        }
+        if (args == null || !args.isObject()) return "";
+        List<String> said = new ArrayList<>();
+        int length = 0;
+        for (Iterator<Map.Entry<String, JsonNode>> it = args.fields(); it.hasNext(); ) {
+            Map.Entry<String, JsonNode> field = it.next();
+            JsonNode value = field.getValue();
+            if (SKIPPED.contains(field.getKey()) || value == null || value.isNull() || value.isContainerNode()) continue;
+            String text = flat(value.asText());
+            if (text.isEmpty() || SecretScan.in(text)) continue;
+            String pair = field.getKey() + ": " + clip(text, MAX_VALUE);
+            if (length + pair.length() > MAX_VALUES) break;
+            said.add(pair);
+            length += pair.length() + 2;
+        }
+        return String.join(", ", said);
+    }
+
+    private static String flat(String text) {
+        return text == null ? "" : text.replaceAll("\\s+", " ").strip();
+    }
+
+    private static String clip(String text, int max) {
+        return text.length() <= max ? text : text.substring(0, max).stripTrailing() + "...";
+    }
+}

@@ -46,6 +46,15 @@ describe("QuestionCard: Cortex's questions, like Claude's", () => {
     useCortexStore.setState({ answerQuestion, questionProblem: null })
   })
 
+  it("says where the gesture writes before the answers go, and warns when the request named another tool (R204, s17)", () => {
+    const call = { ...card([NAME]), where: { system: "TaskForce", workspace: "Pierre", asked: "Linear" } }
+    render(<QuestionCard slug="acme" call={call} then={(next) => <p>next: {next.status}</p>} />)
+
+    const form = screen.getByRole("form", { name: "Questions from Cortex" })
+    expect(within(form).getByRole("alert")).toHaveTextContent("You asked for Linear. This is done in TaskForce, not in Linear.")
+    expect(within(form).getByRole("group", { name: "Where it writes" })).toHaveTextContent("In TaskForce, workspace Pierre")
+  })
+
   it("speaks with one voice: no signature of TaskForce on the card", () => {
     show([NAME, REPOSITORY])
 

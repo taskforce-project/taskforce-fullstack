@@ -41,6 +41,7 @@ import { StoppedNotice } from "./stopped-notice"
 import { UndoAction } from "./undo-action"
 import { UserMessage } from "./user-message"
 import { WorkedLine, WorkingLine } from "./work-line"
+import { WriteTarget } from "./write-target"
 
 /**
  * Plafond mensuel de tokens IA de l'instance atteint (HTTP 409) - carte d'**information** (pas
@@ -128,6 +129,8 @@ function PendingAction({ slug, call }: { slug: string; call: AssistantToolCall }
   return (
     <div className="my-2 flex flex-col gap-2 border border-shape-yellow/35 bg-shape-yellow/[0.06] p-2.5 text-xs">
       <ProposalSentence said={proposal(call.name, t, call.input)} />
+      {/* Où l'action écrit, avant le geste (R204) : TaskForce ou l'outil connecté, et l'outil demandé quand c'est ailleurs. */}
+      <WriteTarget where={call.where} />
       {args.length > 0 && (
         <div className="flex flex-col gap-1">
           <DisclosureButton open={details} onToggle={() => setDetails((v) => !v)}>

@@ -146,7 +146,10 @@ public class WorkspaceMcpService {
         }
     }
 
-    /** Un serveur local accordé par la personne demande cet accord explicite avant d'être enregistré. */
+    /**
+     * Un serveur local accordé par la personne demande cet accord explicite avant d'être enregistré. La connexion le dit à
+     * la personne : la transaction qui la porte n'est pas marquée pour l'annulation (R204).
+     */
     public static class LocalServerNeedsApproval extends BusinessException {
         public LocalServerNeedsApproval(String host) {
             super(ConnectFailure.LOCAL_NEEDS_APPROVAL, "This server runs on your computer or your local network (" + host + "). Connect it only if you "
@@ -296,7 +299,7 @@ public class WorkspaceMcpService {
      * une instance qui l'admet (l'app desktop) et avec l'accord explicite de la personne. Renvoie la clé et le nom
      * retenus.
      */
-    @Transactional
+    @Transactional(noRollbackFor = LocalServerNeedsApproval.class)
     public ServerIdentity connectServer(Workspace ws, User person, ServerRequest req) {
         authorization.requireForConnection(ws.getId(), person == null ? null : person.getId(), req.shared());
         String mcpUrl = req.mcpUrl() == null ? "" : req.mcpUrl().trim();

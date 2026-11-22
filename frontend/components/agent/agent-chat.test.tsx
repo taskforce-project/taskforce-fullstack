@@ -94,6 +94,15 @@ describe("AgentChat : le fil", () => {
     expect(await screen.findByText("Done. Delegated SOLO-151.")).toBeInTheDocument()
   })
 
+  it("la carte d'une écriture dit où elle écrit, et avertit quand la demande nommait un autre outil (R204, s17)", () => {
+    const where = { system: "TaskForce", workspace: "Pierre", asked: "Linear" }
+    show([said("u1", "Crée un projet Test dans Linear"), replied("a1", { toolCalls: [call("create_project", "pending", { where })] })])
+
+    expect(screen.getByRole("alert")).toHaveTextContent("You asked for Linear. This is done in TaskForce, not in Linear.")
+    expect(screen.getByRole("group", { name: "Where it writes" })).toHaveTextContent("In TaskForce, workspace Pierre")
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument()
+  })
+
   it("une action dans un outil connecté dit ce qui sera fait, ses arguments sous Details, le bouton tel quel (R160)", () => {
     const input = JSON.stringify({ title: "Fix VAT rounding in the monthly ledger", teamId: "e3b0c442-98fc-1c14", priority: 2 })
     show([said("u1", "Crée l'issue"), replied("a1", { toolCalls: [call("linear__create_issue", "pending", { input })] })])

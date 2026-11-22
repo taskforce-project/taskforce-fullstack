@@ -683,6 +683,9 @@ export const CONSTANTS_EN = {
     // "Show all links" (decision of the CEO, 16/11/2026): every link between the cards on screen, as a blueprint.
     links: {
       show: "Show all links",
+      // R204: an empty view says it is empty (acceptance run of 1.17.0, step s09: the switch drew nothing, and said nothing).
+      // R159: about the cards shown, since a link to an archived issue or another project's is not drawn here.
+      none: "No links between these cards yet: a link appears when an issue blocks another.",
       more: "and {count} more links",
       countOne: "1 link",
       countMany: "{count} links",
@@ -1600,6 +1603,12 @@ export const CONSTANTS_EN = {
     // The card of an action that waits for the person's approval.
     proposes: "Cortex proposes to {what}. Nothing changes until you approve it.",
     proposesThis: "do this",
+    // Where a write lands, on its card, before the gesture (R204): TaskForce and its workspace, or the connected tool;
+    // and, when the request named another tool, that it is not there.
+    whereLabel: "Where it writes",
+    whereIn: "In {system}",
+    whereInWorkspace: "In {system}, workspace {workspace}",
+    whereElsewhere: "You asked for {asked}. This is done in {system}, not in {asked}.",
     proposesExternal: "Cortex proposes an action in {service}. Nothing is sent until you approve it.",
     // The card of an action in a connected tool (R160): the action in words and its main values, the arguments one
     // click away under "Details"
@@ -2244,6 +2253,8 @@ export const CONSTANTS_EN = {
     improved: "What improved it",
     improvedHint: "Each case someone kept from an answer, where it came from, and its result since.",
     originIncident: "From a trust incident on {date}: TaskForce corrected the answer.",
+    // R159: TaskForce left a sentence of Cortex it couldn't tie to an action, and said next to it what was done.
+    originUncertain: "From a trust incident on {date}: TaskForce couldn't tie what Cortex said to what was done, and said what was done next to it.",
     originSaid: "Cortex said: {text}",
     originShown: "TaskForce showed: {text}",
     originAnswer: "From an answer of Cortex on {date}.",
@@ -2486,6 +2497,18 @@ export const CONSTANTS_EN = {
     taskforceSaysWhat: "corrected what Cortex said was done",
     taskforceSaysLabel: "Correction by TaskForce",
     taskforceSaysHint: "Cortex said something was done, but no action of this turn did it. TaskForce replaced its sentence with what happened: these are not the model's words.",
+    // R204: the same correction when Cortex said something wasn't done that an action of this conversation did.
+    taskforceSaysDoneWhat: "corrected what Cortex said was not done",
+    taskforceSaysDoneHint: "Cortex said something wasn't done, but an action of this conversation did it. TaskForce replaced its sentence with what was done, and where: these are not the model's words.",
+    // R204: the tool the request named isn't connected, or only for reading: TaskForce says so, and how to fix it.
+    taskforceSaysConnectionsWhat: "about the tool you named",
+    taskforceSaysConnectionsLabel: "TaskForce about your connections",
+    taskforceSaysConnectionsHint: "TaskForce checked the tool you named in your request: whether Cortex can act there, and what to do if it can't. These are not the model's words.",
+    // R204, R159: next to a sentence of Cortex about an earlier action that TaskForce couldn't tie to one for sure, what
+    // this conversation really did. Cortex's sentence stays as it was: this is not a correction.
+    taskforceSaysRecordWhat: "what this conversation did",
+    taskforceSaysRecordLabel: "TaskForce on what this conversation did",
+    taskforceSaysRecordHint: "Cortex spoke of an earlier action. TaskForce left its words as they were and shows, next to them, what this conversation really did, and where: these are not the model's words.",
     // The issue Cortex prepares as a card (R78): the person checks it, edits it, then creates it.
     issueCardTitle: "New issue, prepared by Cortex",
     issueCardHint: "Filled from your request and the project",

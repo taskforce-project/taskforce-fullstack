@@ -240,6 +240,12 @@ class IssueMaterialTest {
     }
 
     @Test
+    @DisplayName("R204 (s14) : l'issue jointe se dit comme celle que « this task », « cette tâche » désignent")
+    void the_attached_issue_is_what_this_task_means() {
+        assertThat(IssueMaterial.ATTACHED).contains("\"this issue\"").contains("\"this task\"").contains("\"cette tâche\"");
+    }
+
+    @Test
     @DisplayName("jointe et nommée : lue une fois ; un projet joint (sans issue) n'est pas une issue ; rien sans pièce")
     void an_issue_attached_and_named_is_read_once() {
         ops35WithComments(0);
@@ -251,5 +257,37 @@ class IssueMaterialTest {
         verify(issueService).getIssue("acme", 30L, 350L, ME);
         assertThat(material.read(ctx(null), "bonjour", null, false)).isSameAs(IssueMaterial.Read.NOTHING);
         assertThat(IssueMaterial.Read.NOTHING.isEmpty()).isTrue();
+    }
+
+    @ParameterizedTest(name = "« {0} » nomme : {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+        // Relecture R159 (7) : seule une clé qui existe, et que la personne voit, nomme une issue.
+        "Et sur OPS-35 ?                      | OPS-35",
+        "Et sur ops 35 ?                      | OPS-35",
+        "Et qui bosse dessus dans 2 jours ?   | -",
+        "On fait ça au 30 ?                   | -",
+        "Et sur SEC-1 ?                       | -",
+    })
+    void only_an_existing_key_names_an_issue(String request, String key) {
+        List<com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject> named = material.namedSubjects(ctx(null), request);
+
+        assertThat(named).extracting(com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject::key)
+            .containsExactlyElementsOf(key == null ? List.of() : List.of(key));
+        if (key != null) {
+            assertThat(named.get(0).issueId()).isEqualTo(350L);
+            assertThat(named.get(0).projectId()).isEqualTo(30L);
+        }
+    }
+
+    @Test
+    @DisplayName("R159 (7) : l'issue de la conversation se relit par ses ids, avec les droits de la personne")
+    void the_issue_of_the_conversation_is_read_again_by_its_ids() {
+        when(issueService.getIssue("acme", 30L, 350L, ME)).thenReturn(ops35().build());
+
+        IssueMaterial.Read read = material.readEarlier(ctx(null),
+            new com.taskforce.tf_api.core.dto.response.AssistantAnswer.Subject("OPS-35", 350L, 30L));
+
+        assertThat(read.text()).startsWith(IssueMaterial.EARLIER).contains("Itération #35");
+        verify(projects, never()).findByWorkspaceIdAndIdentifier(any(), any());
     }
 }

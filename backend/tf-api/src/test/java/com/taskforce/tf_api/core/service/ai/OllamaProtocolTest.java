@@ -138,6 +138,41 @@ class OllamaProtocolTest {
             Arguments.of("llama2", "[\"completion\"]", "[INST] <<SYS>>{{ .System }}<</SYS>> {{ .Prompt }} [/INST]", true));
     }
 
+    @Test
+    @DisplayName("la fiche de mimo-v2.6:9b (16/11/2026) : sa famille et son analyseur disent le Qwen3.5 que son nom tait")
+    void theCardOfMimo() throws Exception {
+        ModelGateway.ModelCard card = OllamaProtocol.card(json(FakeOllama.MIMO_SHOW));
+
+        assertThat(card).isEqualTo(new ModelGateway.ModelCard("9.0B", 262_144, true, "qwen35", true, null, "qwen3.5"));
+        assertThat(OllamaProtocol.qwen3(card)).isTrue();
+    }
+
+    @ParameterizedTest(name = "famille {0}, analyseur {1} : {2}")
+    @CsvSource(nullValues = "-", value = {
+        // mimo-v2.6:9b et qwen3.5:9b le 16/11/2026.
+        "qwen35,   qwen3.5,     true",
+        "qwen35,   -,           true",
+        "-,        qwen3.5,     true",
+        "qwen3,    -,           true",
+        "QWEN3MOE, qwen3-coder, true",
+        // Qwen2 et Qwen2.5 ne raisonnent pas ; un autre modèle non plus pour Qwen.
+        "qwen2,    -,           false",
+        "llama,    -,           false",
+        "gptoss,   harmony,     false",
+        "-,        -,           false",
+    })
+    @DisplayName("un Qwen3 se reconnaît à sa famille ou à l'analyseur d'Ollama, quand son nom ne le dit pas")
+    void aQwen3ByItsCard(String family, String parser, boolean qwen3) {
+        assertThat(OllamaProtocol.qwen3(new ModelGateway.ModelCard(null, null, null, family, null, null, parser))).isEqualTo(qwen3);
+    }
+
+    @Test
+    @DisplayName("sans fiche, ce n'est pas un Qwen3")
+    void noCardIsNoQwen3() {
+        assertThat(OllamaProtocol.qwen3(null)).isFalse();
+        assertThat(OllamaProtocol.qwen3(ModelGateway.ModelCard.NONE)).isFalse();
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("realCards")
     @DisplayName("un modèle sait-il converser ? ses capacités, puis son gabarit")
@@ -196,18 +231,27 @@ class OllamaProtocolTest {
         assertThat(OllamaProtocol.nativeBase(base)).isEqualTo(expected);
     }
 
-    static Stream<Arguments> requests() {
+    static Stream<Arguments> requests() throws Exception {
+        ModelGateway.ModelCard mimo = OllamaProtocol.card(json(FakeOllama.MIMO_SHOW));
+        ModelGateway.ModelCard llama = OllamaProtocol.card(json("{\"details\":{\"family\":\"llama\"},\"capabilities\":[\"completion\",\"tools\"]}"));
         return Stream.of(
-            Arguments.of("qwen3:8b", false, false, "hi /no_think", false),
-            Arguments.of("qwen3:8b", true, false, "hi", null),
-            Arguments.of("llama3.1:8b", false, true, "hi", null));
+            Arguments.of("qwen3:8b", ModelGateway.ModelCard.NONE, false, false, "hi /no_think", false),
+            Arguments.of("qwen3:8b", ModelGateway.ModelCard.NONE, true, false, "hi", null),
+            Arguments.of("llama3.1:8b", ModelGateway.ModelCard.NONE, false, true, "hi", null),
+            Arguments.of("llama3.1:8b", llama, false, false, "hi", null),
+            // Un Qwen3.5 sous un autre nom : sa fiche le dit, le réglage natif suffit, sans directive dans son texte.
+            Arguments.of(FakeOllama.MIMO, mimo, false, false, "hi", false),
+            Arguments.of(FakeOllama.MIMO, mimo, false, true, "hi", false),
+            Arguments.of(FakeOllama.MIMO, mimo, true, false, "hi", null),
+            // Sans fiche lisible, son nom ne dit rien : il raisonne, comme avant.
+            Arguments.of(FakeOllama.MIMO, ModelGateway.ModelCard.NONE, false, false, "hi", null));
     }
 
-    @ParameterizedTest(name = "{0}, raisonnement {1}, JSON {2}")
+    @ParameterizedTest(name = "{0}, raisonnement {2}, JSON {3}")
     @MethodSource("requests")
     @DisplayName("la requête : sans flux, la température dans les options, Qwen3 sans raisonnement, le mode JSON")
-    void request(String model, boolean think, boolean jsonMode, String lastMessage, Boolean thinkField) {
-        ObjectNode body = OllamaProtocol.request(JSON, List.of(Map.of("role", "user", "content", "hi")), model, think,
+    void request(String model, ModelGateway.ModelCard card, boolean think, boolean jsonMode, String lastMessage, Boolean thinkField) {
+        ObjectNode body = OllamaProtocol.request(JSON, List.of(Map.of("role", "user", "content", "hi")), model, card, think,
             jsonMode, 0.4);
 
         assertThat(body.path("model").asText()).isEqualTo(model);

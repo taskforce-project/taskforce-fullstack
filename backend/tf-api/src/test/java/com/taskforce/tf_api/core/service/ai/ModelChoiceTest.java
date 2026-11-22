@@ -17,6 +17,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ModelChoiceTest {
 
     private static final List<String> OLLAMA = List.of("nomic-embed-text:latest", "llama3.1:8b", "bge-m3:latest", "qwen3:8b");
+    /** Les modèles du poste de la Présidence le 16/11/2026, dans l'ordre d'Ollama : qwen3:8b et qwen2.5:7b-instruct retirés. */
+    private static final List<String> PRESIDENCY = List.of("mimo-v2.6:9b", "qwen3.5:9b", "qwen3-embedding:0.6b", "bge-m3:latest");
+
+    @Test
+    @DisplayName("les préférences : les modèles locaux d'aujourd'hui d'abord, les anciens ensuite")
+    void todaysLocalModelsFirst() {
+        assertThat(ModelChoice.CHAT_PREFERENCES).startsWith("qwen3.5:9b", "mimo-v2.6:9b")
+            .containsSubsequence("mimo-v2.6:9b", "qwen3:8b", "qwen2.5:7b-instruct", "qwen3:4b", "llama3.1:8b")
+            .doesNotHaveDuplicates();
+    }
 
     private static AiProviderSettings settings(Map<String, String> env) {
         return AiProviderSettings.from(env::get);
@@ -63,6 +73,8 @@ class ModelChoiceTest {
             // Anthropic sans modèle préféré : le premier annoncé (le plus récent), lui aussi pour les réponses rapides.
             Arguments.of(Map.of("AI_PROVIDER", "anthropic"), List.of("claude-next-1", "claude-old-0"), "claude-next-1",
                 "claude-next-1"),
+            // Le poste de la Présidence le 16/11/2026, dans l'ordre d'Ollama : le premier modèle des préférences, pas le dernier installé.
+            Arguments.of(Map.of("AI_PROVIDER", "ollama"), PRESIDENCY, "qwen3.5:9b", "qwen3.5:9b"),
             // Le fournisseur ne répond pas : rien à choisir.
             Arguments.of(Map.of("AI_PROVIDER", "ollama"), null, null, null));
     }
@@ -111,6 +123,11 @@ class ModelChoiceTest {
                 List.of("qwen2.5-coder:7b-base", "qwen3-embedding:0.6b", "qwen3:14b", "bge-m3:latest", "qwen2.5:7b-instruct",
                     "qwen3:8b"),
                 List.of("qwen3:8b", "qwen2.5:7b-instruct", "qwen2.5-coder:7b-base", "qwen3:14b")),
+            // Le 16/11/2026 : qwen3.5:9b puis mimo-v2.6:9b, quel que soit l'ordre d'Ollama ; sans vecteurs.
+            Arguments.of(AiProvider.OLLAMA, PRESIDENCY, List.of("qwen3.5:9b", "mimo-v2.6:9b")),
+            // Les anciens et les nouveaux ensemble : les nouveaux d'abord.
+            Arguments.of(AiProvider.OLLAMA, List.of("qwen2.5:7b-instruct", "qwen3:8b", "mimo-v2.6:9b", "qwen3.5:9b"),
+                List.of("qwen3.5:9b", "mimo-v2.6:9b", "qwen3:8b", "qwen2.5:7b-instruct")),
             // Groq : la voix, la transcription et les filtres de sécurité ne conversent pas.
             Arguments.of(AiProvider.OPENAI,
                 List.of("whisper-large-v3", "openai/gpt-oss-120b", "meta-llama/llama-guard-4-12b", "playai-tts",

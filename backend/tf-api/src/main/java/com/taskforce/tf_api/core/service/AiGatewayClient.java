@@ -30,7 +30,8 @@ import lombok.extern.slf4j.Slf4j;
  * {@code fast} le modèle rapide, {@code deep} le modèle principal qui raisonne, sinon le modèle principal.
  *
  * <p>Quand l'IA n'est pas disponible ({@link AiStatusService}), l'appel échoue tout de suite au lieu d'attendre le
- * délai de lecture : les appelants passent à leur repli sans bloquer la requête.</p>
+ * délai de lecture : les appelants passent à leur repli sans bloquer la requête. Un appel qui nomme son modèle (la banque,
+ * le banc) ne demande que ce modèle au fournisseur, pas ceux des réglages.</p>
  */
 @Service
 @Slf4j
@@ -148,12 +149,15 @@ public class AiGatewayClient implements LlmClient {
         TurnStop.check();
         AiStatusService.Snapshot snapshot = status.snapshot();
         AiStatus current = snapshot.status();
-        if (!current.chatAvailable()) {
+        // Le modèle nommé d'abord (rejeu de la banque, R61 ; le banc des modèles, R142), puis celui que la personne a
+        // choisi pour cette action (R113, R118), sinon celui du palier.
+        boolean named = model != null && !model.isBlank();
+        String chosen = named ? model : modelOf(tier, current);
+        if (named) {
+            requireServed(snapshot, chosen);
+        } else if (!current.chatAvailable()) {
             throw new LlmException("AI is not available on this instance", null);
         }
-        // Le modèle nommé d'abord (rejeu de la banque, R61), puis celui que la personne a choisi pour cette action
-        // (R113, R118), sinon celui du palier.
-        String chosen = model != null && !model.isBlank() ? model : modelOf(tier, current);
         boolean think = "deep".equals(tier);
         try {
             ModelGateway.ChatReply reply = gateway.chat(settingsOf(snapshot),
@@ -179,6 +183,27 @@ public class AiGatewayClient implements LlmClient {
             status.invalidate(); // le fournisseur est peut-être tombé : on relira son état au prochain appel
             throw new LlmException("AI service unavailable: " + ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Un modèle nommé (la banque, le banc et ses mesures) ne demande que le fournisseur et lui-même : les modèles des réglages
+     * n'y sont pour rien. Le 16/11/2026, le banc refusait ainsi mimo-v2.6:9b, installé, parce que qwen3:8b, que nommaient les
+     * réglages, ne l'était plus : « stopped answering », sans qu'Ollama ait reçu une question ni que le journal en dise rien.
+     * Quand il ne peut pas répondre, l'échec dit pourquoi ({@link com.taskforce.tf_api.core.service.ai.ModelFailure}), et le
+     * journal le garde.
+     */
+    private static void requireServed(AiStatusService.Snapshot snapshot, String model) {
+        ModelProviderException why;
+        if (!snapshot.settings().enabled() || !snapshot.reachable()) {
+            why = new ModelProviderException.Unreachable("AI is not available on this instance", null);
+        } else if (!ModelChoice.listed(snapshot.models(), model)) {
+            why = ModelProviderException.notServed(model);
+        } else {
+            return;
+        }
+        log.warn("AI provider can't answer with {}: {}", LogSafe.of(model), LogSafe.of(why.getMessage()));
+        // Le message reste lisible là où il se montre tel quel (la mission d'un agent à l'essai) : la cause, pas un code.
+        throw new LlmException(why.getMessage(), why);
     }
 
     /** Les réglages de cet appel : le temps qu'il reste au cas du banc en cours (R142), sinon le délai général de l'IA. */

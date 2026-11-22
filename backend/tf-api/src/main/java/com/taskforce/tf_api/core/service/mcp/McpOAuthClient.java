@@ -121,9 +121,10 @@ public class McpOAuthClient {
                     .header("Content-Type", "application/json"),
                 url, "application/json");
             JsonNode node = readJson(r);
-            // Un 5xx : l'inscription de l'éditeur ne répond pas ; elle ne refuse rien (R159).
-            requireSuccess(r, node, "DCR " + url,
-                r.statusCode() / 100 == 5 ? ConnectFailure.SIGN_IN_UNREACHABLE : ConnectFailure.REGISTRATION_REFUSED);
+            // Un 5xx, ou trop de demandes (429) : l'inscription de l'éditeur ne répond pas pour l'instant ; elle ne refuse rien
+            // (R159, relecture R159 de la PR #548).
+            boolean busy = r.statusCode() / 100 == 5 || r.statusCode() == 429;
+            requireSuccess(r, node, "DCR " + url, busy ? ConnectFailure.SIGN_IN_UNREACHABLE : ConnectFailure.REGISTRATION_REFUSED);
             return node;
         } catch (BusinessException be) {
             throw be;

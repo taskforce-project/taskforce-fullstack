@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { LinkedText } from "./answer-links"
 import { UndoAction } from "./undo-action"
+import { WriteTarget } from "./write-target"
 
 type CardState = "draft" | "creating" | "created" | "failed"
 
@@ -154,6 +155,8 @@ export function IssueDraftCard({ slug, call }: { slug: string; call: AssistantTo
         <p className="text-muted-foreground">{t.issueCardHint}</p>
       </div>
       <div className="flex flex-col gap-2.5 px-3 py-2.5">
+        {/* Où l'issue se créera (R204) : TaskForce et son espace, et l'outil demandé quand la demande en nommait un autre. */}
+        <WriteTarget where={call.where} />
         <dl className="grid grid-cols-[96px_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5">
           <dt className="text-muted-foreground">{t.issueProject}</dt>
           <dd className="min-w-0">

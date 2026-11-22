@@ -73,6 +73,14 @@ public class EvalCase {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String criteria;
 
+    /**
+     * Ce qui entoure la question (V134, R204), en JSON (voir {@code ReplayContext}) : les tours d'avant de la conversation,
+     * avec ce que chaque réponse a fait ; {@code {}} pour un cas d'une seule question.
+     */
+    @Builder.Default
+    @Column(nullable = false, updatable = false, columnDefinition = "TEXT")
+    private String context = "{}";
+
     @Column(nullable = false)
     private boolean archived;
 

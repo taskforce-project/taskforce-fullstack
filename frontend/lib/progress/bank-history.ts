@@ -132,10 +132,10 @@ const clip = (text: string): string => {
  */
 export function caseOrigin(item: Pick<EvalHistoryCase, "askedOn" | "origin">, t: ProgressTexts): CaseOrigin {
   const date = dayOf(item.askedOn)
-  if (item.origin.kind === "incident") {
+  if (item.origin.kind === "incident" || item.origin.kind === "uncertain") {
     const said = item.origin.said.join(" ").trim()
     return {
-      origin: fillText(t.originIncident, { date }),
+      origin: fillText(item.origin.kind === "uncertain" ? t.originUncertain : t.originIncident, { date }),
       said: said ? fillText(t.originSaid, { text: clip(said) }) : null,
       shown: item.origin.shown ? fillText(t.originShown, { text: clip(item.origin.shown) }) : null,
     }

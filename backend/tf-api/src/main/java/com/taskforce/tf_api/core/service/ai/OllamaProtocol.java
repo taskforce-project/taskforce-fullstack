@@ -2,6 +2,7 @@ package com.taskforce.tf_api.core.service.ai;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -66,16 +67,18 @@ final class OllamaProtocol {
     }
 
     /**
-     * La requête, sans ses outils ni sa fenêtre, que la passerelle pose à chaque essai. Qwen3 sans raisonnement reçoit
-     * {@code /no_think} et le réglage natif {@code think: false} ; un autre modèle, ou le palier qui raisonne, rien.
+     * La requête, sans ses outils ni sa fenêtre, que la passerelle pose à chaque essai. Un modèle Qwen3 sans raisonnement
+     * reçoit le réglage natif {@code think: false}, qu'il se reconnaisse à son nom ou à sa fiche ({@link #qwen3}) ; son nom
+     * seul lui vaut aussi {@code /no_think} ({@link OpenAiProtocol#messages}), une directive qu'un modèle d'un autre nom
+     * pourrait lire comme du texte. Un autre modèle, ou le palier qui raisonne, rien.
      */
-    static ObjectNode request(ObjectMapper mapper, List<?> messages, String model, boolean think, boolean jsonMode,
-                              double temperature) {
+    static ObjectNode request(ObjectMapper mapper, List<?> messages, String model, ModelGateway.ModelCard card, boolean think,
+                              boolean jsonMode, double temperature) {
         ObjectNode body = mapper.createObjectNode();
         body.put("model", model);
         body.set("messages", messages(mapper, messages, model, think));
         body.put("stream", false);
-        if (!think && OpenAiProtocol.isQwen3(model)) {
+        if (!think && (OpenAiProtocol.isQwen3(model) || qwen3(card))) {
             body.put("think", false);
         }
         if (jsonMode) {
@@ -180,15 +183,31 @@ final class OllamaProtocol {
     }
 
     /**
+     * La fiche dit-elle un modèle de la famille Qwen3, quand son nom ne le dit pas ? Sa famille ({@code details.family} :
+     * qwen3, qwen35, qwen3moe) ou l'analyseur qu'Ollama applique à ses réponses ({@code parser} : qwen3.5, qwen3-coder).
+     * mimo-v2.6:9b, un Qwen3.5 affiné sous un autre nom, n'a que ces deux-là pour le dire : {@code qwen35} et
+     * {@code qwen3.5} (Ollama 0.40.16, 16/11/2026) ; sans {@code think: false}, il raisonnait à chaque appel. Qwen2 et
+     * Qwen2.5 ({@code qwen2}) ne raisonnent pas.
+     */
+    static boolean qwen3(ModelGateway.ModelCard card) {
+        return card != null && (saysQwen3(card.family()) || saysQwen3(card.parser()));
+    }
+
+    private static boolean saysQwen3(String said) {
+        return said != null && said.toLowerCase(Locale.ROOT).startsWith("qwen3");
+    }
+
+    /**
      * Ce que la fiche d'un modèle dit de lui, dans la réponse de {@code /api/show} (R113, R125, R142) : sa taille
      * ({@code details.parameter_size}, « 8.2B »), sa fenêtre de contexte, s'il prend des outils ({@code capabilities},
-     * qu'Ollama donne depuis 0.6 ; {@code null} quand la fiche ne le dit pas), sa famille, et s'il sait converser. Une
-     * description, jamais une mesure.
+     * qu'Ollama donne depuis 0.6 ; {@code null} quand la fiche ne le dit pas), sa famille, s'il sait converser, et
+     * l'analyseur de ses réponses ({@code parser}). Une description, jamais une mesure.
      */
     static ModelGateway.ModelCard card(JsonNode show) {
         JsonNode details = show.path("details");
         String size = details.path("parameter_size").asText("").strip();
         String family = details.path("family").asText("").strip();
+        String parser = show.path("parser").asText("").strip();
         int window = contextLength(show);
         JsonNode capabilities = show.path("capabilities");
         Boolean tools = null;
@@ -199,7 +218,7 @@ final class OllamaProtocol {
             }
         }
         return new ModelGateway.ModelCard(size.isEmpty() ? null : size, window > 0 ? window : null, tools,
-            family.isEmpty() ? null : family, chats(show, tools), null);
+            family.isEmpty() ? null : family, chats(show, tools), null, parser.isEmpty() ? null : parser);
     }
 
     /**
