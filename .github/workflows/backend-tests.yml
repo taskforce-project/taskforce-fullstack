@@ -10,6 +10,7 @@ on:
     paths:
       - 'backend/tf-api/**'
       - 'contracts/**'
+      - 'fern/openapi/**'  # la référence d'API publiée, lue par ProcessApiReferenceTest
       - '.github/workflows/backend-tests.yml'
   pull_request:
     branches:
@@ -18,6 +19,7 @@ on:
     paths:
       - 'backend/tf-api/**'
       - 'contracts/**'
+      - 'fern/openapi/**'
 
 jobs:
   test:
