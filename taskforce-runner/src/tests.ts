@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { runShell, type ProcOptions, type ProcResult } from "./proc.js";
+import { cutEnd } from "./text.js";
 
 /**
  * Les tests du projet, lancés par le runner après le travail de l'agent (niveau S1, décidé le 28/10/2026, R32) : la
@@ -81,10 +82,9 @@ export function testCounts(output: string): TestCounts | null {
   return null;
 }
 
-/** Le dernier morceau de la sortie, borné : la fin dit le plus souvent ce qui a échoué. */
+/** Le dernier morceau de la sortie, borné : la fin dit le plus souvent ce qui a échoué. La coupe se dit (R159, L4). */
 export function outputTail(result: Pick<ProcResult, "stdout" | "stderr">, max = 3000): string {
-  const text = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`.trim();
-  return text.length > max ? `...${text.slice(text.length - max)}` : text;
+  return cutEnd(`${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`.trim(), max);
 }
 
 export function seconds(ms: number): string {

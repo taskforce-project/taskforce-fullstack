@@ -33,6 +33,7 @@ import { resolveCommand, run } from "./proc.js";
 import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
 import { ApprovedTests, runProjectTests } from "./tests.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
+import { cut, cutEnd } from "./text.js";
 
 // Lancé par l'app desktop avec le Node d'Electron (ELECTRON_RUN_AS_NODE) : ni git, ni gh, ni Claude Code ne doivent
 // en hériter.
@@ -192,11 +193,11 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           { ask, approved: ApprovedTests.in(config.home), outputFile: join(kept, "tests.log") }, signal);
         log.info(tests.summary);
         // Les tests au dossier : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière, la preuve,
-        // que ce poste garde (R212, rubrique 4).
+        // que ce poste garde (R212, rubrique 4). Une coupe se dit, entre deux caractères (R159, L4).
         relay.push([{
-          kind: "test", tool: tests.command.slice(0, 120), text: `${tests.summary}${tests.tail ? `\n${tests.tail.slice(-1500)}` : ""}`,
+          kind: "test", tool: cut(tests.command, 120), text: `${tests.summary}${tests.tail ? `\n${cutEnd(tests.tail, 1500)}` : ""}`,
           test: {
-            command: tests.command.slice(0, 500), ran: tests.ran, passed: tests.passed,
+            command: cut(tests.command, 500), ran: tests.ran, passed: tests.passed,
             ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
             ...(tests.output ? { output: tests.output.sha256, outputBytes: tests.output.bytes } : {}),
           },
@@ -217,11 +218,11 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       // Arrêtée pendant ses tests : rien ne sort du poste.
       signal.throwIfAborted();
       if (commits === 0) {
-        result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
+        result = { status: "DONE", summary: cut(`No code change was needed.\n\n${outcome.text}`, 7900) };
       } else if (!config.push) {
         result = {
           status: "DONE",
-          summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
+          summary: cut(`${report}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`, 7900),
         };
       } else {
         // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
@@ -233,7 +234,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         if (!push.go) {
           result = {
             status: "DONE",
-            summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
+            summary: cut(`${report}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`, 7900),
           };
         } else {
           await pushBranch(worktree, repo);
@@ -252,7 +253,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
             }
             else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
           }
-          result = { status: "DONE", summary: `${report}${note}`.slice(0, 7900), resultUrl: url };
+          result = { status: "DONE", summary: cut(`${report}${note}`, 7900), resultUrl: url };
           log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
         }
       }
@@ -282,16 +283,16 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       logOutcome(outcome);
       await changes.finish();
       if (!outcome.ok) throw new Error(outcome.text);
-      result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
+      result = { status: "DONE", summary: cut(outcome.text, 7900) };
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (e instanceof MissionNotStarted) {
       log.warn(`Run #${claim.runId} not started: ${message}`);
-      result = { status: "FAILED", error: message.slice(0, 3900), refused: true };
+      result = { status: "FAILED", error: cut(message, 3900), refused: true };
     } else {
       log.error(`Run #${claim.runId} failed: ${message}`);
-      result = { status: "FAILED", error: message.slice(0, 3900) };
+      result = { status: "FAILED", error: cut(message, 3900) };
     }
   } finally {
     heartbeat.stop();

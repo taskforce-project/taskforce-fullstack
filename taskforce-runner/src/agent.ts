@@ -12,6 +12,7 @@ import { log } from "./log.js";
 import { run, type StdinChannel } from "./proc.js";
 import { buildFollowUpPrompt, buildPrompt, buildReplyPrompt } from "./prompt.js";
 import { agentInfo, describeToolInput, parseAgentOutput, toEvents, toolLabel, WriteWatcher, type AgentOutcome } from "./stream.js";
+import { cut } from "./text.js";
 
 export type { AgentOutcome } from "./stream.js";
 export { parseAgentOutput } from "./stream.js";
@@ -334,8 +335,9 @@ export async function runAgent(
   const prompt = opts.mode === "repoless" ? buildReplyPrompt(claim)
     : claim.followUp ? buildFollowUpPrompt(claim, opts.branch ?? "", claim.followUp.comments)
     : buildPrompt(claim, opts.branch ?? "");
-  // Le brief tel qu'il part à l'agent entre au dossier par son empreinte, son texte à côté de la chaîne (R198).
-  relay.push([{ kind: "brief", text: "The brief given to Claude Code", body: prompt.slice(0, MAX_BRIEF) }]);
+  // Le brief tel qu'il part à l'agent entre au dossier par son empreinte, son texte à côté de la chaîne (R198) ; trop
+  // long, il est coupé entre deux caractères, et la coupe se dit (R159, L4).
+  relay.push([{ kind: "brief", text: "The brief given to Claude Code", body: cut(prompt, MAX_BRIEF) }]);
   const session = new SessionRecord(opts.sessionFile);
   let announced = false;
 

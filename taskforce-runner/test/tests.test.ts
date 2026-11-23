@@ -72,7 +72,8 @@ describe("S1 : les tests du projet, lancés par le runner après l'agent (R32)",
   });
 
   it("la sortie gardée est la fin, bornée", () => {
-    assert.equal(outputTail({ stdout: "x".repeat(5000), stderr: "" }, 100), `...${"x".repeat(100)}`);
+    const mark = "[TaskForce cut the start of this text] ";
+    assert.equal(outputTail({ stdout: "x".repeat(5000), stderr: "" }, 100), `${mark}${"x".repeat(100 - mark.length)}`);
     assert.equal(outputTail({ stdout: "ok\n", stderr: "warn" }), "ok\n\nwarn");
     assert.deepEqual([seconds(400), seconds(42_000), seconds(125_000)], ["1 s", "42 s", "2 min 5 s"]);
   });
