@@ -1,8 +1,7 @@
-import { createHash, createPublicKey, verify as verifySignature } from "node:crypto";
-
 import {
   bundleDigest, canonicalJson, decideAll, firstBrokenLink, type ChainedEvent, type Facts, type Json, type RulesBundle,
-} from "./engine/rules-engine.js";
+} from "../engine/rules-engine.js";
+import { concat, ed25519Key, fromBase64, sha256, text, utf8, verifyEd25519, type Bytes } from "./crypto.js";
 
 /**
  * Ce que le vérificateur lit d'un dossier exporté (`taskforce-evidence/1`, contracts/README.md), sans TaskForce ni réseau :
@@ -10,6 +9,9 @@ import {
  * trous, le sceau (une enveloppe DSSE d'un énoncé in-toto, signée en Ed25519), et le témoin. L'en-tête et le sceau sont
  * écrits une seconde fois ici, en TypeScript, comme le serveur les écrit en Java (EvidenceHeader, EvidenceSeal) :
  * l'exemple de contracts/evidence les tient ensemble.
+ *
+ * <p>Rien ici ne dépend de Node : la Web Crypto et le moteur compilé suffisent, et l'app vérifie un dossier avec ce même
+ * code (`npm run share:app` le copie dans `frontend/lib/evidence`).</p>
  */
 
 export const FORMAT = "taskforce-evidence/1";
@@ -17,7 +19,7 @@ export const PAYLOAD_TYPE = "application/vnd.in-toto+json";
 export const STATEMENT_TYPE = "https://in-toto.io/Statement/v1";
 export const PREDICATE_TYPE = "https://taskforce-project.fr/contracts/taskforce-evidence/1";
 
-type Obj = Record<string, unknown>;
+export type Obj = Record<string, unknown>;
 
 const isObj = (value: unknown): value is Obj => value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -60,14 +62,14 @@ export function headerOf(events: readonly ChainedEvent[]): { header: Obj; covere
 }
 
 /** L'encodage préalable à la signature de DSSE (PAE) : `DSSEv1 <len> <type> <len> <corps>`, longueurs en octets. */
-export function pae(payloadType: string, payload: Buffer): Buffer {
-  const type = Buffer.from(payloadType, "utf8");
-  return Buffer.concat([Buffer.from(`DSSEv1 ${type.length} ${payloadType} ${payload.length} `, "utf8"), payload]);
+export function pae(payloadType: string, payload: Bytes): Bytes {
+  const type = utf8(payloadType);
+  return concat(utf8(`DSSEv1 ${type.length} ${payloadType} ${payload.length} `), payload);
 }
 
 /** L'identifiant d'une clé publique : `sha256:` et l'empreinte de son SubjectPublicKeyInfo en DER. */
-export function keyId(spki: Buffer): string {
-  return `sha256:${createHash("sha256").update(spki).digest("hex")}`;
+export function keyId(spki: Bytes): Promise<string> {
+  return sha256(spki);
 }
 
 const sameJson = (a: unknown, b: unknown): boolean => {
@@ -78,18 +80,21 @@ const sameJson = (a: unknown, b: unknown): boolean => {
   }
 };
 
-/** Une clé de confiance donnée au vérificateur : son identifiant (`sha256:...`) ou sa clé publique (PEM, ou base64 DER). */
-export function trustedKeyId(key: string): string | null {
-  const text = key.trim();
-  if (/^sha256:[0-9a-f]{64}$/.test(text)) return text;
+/**
+ * Une clé de confiance donnée au vérificateur : son identifiant (`sha256:...`), ou sa clé publique Ed25519 (un bloc PEM
+ * `PUBLIC KEY`, ou le SubjectPublicKeyInfo en base64) ; null si elle ne se lit pas.
+ */
+export async function trustedKeyId(key: string): Promise<string | null> {
+  const value = key.trim();
+  if (/^sha256:[0-9a-f]{64}$/.test(value)) return value;
+  const pem = /-----BEGIN PUBLIC KEY-----([\s\S]*?)-----END PUBLIC KEY-----/.exec(value);
+  let spki: Bytes;
   try {
-    const der = text.includes("BEGIN PUBLIC KEY")
-      ? createPublicKey(text).export({ format: "der", type: "spki" })
-      : createPublicKey({ key: Buffer.from(text, "base64"), format: "der", type: "spki" }).export({ format: "der", type: "spki" });
-    return keyId(Buffer.from(der));
+    spki = fromBase64(pem ? (pem[1] ?? "") : value);
   } catch {
     return null;
   }
+  return (await ed25519Key(spki)) ? keyId(spki) : null;
 }
 
 export type Level = "ok" | "info" | "warn" | "fail";
@@ -97,6 +102,18 @@ export type Level = "ok" | "info" | "warn" | "fail";
 export interface Line {
   level: Level;
   text: string;
+}
+
+/**
+ * Ce que le sceau prouve, pour la première ligne du verdict (R159, B1) : signé par la clé que l'on croit (`trusted`),
+ * signé par la seule clé que le fichier porte, que n'importe qui peut fabriquer (`self`), pas de sceau (`none`), ou un
+ * sceau qui ne tient pas (`broken`).
+ */
+export type SealState = "trusted" | "self" | "none" | "broken";
+
+export interface Reading {
+  lines: Line[];
+  seal: SealState;
 }
 
 export interface SealReading {
@@ -108,14 +125,15 @@ export interface SealReading {
 }
 
 /** Ouvre une enveloppe DSSE et vérifie sa signature Ed25519 avec la clé publique de l'énoncé. */
-export function openSeal(envelope: unknown): SealReading {
+export async function openSeal(envelope: unknown): Promise<SealReading> {
   if (!isObj(envelope) || envelope.payloadType !== PAYLOAD_TYPE || typeof envelope.payload !== "string") {
     return { valid: false, statement: null, keyId: null, reason: "not a DSSE envelope of an in-toto statement" };
   }
-  const payload = Buffer.from(envelope.payload, "base64");
+  let payload: Bytes;
   let statement: Obj;
   try {
-    const parsed: unknown = JSON.parse(payload.toString("utf8"));
+    payload = fromBase64(envelope.payload);
+    const parsed: unknown = JSON.parse(text(payload));
     if (!isObj(parsed)) throw new Error("not an object");
     statement = parsed;
   } catch {
@@ -128,20 +146,27 @@ export function openSeal(envelope: unknown): SealReading {
   if (key.algorithm !== "ed25519" || typeof key.publicKey !== "string") {
     return { valid: false, statement, keyId: null, reason: "the seal is not an Ed25519 signature" };
   }
-  const spki = Buffer.from(key.publicKey, "base64");
-  const id = keyId(spki);
+  let spki: Bytes;
+  try {
+    spki = fromBase64(key.publicKey);
+  } catch {
+    return { valid: false, statement, keyId: null, reason: "the public key of the seal is not base64" };
+  }
+  const id = await keyId(spki);
   if (id !== key.id) return { valid: false, statement, keyId: id, reason: "the key id does not match the public key" };
   const signatures = Array.isArray(envelope.signatures) ? (envelope.signatures as unknown[]) : [];
   const signature = signatures.find((s): s is Obj => isObj(s) && s.keyid === id && typeof s.sig === "string");
   if (!signature) return { valid: false, statement, keyId: id, reason: "no signature of the key the statement names" };
+  const publicKey = await ed25519Key(spki);
+  if (!publicKey) return { valid: false, statement, keyId: id, reason: "the public key of the seal is not an Ed25519 key" };
+  let sig: Bytes;
   try {
-    const publicKey = createPublicKey({ key: spki, format: "der", type: "spki" });
-    const ok = verifySignature(null, pae(PAYLOAD_TYPE, payload), publicKey, Buffer.from(String(signature.sig), "base64"));
-    return ok ? { valid: true, statement, keyId: id }
-      : { valid: false, statement, keyId: id, reason: "the signature does not hold: the statement was changed after it was sealed" };
-  } catch (e) {
-    return { valid: false, statement, keyId: id, reason: `the signature cannot be checked: ${(e as Error).message}` };
+    sig = fromBase64(String(signature.sig));
+  } catch {
+    return { valid: false, statement, keyId: id, reason: "the signature is not base64" };
   }
+  return (await verifyEd25519(publicKey, pae(PAYLOAD_TYPE, payload), sig)) ? { valid: true, statement, keyId: id }
+    : { valid: false, statement, keyId: id, reason: "the signature does not hold: the statement was changed after it was sealed" };
 }
 
 /** Les règles que le runner applique lui-même, et qu'un paquet ne rejuge pas : le plafond, un accord pour la mission. */
@@ -155,20 +180,34 @@ const CUSTODY: Record<string, string> = {
 };
 
 /**
+ * Un texte gardé à côté de la chaîne, face à l'empreinte que la chaîne porte : `{ salt, text }`, et l'empreinte est le
+ * SHA-256 du sel suivi du texte ; un texte sans sel (avant le sel, R159 M6) se compare au SHA-256 du texte seul.
+ */
+async function textMatches(hash: string, entry: unknown): Promise<boolean> {
+  if (typeof entry === "string") return (await sha256(entry)) === hash;
+  if (!isObj(entry) || typeof entry.salt !== "string" || typeof entry.text !== "string") return false;
+  return (await sha256(`${entry.salt}${entry.text}`)) === hash;
+}
+
+/**
  * Lit un dossier, ligne à ligne. Une ligne `fail` fait échouer la vérification : la chaîne, l'en-tête, un texte, le
  * paquet, une décision rejugée, le sceau ou le témoin ne tiennent pas. Une ligne `warn` dit ce que le dossier ne prouve
- * pas (un trou, pas de sceau, une clé sur la machine de l'agent) sans faire échouer.
+ * pas (un trou, pas de sceau, un sceau que n'importe qui peut faire, une clé sur la machine de l'agent) sans faire
+ * échouer. Avec `key`, la clé que l'exploitant publie : un dossier sans sceau, ou scellé par une autre clé, échoue.
  */
-export function readDossier(file: Obj, options: { key?: string } = {}): Line[] {
+export async function readDossier(file: Obj, options: { key?: string } = {}): Promise<Reading> {
   const lines: Line[] = [];
+  let sealState: SealState = "none";
   const events = file.events as ChainedEvent[];
-  const last = events.at(-1);
 
-  // L'en-tête : chaque champ que la chaîne couvre doit être celui du fichier.
+  // L'en-tête : chaque champ que la chaîne couvre doit être là, et être celui du fichier.
   const mission = isObj(file.mission) ? file.mission : {};
   const { header, covered } = headerOf(events);
   for (const field of covered) {
-    if (!Object.hasOwn(mission, field)) continue;
+    if (!Object.hasOwn(mission, field)) {
+      lines.push({ level: "fail", text: `The header has no ${field}, which the chain gives: the header was changed after it was written.` });
+      continue;
+    }
     if (!sameJson(mission[field], header[field])) {
       lines.push({ level: "fail", text: `The header says ${field} ${JSON.stringify(mission[field])}, the chain says ${JSON.stringify(header[field])}: the header was changed after it was written.` });
     }
@@ -176,11 +215,11 @@ export function readDossier(file: Obj, options: { key?: string } = {}): Line[] {
   const uncovered = ["id", "workspace", "project", "issue", "requestedBy", "agent", "rules"].filter((f) => !covered.includes(f) && Object.hasOwn(mission, f));
   if (covered.length > 0 && uncovered.length > 0) {
     lines.push({ level: "warn", text: `The chain does not cover ${uncovered.join(", ")} of the header (a mission written before TaskForce 1.18).` });
-  } else if (covered.length > 0) {
+  } else if (covered.length > 0 && !lines.some((l) => l.level === "fail")) {
     lines.push({ level: "ok", text: "The header comes from the chain." });
   }
 
-  // Les textes gardés à côté : chacun doit avoir l'empreinte que la chaîne porte.
+  // Les textes gardés à côté : chacun doit être nommé par la chaîne, et avoir l'empreinte qu'elle porte.
   const texts = isObj(file.texts) ? file.texts : {};
   const referenced = new Set<string>();
   const walk = (value: unknown): void => {
@@ -192,9 +231,11 @@ export function readDossier(file: Obj, options: { key?: string } = {}): Line[] {
   };
   events.forEach((e) => walk(e.data));
   let badTexts = 0;
-  for (const [hash, text] of Object.entries(texts)) {
-    const actual = `sha256:${createHash("sha256").update(String(text), "utf8").digest("hex")}`;
-    if (actual !== hash) {
+  for (const [hash, entry] of Object.entries(texts)) {
+    if (!referenced.has(hash)) {
+      badTexts++;
+      lines.push({ level: "fail", text: `A text kept beside the chain is not named by the chain (${shortHash(hash)}): it was added after the record was written.` });
+    } else if (!(await textMatches(hash, entry))) {
       badTexts++;
       lines.push({ level: "fail", text: `A text kept beside the chain does not match its digest ${shortHash(hash)}: it was changed.` });
     }
@@ -252,16 +293,26 @@ export function readDossier(file: Obj, options: { key?: string } = {}): Line[] {
     if (event.type === "note" && data?.kind === "gap") lines.push({ level: "warn", text: `Event ${event.seq}: ${String(data.text)}` });
   }
 
-  // Le sceau.
+  // Le sceau. Sans la clé de l'exploitant, une signature qui tient ne prouve que l'accord entre le fichier et la clé
+  // qu'il porte lui-même : n'importe qui peut en faire une (R159, B1).
   if (file.seal === undefined) {
-    lines.push({ level: "warn", text: "Not sealed: the mission had not ended when this file was exported, or it ended before TaskForce signed its evidence." });
+    lines.push(options.key !== undefined
+      ? { level: "fail", text: "Not sealed: you gave --key, and this record carries no seal, so nothing shows that this key saw its chain." }
+      : { level: "warn", text: "Not sealed: the mission had not ended when this file was exported, or it ended before TaskForce signed its evidence." });
   } else {
-    const seal = openSeal(file.seal);
-    const predicate = isObj(seal.statement?.predicate) ? (seal.statement?.predicate as Obj) : {};
+    sealState = "broken";
+    const seal = await openSeal(file.seal);
+    const statement = seal.statement ?? {};
+    const predicate = isObj(statement.predicate) ? statement.predicate : {};
     const seq = typeof predicate.seq === "number" ? predicate.seq : -1;
     const sealed = events[seq - 1];
+    const subject = Array.isArray(statement.subject) && isObj(statement.subject[0]) ? statement.subject[0] : {};
+    const subjectDigest = isObj(subject.digest) ? subject.digest.sha256 : undefined;
     if (!seal.valid) {
       lines.push({ level: "fail", text: `The seal does not hold: ${seal.reason ?? "unknown reason"}.` });
+    } else if (typeof predicate.root !== "string" || subjectDigest !== predicate.root.replace(/^sha256:/, "")
+      || subject.name !== `taskforce-mission-${String(mission.id ?? (isObj(predicate.mission) ? predicate.mission.id : ""))}`) {
+      lines.push({ level: "fail", text: `The seal's subject (${String(subject.name)}, ${shortHash(subjectDigest)}) is not the root it names (${shortHash(predicate.root)}): an in-toto tool and this check would not agree.` });
     } else if (!sealed || sealed.hash !== predicate.root) {
       lines.push({ level: "fail", text: `The seal names event ${seq} with ${shortHash(predicate.root)}, which is not in this chain.` });
     } else {
@@ -272,19 +323,25 @@ export function readDossier(file: Obj, options: { key?: string } = {}): Line[] {
         lines.push({ level: "fail", text: "The seal does not hold the header of this file: the header was changed after it was sealed." });
       } else {
         const key = isObj(predicate.key) ? predicate.key : {};
-        lines.push({ level: "ok", text: `Sealed at event ${seq} on ${String(predicate.sealedAt)} by key ${String(seal.keyId)}: the signature holds.` });
+        const at = `Sealed at event ${seq} on ${String(predicate.sealedAt)}`;
+        if (options.key !== undefined) {
+          const trusted = await trustedKeyId(options.key);
+          if (trusted === null) {
+            lines.push({ level: "fail", text: "The key given with --key cannot be read (a key id sha256:..., or an Ed25519 public key)." });
+          } else if (trusted !== seal.keyId) {
+            lines.push({ level: "fail", text: `The seal was signed by ${String(seal.keyId)}, not by the key you trust (${trusted}).` });
+          } else {
+            sealState = "trusted";
+            lines.push({ level: "ok", text: `${at} by the key you trust (${trusted}): the signature holds.` });
+          }
+        } else {
+          sealState = "self";
+          lines.push({ level: "warn", text: `${at} by the key the file carries (${String(seal.keyId)}): the signature holds, but anyone can make such a seal. Check it against the key the operator publishes: npm run verify -- <file> --key <key id>.` });
+        }
         if (seq < events.length) lines.push({ level: "warn", text: `Events ${seq + 1} to ${events.length} came after the last seal: they are not signed.` });
         const custody = CUSTODY[String(key.custody)] ?? CUSTODY["same-machine"];
         lines.push({ level: key.custody === "separate-machine" ? "info" : "warn", text: `Key custody: ${custody}.` });
         if (key.kept === false) lines.push({ level: "warn", text: "The key was drawn when the server started and is not kept: the operator cannot publish it." });
-        if (options.key !== undefined) {
-          const trusted = trustedKeyId(options.key);
-          if (trusted === null) lines.push({ level: "fail", text: "The key given with --key cannot be read (a key id sha256:..., or a public key)." });
-          else if (trusted !== seal.keyId) lines.push({ level: "fail", text: `The seal was signed by ${String(seal.keyId)}, not by the key you trust (${trusted}).` });
-          else lines.push({ level: "ok", text: "The seal was signed by the key you trust." });
-        } else {
-          lines.push({ level: "info", text: "Compare the key id with the key the operator publishes: npm run verify -- <file> --key <key id>." });
-        }
       }
     }
   }
@@ -312,7 +369,7 @@ export function readDossier(file: Obj, options: { key?: string } = {}): Line[] {
         ? "No witness was written in the pull request: only the operator holds this chain."
         : "No witness: this mission has no pull request, so only the operator holds this chain." });
   }
-  return lines;
+  return { lines, seal: sealState };
 }
 
 /** Le dossier est-il bien formé, et sa chaîne tient-elle ? Avant tout le reste. */

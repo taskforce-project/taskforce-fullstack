@@ -112,13 +112,20 @@ at the end of the mission, and again after each later gesture; `GET .../evidence
 
 `custody` says where the private key lives: `same-machine` (the default, and always in the desktop app) when an agent
 may run on the machine that holds it, `separate-machine` when the operator declares that none does. A seal proves that
-the key saw this chain up to `seq`; it proves nothing more than the custody of its key. Check a seal without TaskForce:
+the key saw this chain up to `seq`; it proves nothing more than the custody of its key. The statement's subject is the
+root it names: a verifier refuses a seal whose `subject[0].digest.sha256` is not `predicate.root` without its prefix.
+
+The file carries the public key of its seal, so a seal checked with that key alone proves nothing: anyone who rewrites
+a record can seal it again with a key of their own. Check a seal against the key the operator publishes, which a
+member of the workspace also reads at `GET /api/workspaces/{slug}/delivery/evidence/key` (the key that seals today,
+and the keys that sealed before, with the dates they were used):
 
 ```bash
 npm run verify -- evidence-run-42.json --key sha256:<the key id the operator publishes>
 ```
 
-or with OpenSSL alone: write the PAE bytes to a file, the signature (`sig`, base64-decoded) to another, and the public
+With `--key`, a record without a seal, or sealed by another key, fails. Without it, the seal is only a warning, and the
+first line of the output says that anyone can make it. Or check the signature with OpenSSL alone: write the PAE bytes to a file, the signature (`sig`, base64-decoded) to another, and the public
 key (`publicKey`, base64-decoded, as DER) to a third, then
 `openssl pkeyutl -verify -pubin -keyform DER -inkey key.der -rawin -in pae.bin -sigfile sig.bin`.
 

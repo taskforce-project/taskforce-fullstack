@@ -8,7 +8,7 @@ import { after, describe, it } from "node:test";
 import { ApiError, type RunnerEvent } from "../src/api.js";
 import { SessionRecord } from "../src/agent.js";
 import { EventRelay } from "../src/events.js";
-import { headerOf, keyId, openSeal, pae, PAYLOAD_TYPE, PREDICATE_TYPE, STATEMENT_TYPE, trustedKeyId } from "../src/harness/dossier.js";
+import { headerOf, keyId, openSeal, pae, PAYLOAD_TYPE, PREDICATE_TYPE, STATEMENT_TYPE, trustedKeyId } from "../src/harness/verifier/dossier.js";
 import { bundleDigest, canonicalJson, chain, type EventInput, type Json, type RulesBundle } from "../src/harness/engine/rules-engine.js";
 import { verifyEvidence } from "../src/harness/verify.js";
 import { contentHash, inputHash, sensitivePath, sha256, written } from "../src/harness/written.js";
@@ -158,6 +158,10 @@ describe("l'agent réellement lancé et sa session brute, gardée à part", () =
   });
 });
 
+
+/** L'identifiant d'une clé, calculé ici avec Node, pour le comparer à celui du vérificateur (Web Crypto). */
+const nodeKeyId = (spki: Buffer): string => `sha256:${createHash("sha256").update(spki).digest("hex")}`;
+
 /** Un dossier scellé, écrit ici comme le serveur l'écrit (MissionEvidenceService, EvidenceSeal). */
 function dossier(options: { key?: KeyObject; tamper?: (file: Record<string, unknown>) => void; seal?: boolean; sealedRoot?: string } = {}) {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
@@ -166,10 +170,12 @@ function dossier(options: { key?: KeyObject; tamper?: (file: Record<string, unkn
   const rules = { ...DEFAULT_RULES };
   rules.digest = bundleDigest(rules);
   const title = "Fix the footer links";
+  const salt = "0123456789abcdef0123456789abcdef";
+  const titleHash = sha256(`${salt}${title}`);
   const events: EventInput[] = [
     { seq: 1, at: "2026-11-22T08:00:00.000Z", type: "mission.started", actor: { kind: "server", id: "taskforce" }, data: {
       mission: 42, workspace: "acme", project: 12, issue: "WEB-48", requestedBy: "ada@example.com", accountable: "ada@example.com",
-      request: { title: { sha256: sha256(title), chars: title.length }, description: null, reporter: "grace@example.com" },
+      request: { title: { sha256: titleHash, chars: title.length }, description: null, reporter: "grace@example.com" },
       agent: { kind: "claude-code", model: "sonnet" }, rules: { version: rules.version, digest: rules.digest, layers: [] },
       runner: "tf-runner-ada", taskforce: null } as Json },
     { seq: 2, at: "2026-11-22T08:00:02.000Z", type: "note", actor: { kind: "agent", id: "claude-code" },
@@ -185,114 +191,130 @@ function dossier(options: { key?: KeyObject; tamper?: (file: Record<string, unkn
   const head = chained.at(-1);
   const mission = headerOf(chained).header;
   const file: Record<string, unknown> = { format: "taskforce-evidence/1", mission, events: chained, root: head?.hash, rules,
-    texts: { [sha256(title)]: title } };
+    texts: { [titleHash]: { salt, text: title } } };
   if (options.seal !== false) {
     const root = options.sealedRoot ?? head?.hash;
     const statement = { _type: STATEMENT_TYPE, subject: [{ name: "taskforce-mission-42", digest: { sha256: String(root).slice(7) } }],
       predicateType: PREDICATE_TYPE, predicate: { format: "taskforce-evidence/1", mission, root, seq: 5,
-        sealedAt: "2026-11-22T08:10:00.100Z", key: { id: keyId(spki), algorithm: "ed25519", publicKey: spki.toString("base64"),
+        sealedAt: "2026-11-22T08:10:00.100Z", key: { id: nodeKeyId(spki), algorithm: "ed25519", publicKey: spki.toString("base64"),
           custody: "same-machine", kept: true } } };
     const payload = Buffer.from(canonicalJson(statement as Json), "utf8");
     file.seal = { payload: payload.toString("base64"), payloadType: PAYLOAD_TYPE,
-      signatures: [{ keyid: keyId(spki), sig: sign(null, pae(PAYLOAD_TYPE, payload), key).toString("base64") }] };
+      signatures: [{ keyid: nodeKeyId(spki), sig: sign(null, pae(PAYLOAD_TYPE, new Uint8Array(payload)), key).toString("base64") }] };
   }
   options.tamper?.(file);
-  return { text: JSON.stringify(file), id: keyId(spki), publicKey };
+  return { text: JSON.stringify(file), id: nodeKeyId(spki), publicKey, titleHash };
 }
 
-const fails = (text: string, pattern: RegExp): void => {
-  const verdict = verifyEvidence(text);
+const fails = async (text: string, pattern: RegExp): Promise<void> => {
+  const verdict = await verifyEvidence(text);
   assert.equal(verdict.ok, false, verdict.message);
   assert.match(verdict.message, pattern);
 };
 
 describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
-  it("un dossier intact et scellé tient : la chaîne, l'en-tête, les textes, les règles rejugées, le sceau ; il dit ce qu'il ne prouve pas", () => {
+  it("un dossier intact et scellé tient : la chaîne, l'en-tête, les textes, les règles rejugées ; il dit ce qu'il ne prouve pas", async () => {
     const { text } = dossier();
-    const verdict = verifyEvidence(text);
+    const verdict = await verifyEvidence(text);
     assert.equal(verdict.ok, true, verdict.message);
-    assert.match(verdict.message, /^Every hash holds: 5 events/);
+    assert.match(verdict.message, /^Every hash holds: 5 events, root sha256:[0-9a-f]+\. Signed by a key the file carries itself: anyone can make this seal/);
+    assert.equal(verdict.seal, "self");
     assert.match(verdict.message, /\[ok\] The header comes from the chain/);
     assert.match(verdict.message, /\[ok\] The 1 texts kept beside the chain match their digests/);
     assert.match(verdict.message, /judging the 1 recorded actions again gives the same decisions/);
     assert.match(verdict.message, /\[!!\] Event 4: Events 4 to 5 from the runner never arrived/);
-    assert.match(verdict.message, /\[ok\] Sealed at event 5 .*the signature holds/);
+    assert.match(verdict.message, /\[!!\] Sealed at event 5 .*by the key the file carries .*anyone can make such a seal/);
     assert.match(verdict.message, /\[!!\] Key custody: the signing key is on the same machine as the agent/);
     assert.match(verdict.message, /\[!!\] No witness was written in the pull request/);
   });
 
-  it("avec la clé que l'exploitant publie : son identifiant, ou sa clé publique", () => {
+  it("avec la clé que l'exploitant publie : son identifiant, ou sa clé publique", async () => {
     const { text, id, publicKey } = dossier();
-    assert.match(verifyEvidence(text, { key: id }).message, /\[ok\] The seal was signed by the key you trust/);
+    const trusted = await verifyEvidence(text, { key: id });
+    assert.equal(trusted.seal, "trusted");
+    assert.match(trusted.message, /^Every hash holds: .* Sealed by the key you trust\./);
+    assert.match(trusted.message, /\[ok\] Sealed at event 5 .*by the key you trust/);
     const pem = publicKey.export({ format: "pem", type: "spki" }).toString();
-    assert.equal(trustedKeyId(pem), id);
+    assert.equal(await trustedKeyId(pem), id);
+    assert.equal(await trustedKeyId(Buffer.from(publicKey.export({ format: "der", type: "spki" })).toString("base64")), id);
     const other = generateKeyPairSync("ed25519").publicKey.export({ format: "pem", type: "spki" }).toString();
-    const verdict = verifyEvidence(text, { key: other });
+    const verdict = await verifyEvidence(text, { key: other });
     assert.equal(verdict.ok, false);
     assert.match(verdict.message, /not by the key you trust/);
-    assert.match(verifyEvidence(text, { key: "nonsense" }).message, /cannot be read/);
+    assert.match((await verifyEvidence(text, { key: "nonsense" })).message, /cannot be read/);
   });
 
-  it("un en-tête changé après coup se voit : la chaîne dit autre chose", () => {
-    fails(dossier({ tamper: (f) => { (f.mission as Record<string, unknown>).requestedBy = "mallory@example.com"; } }).text,
+  it("un en-tête changé après coup se voit : la chaîne dit autre chose", async () => {
+    await fails(dossier({ tamper: (f) => { (f.mission as Record<string, unknown>).requestedBy = "mallory@example.com"; } }).text,
       /The header says requestedBy "mallory@example.com", the chain says "ada@example.com"/);
   });
 
-  it("un texte gardé à côté changé se voit", () => {
-    fails(dossier({ tamper: (f) => { f.texts = { [sha256("Fix the footer links")]: "Delete the database" }; } }).text,
+  it("un texte gardé à côté changé se voit, et un texte sans son sel ne se vérifie pas", async () => {
+    const { titleHash } = dossier();
+    await fails(dossier({ tamper: (f) => { f.texts = { [titleHash]: { salt: "0123456789abcdef0123456789abcdef", text: "Delete the database" } }; } }).text,
+      /does not match its digest/);
+    await fails(dossier({ tamper: (f) => { f.texts = { [titleHash]: { salt: "ffffffffffffffffffffffffffffffff", text: "Fix the footer links" } }; } }).text,
       /does not match its digest/);
   });
 
-  it("un paquet de règles changé se voit, et une décision que les règles ne donnent pas aussi", () => {
-    fails(dossier({ tamper: (f) => { (f.rules as RulesBundle).rules = []; } }).text, /is not the one the mission received/);
+  it("un paquet de règles changé se voit, et une décision que les règles ne donnent pas aussi", async () => {
+    await fails(dossier({ tamper: (f) => { (f.rules as RulesBundle).rules = []; } }).text, /is not the one the mission received/);
     const lying = dossier({ tamper: (f) => {
       const events = f.events as Array<Record<string, unknown>>;
       const decided = events[2] as { data: Record<string, unknown> };
       decided.data = { ...decided.data, effect: "deny" };
     } });
     // L'événement changé casse d'abord la chaîne : rejuger ne vient qu'après une chaîne qui tient.
-    fails(lying.text, /The chain breaks at event 3/);
+    await fails(lying.text, /The chain breaks at event 3/);
   });
 
-  it("une signature qui ne tient pas, ou un sceau d'une autre chaîne, se voit", () => {
+  it("une signature qui ne tient pas, ou un sceau d'une autre chaîne, se voit", async () => {
     const stranger = generateKeyPairSync("ed25519").privateKey;
-    fails(dossier({ key: stranger }).text, /The seal does not hold: the signature does not hold/);
-    fails(dossier({ sealedRoot: `sha256:${"f".repeat(64)}` }).text, /The seal names event 5 with sha256:ffff.*not in this chain/);
-    fails(dossier({ tamper: (f) => { (f.mission as Record<string, unknown>).runner = "tf-runner-mallory"; } }).text,
+    await fails(dossier({ key: stranger }).text, /The seal does not hold: the signature does not hold/);
+    await fails(dossier({ sealedRoot: `sha256:${"f".repeat(64)}` }).text, /The seal names event 5 with sha256:ffff.*not in this chain/);
+    await fails(dossier({ tamper: (f) => { (f.mission as Record<string, unknown>).runner = "tf-runner-mallory"; } }).text,
       /The header says runner/);
   });
 
-  it("un dossier sans sceau tient, et dit qu'il n'est pas signé", () => {
-    const verdict = verifyEvidence(dossier({ seal: false }).text);
+  it("un dossier sans sceau tient et dit qu'il n'est pas signé ; avec --key, il échoue", async () => {
+    const { text, id } = dossier({ seal: false });
+    const verdict = await verifyEvidence(text);
     assert.equal(verdict.ok, true);
+    assert.equal(verdict.seal, "none");
+    assert.match(verdict.message, /^Every hash holds: .* Not sealed\./);
     assert.match(verdict.message, /\[!!\] Not sealed/);
+    const trusted = await verifyEvidence(text, { key: id });
+    assert.equal(trusted.ok, false);
+    assert.match(trusted.message, /\[KO\] Not sealed: you gave --key/);
   });
 
-  it("un témoin dont la tête n'est pas dans la chaîne se voit", () => {
+  it("un témoin dont la tête n'est pas dans la chaîne se voit", async () => {
     const base = dossier({ seal: false });
     const file = JSON.parse(base.text) as Record<string, unknown>;
     const events = (file.events as EventInput[]).map(({ seq, at, type, actor, data }) => ({ seq, at, type, actor, data }));
     events.push({ seq: 6, at: "2026-11-22T08:10:05.000Z", type: "note", actor: { kind: "server", id: "taskforce" },
       data: { kind: "witness", written: true, root: `sha256:${"0".repeat(64)}`, seq: 5, pullRequest: "https://github.com/acme/website/pull/212" } });
     const chained = chain(events);
-    fails(JSON.stringify({ ...file, events: chained, root: chained.at(-1)?.hash }), /The witness names event 5/);
+    await fails(JSON.stringify({ ...file, events: chained, root: chained.at(-1)?.hash }), /The witness names event 5/);
   });
 
-  it("le sceau tel que le serveur l'écrit en Java s'ouvre ici : l'exemple de contracts/evidence", () => {
+  it("le sceau tel que le serveur l'écrit en Java s'ouvre ici : l'exemple de contracts/evidence", async () => {
     const example = readFileSync(new URL("../../contracts/evidence/example-mission.json", import.meta.url), "utf8");
-    const verdict = verifyEvidence(example);
+    const file = JSON.parse(example) as { seal: { payload: string }; events: Array<{ type: string }> };
+    const sealed = JSON.parse(Buffer.from(file.seal.payload, "base64").toString("utf8")) as { predicate: { key: { id: string } } };
+    const verdict = await verifyEvidence(example, { key: sealed.predicate.key.id });
     assert.equal(verdict.ok, true, verdict.message);
-    assert.match(verdict.message, /\[ok\] Sealed at event \d+ .*the signature holds/);
+    assert.match(verdict.message, /\[ok\] Sealed at event \d+ .*by the key you trust/);
     assert.match(verdict.message, /\[ok\] Witness: the head sha256:/);
     assert.match(verdict.message, /judging the \d+ recorded actions again gives the same decisions/);
-    const file = JSON.parse(example) as { seal: unknown; events: Array<{ type: string }> };
-    assert.equal(openSeal(file.seal).valid, true);
+    assert.equal((await openSeal(file.seal)).valid, true);
     // Changer un octet de l'exemple casse la chaîne, ou le sceau.
-    assert.equal(verifyEvidence(example.replace("Fix the footer links", "Fix the header links")).ok, false);
+    assert.equal((await verifyEvidence(example.replace("claude-code", "claude-kode"))).ok, false);
   });
 
-  it("l'encodage préalable de DSSE : l'exemple de la spécification", () => {
-    assert.equal(pae("http://example.com/HelloWorld", Buffer.from("hello world")).toString(), "DSSEv1 29 http://example.com/HelloWorld 11 hello world");
-    assert.equal(keyId(Buffer.from("x")), `sha256:${createHash("sha256").update("x").digest("hex")}`);
+  it("l'encodage préalable de DSSE : l'exemple de la spécification", async () => {
+    assert.equal(Buffer.from(pae("http://example.com/HelloWorld", new TextEncoder().encode("hello world"))).toString(),
+      "DSSEv1 29 http://example.com/HelloWorld 11 hello world");
+    assert.equal(await keyId(new TextEncoder().encode("x")), `sha256:${createHash("sha256").update("x").digest("hex")}`);
   });
 });

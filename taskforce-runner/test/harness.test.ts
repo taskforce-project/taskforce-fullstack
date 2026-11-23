@@ -14,6 +14,7 @@ import {
   changesTaskForce, INTERNAL_TOOLS, splitCommand, TASKFORCE_CHANGES, TASKFORCE_TOOLS, toolFacts,
 } from "../src/harness/facts.js";
 import { verifiedBundle, verifyEvidence } from "../src/harness/verify.js";
+import { headerOf } from "../src/harness/verifier/dossier.js";
 
 // Tests de contrat (R16) : les cas partagés de contracts/, rejoués ici contre le moteur du serveur compilé en
 // JavaScript (src/harness/engine/rules-engine.js), comme le serveur les rejoue en Java.
@@ -390,8 +391,9 @@ describe("contrat de la preuve : chaîne d'empreintes", () => {
 
 describe("dossier exporté, vérifié sans TaskForce", () => {
   const chained = chain(chainCases.chain.events);
+  // L'en-tête tel que la chaîne le donne : un en-tête vidé de ce qu'elle couvre ne tient pas (R159, L2).
   const file = (events: unknown[], root: unknown = chained.at(-1)?.hash) =>
-    JSON.stringify({ format: "taskforce-evidence/1", mission: {}, events, root });
+    JSON.stringify({ format: "taskforce-evidence/1", mission: headerOf(chained).header, events, root });
   const changed = chained.map((e, i) => (i === 1 ? { ...e, data: { ...e.data, tampered: true } } : e));
   const decimal = chained.map((e, i) => (i === 0 ? { ...e, data: { ...e.data, score: 0.5 } } : e));
   const cases: Array<[string, string, boolean, RegExp]> = [
@@ -404,8 +406,8 @@ describe("dossier exporté, vérifié sans TaskForce", () => {
     ["un autre format", JSON.stringify({ format: "x", events: [] }), false, /Not a TaskForce evidence file/],
   ];
   for (const [label, text, ok, message] of cases) {
-    it(`${label} -> ${ok ? "tient" : "ne tient pas"}`, () => {
-      const verdict = verifyEvidence(text);
+    it(`${label} -> ${ok ? "tient" : "ne tient pas"}`, async () => {
+      const verdict = await verifyEvidence(text);
       assert.equal(verdict.ok, ok);
       assert.match(verdict.message, message);
     });

@@ -107,6 +107,18 @@ class EvidenceSealTest {
     }
 
     @Test
+    @DisplayName("un sceau signé dont le sujet n'est pas la racine qu'il nomme ne tient pas (R159, L1)")
+    void a_subject_that_is_not_the_root_does_not_hold() throws Exception {
+        ObjectNode statement = EvidenceSeal.statement(header, ROOT, 7, "2026-11-22T10:00:00.000Z", key);
+        ((ObjectNode) statement.get("subject").get(0).get("digest")).put("sha256", "0".repeat(64));
+
+        EvidenceSeal.Opened opened = EvidenceSeal.open(sealed(statement));
+
+        assertThat(opened.valid()).isFalse();
+        assertThat(opened.reason()).contains("subject is not the root it names");
+    }
+
+    @Test
     @DisplayName("ce qui n'est pas une enveloppe DSSE d'un dossier ne s'ouvre pas")
     void other_documents_do_not_open() throws Exception {
         assertThat(EvidenceSeal.open(JSON.readTree("{\"payloadType\":\"text/plain\"}")).valid()).isFalse();

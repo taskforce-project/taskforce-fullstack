@@ -124,8 +124,12 @@ openssl genpkey -algorithm ed25519 | sed -n 2p
 Put that line (the key, in base64) in `DELIVERY_EVIDENCE_SIGNING_KEY` in `.env`. Without it, the server draws a key at
 each start, and a seal can no longer be compared with a key you publish. If no coding agent runs on the machine of the
 server, set `DELIVERY_EVIDENCE_KEY_CUSTODY=separate-machine`: each seal, and each verification page, says where the key
-lives. TaskForce cannot check this; leave the default (`same-machine`) when in doubt. Anyone can check an exported
-file without TaskForce: `npm run verify -- evidence-run-42.json --key <key id>` in `taskforce-runner`.
+lives. TaskForce cannot check this; leave the default (`same-machine`) when in doubt.
+
+Anyone can check an exported file without TaskForce, with `npm run verify -- evidence-run-42.json --key <key id>` in
+`taskforce-runner`. Publish your key id where the people who check your records can find it: a member of a workspace
+also reads it at `GET /api/workspaces/{slug}/delivery/evidence/key`. The file carries its own public key, so a check
+without `--key` only says that the seal matches the key in the file, which anyone can make.
 
 ## Integrations
 
