@@ -20,6 +20,9 @@ const eslintConfig = defineConfig([
     // chargés tels quels par Playwright pour l'audit d'accessibilité. Ce n'est pas notre
     // code, on ne le corrige pas - on l'exclut de l'analyse.
     "e2e/axe.min.js",
+    // Le moteur de règles du serveur compilé en JavaScript (TeaVM), copié du runner par `npm run share:app` avec le
+    // vérificateur des dossiers (R159, #551) : un artefact généré, minifié, que la CI du runner compare à sa source.
+    "lib/evidence/engine/**",
   ]),
   {
     rules: {
