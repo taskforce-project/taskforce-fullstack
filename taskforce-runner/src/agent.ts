@@ -158,9 +158,10 @@ export function agentEnv(config: RunnerConfig, base: NodeJS.ProcessEnv = process
   } else if (!env.ANTHROPIC_API_KEY) {
     throw new Error('agent.auth is "api-key" but ANTHROPIC_API_KEY is not set in the environment');
   }
-  // Les identifiants machine du runner ne descendent jamais dans le processus de l'agent.
-  delete env.TASKFORCE_RUNNER_CLIENT_ID;
-  delete env.TASKFORCE_RUNNER_CLIENT_SECRET;
+  // Rien du runner ne descend dans le processus de l'agent : ni ses identifiants machine, ni son dossier (R159, L9).
+  for (const name of Object.keys(env)) {
+    if (name.startsWith("TASKFORCE_RUNNER_")) delete env[name];
+  }
   if (hookToken) env[HOOK_TOKEN_ENV] = hookToken;
   else delete env[HOOK_TOKEN_ENV];
   return env;
