@@ -10,6 +10,7 @@ vi.mock("sonner", () => ({ toast: toaster }))
 import { MissionChanges } from "./mission-changes"
 import type { DeliveryRun, MissionChanges as Changes, MissionFileChange, MissionFileDiff } from "@/lib/api/delivery-service"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
+import { lowestContrast, THEMES } from "@/lib/__tests__/contrast"
 
 const RUN: DeliveryRun = {
   id: 100, issueId: 28, issueKey: "WEB-28", issueTitle: "Fix the footer", projectId: 3, projectName: "Website",
@@ -93,7 +94,7 @@ describe("MissionChanges", () => {
     expect(screen.getByRole("img", { name: "15 added, 1 removed" })).toBeInTheDocument()
     expect(screen.getByText("2 files")).toBeInTheDocument()
     expect(screen.getByText("+15")).toBeInTheDocument()
-    expect(screen.getAllByText("−1", { selector: "span.text-chart-2" })).toHaveLength(2)
+    expect(screen.getAllByText("−1", { selector: "span.text-destructive" })).toHaveLength(2)
   })
 
   it("says one file, and how many more past the cap", () => {
@@ -217,6 +218,27 @@ describe("MissionChanges", () => {
     expect(await screen.findByText("# Plan")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Put this file back/ })).toBeNull()
     expect(screen.queryByRole("button", { name: "Comment on this line" })).toBeNull()
+  })
+
+  // Revue axe-core de la vue de travail : aux couleurs des graphiques, « +3 » et « −3 » tenaient 4,14:1 et 4,17:1 en clair.
+  describe.each(THEMES)("in the %s theme (WCAG AA, 4.5:1)", (theme) => {
+    it("keeps the lines added and removed readable: the counts, and the numbers and markers of the diff", async () => {
+      seed(changes())
+      render(<MissionChanges run={RUN} />)
+      openRow()
+      await screen.findByText("new line")
+
+      const diff = ["keep", "old line", "new line"].flatMap((text) => [...(screen.getByText(text).parentElement?.children ?? [])])
+      const texts = [...screen.getAllByText("+12"), ...screen.getAllByText("−1"), ...diff.filter((part) => part.tagName === "SPAN")]
+      expect(texts).toHaveLength(16)
+      for (const text of texts) expect(lowestContrast(text, theme)).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it("keeps a written file's count readable", () => {
+      seed(changes({ mode: "scratch", canRevert: false, canComment: false, files: [file({ status: "written", added: 3, removed: 0 })] }))
+      render(<MissionChanges run={RUN} />)
+      expect(lowestContrast(screen.getByText("+3"), theme)).toBeGreaterThanOrEqual(4.5)
+    })
   })
 
   it("puts a file back after a confirmation that says what will happen", async () => {

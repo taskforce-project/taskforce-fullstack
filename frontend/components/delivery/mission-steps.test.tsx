@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 
 import { MissionStepIcon, MissionSteps, timeOf } from "./mission-steps"
 import type { MissionLine, MissionStep, MissionStepState } from "@/lib/delivery/mission-sequence"
+import { lowestContrast, THEMES } from "@/lib/__tests__/contrast"
 
 const line = (seq: number, sentence: string, over: Partial<MissionLine> = {}): MissionLine =>
   ({ seq, sentence, raw: `raw ${sentence}`, at: "2026-11-09T00:45:00", failed: false, ...over })
@@ -107,6 +108,16 @@ describe("MissionSteps", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show 3 earlier" }))
     expect(screen.getByText("Wrote f0.md")).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /earlier/ })).toBeNull()
+  })
+
+  // Revue axe-core de la vue de travail : au gris à 70 %, « No tests » tenait 3,58:1 en clair, de 4,2 à 4,5:1 en sombre.
+  it.each(THEMES)("keeps the sentence of every step readable in the %s theme, a step skipped or not started too (WCAG AA)", (theme) => {
+    const steps = STEPS.map((step) => step.key === "check" ? { ...step, state: "skipped" as MissionStepState, sentence: "No tests" } : step)
+    render(<MissionSteps steps={steps} showCommands={false} />)
+
+    const sentences = ["Read the issue", "Skipped", "Wrote c2.md", "No tests", "Not started"].flatMap((sentence) => screen.getAllByText(sentence))
+    expect(sentences).toHaveLength(6)
+    for (const sentence of sentences) expect(lowestContrast(sentence, theme)).toBeGreaterThanOrEqual(4.5)
   })
 
   describe("what waits for the person", () => {

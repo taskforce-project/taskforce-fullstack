@@ -32,26 +32,36 @@ const FOCUS = "outline-none focus-visible:ring-1 focus-visible:ring-ring"
 
 type Words = ReturnType<typeof usePreferencesStore.getState>["t"]["missionChanges"]
 
+/**
+ * L'encre des lignes ajoutées et retirées : le vert des états et le rouge du texte (`destructive`), comme le veut le design
+ * system ; ils tiennent 4,5:1 dans les deux thèmes. Les couleurs des graphiques (`chart-3`, `chart-2`) teintent le fond
+ * d'une ligne du diff ; en texte, elles n'atteignent pas 4,5:1 en clair.
+ */
+const INK = { add: "text-ink-green", del: "text-destructive" } as const
+
 /** `+12 −1` en chiffres à chasse fixe, le nom complet au survol et pour les lecteurs d'écran. */
 function Counts({ added, removed, t }: Readonly<{ added: number; removed: number; t: Words }>) {
   const label = fillText(t.counts, { added, removed })
   return (
     <span className="shrink-0 font-mono text-xs tabular-nums" title={label} role="img" aria-label={label}>
-      <span className="text-chart-3">+{added}</span> <span className="text-chart-2">−{removed}</span>
+      <span className={INK.add}>+{added}</span> <span className={INK.del}>−{removed}</span>
     </span>
   )
 }
 
-/** Une ligne du diff : ses numéros, son texte, et, si la relecture est ouverte, le geste pour la commenter. */
+/**
+ * Une ligne du diff : ses numéros, son texte, et, si la relecture est ouverte, le geste pour la commenter. Les numéros
+ * gardent le gris secondaire : sur le fond teinté d'une ligne, un gris plus pâle passe sous 4,5:1.
+ */
 function Line({ row, plain, t, onComment }: Readonly<{ row: DiffLine; plain: boolean; t: Words; onComment: ((row: DiffLine) => void) | null }>) {
   const marker = row.kind === "add" ? "+" : row.kind === "del" ? "−" : ""
   return (
     <div className={cn("group/line relative flex min-w-0 font-mono text-[12px] leading-5",
       row.kind === "add" && "bg-chart-3/10", row.kind === "del" && "bg-chart-2/10")}>
-      {!plain && <span className="w-9 shrink-0 select-none pr-1.5 text-right tabular-nums text-muted-foreground/70">{row.oldLine ?? ""}</span>}
-      <span className="w-9 shrink-0 select-none pr-1.5 text-right tabular-nums text-muted-foreground/70">{row.newLine ?? ""}</span>
+      {!plain && <span className="w-9 shrink-0 select-none pr-1.5 text-right tabular-nums text-muted-foreground">{row.oldLine ?? ""}</span>}
+      <span className="w-9 shrink-0 select-none pr-1.5 text-right tabular-nums text-muted-foreground">{row.newLine ?? ""}</span>
       {!plain && (
-        <span aria-hidden="true" className={cn("w-3 shrink-0 select-none", row.kind === "add" ? "text-chart-3" : "text-chart-2")}>{marker}</span>
+        <span aria-hidden="true" className={cn("w-3 shrink-0 select-none", row.kind === "add" ? INK.add : INK.del)}>{marker}</span>
       )}
       <span className="min-w-0 flex-1 whitespace-pre-wrap break-all pr-7 text-foreground">{row.text || " "}</span>
       {onComment && (
@@ -202,7 +212,7 @@ function FileRow({ slug, runId, file, canRevert, canComment, error, t }: Readonl
             <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> {t.revert.working}
           </span>
         ) : file.status === "written" && file.added !== null ? (
-          <span className="shrink-0 text-xs text-muted-foreground">{t.written} · <span className="font-mono tabular-nums text-chart-3">+{file.added}</span></span>
+          <span className="shrink-0 text-xs text-muted-foreground">{t.written} · <span className={cn("font-mono tabular-nums", INK.add)}>+{file.added}</span></span>
         ) : file.added === null || file.removed === null ? (
           <span className="shrink-0 text-xs text-muted-foreground">{t.binary}</span>
         ) : (
