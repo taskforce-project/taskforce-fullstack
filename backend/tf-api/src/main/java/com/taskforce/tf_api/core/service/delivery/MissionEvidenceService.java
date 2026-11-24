@@ -621,7 +621,7 @@ public class MissionEvidenceService {
             .append("canonical JSON of the event without its `hash` (contracts/README.md). The last one is the root. ")
             .append("The JSON export carries the signed seal: `npm run verify -- evidence-run-").append(runId)
             .append(".json` in taskforce-runner checks both.\n");
-        return Optional.of(md.toString());
+        return Optional.of(EvidenceIntake.text(md.toString()));
     }
 
     private String custodyWords() {
@@ -728,9 +728,14 @@ public class MissionEvidenceService {
         }
     }
 
+    /**
+     * Le fichier exporté. Un dossier d'avant ce lot peut garder une moitié de paire de substitution (l'ancienne coupe d'un
+     * texte au milieu d'un emoji) : écrite telle quelle, l'UTF-8 en ferait « ? » et la chaîne ne tiendrait plus. Elle sort
+     * échappée, comme le JSON canonique l'empreinte (R159, M7).
+     */
     private static String write(JsonNode file) {
         try {
-            return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(file);
+            return EvidenceIntake.escapeLoneSurrogates(JSON.writerWithDefaultPrettyPrinter().writeValueAsString(file));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Evidence file could not be written", e);
         }

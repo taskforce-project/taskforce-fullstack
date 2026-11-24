@@ -130,6 +130,32 @@ public final class EvidenceIntake {
     }
 
     /**
+     * Un texte JSON où chaque moitié de paire de substitution seule devient {@code \}{@code uXXXX} (minuscules), comme le
+     * JSON canonique l'écrit : relu, il donne la même valeur, et son UTF-8 n'a plus de « ? » à la place (R159, M7). Une
+     * moitié seule ne peut être que dans une chaîne : la structure du JSON est en ASCII.
+     */
+    public static String escapeLoneSurrogates(String json) {
+        StringBuilder out = null;
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (Character.isHighSurrogate(c) && i + 1 < json.length() && Character.isLowSurrogate(json.charAt(i + 1))) {
+                if (out != null) {
+                    out.append(c).append(json.charAt(i + 1));
+                }
+                i++;
+            } else if (Character.isSurrogate(c)) {
+                if (out == null) {
+                    out = new StringBuilder(json.length() + 16).append(json, 0, i);
+                }
+                out.append(String.format("\\u%04x", (int) c));
+            } else if (out != null) {
+                out.append(c);
+            }
+        }
+        return out == null ? json : out.toString();
+    }
+
+    /**
      * Le texte borné à {@code max} unités, coupé sur une frontière de caractère : une coupe ne laisse jamais une moitié
      * de paire de substitution. Plus long, il finit par « ... ».
      */
