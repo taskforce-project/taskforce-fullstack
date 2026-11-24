@@ -30,6 +30,14 @@ const SEAL_WORDS: Record<SealState, string> = {
   unchecked: "The seal was not checked: this platform has no Ed25519.",
 };
 
+/**
+ * Ce qu'elle en dit quand il a été posé tard (R159, second tour, N5) : sur un dossier fini avant que TaskForce ne scelle,
+ * il ne prouve que la chaîne telle qu'elle était ce jour-là.
+ */
+const lateWords = (seal: SealState, on: string): string => seal === "trusted"
+  ? `Sealed late, on ${on}, by the key you trust: it proves the chain as it was on that date, not what happened before.`
+  : `Sealed late, on ${on}, by a key the file carries itself: anyone can make this seal. Check it with --key and the key the operator publishes.`;
+
 export async function verifyEvidence(text: string, options: VerifyOptions = {}): Promise<Verdict> {
   let file: unknown;
   try {
@@ -43,8 +51,8 @@ export async function verifyEvidence(text: string, options: VerifyOptions = {}):
   const record = file as Record<string, unknown>;
   const chain = chainOf(record);
   if (!chain.ok) return { ok: false, message: chain.message, lines: [], seal: "none" };
-  const { lines, seal } = await readDossier(record, options);
-  const head = `Every hash holds: ${chain.events.length} events, root ${String(record.root)}. ${SEAL_WORDS[seal]}`;
+  const { lines, seal, lateOn } = await readDossier(record, options);
+  const head = `Every hash holds: ${chain.events.length} events, root ${String(record.root)}. ${lateOn ? lateWords(seal, lateOn) : SEAL_WORDS[seal]}`;
   const ok = lines.every((line) => line.level !== "fail");
   return {
     ok,

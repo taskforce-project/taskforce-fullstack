@@ -27,7 +27,8 @@ describe("L5. le fournisseur de la configuration réelle, et le modèle réellem
   it("le dernier mot sur l'agent : le modèle servi, celui de la configuration, le fournisseur", () => {
     const event = agentEvent({ version: "2.1.300", model: "sonnet", session: "s-1" }, ["claude-sonnet-5-20261001", "claude-haiku-4-5"], "amazon-bedrock");
     assert.deepEqual(event.agent, { version: "2.1.300", model: "claude-sonnet-5-20261001", configured: "sonnet",
-      served: ["claude-sonnet-5-20261001", "claude-haiku-4-5"], session: "s-1", provider: "amazon-bedrock" });
+      served: ["claude-sonnet-5-20261001", "claude-haiku-4-5"], session: "s-1", provider: "amazon-bedrock",
+      providerFrom: "launch-configuration" });
     assert.match(event.text, /claude-sonnet-5-20261001/);
     const unknown = agentEvent({ version: "2.1.300", model: "sonnet" }, [], "anthropic");
     assert.equal(unknown.agent?.model, "sonnet");

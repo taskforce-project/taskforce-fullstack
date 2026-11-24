@@ -50,7 +50,8 @@ import com.taskforce.tf_api.shared.exception.BusinessException;
 class MissionWitnessTest {
 
     private static final String ROOT = "sha256:" + "9".repeat(64);
-    private static final String HEAD = "TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of mission 100).";
+    private static final String HEAD = "TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of its record).";
+    private static final String LINK = "0123456789abcdef0123456789abcdef";
     private static final String URL = "https://app.taskforce.dev/";
 
     @Mock private DeliveryRunRepository runRepository;
@@ -96,10 +97,13 @@ class MissionWitnessTest {
         when(pullRequests.visibility(1L, "acme/website")).thenReturn(Optional.of("private"));
         when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-1"));
+        when(evidence.linkId(100L)).thenReturn(LINK);
 
         witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
 
-        assertThat(written()).isEqualTo(HEAD + "\nVerification page: https://app.taskforce.dev/acme/missions/100/verification");
+        // R159, second tour, M-b : le lien ne porte qu'un identifiant opaque du dossier, ni l'espace ni la mission.
+        assertThat(written()).isEqualTo(HEAD + "\nVerification page: https://app.taskforce.dev/verify/" + LINK)
+            .doesNotContain("acme/missions").doesNotContain("100");
         assertThat(noted()).containsEntry("kind", "witness").containsEntry("where", "github-pull-request")
             .containsEntry("written", true).containsEntry("root", ROOT).containsEntry("seq", 31).containsEntry("pageLinked", true)
             .containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-1").doesNotContainKey("pageLeftOut");
@@ -164,17 +168,83 @@ class MissionWitnessTest {
     }
 
     @Test
-    @DisplayName("R159, L7 : GitHub ne répond pas une fois, le second essai écrit le témoin")
+    @DisplayName("R159, L7 et second tour, M-a (sonde B) : GitHub écrit le commentaire mais sa réponse se perd ; l'essai suivant le trouve et ne reposte pas")
     void a_passing_failure_is_retried() {
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
-        when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
-            .thenThrow(new IllegalStateException("GitHub did not answer"))
+        when(pullRequests.findComment(1L, "acme/website", 212, ROOT)).thenReturn(Optional.empty())
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-2"));
+        when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
+            .thenThrow(new BusinessException("GitHub can't be reached: nothing changed. Try again in a moment."));
 
         witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
 
+        verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
+        assertThat(noted()).containsEntry("written", true).containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-2")
+            .doesNotContainKey("reason");
+    }
+
+    @Test
+    @DisplayName("GitHub ne répond pas une fois sans avoir rien écrit : le second essai écrit le témoin, une seule fois")
+    void a_real_failure_is_retried_once() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
+            .thenThrow(new IllegalStateException("GitHub did not answer"))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-3"));
+
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+
+        verify(pullRequests, times(2)).findComment(1L, "acme/website", 212, ROOT);
         verify(pullRequests, times(2)).comment(anyLong(), anyString(), anyInt(), anyString());
         assertThat(noted()).containsEntry("written", true).doesNotContainKey("reason");
+    }
+
+    @Test
+    @DisplayName("R159 second tour, N6 : le commentaire porte aussi la clé qui a scellé la tête, et le dossier la note")
+    void the_comment_carries_the_key() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
+        String key = "sha256:" + "e".repeat(64);
+
+        witness("http://127.0.0.1:43123", false).write(new MissionSealed(100L, ROOT, 31, key));
+
+        assertThat(written()).isEqualTo("TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of its record), "
+            + "sealed with the key `" + key + "`.");
+        assertThat(noted()).containsEntry("key", key);
+    }
+
+    @Test
+    @DisplayName("R159 second tour, M-b : l'exploitant a coupé le lien ; la tête seule, et le dossier dit pourquoi")
+    void an_operator_can_turn_the_link_off() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
+
+        witness(URL, false).write(new MissionSealed(100L, ROOT, 31));
+
+        assertThat(written()).isEqualTo(HEAD);
+        assertThat(noted()).containsEntry("pageLeftOut", "turned-off");
+        verify(pullRequests, never()).visibility(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("R159 second tour, N2 (sonde C) : la note ne s'écrit pas ; le témoin a fini quand même, et trois passages ne font qu'un commentaire")
+    void a_note_that_is_not_kept_ends_the_attempts() {
+        when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.empty());
+        when(pullRequests.findComment(1L, "acme/website", 212, ROOT)).thenReturn(Optional.empty())
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-4"));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-4"));
+        MissionWitness witness = witness(URL, true);
+
+        witness.sweep();
+        witness.sweep();
+        witness.sweep();
+
+        verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
+        verify(evidence, times(3)).witnessed(100L);
     }
 
     @Test
@@ -206,13 +276,13 @@ class MissionWitnessTest {
     void the_sweep_writes_a_lost_witness() {
         when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
         when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
-            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).keyId("sha256:" + "e".repeat(64)).build()));
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
 
         witness(URL, true).sweep();
 
-        assertThat(written()).startsWith(HEAD);
+        assertThat(written()).startsWith("TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of its record), sealed with the key");
         assertThat(noted()).containsEntry("written", true).containsEntry("root", ROOT).containsEntry("seq", 31);
     }
 
@@ -220,6 +290,6 @@ class MissionWitnessTest {
     @DisplayName("le lien de la page suit l'adresse de l'app")
     void the_page_url_follows_the_app() {
         assertThat(new MissionWitness(runRepository, pullRequests, evidence, transactionManager, "https://tf.example.com/")
-            .pageUrl("acme", 7L)).isEqualTo("https://tf.example.com/acme/missions/7/verification");
+            .pageUrl(LINK)).isEqualTo("https://tf.example.com/verify/" + LINK);
     }
 }

@@ -8,6 +8,13 @@ package com.taskforce.tf_api.core.service.delivery;
  * @param runId la mission
  * @param root  la tête de la chaîne scellée
  * @param seq   son rang
+ * @param keyId la clé qui l'a scellée ({@code sha256:} et l'empreinte de sa clé publique) : le témoin l'écrit aussi, une
+ *              ancre que l'exploitant ne tient pas seul (R159, second tour, N6)
  */
-public record MissionSealed(Long runId, String root, int seq) {
+public record MissionSealed(Long runId, String root, int seq, String keyId) {
+
+    /** Un sceau dont on ne dit pas la clé. */
+    public MissionSealed(Long runId, String root, int seq) {
+        this(runId, root, seq, null);
+    }
 }

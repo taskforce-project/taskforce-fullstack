@@ -46,4 +46,12 @@ public class MissionDossierSeal {
     /** L'enveloppe DSSE, en JSON. */
     @Column(nullable = false, updatable = false, columnDefinition = "TEXT")
     private String envelope;
+
+    /**
+     * Un sceau tardif (R159, second tour, N5) : posé sur un dossier fini avant que TaskForce ne scelle, il ne prouve que la
+     * chaîne telle qu'elle était ce jour-là ; ceux qui le suivent le sont aussi.
+     */
+    @Builder.Default
+    @Column(nullable = false, updatable = false)
+    private boolean late = false;
 }

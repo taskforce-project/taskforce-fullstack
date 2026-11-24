@@ -66,6 +66,8 @@ const TAG_MAP = {
   "client-log-controller": "Client logs",
   "ai-status-controller": "AI status",
   "delivery-controller": "Coding agents",
+  // Le lien du témoin d'un dossier (`/verify/<id>`), avec les autres routes du dossier d'une mission.
+  "evidence-link-controller": "Coding agents",
   "runner-provisioning-controller": "Coding agent runners",
   "mcp-server-controller": "MCP server",
   "rules-controller": "Rules",

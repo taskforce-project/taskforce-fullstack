@@ -219,6 +219,8 @@ services:
       # (separate-machine si aucun agent ne tourne sur ce serveur) va dans chaque sceau.
       DELIVERY_EVIDENCE_SIGNING_KEY: ${DELIVERY_EVIDENCE_SIGNING_KEY:-}
       DELIVERY_EVIDENCE_KEY_CUSTODY: ${DELIVERY_EVIDENCE_KEY_CUSTODY:-same-machine}
+      # Le lien de la page dans le commentaire témoin d'un dépôt privé (R159, second tour, M-b) ; false : jamais.
+      DELIVERY_EVIDENCE_WITNESS_LINK: ${DELIVERY_EVIDENCE_WITNESS_LINK:-true}
 
       # Plafonds IA (0 = désactivé, défaut). Le conteneur ne reçoit QUE les variables listées ici
       # (--env-file ne sert qu'à l'interpolation compose) : une instance adossée à une API payante

@@ -12,14 +12,14 @@
  *
  * Options : `--check` (vérifie l'installation, ne réclame rien), `--once` (traite au plus un run puis sort).
  */
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
 import { askInTaskForce } from "./approvals.js";
-import { ChangeTracker, changedPaths, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges } from "./changes.js";
+import { ChangeTracker, changedPaths, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges, trackedFiles } from "./changes.js";
 import { LiveMissions, pollCommands } from "./commands.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { EventRelay } from "./events.js";
@@ -31,7 +31,7 @@ import { startHeartbeat } from "./heartbeat.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
-import { testDefinitions } from "./test-definitions.js";
+import { definitionFiles, scriptFiles, testDefinitions } from "./test-definitions.js";
 import { ApprovedTests, runProjectTests } from "./tests.js";
 import { cut, cutEnd } from "./text.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
@@ -194,7 +194,18 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           { ask, approved: ApprovedTests.in(config.home), outputFile: join(kept, "tests.log") }, signal);
         log.info(tests.summary);
         // La branche a changé ce qui dit comment les tests tournent : le résultat ne vaut que pour sa version (R159, M5).
-        const definitionChanged = testDefinitions(await changedPaths(worktree.path, open.baseSha), claim.testCommand);
+        // Le dossier dit aussi ce que le runner a regardé : une liste, pas la preuve que les tests sont les mêmes (L-b).
+        const dir = worktree.path;
+        const files = await trackedFiles(dir);
+        const scripts = files.filter((path) => /(^|\/)package\.json$/.test(path)).slice(0, 20).flatMap((path) => {
+          try {
+            return scriptFiles(path, readFileSync(join(dir, path), "utf8"));
+          } catch {
+            return [];
+          }
+        });
+        const definitions = definitionFiles(files, claim.testCommand, scripts);
+        const definitionChanged = testDefinitions(await changedPaths(worktree.path, open.baseSha), claim.testCommand, scripts);
         if (definitionChanged.length > 0) {
           log.warn(`The branch changes how the tests run (${definitionChanged.join(", ")}): the evidence will say so.`);
         }
@@ -206,6 +217,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
             command: cut(tests.command, 500), ran: tests.ran, passed: tests.passed,
             ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
             ...(tests.output ? { output: tests.output.sha256, outputBytes: tests.output.bytes } : {}),
+            ...(definitions.length > 0 ? { definitions } : {}),
             ...(definitionChanged.length > 0 ? { definitionChanged } : {}),
           },
         }]);

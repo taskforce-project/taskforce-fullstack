@@ -284,7 +284,7 @@ describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
     const verdict = await verifyEvidence(dossier({ edit }).text);
     assert.equal(verdict.ok, true, verdict.message);
     assert.match(verdict.message, /\[!!\] The runner's facts \(its tests, the agent and its model, the numbers of its events\) come from the computer where the agent works/);
-    assert.match(verdict.message, /\[!!\] Event 5: the branch changed package\.json, vitest\.config\.ts, which defines how its tests run/);
+    assert.match(verdict.message, /\[!!\] Event 5: what defines how its tests run changed during the mission \(package\.json, vitest\.config\.ts\)/);
     // Le champ couvert retiré de l'en-tête : la chaîne le donne encore.
     await fails(dossier({ edit, tamper: (f) => { delete (f.mission as Record<string, unknown>).runnerFacts; } }).text,
       /The header has no runnerFacts, which the chain gives/);
@@ -331,6 +331,22 @@ describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
     await fails(JSON.stringify({ ...file, events: chained, root: chained.at(-1)?.hash }), /The witness names event 5/);
   });
 
+  it("un témoin qui nomme sa clé la dit, à comparer à celle qu'on vous donne (R159, second tour, N6)", async () => {
+    const base = dossier({ seal: false });
+    const file = JSON.parse(base.text) as Record<string, unknown>;
+    const kept = file.events as Array<EventInput & { hash: string }>;
+    const events = kept.map(({ seq, at, type, actor, data }) => ({ seq, at, type, actor, data }));
+    const key = `sha256:${"a".repeat(64)}`;
+    const comment = "https://github.com/acme/website/pull/212#issuecomment-1";
+    events.push({ seq: 6, at: "2026-11-22T08:10:05.000Z", type: "note", actor: { kind: "server", id: "taskforce" },
+      data: { kind: "witness", written: true, root: kept[4].hash, seq: 5, key, pullRequest: "https://github.com/acme/website/pull/212", comment } });
+    const chained = chain(events);
+    const verdict = await verifyEvidence(JSON.stringify({ ...file, events: chained, root: chained.at(-1)?.hash }));
+    assert.equal(verdict.ok, true, verdict.message);
+    assert.ok(verdict.message.includes(`(event 5), sealed by the key ${key}, was written on ${comment}.`), verdict.message);
+    assert.ok(verdict.message.includes("the same digest and the same key, and that this key is the one you were given"), verdict.message);
+  });
+
   it("le sceau tel que le serveur l'écrit en Java s'ouvre ici : l'exemple de contracts/evidence", async () => {
     const example = readFileSync(new URL("../../contracts/evidence/example-mission.json", import.meta.url), "utf8");
     const file = JSON.parse(example) as { seal: { payload: string }; events: Array<{ type: string }> };
@@ -339,6 +355,8 @@ describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
     assert.equal(verdict.ok, true, verdict.message);
     assert.match(verdict.message, /\[ok\] Sealed at event \d+ .*by the key you trust/);
     assert.match(verdict.message, /\[ok\] Witness: the head sha256:/);
+    // Le témoin de l'exemple nomme la clé qui a scellé sa tête, comme le serveur l'écrit (R159, second tour, N6).
+    assert.ok(verdict.message.includes(`sealed by the key ${sealed.predicate.key.id}, was written on`), verdict.message);
     assert.match(verdict.message, /judging the \d+ recorded actions again gives the same decisions/);
     assert.equal((await openSeal(file.seal)).valid, true);
     // Changer un octet de l'exemple casse la chaîne, ou le sceau.

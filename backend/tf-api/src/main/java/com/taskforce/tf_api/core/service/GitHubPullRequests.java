@@ -83,6 +83,36 @@ public class GitHubPullRequests {
         }
     }
 
+    /** Au plus ce nombre de pages de cent commentaires lues pour trouver un témoin déjà écrit. */
+    static final int COMMENT_PAGES = 10;
+
+    /**
+     * L'adresse du commentaire de la pull request qui porte déjà ce texte (la tête d'un dossier), ou vide (R159, second
+     * tour, M-a) : avant de poster, le témoin cherche s'il l'a déjà fait, une réponse de GitHub ayant pu se perdre après
+     * l'écriture. Par pages de cent, au plus {@value #COMMENT_PAGES}. Une lecture qui échoue le dit, comme un envoi.
+     */
+    public Optional<String> findComment(Long workspaceId, String repo, int number, String text) {
+        for (int page = 1; page <= COMMENT_PAGES; page++) {
+            String answer = send(workspaceId, repo, "/issues/" + number + "/comments?per_page=100&page=" + page, HttpMethod.GET, null,
+                "read the comments of pull request #" + number);
+            JsonNode comments;
+            try {
+                comments = answer == null || answer.isBlank() ? null : JSON.readTree(answer);
+            } catch (JsonProcessingException e) {
+                return Optional.empty();
+            }
+            if (comments == null || !comments.isArray() || comments.isEmpty()) return Optional.empty();
+            for (JsonNode comment : comments) {
+                if (comment.path("body").asText("").contains(text)) {
+                    String url = comment.path("html_url").asText("");
+                    return Optional.of(url.startsWith("https://") ? url : "https://github.com/" + repo + "/pull/" + number);
+                }
+            }
+            if (comments.size() < 100) return Optional.empty();
+        }
+        return Optional.empty();
+    }
+
     /**
      * La visibilité du dépôt telle que GitHub la donne : {@code public}, {@code private} ou {@code internal} ; vide quand
      * elle ne se lit pas (pas de jeton, GitHub injoignable, une réponse sans visibilité). Le témoin n'écrit un lien vers

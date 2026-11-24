@@ -116,6 +116,11 @@ export type SealState = "trusted" | "self" | "none" | "broken" | "unchecked";
 export interface Reading {
   lines: Line[];
   seal: SealState;
+  /**
+   * Le sceau qui tient a été posé tard (R159, second tour, N5) : sur un dossier fini avant que TaskForce ne scelle, à
+   * cette date. Il prouve la chaîne telle qu'elle était ce jour-là, rien de ce qui précède. Null sinon.
+   */
+  lateOn: string | null;
 }
 
 export interface SealReading {
@@ -174,6 +179,14 @@ export async function openSeal(envelope: unknown): Promise<SealReading> {
 /** Les règles que le runner applique lui-même, et qu'un paquet ne rejuge pas : le plafond, un accord pour la mission. */
 const RUNNER_GATES = /^(cap:|allowed for this mission)/;
 
+/** Ce que le dossier garde d'un fait jugé ; au-delà, le runner le coupe et le dit (R159, L4 ; second tour, N2). */
+export const MAX_FACT = 4000;
+const CUT_MARK = /\n\[TaskForce cut this text here: \d+ characters in all\]$/;
+
+/** Des faits dont l'un a été coupé pour tenir au dossier : les règles ont jugé le fait entier, qu'on n'a plus. */
+const cutFacts = (facts: readonly Facts[]): boolean =>
+  facts.some((part) => isObj(part) && Object.values(part).some((value) => typeof value === "string" && CUT_MARK.test(value)));
+
 const shortHash = (hash: unknown): string => (typeof hash === "string" ? `${hash.slice(0, 19)}...` : String(hash));
 
 const CUSTODY: Record<string, string> = {
@@ -191,6 +204,9 @@ async function textMatches(hash: string, entry: unknown): Promise<boolean> {
   }
   return (await sha256(`${entry.salt}${entry.text}`)) === hash;
 }
+
+/** Ce que `definitionChanged` porte quand le réglage de test du projet, dans TaskForce, a changé (R159, second tour, L-b). */
+export const TEST_SETTING = "taskforce:test-command";
 
 const RUNNER_FACTS = "The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer "
   + "where the agent works: they are worth what that computer is worth, whatever the custody of the key.";
@@ -223,6 +239,8 @@ export interface RulesCheck {
   readonly present: boolean;
   readonly digestHolds: boolean;
   readonly judged: number;
+  /** Les décisions prises sur un fait que le dossier n'a gardé qu'en partie : elles ne se rejugent pas (second tour, N2). */
+  readonly cut: number;
   readonly differ: ReadonlyArray<{ readonly seq: number; readonly effect: string; readonly rule: string; readonly recorded: string; readonly recordedRule: string }>;
 }
 
@@ -239,6 +257,8 @@ export interface SealCheck {
   readonly kept: boolean | null;
   /** Les événements venus après le sceau : rien ne les signe. */
   readonly after: number;
+  /** Un sceau tardif, posé sur un dossier fini avant que TaskForce ne scelle (R159, second tour, N5). */
+  readonly late: boolean;
 }
 
 /** Un témoin : écrit ou non, et si la tête qu'il nomme est dans cette chaîne. */
@@ -249,6 +269,8 @@ export interface WitnessCheck {
   readonly root: string | null;
   readonly at: number | null;
   readonly where: string | null;
+  /** La clé qui a scellé la tête, que le commentaire porte aussi (R159, second tour, N6) ; nulle pour une note plus ancienne. */
+  readonly key: string | null;
   readonly reason: string | null;
 }
 
@@ -261,6 +283,8 @@ export interface DossierCheck {
   /** Le runner a pris la mission : ses faits viennent du poste de l'agent (R159, M5). */
   readonly runnerFacts: boolean;
   readonly definitionChanged: ReadonlyArray<{ readonly seq: number; readonly paths: readonly string[] }>;
+  /** Ce que le runner a regardé de la définition des tests, changé ou non : une liste, pas une preuve (second tour, L-b). */
+  readonly definitions: ReadonlyArray<{ readonly seq: number; readonly paths: readonly string[] }>;
   readonly seal: SealCheck;
   readonly witnesses: readonly WitnessCheck[];
 }
@@ -324,6 +348,7 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
   const declared = isObj(mission.rules) ? mission.rules.digest : undefined;
   let digestHolds = false;
   let judged = 0;
+  let cut = 0;
   const differ: Array<{ seq: number; effect: string; rule: string; recorded: string; recordedRule: string }> = [];
   if (rules) {
     let digest: string | null = null;
@@ -339,6 +364,11 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
         if (event.type !== "action.decided" || data?.kind !== "decision" || !Array.isArray(data.facts) || data.facts.length === 0) continue;
         const ruleId = event.actor?.id ?? "none";
         if (RUNNER_GATES.test(ruleId)) continue;
+        // Les règles ont jugé le fait entier ; le dossier n'en garde que le début (R159, second tour, N2).
+        if (cutFacts(data.facts as Facts[])) {
+          cut++;
+          continue;
+        }
         const decision = decideAll(rules, data.facts as Facts[]);
         judged++;
         if (decision.effect !== data.effect || (decision.rule?.id ?? "none") !== ruleId) {
@@ -354,6 +384,11 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
     const data = dataOf(event);
     if (event.type !== "test.result" || !Array.isArray(data?.definitionChanged) || data.definitionChanged.length === 0) return [];
     return [{ seq: event.seq, paths: data.definitionChanged.map(String) }];
+  });
+  const definitions = events.flatMap((event) => {
+    const data = dataOf(event);
+    if (event.type !== "test.result" || !Array.isArray(data?.definitions) || data.definitions.length === 0) return [];
+    return [{ seq: event.seq, paths: data.definitions.map(String) }];
   });
 
   // Le sceau. Sans la clé de l'exploitant, une signature qui tient ne prouve que l'accord entre le fichier et la clé
@@ -372,6 +407,7 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
       root: typeof data.root === "string" ? data.root : null,
       at,
       where: typeof data.comment === "string" ? data.comment : typeof data.pullRequest === "string" ? data.pullRequest : null,
+      key: typeof data.key === "string" ? data.key : null,
       reason: typeof data.reason === "string" ? data.reason : null,
     };
   });
@@ -379,10 +415,11 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
   return {
     header: { covered, differs, missing: missingFields, uncovered },
     texts: { referenced: referenced.size, matches, changed, unnamed, absent },
-    rules: { present: rules !== null, digestHolds, judged, differ },
+    rules: { present: rules !== null, digestHolds, judged, cut, differ },
     gaps,
     runnerFacts: header.runnerFacts === "agent-machine",
     definitionChanged,
+    definitions,
     seal,
     witnesses,
   };
@@ -390,7 +427,7 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
 
 /** Le sceau du fichier, ouvert et comparé à sa chaîne, à son en-tête et aux clés que l'on croit. */
 async function sealCheck(file: Obj, events: readonly ChainedEvent[], mission: Obj, options: CheckOptions): Promise<SealCheck> {
-  const empty = { seq: null, sealedAt: null, keyId: null, custody: null, kept: null, after: 0 } as const;
+  const empty = { seq: null, sealedAt: null, keyId: null, custody: null, kept: null, after: 0, late: false } as const;
   if (file.seal === undefined) {
     return { ...empty, state: "none", reason: null, kind: options.key !== undefined ? "noSeal" : null };
   }
@@ -409,6 +446,8 @@ async function sealCheck(file: Obj, events: readonly ChainedEvent[], mission: Ob
     custody: key.custody === "separate-machine" ? "separate-machine" as const : key.custody === "same-machine" ? "same-machine" as const : null,
     kept: typeof key.kept === "boolean" ? key.kept : null,
     after: seq > 0 && seq < events.length ? events.length - seq : 0,
+    // Un sceau tardif (R159, second tour, N5) : posé sur un dossier fini avant que TaskForce ne scelle.
+    late: predicate.late === true,
   };
   const broken = (kind: SealCheck["kind"], reason: string): SealCheck => ({ ...described, state: "broken", kind, reason });
   if (!seal.valid && !(await ed25519Supported())) return { ...described, state: "unchecked", kind: "unsupported", reason: null };
@@ -490,13 +529,22 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         ? `The rules bundle matches its digest, and judging the ${check.rules.judged} recorded actions again gives the same decisions.`
         : "The rules bundle matches its digest." });
     }
+    if (check.rules.cut > 0) {
+      lines.push({ level: "info", text: `${check.rules.cut === 1 ? "1 recorded action was" : `${check.rules.cut} recorded actions were`} judged on facts longer than the record keeps (cut at ${MAX_FACT} characters): ${check.rules.cut === 1 ? "it is" : "they are"} not judged again.` });
+    }
   }
 
   // Les trous, et ce que le runner rapporte.
   for (const gap of check.gaps) lines.push({ level: "warn", text: `Event ${gap.seq}: ${gap.text}` });
   if (check.runnerFacts) lines.push({ level: "warn", text: RUNNER_FACTS });
   for (const d of check.definitionChanged) {
-    lines.push({ level: "warn", text: `Event ${d.seq}: the branch changed ${d.paths.join(", ")}, which defines how its tests run: the tests' result only says that the agent's version of the tests passes.` });
+    const what = d.paths.map((path) => (path === TEST_SETTING ? "the project's test command in TaskForce" : path)).join(", ");
+    lines.push({ level: "warn", text: `Event ${d.seq}: what defines how its tests run changed during the mission (${what}): the tests' result only says that the agent's version of the tests passes.` });
+  }
+  // Une liste de ce que TaskForce cherche, pas la preuve que les tests sont les mêmes (R159, second tour, L-b).
+  for (const d of check.definitions) {
+    if (check.definitionChanged.some((c) => c.seq === d.seq)) continue;
+    lines.push({ level: "info", text: `Event ${d.seq}: none of these files, which define how the tests run, changed: ${d.paths.join(", ")}. It is the list TaskForce looks for, not a proof that the tests are the same.` });
   }
 
   // Le sceau.
@@ -520,7 +568,10 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
   } else if (s.state === "broken" && s.kind === "header") {
     lines.push({ level: "fail", text: "The seal does not hold the header of this file: the header was changed after it was sealed." });
   } else {
-    const at = `Sealed at event ${s.seq ?? -1} on ${String(s.sealedAt ?? undefined)}`;
+    const at = `${s.late ? "Sealed late" : "Sealed"} at event ${s.seq ?? -1} on ${String(s.sealedAt ?? undefined)}`;
+    if (s.late) {
+      lines.push({ level: "warn", text: `This record was sealed late, on ${String(s.sealedAt)}, after its mission had ended: the seal proves the chain as it was on that date, not what happened before.` });
+    }
     if (s.kind === "unreadableKey") {
       lines.push({ level: "fail", text: "The key given with --key cannot be read (a key id sha256:..., or an Ed25519 public key)." });
     } else if (s.kind === "key") {
@@ -542,6 +593,10 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
       lines.push({ level: "warn", text: `No witness: ${w.reason ?? "it was not written"}.` });
     } else if (!w.holds) {
       lines.push({ level: "fail", text: `The witness names event ${w.at ?? -1} with ${shortHash(w.root)}, which is not in this chain.` });
+    } else if (w.key !== null) {
+      // Le commentaire porte aussi la clé qui a scellé cette tête : datée par GitHub, elle ancre ce que la liste des clés de
+      // l'exploitant ne peut pas ancrer (R159, second tour, N6).
+      lines.push({ level: "ok", text: `Witness: the head ${String(w.root)} (event ${w.at ?? -1}), sealed by the key ${w.key}, was written on ${String(w.where)}. Check that the comment there shows the same digest and the same key, and that this key is the one you were given.` });
     } else {
       lines.push({ level: "ok", text: `Witness: the head ${String(w.root)} (event ${w.at ?? -1}) was written on ${String(w.where)}. Check that the comment there shows the same digest.` });
     }
@@ -554,7 +609,8 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         ? "No witness was written in the pull request: only the operator holds this chain."
         : "No witness: this mission has no pull request, so only the operator holds this chain." });
   }
-  return { lines, seal: s.kind === "noSeal" || s.kind === "unreadableKey" || s.kind === "key" ? sealStateOf(s) : s.state };
+  const state = s.kind === "noSeal" || s.kind === "unreadableKey" || s.kind === "key" ? sealStateOf(s) : s.state;
+  return { lines, seal: state, lateOn: s.late && (state === "trusted" || state === "self") ? s.sealedAt : null };
 }
 
 /** Ce que la première ligne dit d'un sceau qui ne tient pas pour la clé donnée. */

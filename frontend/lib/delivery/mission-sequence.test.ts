@@ -581,6 +581,13 @@ describe("When it doesn't go to the end", () => {
     expect(sequence(stopped, S08.slice(0, 13)).steps[2]).toMatchObject({ state: "stopped", sentence: "Stopped here" })
   })
 
+  // R159, second tour, N2 : TaskForce arrête une mission dont le dossier a atteint son plafond, et le dit sans nommer personne.
+  it("stopped at the cap of its record: the app says it in its own words, naming no one", () => {
+    const capped = { ...failed, error: "Evidence cap reached: TaskForce stopped the mission." }
+    expect(sequence(capped, S08.slice(0, 13), [], false).status).toBe(CONSTANTS_EN.missionSequence.status.evidenceCap)
+    expect(CONSTANTS_EN.missionSequence.status.evidenceCap).not.toMatch(/Pierre|\{who\}/)
+  })
+
   it("refused at the start: nothing started, and it says why", () => {
     const refused = { ...failed, refused: true, error: "This project's rules refuse a public repository." }
     const seq = sequence(refused, [])

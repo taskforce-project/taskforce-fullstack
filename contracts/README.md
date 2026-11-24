@@ -86,19 +86,30 @@ only part of its header; the verifier says which fields are not covered, and its
 
 ### People
 
-A person enters the chain by an opaque id, `person:` and 32 hex digits, drawn the first time and the same in every
-mission: `requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the person a request is
+A person enters the chain by an opaque id, `who:` and 32 hex digits, drawn the first time, one per person and
+workspace: the same in every mission of a workspace, and nothing links the ids of one person from a workspace to
+another. The prefix is the record's own: the live rules name a member `person:<id>`, the record never does. The id
+names `requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the person a request is
 `asked` of, and the actor of each gesture. A `note` of kind `person` introduces each one in a dossier, once: `person`,
 and `email` and `name` as texts kept beside the chain. A GitHub account that merges the pull request enters the same
 way, by the text of its login. When an account is purged, its email and name are erased in every dossier, with their
 salt, and a `note` of kind `erased` (`person`, `texts`, `reason: account-deleted`) says so; the id stays in the
-chains, linked to no one. A chain written before 1.18 named people by their email: it cannot be erased without
-breaking the chain. The rules bundle names who answers for each rule as `taskforce-rules/1` does (`owner`).
+chains, linked to no one. A chain written before 1.18 named people by their email (its `mission.started` has no
+`accountable`): those events cannot change without breaking the chain. When the account of a person it names is
+purged, the record gets a `note` of kind `erased` with `legacy: true`, the `events` that keep the email and the
+`reason`, naming no one, then a late seal (below). TaskForce hides the emails of such a record when it shows it (the
+page, the Markdown export), and only an owner or admin of the workspace exports its JSON or its seal, which carry them.
+The copy of the rules bundle the record keeps names people the same way: the `owner` of each
+rule, its `approvers` and the `ref` of a person's layer are opaque ids, each introduced by its note (a person
+TaskForce no longer knows is `who:unknown`). A rule stays that of a named person until their name is erased; then the
+`erased` note says when. The live rules, and the bundle the runner receives, keep their form.
 
 ### What the file carries besides the chain
 
-- `rules`: the rules bundle as the mission received it (`taskforce-rules/1`). Its digest is the one `mission.started`
-  holds; anyone judges each `action.decided` of kind `decision` again with the `facts` it keeps.
+- `rules`: the rules bundle the mission received (`taskforce-rules/1`), each person in it by their opaque id (above).
+  Its digest is computed on this copy and is the one `mission.started` holds, as is each layer's, computed on that
+  layer's rules named the same way: none confirms an email once erased. Anyone judges each `action.decided` of kind
+  `decision` again with the `facts` it keeps.
 - `texts`: the texts kept beside the chain, by their hash, each as `{ "salt": ..., "text": ... }`. The hash is `sha256:`
   and the SHA-256 of the UTF-8 bytes of the salt (32 hex digits, drawn for this text) followed by the text: a short
   text, erased, cannot be confirmed by guessing it. The chain holds only `{ "sha256": ..., "chars": ... }` for the
@@ -112,11 +123,18 @@ breaking the chain. The rules bundle names who answers for each rule as `taskfor
 The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer where the
 agent works, under the same user: they are worth what that computer is worth, whatever the custody of the key. When a
 runner takes the mission, `mission.started` says so with `runnerFacts: "agent-machine"`, and the verifier repeats it.
-A `test.result` lists in `definitionChanged` the files of the branch that define how the tests run (`package.json`,
-`pom.xml`, `pyproject.toml` and the like, or a script the command names): the result then only says that the agent's
-version of the tests passes. The `note` of kind `agent` gives the model the configuration asked for (`configured`), each
-model the answers named (`served`), and who serves it (`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or
-`another-endpoint`).
+A `test.result` lists in `definitionChanged` what changed of what defines how the tests run: the files of the branch
+(`package.json` and the scripts its commands run, `pom.xml`, `mvnw` and `.mvn/`, Gradle's files and wrapper,
+`pyproject.toml`, `setup.cfg`, `tox.ini`, `pytest.ini`, `conftest.py`, `noxfile.py`, Jest, Vitest and Playwright
+configurations, Makefiles, a script the command names, and the like), and `taskforce:test-command` when the project's
+test command in TaskForce is no longer the one the runner ran. The result then only says that the agent's version of
+the tests passes. `definitions` lists the files of that kind the runner found, changed or not: it is the list
+TaskForce looks for, so "none of these files changed", never "the tests are the same". The `note` of kind `agent` gives
+the model the configuration asked for (`configured`), each model the answers named (`served`), and who serves it
+(`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or `another-endpoint`), as the configuration said when
+the agent was launched (`providerFrom: launch-configuration`): the runner's environment, then the `env` of Claude
+Code's user settings and of the organization's managed settings. The repository's settings are not read: the runner
+launches Claude Code without them.
 
 ### Gaps and the cap
 
@@ -125,20 +143,33 @@ last number it received: a number already received is dropped, a number that ski
 `gap` (`from`, `to`). At the end, the runner says how many events it numbered; the ones that never came are marked too.
 A runner that stops answering leaves a `gap` with `to: null`: any event after `from - 1` may be missing.
 
-A dossier keeps 10,000 events from the agent's computer (actors `agent`, `rule`, `runner`); the next one becomes a
-`limit.reached`, and the rest is not kept. What the server and people write (the end, gestures and their reason, the
-witness, an erasure) still is, in a reserve of 1,000 more.
+A dossier keeps 10,000 events of what the mission gives rise to: what comes from the agent's computer (actors `agent`,
+`rule`, `runner`) and what the server writes because of it (a `gap`, a request for approval, its expiry). The next one
+becomes a `limit.reached` written by the server (`max`, `stopped`), and TaskForce stops the mission, so that nothing
+goes on without being written. A reserve of 1,000 more keeps only what the server and people write, and nothing else:
+`mission.ended`, the people's gestures (`human.decision`), the `limit.reached` itself, the notes of kind `person`,
+`checklist`, `witness`, `erased` and `late-seal`, and the `gap` of a lost runner. A text is kept beside the chain only
+with the event that names it: an event the cap drops leaves none.
+
+A fact longer than 4,000 characters (a long command) arrives cut, its end replaced by `[TaskForce cut this text here:
+N characters in all]`. The rules judged the whole fact: a decision whose facts were cut is not judged again, and the
+verifier says how many.
 
 ### Seal
 
 No format of TaskForce's own (E34): the seal is an in-toto Statement v1 whose subject is the head of the chain
 (`taskforce-mission-<id>`, `sha256` digest of the root), with predicate type
 `https://taskforce-project.fr/contracts/taskforce-evidence/1` and the predicate `{ format, mission, root, seq,
-sealedAt, key: { id, algorithm, publicKey, custody, kept } }`. The payload is the canonical JSON of the statement. It is
+sealedAt, key: { id, algorithm, publicKey, custody, kept }, late }` (`late` only on a late seal, below). The payload is the canonical JSON of the statement. It is
 signed in Ed25519 over the DSSE pre-authentication encoding, `DSSEv1 <len> application/vnd.in-toto+json <len>
 <payload>` (lengths in bytes), and kept in a DSSE envelope: `{ payload (base64), payloadType, signatures: [{ keyid, sig
 (base64) }] }`. The key id is `sha256:` and the SHA-256 of the public key in SubjectPublicKeyInfo DER. The server seals
 at the end of the mission, and again after each later gesture; `GET .../evidence?format=dsse` gives the envelope alone.
+
+A record whose mission ended before TaskForce sealed records is sealed once, when the server starts: a `note` of kind
+`late-seal` says so at the end of its chain, with the date, and the seal's predicate carries `late: true`. A late seal
+proves the chain as it was on `sealedAt`, not what happened before; every later seal of that record is late too. The
+verifier accepts it with `--key`, and its first line says "Sealed late, on ...".
 
 `custody` says where the private key lives: `same-machine` (the default, and always in the desktop app) when an agent
 may run on the machine that holds it, `separate-machine` when the operator declares that none does. A seal proves that
@@ -164,13 +195,19 @@ key (`publicKey`, base64-decoded, as DER) to a third, then
 ### Witness
 
 At the end of the mission, the server writes the sealed head in the mission's pull request, then keeps a `note` of kind
-`witness` (`root`, `seq`, `pullRequest`, `comment`, or `written: false` and its `reason`). GitHub dates the comment and
-keeps its edits: a chain rewritten afterwards no longer holds that head. The comment always carries the head; it links
-the verification page only when GitHub says the repository is private, never from the desktop app or to the machine
-itself, and never names a workspace, a person or a host otherwise: `pageLinked`, and `pageLeftOut` (`desktop-app`,
-`local-address`, `visibility-unknown`, `public-repository`, `internal-repository`). A failure is tried again, and a
-regular pass writes the witness of a sealed mission that has none. A mission without a pull request gets a `witness`
-note with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
+`witness` (`root`, `seq`, `key`, `pullRequest`, `comment`, or `written: false` and its `reason`). GitHub dates the
+comment: a chain rewritten afterwards no longer holds that head. The comment carries the head and the id of the key
+that sealed it (`key`), from the desktop app too: compare the key id you are given with the one in the comment, which
+the operator does not hold alone. It never names a workspace, a mission number, a person or a host. It links the
+verification page only when GitHub says the repository is private, never from the desktop app or to the machine
+itself: the link is `<the instance's address>/verify/<id>`, where `id` is an opaque, random id of the record (128
+bits), and the page asks for a sign-in and checks access as any other. `pageLinked`, and `pageLeftOut` (`desktop-app`,
+`turned-off` when the operator sets `witness-link: false`, `local-address`, `visibility-unknown`, `public-repository`,
+`internal-repository`). Before posting, and before each new attempt, the server looks for the head among the comments
+of the pull request: a reply from GitHub lost after the comment was written never makes a second one, and a comment is
+never edited. Once it has tried, written or not, a regular pass no longer tries again, even when its note could not be
+kept; that pass only writes the witness of a sealed mission the server restarted before. A mission without a pull
+request gets a `witness` note with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
 drawn for it; both sides check it.
 
 ## Mission steps: two codes, one set of cases

@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -41,6 +42,8 @@ import lombok.RequiredArgsConstructor;
 public class MissionDossierAccess {
 
     static final String NOT_FOUND = "This run has no evidence file";
+    static final String LEGACY = "This record was written before TaskForce 1.18 and names people by their email: only an "
+        + "owner or admin of the workspace can export it as JSON. The Markdown export hides the emails.";
 
     private final MissionEvidenceService evidence;
     private final ProjectRepository projects;
@@ -50,6 +53,7 @@ public class MissionDossierAccess {
     private final WorkspaceRepository workspaces;
     private final MissionDossierSealRepository seals;
     private final EvidenceSigner signer;
+    private final MissionDossierRepository dossiers;
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -58,12 +62,40 @@ public class MissionDossierAccess {
 
     @Transactional(readOnly = true)
     public Optional<String> export(String slug, Long runId, Long userId, Format format) {
-        readable(slug, runId, userId);
+        MissionDossier dossier = readable(slug, runId, userId);
+        // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel, et son sceau aussi : le JSON et l'enveloppe ne
+        // s'exportent que pour un responsable de l'espace ; le Markdown, lui, les masque (R159, second tour, N4).
+        if (format != Format.MARKDOWN && evidence.legacy(runId) && !manager(dossier, userId)) {
+            throw new ForbiddenException(LEGACY);
+        }
         return switch (format) {
             case JSON -> evidence.dossierJson(runId);
             case MARKDOWN -> evidence.dossierMarkdown(runId);
             case DSSE -> evidence.envelope(runId);
         };
+    }
+
+    /** Le dossier que désigne un lien du témoin : son espace et sa mission, pour ouvrir sa page. */
+    public record Linked(String workspace, Long runId) {
+    }
+
+    /**
+     * Ce que désigne le lien d'un témoin (R159, second tour, M-b) : le lien ne porte qu'un identifiant opaque du dossier, et
+     * la page qu'il ouvre garde ses contrôles d'accès. La personne doit pouvoir lire le dossier, comme par son adresse dans
+     * l'espace ; sinon, le lien répond comme un lien qui ne mène à rien, sans dire lequel.
+     */
+    @Transactional(readOnly = true)
+    public Linked byLink(String linkId, Long userId) {
+        MissionDossier dossier = linkId == null ? null : dossiers.findByLinkId(linkId).orElse(null);
+        if (dossier == null || dossier.getWorkspace() == null) {
+            throw new ResourceNotFoundException(NOT_FOUND);
+        }
+        try {
+            readable(dossier.getWorkspace().getSlug(), dossier.getRunId(), userId);
+        } catch (ForbiddenException e) {
+            throw new ResourceNotFoundException(NOT_FOUND);
+        }
+        return new Linked(dossier.getWorkspace().getSlug(), dossier.getRunId());
     }
 
     /** Efface un texte du dossier ; sa chaîne et son sceau tiennent, et l'effacement s'y ajoute. */

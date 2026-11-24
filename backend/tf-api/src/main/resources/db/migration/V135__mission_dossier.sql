@@ -25,7 +25,12 @@ CREATE TABLE mission_dossiers (
     issue_key     VARCHAR(80),
     delegated_by  BIGINT       REFERENCES users(id) ON DELETE SET NULL,
     rules_bundle  TEXT,
-    created_at    TIMESTAMP    NOT NULL DEFAULT now()
+    created_at    TIMESTAMP    NOT NULL DEFAULT now(),
+    -- Le lien du témoin (R159, second tour, M-b) : un identifiant du dossier, opaque et tiré au hasard (128 bits), sans
+    -- l'espace ni le numéro de la mission. Posé une fois.
+    link_id       VARCHAR(32)  UNIQUE,
+    -- Quand le témoin a fini d'essayer, écrit ou non (N2) : le passage régulier ne le relance plus. Posé une fois.
+    witnessed_at  TIMESTAMP
 );
 CREATE INDEX idx_mission_dossiers_workspace ON mission_dossiers (workspace_id);
 
@@ -51,7 +56,9 @@ ALTER TABLE delivery_run_evidence
     ADD CONSTRAINT fk_delivery_run_evidence_dossier FOREIGN KEY (run_id) REFERENCES mission_dossiers (run_id) ON DELETE CASCADE;
 
 -- 5. Les sceaux : la tête de la chaîne signée (une enveloppe DSSE d'un énoncé in-toto), un par état scellé, jamais
---    réécrits. Le dernier couvre tout le dossier.
+--    réécrits. Le dernier couvre tout le dossier. Un sceau tardif (R159, second tour, N5) est posé sur un dossier fini
+--    avant que TaskForce ne scelle : il ne prouve que la chaîne telle qu'elle était ce jour-là, et ceux qui le suivent non
+--    plus.
 CREATE TABLE mission_dossier_seals (
     id          BIGSERIAL    PRIMARY KEY,
     run_id      BIGINT       NOT NULL REFERENCES mission_dossiers (run_id) ON DELETE CASCADE,
@@ -60,6 +67,7 @@ CREATE TABLE mission_dossier_seals (
     sealed_at   VARCHAR(32)  NOT NULL,
     key_id      VARCHAR(71)  NOT NULL,
     envelope    TEXT         NOT NULL,
+    late        BOOLEAN      NOT NULL DEFAULT false,
     CONSTRAINT uq_mission_dossier_seal UNIQUE (run_id, seq)
 );
 
@@ -83,14 +91,19 @@ CREATE TABLE mission_dossier_texts (
 );
 CREATE INDEX idx_mission_dossier_texts_person ON mission_dossier_texts (person) WHERE person IS NOT NULL;
 
--- 6 bis. Une personne entre dans la chaîne par un identifiant opaque et stable (R159, M6), jamais par son courriel :
---    tiré au hasard la première fois, gardé ici, et retiré quand son compte est purgé. L'identifiant reste dans les
---    chaînes ; plus rien ne le relie à la personne.
+-- 6 bis. Une personne entre dans la chaîne par un identifiant opaque (R159, M6), jamais par son courriel : `who:` et 32
+--    chiffres hexadécimaux, tiré au hasard la première fois, un par personne et par espace (R159, second tour, L-a). Il
+--    est stable dans un espace, et rien ne relie les identifiants d'une même personne d'un espace à l'autre. Il est
+--    retiré quand son compte est purgé : l'identifiant reste dans les chaînes, plus rien ne le relie à la personne.
 CREATE TABLE mission_people (
-    user_id     BIGINT       PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    person      VARCHAR(48)  NOT NULL UNIQUE,
-    created_at  TIMESTAMP    NOT NULL DEFAULT now()
+    id            BIGSERIAL    PRIMARY KEY,
+    workspace_id  BIGINT       NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    person        VARCHAR(48)  NOT NULL UNIQUE,
+    created_at    TIMESTAMP    NOT NULL DEFAULT now(),
+    CONSTRAINT uq_mission_people UNIQUE (workspace_id, user_id)
 );
+CREATE INDEX idx_mission_people_user ON mission_people (user_id);
 
 -- 7. Rien ne se modifie, comme les versions des règles (V125). Un événement ou un sceau ne s'efface qu'avec tout son
 --    dossier, et un dossier qu'avec son espace de travail.
@@ -114,8 +127,8 @@ CREATE TRIGGER trg_mission_dossier_seals_immutable
     BEFORE UPDATE OR DELETE ON mission_dossier_seals
     FOR EACH ROW EXECUTE FUNCTION mission_evidence_immutable();
 
--- Seuls changent : la personne qui a délégué, quand son compte est supprimé (elle passe à NULL), et le paquet de règles
--- d'un dossier ouvert avant ce lot, posé une fois.
+-- Seuls changent : la personne qui a délégué, quand son compte est supprimé (elle passe à NULL), le paquet de règles
+-- d'un dossier ouvert avant ce lot, le lien du témoin et la fin de ses essais, chacun posé une fois.
 CREATE OR REPLACE FUNCTION mission_dossiers_guard() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -128,6 +141,8 @@ BEGIN
        OR NEW.project_id IS DISTINCT FROM OLD.project_id OR NEW.issue_id IS DISTINCT FROM OLD.issue_id
        OR NEW.issue_key IS DISTINCT FROM OLD.issue_key OR NEW.created_at IS DISTINCT FROM OLD.created_at
        OR (NEW.rules_bundle IS DISTINCT FROM OLD.rules_bundle AND OLD.rules_bundle IS NOT NULL)
+       OR (NEW.link_id IS DISTINCT FROM OLD.link_id AND OLD.link_id IS NOT NULL)
+       OR (NEW.witnessed_at IS DISTINCT FROM OLD.witnessed_at AND OLD.witnessed_at IS NOT NULL)
        OR (NEW.delegated_by IS DISTINCT FROM OLD.delegated_by AND NEW.delegated_by IS NOT NULL) THEN
         RAISE EXCEPTION 'The dossier of a mission never changes';
     END IF;

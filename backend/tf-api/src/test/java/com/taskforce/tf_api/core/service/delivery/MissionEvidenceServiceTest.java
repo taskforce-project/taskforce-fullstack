@@ -58,6 +58,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 /**
@@ -81,6 +82,7 @@ class MissionEvidenceServiceTest {
     @Mock private IssueChecklistItemRepository checklist;
     @Mock private MissionPersonRepository people;
     @Mock private ApplicationEventPublisher publisher;
+    @Mock private UserRepository users;
 
     /** Ce que la base garde, dans l'ordre. */
     private final List<DeliveryRunEvidence> stored = new ArrayList<>();
@@ -96,7 +98,7 @@ class MissionEvidenceServiceTest {
     @BeforeEach
     void setUp() {
         service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository, textRepository, ruleSets,
-            checklist, people, new EvidenceSigner("", "", ""), publisher);
+            checklist, people, new EvidenceSigner("", "", ""), publisher, users);
         ada = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada Lovelace").build();
         User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(3L).slug("acme").owner(ada).build();
@@ -149,15 +151,23 @@ class MissionEvidenceServiceTest {
                 && inv.getArgument(1).equals(t.getPerson()) && t.getKind().equals(inv.getArgument(2))));
         lenient().when(textRepository.findByPersonAndBodyIsNotNull(anyString()))
             .thenAnswer(inv -> texts.stream().filter(t -> inv.getArgument(0).equals(t.getPerson()) && t.getBody() != null).toList());
-        lenient().when(repository.existsByRunIdAndType(anyLong(), anyString()))
-            .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))));
-        lenient().when(people.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))));
+        lenient().when(repository.existsByRunIdAndTypeAndActorKind(anyLong(), anyString(), anyString()))
+            .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))
+                && e.getActorKind().equals(inv.getArgument(2))));
+        // Un seul espace ici : l'identifiant d'une personne se range par son compte.
+        lenient().when(people.findByWorkspaceIdAndUserId(anyLong(), anyLong()))
+            .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));
+        lenient().when(people.findByUserId(anyLong()))
+            .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))).stream().toList());
         lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
             MissionPerson person = inv.getArgument(0);
             persons.put(person.getUserId(), person);
             return person;
         });
-        lenient().doAnswer(inv -> persons.remove(inv.<MissionPerson>getArgument(0).getUserId())).when(people).delete(any());
+        lenient().doAnswer(inv -> {
+            inv.<List<MissionPerson>>getArgument(0).forEach(p -> persons.remove(p.getUserId()));
+            return null;
+        }).when(people).deleteAll(any());
     }
 
     /** Le texte gardé à côté de la chaîne, de cette sorte, et l'empreinte salée que la chaîne en porte. */
@@ -165,7 +175,7 @@ class MissionEvidenceServiceTest {
         return texts.stream().filter(t -> t.getKind().equals(kind)).findFirst().orElseThrow();
     }
 
-    private static final String PERSON = "person:[0-9a-f]{32}";
+    private static final String PERSON = "who:[0-9a-f]{32}";
 
     private static RulesBundle rules() {
         return new RulesBundle("taskforce-rules/1", "acme", 12L, 3, DIGEST, null, List.of(), null,
@@ -241,12 +251,62 @@ class MissionEvidenceServiceTest {
             assertThat(texts).extracting(MissionDossierText::getKind).containsExactly("title", "description", "email", "name", "email", "email");
             assertThat(texts).filteredOn(t -> "email".equals(t.getKind())).extracting(MissionDossierText::getPerson)
                 .containsExactly(adaId, persons.get(8L).getPerson(), persons.get(9L).getPerson());
-            assertThat(rows.get(100L).getRulesBundle()).contains("\"digest\":\"" + DIGEST + "\"");
+            // La copie du paquet que le dossier garde porte son empreinte à elle, celle que la chaîne porte (R159, second tour, N3).
+            JsonNode copy = JSON.readTree(rows.get(100L).getRulesBundle());
+            assertThat(copy.get("digest").asText()).isEqualTo(com.taskforce.tf_api.core.harness.rules.RulesDigest.of(copy))
+                .isEqualTo(started.get("rules").get("digest").asText());
         }
 
         private void when_layer_author(String email) {
             lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3))
                 .thenReturn(Optional.of(HarnessRuleSet.builder().version(3).createdBy(User.builder().id(9L).email(email).build()).build()));
+        }
+
+        @Test
+        @DisplayName("R159 second tour, N3 : la copie du paquet nomme chaque personne par son identifiant ; ses empreintes se calculent sur elle")
+        void the_rules_copy_names_people_by_their_id() throws Exception {
+            User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
+            lenient().when(users.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));
+            lenient().when(users.findByEmail("bob@taskforce.dev")).thenReturn(Optional.of(bob));
+            lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
+            // La couche de Bob telle qu'elle est gardée : ses règles nomment leur propriétaire par son courriel.
+            Map<String, Object> layerRule = new java.util.LinkedHashMap<>();
+            layerRule.put("id", "ledger");
+            layerRule.put("effect", "ask");
+            layerRule.put("owner", "bob@taskforce.dev");
+            layerRule.put("require", Map.of("approvers", List.of("person:8")));
+            lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3)).thenReturn(Optional.of(HarnessRuleSet.builder().version(3)
+                .createdBy(bob).rules(List.of(layerRule)).build()));
+            RulesBundle.Rule table = new RulesBundle.Rule("read-files", new RulesBundle.Condition("file.read", null, null, null, null,
+                null, null, null), "reversible", "allow", null, "ada@taskforce.dev", "Reading changes nothing.", "2027-01-01");
+            RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
+                null, null, null, null), "reversible", "ask", null, "bob@taskforce.dev", "Ask Bob first.", "2027-01-01", "person",
+                "Ask Bob first.", new RulesBundle.Require(List.of("person:8", "role:admin"), 1, false));
+            String liveLayerDigest = "sha256:" + "b".repeat(64);
+            RulesBundle live = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, DIGEST, null, List.of(table, ledger), null,
+                List.of(new RulesBundle.Layer("person", "8", 3, liveLayerDigest)));
+            String before = JSON.writeValueAsString(live);
+
+            service.open(run, live, "tf-runner-ada", Map.of());
+
+            JsonNode copy = JSON.readTree(rows.get(100L).getRulesBundle());
+            String ada7 = persons.get(7L).getPerson();
+            String bob8 = persons.get(8L).getPerson();
+            assertThat(copy.toString()).doesNotContain("@").doesNotContain("person:");
+            assertThat(copy.get("rules").get(0).get("owner").asText()).isEqualTo(ada7);
+            assertThat(copy.get("rules").get(1).get("owner").asText()).isEqualTo(bob8);
+            assertThat(copy.get("rules").get(1).get("require").get("approvers")).extracting(JsonNode::asText).containsExactly(bob8, "role:admin");
+            assertThat(copy.get("layers").get(0).get("ref").asText()).isEqualTo(bob8);
+            // L'empreinte du paquet, celle que la chaîne porte, se calcule sur la copie ; celle de la couche aussi, sur ses
+            // règles nommées comme le dossier les nomme : aucune ne confirme un courriel une fois effacé.
+            assertThat(copy.get("digest").asText()).isEqualTo(com.taskforce.tf_api.core.harness.rules.RulesDigest.of(copy))
+                .isNotEqualTo(DIGEST).isEqualTo(data(0).get("rules").get("digest").asText());
+            String layerDigest = copy.get("layers").get(0).get("digest").asText();
+            assertThat(layerDigest).isNotEqualTo(liveLayerDigest).isEqualTo(data(0).get("rules").get("layers").get(0).get("digest").asText());
+            assertThat(data(0).get("rules").get("layers").get(0).get("ref").asText()).isEqualTo(bob8);
+            // Chaque personne que la copie nomme est présentée au dossier ; les règles vivantes gardent leur forme.
+            assertThat(stored.stream().filter(e -> e.getData().contains("\"kind\":\"person\""))).hasSize(2);
+            assertThat(JSON.writeValueAsString(live)).isEqualTo(before);
         }
 
         @Test
@@ -348,7 +408,8 @@ class MissionEvidenceServiceTest {
             Map<String, Object> other = service.ref(101L, "text", "Done.");
 
             assertThat(data(1).get("text")).isEqualTo(data(0).get("text"));
-            assertThat(texts).hasSize(2);
+            // La référence de l'autre dossier n'est nommée par aucun événement : son texte n'est pas gardé (R159, second tour, N1).
+            assertThat(texts).hasSize(1);
             assertThat(other.get("sha256")).isNotEqualTo(data(0).get("text").get("sha256").asText());
         }
 
@@ -374,6 +435,43 @@ class MissionEvidenceServiceTest {
                     "sha256:" + "1".repeat(64), 5000L, true, List.of("package.json", " ", "vitest.config.ts"))));
 
             assertThat(data(0).get("definitionChanged")).extracting(JsonNode::asText).containsExactly("package.json", "vitest.config.ts");
+        }
+
+        @Test
+        @DisplayName("R159 second tour, L-b : la liste que le runner a regardée, et le réglage de test du projet changé pendant la mission")
+        void the_tests_say_what_the_runner_looked_at() throws Exception {
+            run.getIssue().getProject().setTestCommand("npm run test:ci");
+
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null, new RunnerEventsRequest.Test("npm test", true, true, 42, 42,
+                    "sha256:" + "1".repeat(64), 5000L, true, null, List.of("package.json", "vitest.config.ts"))));
+
+            assertThat(data(0).get("definitions")).extracting(JsonNode::asText).containsExactly("package.json", "vitest.config.ts");
+            assertThat(data(0).get("definitionChanged")).extracting(JsonNode::asText).containsExactly(MissionEvidenceService.TEST_SETTING);
+            String md = service.dossierMarkdown(100L).orElseThrow();
+            assertThat(md).contains("changed during the mission (the project's test command in TaskForce)");
+        }
+
+        @Test
+        @DisplayName("R159 second tour, L-b : rien de changé, le Markdown dit une liste, jamais que les tests sont les mêmes")
+        void nothing_changed_is_said_as_a_list() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null, new RunnerEventsRequest.Test("npm test", true, true, 42, 42,
+                    "sha256:" + "1".repeat(64), 5000L, true, null, List.of("package.json"))));
+
+            assertThat(data(0).has("definitionChanged")).isFalse();
+            assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("None of these files, which define how the tests run, changed: `package.json`")
+                .contains("not a proof that the tests are the same");
+        }
+
+        @Test
+        @DisplayName("R159 second tour, L-c : le dossier dit que le fournisseur est celui de la configuration du lancement")
+        void the_provider_is_the_launch_configuration() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "another-endpoint",
+                    "sonnet", List.of(), "launch-configuration"), null));
+
+            assertThat(data(0).get("providerFrom").asText()).isEqualTo("launch-configuration");
         }
 
         @Test
@@ -458,7 +556,10 @@ class MissionEvidenceServiceTest {
             assertThat(seals.getFirst().getRoot()).isEqualTo(run.getEvidenceRoot());
             ArgumentCaptor<MissionSealed> sealed = ArgumentCaptor.forClass(MissionSealed.class);
             verify(publisher).publishEvent(sealed.capture());
-            assertThat(sealed.getValue()).isEqualTo(new MissionSealed(100L, run.getEvidenceRoot(), 4));
+            // Le témoin écrit aussi la clé qui a scellé la tête (R159, second tour, N6).
+            assertThat(sealed.getValue()).extracting(MissionSealed::runId, MissionSealed::root, MissionSealed::seq)
+                .containsExactly(100L, run.getEvidenceRoot(), 4);
+            assertThat(sealed.getValue().keyId()).isEqualTo(seals.getFirst().getKeyId());
         }
 
         @Test
@@ -512,7 +613,8 @@ class MissionEvidenceServiceTest {
             assertThat(file.get("mission").get("workspace").asText()).isEqualTo("acme");
             assertThat(file.get("mission").get("agent").get("model").asText()).isEqualTo("claude-sonnet-5-20261001");
             assertThat(file.get("mission").get("agent").get("version").asText()).isEqualTo("2.1.300");
-            assertThat(file.get("rules").get("digest").asText()).isEqualTo(DIGEST);
+            assertThat(file.get("rules").get("digest").asText()).isEqualTo(com.taskforce.tf_api.core.harness.rules.RulesDigest.of(file.get("rules")))
+                .isEqualTo(file.get("mission").get("rules").get("digest").asText());
             assertThat(file.get("mission").get("requestedBy").asText()).matches(PERSON);
             assertThat(file.get("mission").get("runnerFacts").asText()).isEqualTo("agent-machine");
             // Chaque texte part avec son sel : l'empreinte que la chaîne porte est le SHA-256 du sel suivi du texte (R159, M6).

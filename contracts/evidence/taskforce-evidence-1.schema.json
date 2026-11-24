@@ -19,7 +19,7 @@
         "issue": { "type": ["string", "null"], "description": "The issue key, for example WEB-48." },
         "requestedBy": {
           "type": ["string", "null"],
-          "description": "The person who delegated, by the opaque id the chain names people with (person: and 32 hex digits; their email and name are texts kept beside the chain, in a note of kind person). Null in a file opened before 1.18, whose chain does not say."
+          "description": "The person who delegated, by the opaque id the chain names people with (who: and 32 hex digits, one per person and workspace; their email and name are texts kept beside the chain, in a note of kind person). Null in a file opened before 1.18, whose chain does not say."
         },
         "agent": {
           "type": "object",

@@ -58,6 +58,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 
 /**
@@ -96,9 +97,13 @@ class EvidenceExampleContractTest {
             assertThat(EvidenceChain.sha256(text.getValue().get("salt").asText() + text.getValue().get("text").asText()))
                 .isEqualTo(text.getKey());
         });
-        // Aucune personne n'y entre par son courriel : son identifiant opaque, son courriel à côté.
+        // Aucune personne n'y entre par son courriel : son identifiant opaque, son courriel à côté ; le paquet de règles non
+        // plus, ni par l'identifiant de son compte (R159, second tour, N3).
         assertThat(file.get("events").toString()).doesNotContain("@example.com");
-        assertThat(file.get("mission").get("requestedBy").asText()).matches("person:[0-9a-f]{32}");
+        assertThat(file.get("rules").toString()).doesNotContain("@").doesNotContain("\"person:");
+        assertThat(file.get("rules").get("rules").get(0).get("owner").asText()).matches("who:[0-9a-f]{32}");
+        assertThat(file.get("mission").get("requestedBy").asText()).matches("who:[0-9a-f]{32}");
+        assertThat(file.toString()).doesNotContain("\"person:");
         // Le paquet de règles est celui de la mission, et chaque décision se rejuge à l'identique.
         RulesBundle rules = JSON.treeToValue(file.get("rules"), RulesBundle.class);
         assertThat(RulesDigest.of(file.get("rules"))).isEqualTo(rules.digest()).isEqualTo(file.get("mission").get("rules").get("digest").asText());
@@ -141,6 +146,14 @@ class EvidenceExampleContractTest {
         example().get("events").forEach(e -> kinds.add(e.get("type").asText() + "/" + e.get("data").path("kind").asText(e.get("data").path("decision").asText())));
         assertThat(kinds).contains("note/person", "note/brief", "note/agent", "note/text", "note/gap", "test.result/test", "note/changes",
             "note/runner", "note/checklist", "note/checklist.checked", "note/witness", "human.decision/ALLOWED", "human.decision/APPLY");
+        // Le témoin nomme la clé qui a scellé sa tête, comme son commentaire (R159, second tour, N6).
+        JsonNode witness = null;
+        for (JsonNode e : example().get("events")) {
+            if ("witness".equals(e.get("data").path("kind").asText())) witness = e.get("data");
+        }
+        assertThat(witness).isNotNull();
+        String key = EvidenceSeal.open(example().get("seal")).statement().get("predicate").get("key").get("id").asText();
+        assertThat(witness.path("key").asText()).as("the witness's key").matches("sha256:[0-9a-f]{64}").isEqualTo(key);
     }
 
     @Test
@@ -164,7 +177,8 @@ class EvidenceExampleContractTest {
 
         String mission() {
             MissionPersonRepository people = mock(MissionPersonRepository.class);
-            lenient().when(people.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))));
+            lenient().when(people.findByWorkspaceIdAndUserId(anyLong(), anyLong()))
+                .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));
             lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
                 MissionPerson person = inv.getArgument(0);
                 persons.put(person.getUserId(), person);
@@ -230,9 +244,12 @@ class EvidenceExampleContractTest {
             HarnessRulesService rulesService = new HarnessRulesService(mock(HarnessRuleSetRepository.class),
                 mock(WorkspaceMemberRepository.class));
             RulesBundle rules = rulesService.bundleFor(workspace, new HarnessRulesService.Work(12L, null, 7L));
+            // Le paquet nomme le propriétaire de la table par son courriel : la copie du dossier le nomme par son identifiant (N3).
+            UserRepository users = mock(UserRepository.class);
+            lenient().when(users.findByEmail("ada@example.com")).thenReturn(Optional.of(ada));
             MissionEvidenceService service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository,
                 textRepository, mock(HarnessRuleSetRepository.class), checklist, people, new EvidenceSigner("", "", ""),
-                mock(ApplicationEventPublisher.class));
+                mock(ApplicationEventPublisher.class), users);
 
             service.open(run, rules, "tf-runner-ada", Map.of());
             int n = 0;
@@ -317,6 +334,8 @@ class EvidenceExampleContractTest {
             witness.put("pullRequest", "https://github.com/acme/website/pull/212");
             witness.put("root", end.getRoot());
             witness.put("seq", end.getSeq());
+            // La clé qui a scellé cette tête, que le commentaire porte aussi (R159, second tour, N6).
+            witness.put("key", end.getKeyId());
             // Un dépôt que GitHub dit privé : le commentaire porte le lien de la page (R159, B2).
             witness.put("pageLinked", true);
             witness.put("written", true);
