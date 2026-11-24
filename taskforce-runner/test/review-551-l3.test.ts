@@ -29,6 +29,14 @@ describe("L3. les nombres d'une entrée d'outil, comme la RFC 8785 les écrit", 
     assert.equal(inputHash({ timeout: 1.5 }), sha256('{"timeout":1.5}'));
   });
 
+  it("le JSON canonique de la chaîne refuse un entier que JavaScript ne tient pas exactement, au lieu d'en écrire un autre", () => {
+    // La sonde : le moteur compilé écrivait 1e21 en 3875820019684212736, sans erreur.
+    assert.equal(canonicalJson({ n: 9007199254740991, m: -9007199254740991 } as Json), '{"m":-9007199254740991,"n":9007199254740991}');
+    assert.throws(() => canonicalJson({ n: 1e21 } as Json));
+    assert.throws(() => canonicalJson({ n: 9007199254740992 } as Json));
+    assert.throws(() => canonicalJson({ n: 0.5 } as Json));
+  });
+
   it("une demi-paire seule n'est pas du I-JSON : pas d'empreinte plutôt qu'une empreinte fausse", () => {
     assert.equal(inputHash({ text: "abc\ud83d" }), null);
   });
