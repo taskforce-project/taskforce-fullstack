@@ -317,9 +317,9 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         em.clear();
 
         JsonNode file = export();
-        // La chaîne, l'en-tête et les textes ; le paquet de règles nomme encore qui répond de chaque règle, comme le contrat
-        // des règles le veut (taskforce-rules/1).
-        String record = file.get("events").toString() + file.get("mission") + file.get("texts");
+        // La chaîne, l'en-tête, les textes, et la copie du paquet de règles, qui nomme qui répond de chaque règle par son
+        // identifiant (R159, second tour, N3) : le courriel n'est plus nulle part.
+        String record = file.get("events").toString() + file.get("mission") + file.get("texts") + file.get("rules");
         assertThat(record).doesNotContain("ada@it.dev").doesNotContain("\"Ada\"");
         assertThat(EvidenceChain.firstBrokenLink(events(file))).isEqualTo(-1);
         JsonNode erased = events(file).getLast().get("data");

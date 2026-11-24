@@ -5,7 +5,7 @@
     "workspace" : "acme",
     "project" : 12,
     "issue" : "WEB-48",
-    "requestedBy" : "who:92b584ad10b990d4d90e4763adfccedc",
+    "requestedBy" : "who:3f232092b083d011d5fb2d46dbfa97d9",
     "agent" : {
       "kind" : "claude-code",
       "model" : "claude-sonnet-5-20261001",
@@ -13,7 +13,7 @@
     },
     "rules" : {
       "version" : 1,
-      "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8"
+      "digest" : "sha256:c60147c95cf476e936402248aa07e4255b0c19353e8912b747ce0cc06171a767"
     },
     "runner" : "tf-runner-ada",
     "runnerFacts" : "agent-machine",
@@ -21,14 +21,14 @@
   },
   "events" : [ {
     "seq" : 1,
-    "at" : "2026-11-24T11:44:10.240Z",
+    "at" : "2026-11-24T12:13:05.842Z",
     "type" : "mission.started",
     "actor" : {
       "kind" : "server",
       "id" : "taskforce"
     },
     "data" : {
-      "accountable" : "who:92b584ad10b990d4d90e4763adfccedc",
+      "accountable" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "agent" : {
         "kind" : "claude-code",
         "model" : "sonnet"
@@ -45,18 +45,18 @@
         "createdAt" : "2026-11-20T09:30:00.000Z",
         "description" : {
           "chars" : 96,
-          "sha256" : "sha256:7612333c182e163060aab15c84ddf16ca243f41f580a3f2bdf53c5ebc483dc5f"
+          "sha256" : "sha256:07f7c83a754976c164fe4af25e476405a878246074482ccf5749ad9ac3f3d402"
         },
         "importedFrom" : null,
-        "reporter" : "who:3932c385c4aade29ba58601bcb3f7039",
+        "reporter" : "who:964c0a0e9ed61c41bdbbf00c6aa8904e",
         "title" : {
           "chars" : 20,
-          "sha256" : "sha256:1e4216f432e1b0a37aad8fe2b78980b111c7fcb16128810e1dabcfec1e00d975"
+          "sha256" : "sha256:0751447e51cdd94a877d413dbb7440448585eb0f4306d8bd960d743bcc5e0335"
         }
       },
-      "requestedBy" : "who:92b584ad10b990d4d90e4763adfccedc",
+      "requestedBy" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "rules" : {
-        "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8",
+        "digest" : "sha256:c60147c95cf476e936402248aa07e4255b0c19353e8912b747ce0cc06171a767",
         "layers" : [ ],
         "version" : 1
       },
@@ -66,10 +66,10 @@
       "workspace" : "acme"
     },
     "prev" : "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    "hash" : "sha256:4a31b2f67881e0d92937dc1ba994896470f2f96e2e7c6e919aed2944eac5194f"
+    "hash" : "sha256:59bf15b629420a7cc31abcb8f57040900bc5e6ef2b3b5eaab252f158d7ec2a22"
   }, {
     "seq" : 2,
-    "at" : "2026-11-24T11:44:10.245Z",
+    "at" : "2026-11-24T12:13:05.843Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -78,20 +78,20 @@
     "data" : {
       "email" : {
         "chars" : 15,
-        "sha256" : "sha256:edea9e05ed83a13ea4de8cbe23545a36a82bf51bd3bc92cabd4d621385681cf5"
+        "sha256" : "sha256:8c55024982cebd81e972f2d34753160b89839bc5c8983678e411a3332fd4bb8e"
       },
       "kind" : "person",
       "name" : {
         "chars" : 3,
-        "sha256" : "sha256:3bd92b007a7c9826cb2412a4ff66369f91eeeadce3d5fb70107c444cc94b6174"
+        "sha256" : "sha256:71052605f9c76b1742444d693baa831902583439c9e8f08112b821754c022e7f"
       },
-      "person" : "who:92b584ad10b990d4d90e4763adfccedc"
+      "person" : "who:3f232092b083d011d5fb2d46dbfa97d9"
     },
-    "prev" : "sha256:4a31b2f67881e0d92937dc1ba994896470f2f96e2e7c6e919aed2944eac5194f",
-    "hash" : "sha256:17a4b6d70114625f71c8e8b11469c463b863d5217bc9fdcba622f3a1570986ec"
+    "prev" : "sha256:59bf15b629420a7cc31abcb8f57040900bc5e6ef2b3b5eaab252f158d7ec2a22",
+    "hash" : "sha256:c9ff3f24e0b0d22bd65366c0d03d16e29d4b3c4ece94447c7ef130ba07242cc5"
   }, {
     "seq" : 3,
-    "at" : "2026-11-24T11:44:10.249Z",
+    "at" : "2026-11-24T12:13:05.843Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -100,20 +100,20 @@
     "data" : {
       "email" : {
         "chars" : 17,
-        "sha256" : "sha256:ac484cf894d922c112069626186c1bde685377a7ae0011e0f1730e20c47b9af9"
+        "sha256" : "sha256:60972380ce4f7b4a89a1a88147b47cde4d3b22e30176f456b7f60755b9bf77e3"
       },
       "kind" : "person",
       "name" : {
         "chars" : 5,
-        "sha256" : "sha256:eed256772e9871e571ca61c5d78c3bda54d6f9ffab7ce66e70966c47f096dd6b"
+        "sha256" : "sha256:b727909be760d8d79ff77856fc8a0472992c4514396cc5240f8e7452aeb636cb"
       },
-      "person" : "who:3932c385c4aade29ba58601bcb3f7039"
+      "person" : "who:964c0a0e9ed61c41bdbbf00c6aa8904e"
     },
-    "prev" : "sha256:17a4b6d70114625f71c8e8b11469c463b863d5217bc9fdcba622f3a1570986ec",
-    "hash" : "sha256:1ba5f2f6ffa277ba9f09594cb41b66d2b62df68aeae2bd45c9c2eb5a01833a27"
+    "prev" : "sha256:c9ff3f24e0b0d22bd65366c0d03d16e29d4b3c4ece94447c7ef130ba07242cc5",
+    "hash" : "sha256:5272e29d26ce96e30fee51b929219fe1da06a2182010267b31ed8c33f4730438"
   }, {
     "seq" : 4,
-    "at" : "2026-11-24T11:44:10.252Z",
+    "at" : "2026-11-24T12:13:05.844Z",
     "type" : "note",
     "actor" : {
       "kind" : "runner",
@@ -122,15 +122,15 @@
     "data" : {
       "brief" : {
         "chars" : 85,
-        "sha256" : "sha256:675cccfd7a9ee73b612a0f87083fe0c4cde13071edace7442a9bbc4fdbaf1b20"
+        "sha256" : "sha256:865cc8b083b4141475f837e1daeb7735a34eb070da74d0a3c7d726e3aa10a665"
       },
       "kind" : "brief"
     },
-    "prev" : "sha256:1ba5f2f6ffa277ba9f09594cb41b66d2b62df68aeae2bd45c9c2eb5a01833a27",
-    "hash" : "sha256:288a5bc784e6acab91a06535faad22cf3c576c9236402c27f2c45aca89f2f51c"
+    "prev" : "sha256:5272e29d26ce96e30fee51b929219fe1da06a2182010267b31ed8c33f4730438",
+    "hash" : "sha256:a9841f4f10b987b21cb880492ebec8fa16705592c8ef478f85c8ab87098f546b"
   }, {
     "seq" : 5,
-    "at" : "2026-11-24T11:44:10.256Z",
+    "at" : "2026-11-24T12:13:05.844Z",
     "type" : "note",
     "actor" : {
       "kind" : "agent",
@@ -147,11 +147,11 @@
       "text" : "Claude Code 2.1.300 with claude-sonnet-5-20261001",
       "version" : "2.1.300"
     },
-    "prev" : "sha256:288a5bc784e6acab91a06535faad22cf3c576c9236402c27f2c45aca89f2f51c",
-    "hash" : "sha256:cf0e8efa3e9576a1a419692698389d1dea85932d9fe993fa9772d03cc0f65d45"
+    "prev" : "sha256:a9841f4f10b987b21cb880492ebec8fa16705592c8ef478f85c8ab87098f546b",
+    "hash" : "sha256:0d0d1b68c775f91af3089f7a42f2dda62482863ca2e7b4c37f6afe444db39646"
   }, {
     "seq" : 6,
-    "at" : "2026-11-24T11:44:10.262Z",
+    "at" : "2026-11-24T12:13:05.846Z",
     "type" : "note",
     "actor" : {
       "kind" : "agent",
@@ -161,14 +161,14 @@
       "kind" : "text",
       "text" : {
         "chars" : 39,
-        "sha256" : "sha256:b6c681dbfa4b4ef84c93356a6e67dc03b33529431a96e437d2c11338a62a0341"
+        "sha256" : "sha256:a8cd6c290d7c04c0929ae55c9727261f90ead7bb63538db8a596db37cf266827"
       }
     },
-    "prev" : "sha256:cf0e8efa3e9576a1a419692698389d1dea85932d9fe993fa9772d03cc0f65d45",
-    "hash" : "sha256:51035e2c99658796c9465ae9ffe96241dd051c7b16b724e61efdc57b30a6ba2d"
+    "prev" : "sha256:0d0d1b68c775f91af3089f7a42f2dda62482863ca2e7b4c37f6afe444db39646",
+    "hash" : "sha256:14bc663c15d9811859dbc9ea3a967518a689a02d20aa8f116feea6431628e8cf"
   }, {
     "seq" : 7,
-    "at" : "2026-11-24T11:44:10.342Z",
+    "at" : "2026-11-24T12:13:05.858Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "rule",
@@ -187,11 +187,11 @@
       "text" : "src/components/footer.tsx",
       "tool" : "Read"
     },
-    "prev" : "sha256:51035e2c99658796c9465ae9ffe96241dd051c7b16b724e61efdc57b30a6ba2d",
-    "hash" : "sha256:cd91d35d7b7e5500f9397188fe2b69c6fc5634d0288853bcb7ef6ae8baabddfd"
+    "prev" : "sha256:14bc663c15d9811859dbc9ea3a967518a689a02d20aa8f116feea6431628e8cf",
+    "hash" : "sha256:5d23c5bbad01a55b4d9a4fd080d550d1eb97891f8a4f144855e1c9e95e74f58e"
   }, {
     "seq" : 8,
-    "at" : "2026-11-24T11:44:10.344Z",
+    "at" : "2026-11-24T12:13:05.858Z",
     "type" : "action.requested",
     "actor" : {
       "kind" : "agent",
@@ -202,11 +202,11 @@
       "text" : "src/components/footer.tsx",
       "tool" : "Read"
     },
-    "prev" : "sha256:cd91d35d7b7e5500f9397188fe2b69c6fc5634d0288853bcb7ef6ae8baabddfd",
-    "hash" : "sha256:4268dfa7cce036abaa02c35db8ed8bd1e8739940e48b6081ec7e3ffd57fefd7c"
+    "prev" : "sha256:5d23c5bbad01a55b4d9a4fd080d550d1eb97891f8a4f144855e1c9e95e74f58e",
+    "hash" : "sha256:f20cb8347722ab3650499458d99812a2c651e5b053e5960cdb9a297e6ffd566f"
   }, {
     "seq" : 9,
-    "at" : "2026-11-24T11:44:10.353Z",
+    "at" : "2026-11-24T12:13:05.859Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "rule",
@@ -230,11 +230,11 @@
         "sha256" : "sha256:5555555555555555555555555555555555555555555555555555555555555555"
       }
     },
-    "prev" : "sha256:4268dfa7cce036abaa02c35db8ed8bd1e8739940e48b6081ec7e3ffd57fefd7c",
-    "hash" : "sha256:f88b06e632102ac0bbe506199f048236e2519bb6b0c7bcac5cebeb9e32cb00dc"
+    "prev" : "sha256:f20cb8347722ab3650499458d99812a2c651e5b053e5960cdb9a297e6ffd566f",
+    "hash" : "sha256:98b489c54f6370c758669832ab604d9ead31e4f93d4130767390259f77d64e8b"
   }, {
     "seq" : 10,
-    "at" : "2026-11-24T11:44:10.355Z",
+    "at" : "2026-11-24T12:13:05.859Z",
     "type" : "action.requested",
     "actor" : {
       "kind" : "agent",
@@ -245,11 +245,11 @@
       "text" : "src/components/footer.tsx",
       "tool" : "Edit"
     },
-    "prev" : "sha256:f88b06e632102ac0bbe506199f048236e2519bb6b0c7bcac5cebeb9e32cb00dc",
-    "hash" : "sha256:2a6271575c22fe12a3e130f08a62652e1437206f81cc73e27184a4e2f12b298b"
+    "prev" : "sha256:98b489c54f6370c758669832ab604d9ead31e4f93d4130767390259f77d64e8b",
+    "hash" : "sha256:0a8452e8ded49dfa2a74fce5b289363452b5336c9b88eaa18e1e68b5240201ad"
   }, {
     "seq" : 11,
-    "at" : "2026-11-24T11:44:10.357Z",
+    "at" : "2026-11-24T12:13:05.859Z",
     "type" : "note",
     "actor" : {
       "kind" : "agent",
@@ -261,14 +261,14 @@
       "kind" : "checklist.checked",
       "text" : {
         "chars" : 48,
-        "sha256" : "sha256:7742ad521ed8532c9b1c9add7147e85ea61703b7e97d624e9e9db5b0bc0a4c73"
+        "sha256" : "sha256:cd400d982b8794124f8e18c814503333732a2701aa76f483b5efc413f7353840"
       }
     },
-    "prev" : "sha256:2a6271575c22fe12a3e130f08a62652e1437206f81cc73e27184a4e2f12b298b",
-    "hash" : "sha256:25b9e626e3dd6a89ed474e288bab9dda6e1fd8054acdc6bd5c61aa971718a0ff"
+    "prev" : "sha256:0a8452e8ded49dfa2a74fce5b289363452b5336c9b88eaa18e1e68b5240201ad",
+    "hash" : "sha256:aef46c871c460b8f77e27e18c1b5b780799602aaea802d4df23b54dbf29f84f7"
   }, {
     "seq" : 12,
-    "at" : "2026-11-24T11:44:10.360Z",
+    "at" : "2026-11-24T12:13:05.860Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "rule",
@@ -286,11 +286,11 @@
       "text" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:25b9e626e3dd6a89ed474e288bab9dda6e1fd8054acdc6bd5c61aa971718a0ff",
-    "hash" : "sha256:823a50ce9b8fc9f07285b5defb4e60011b7db9664c1a0a7d28e4d0449b7259cc"
+    "prev" : "sha256:aef46c871c460b8f77e27e18c1b5b780799602aaea802d4df23b54dbf29f84f7",
+    "hash" : "sha256:206f5c8210942d9ac71596c1debf06ac1f1526c2e4ab09e018f6dd8e180ff954"
   }, {
     "seq" : 13,
-    "at" : "2026-11-24T11:44:10.362Z",
+    "at" : "2026-11-24T12:13:05.861Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "server",
@@ -299,7 +299,7 @@
     "data" : {
       "action" : "web.search",
       "approval" : 9,
-      "asked" : "who:92b584ad10b990d4d90e4763adfccedc",
+      "asked" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "askedBy" : "agent",
       "effect" : "ask",
       "facts" : [ {
@@ -312,15 +312,15 @@
       "summary" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:823a50ce9b8fc9f07285b5defb4e60011b7db9664c1a0a7d28e4d0449b7259cc",
-    "hash" : "sha256:b69f2afb82740a276dfb1b3274c617debba09cb6fa39746b6d2b9eee8b2e8352"
+    "prev" : "sha256:206f5c8210942d9ac71596c1debf06ac1f1526c2e4ab09e018f6dd8e180ff954",
+    "hash" : "sha256:fdbfd4a44b0838d2f49f0d984ca264a35960a3baa3f65b3a2a8092380b927eff"
   }, {
     "seq" : 14,
-    "at" : "2026-11-24T11:44:10.368Z",
+    "at" : "2026-11-24T12:13:05.863Z",
     "type" : "human.decision",
     "actor" : {
       "kind" : "person",
-      "id" : "who:92b584ad10b990d4d90e4763adfccedc"
+      "id" : "who:3f232092b083d011d5fb2d46dbfa97d9"
     },
     "data" : {
       "action" : "web.search",
@@ -332,11 +332,11 @@
       "summary" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:b69f2afb82740a276dfb1b3274c617debba09cb6fa39746b6d2b9eee8b2e8352",
-    "hash" : "sha256:71aafe4a01c9299966ce33549a8caaf4baa9dcbf618c4120c823292add5b3c6b"
+    "prev" : "sha256:fdbfd4a44b0838d2f49f0d984ca264a35960a3baa3f65b3a2a8092380b927eff",
+    "hash" : "sha256:cd030eae13ecd5caaf8bdbcee23d200e8e1fb94d64feaf801eff77152f85d3f3"
   }, {
     "seq" : 15,
-    "at" : "2026-11-24T11:44:10.372Z",
+    "at" : "2026-11-24T12:13:05.864Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -348,11 +348,11 @@
       "text" : "Event 9 from the runner never arrived.",
       "to" : 9
     },
-    "prev" : "sha256:71aafe4a01c9299966ce33549a8caaf4baa9dcbf618c4120c823292add5b3c6b",
-    "hash" : "sha256:6c1ff396bd516e0ec3e9c3ed8ca78521dea46626b73bc110bd7597f4d7d73da7"
+    "prev" : "sha256:cd030eae13ecd5caaf8bdbcee23d200e8e1fb94d64feaf801eff77152f85d3f3",
+    "hash" : "sha256:9827dc286e2ed5830d20edfd12234a364b52633b3359e046e64e66dc91798328"
   }, {
     "seq" : 16,
-    "at" : "2026-11-24T11:44:10.374Z",
+    "at" : "2026-11-24T12:13:05.864Z",
     "type" : "action.requested",
     "actor" : {
       "kind" : "agent",
@@ -363,11 +363,11 @@
       "text" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:6c1ff396bd516e0ec3e9c3ed8ca78521dea46626b73bc110bd7597f4d7d73da7",
-    "hash" : "sha256:4c5d5db75a3b01ad6b9a86d059dfe86d41c62e9846a29d7e4810259a07c4a586"
+    "prev" : "sha256:9827dc286e2ed5830d20edfd12234a364b52633b3359e046e64e66dc91798328",
+    "hash" : "sha256:eaba63787b8b30f5d2c8fd0b4a3d7978a1e53b3f2e2428fb9513fca4c0d251a9"
   }, {
     "seq" : 17,
-    "at" : "2026-11-24T11:44:10.374Z",
+    "at" : "2026-11-24T12:13:05.865Z",
     "type" : "exit.result",
     "actor" : {
       "kind" : "runner",
@@ -380,11 +380,11 @@
       "text" : "allowed by the rule push-agent-branch-private",
       "tool" : "git push"
     },
-    "prev" : "sha256:4c5d5db75a3b01ad6b9a86d059dfe86d41c62e9846a29d7e4810259a07c4a586",
-    "hash" : "sha256:2928761a729368d8aafa08bbbf6197e0535abf6b392c930adcd9ee1d1adf6893"
+    "prev" : "sha256:eaba63787b8b30f5d2c8fd0b4a3d7978a1e53b3f2e2428fb9513fca4c0d251a9",
+    "hash" : "sha256:ad1708207245213a1c22613ca77b30a632e1303af17936d7acf990b90b2f6222"
   }, {
     "seq" : 18,
-    "at" : "2026-11-24T11:44:10.375Z",
+    "at" : "2026-11-24T12:13:05.865Z",
     "type" : "exit.result",
     "actor" : {
       "kind" : "runner",
@@ -397,11 +397,11 @@
       "text" : "allowed by the rule open-pull-request",
       "tool" : "gh pr create"
     },
-    "prev" : "sha256:2928761a729368d8aafa08bbbf6197e0535abf6b392c930adcd9ee1d1adf6893",
-    "hash" : "sha256:ed9e8ecc4475d7fa2eaa5db441488b43e033e46d3f2c3281ad43e087c988f8f4"
+    "prev" : "sha256:ad1708207245213a1c22613ca77b30a632e1303af17936d7acf990b90b2f6222",
+    "hash" : "sha256:f70e2e7d66c138552a78e05db73ab4d0021955a8af096671b7f65367c8c924bc"
   }, {
     "seq" : 19,
-    "at" : "2026-11-24T11:44:10.376Z",
+    "at" : "2026-11-24T12:13:05.865Z",
     "type" : "note",
     "actor" : {
       "kind" : "runner",
@@ -423,11 +423,11 @@
       "more" : 0,
       "removed" : 3
     },
-    "prev" : "sha256:ed9e8ecc4475d7fa2eaa5db441488b43e033e46d3f2c3281ad43e087c988f8f4",
-    "hash" : "sha256:57cfcde27e9985877938c873786fc0c51ca649bcb2b1a2f62e8e7a3bd950bec9"
+    "prev" : "sha256:f70e2e7d66c138552a78e05db73ab4d0021955a8af096671b7f65367c8c924bc",
+    "hash" : "sha256:11d3d951dfee4c99b426556714548c6781ce0009a7f589202ec8d594622e2a54"
   }, {
     "seq" : 20,
-    "at" : "2026-11-24T11:44:10.392Z",
+    "at" : "2026-11-24T12:13:05.882Z",
     "type" : "test.result",
     "actor" : {
       "kind" : "runner",
@@ -449,11 +449,11 @@
       "tool" : "npm test",
       "total" : 48
     },
-    "prev" : "sha256:57cfcde27e9985877938c873786fc0c51ca649bcb2b1a2f62e8e7a3bd950bec9",
-    "hash" : "sha256:1d7c873c19adf85ab603b3ba0fffd07eca60af37cc5847b953b64f732f095bf5"
+    "prev" : "sha256:11d3d951dfee4c99b426556714548c6781ce0009a7f589202ec8d594622e2a54",
+    "hash" : "sha256:de248df154093c3b0aaf049d91018546ae83ef65ab9387c3d6398a1d002fef4d"
   }, {
     "seq" : 21,
-    "at" : "2026-11-24T11:44:10.407Z",
+    "at" : "2026-11-24T12:13:05.895Z",
     "type" : "note",
     "actor" : {
       "kind" : "runner",
@@ -471,11 +471,11 @@
         "sha256" : "sha256:4444444444444444444444444444444444444444444444444444444444444444"
       }
     },
-    "prev" : "sha256:1d7c873c19adf85ab603b3ba0fffd07eca60af37cc5847b953b64f732f095bf5",
-    "hash" : "sha256:3b3d7ba43e2a12f0da527c0661cf442f70dead6544575cd0ec26f261fee59fb2"
+    "prev" : "sha256:de248df154093c3b0aaf049d91018546ae83ef65ab9387c3d6398a1d002fef4d",
+    "hash" : "sha256:a2b65026c453f8feb4a9e9b3b05c7ce7b33ef7dbc383316a286ad2e5b09ebca3"
   }, {
     "seq" : 22,
-    "at" : "2026-11-24T11:44:10.408Z",
+    "at" : "2026-11-24T12:13:05.896Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -487,23 +487,23 @@
         "id" : 1,
         "text" : {
           "chars" : 48,
-          "sha256" : "sha256:7742ad521ed8532c9b1c9add7147e85ea61703b7e97d624e9e9db5b0bc0a4c73"
+          "sha256" : "sha256:cd400d982b8794124f8e18c814503333732a2701aa76f483b5efc413f7353840"
         }
       }, {
         "done" : false,
         "id" : 2,
         "text" : {
           "chars" : 35,
-          "sha256" : "sha256:a9f8b2be331c288d632a74dd66028c2627ed935f7d163f6697ee731dc3348e60"
+          "sha256" : "sha256:1731ffd49054e9762a8370dde546ad66cce36ec0520c7df09f7cd4bfcac47126"
         }
       } ],
       "kind" : "checklist"
     },
-    "prev" : "sha256:3b3d7ba43e2a12f0da527c0661cf442f70dead6544575cd0ec26f261fee59fb2",
-    "hash" : "sha256:ab16a4576ee172d54af2ae04e4c5c8f54a104c0eaf94581f265a4f6a9f787ad8"
+    "prev" : "sha256:a2b65026c453f8feb4a9e9b3b05c7ce7b33ef7dbc383316a286ad2e5b09ebca3",
+    "hash" : "sha256:bd0df43d8312aa5f502ada511ca9d32b2decb62857265e99b0180dff0cc12b7c"
   }, {
     "seq" : 23,
-    "at" : "2026-11-24T11:44:10.409Z",
+    "at" : "2026-11-24T12:13:05.896Z",
     "type" : "mission.ended",
     "actor" : {
       "kind" : "server",
@@ -517,14 +517,14 @@
       "status" : "DONE",
       "summary" : {
         "chars" : 227,
-        "sha256" : "sha256:4de4cf52beb122b4d12463def619e43318f889d0f288e1eeb9e357372d7420f3"
+        "sha256" : "sha256:dd64b6e21fb9ca3d6c2458ef2b7ea6aa1b4cff950ef16a62a4a2fc2ca8a24f1c"
       }
     },
-    "prev" : "sha256:ab16a4576ee172d54af2ae04e4c5c8f54a104c0eaf94581f265a4f6a9f787ad8",
-    "hash" : "sha256:6b96625261eee3c719db29998433bbacc0029e41848476145d0a0741deee32d7"
+    "prev" : "sha256:bd0df43d8312aa5f502ada511ca9d32b2decb62857265e99b0180dff0cc12b7c",
+    "hash" : "sha256:36b7e812f214c4fe0439caed9d54ed0b07d97d4288e739ac10dcf7b8ab10f28c"
   }, {
     "seq" : 24,
-    "at" : "2026-11-24T11:44:10.428Z",
+    "at" : "2026-11-24T12:13:05.899Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -535,20 +535,20 @@
       "kind" : "witness",
       "pageLinked" : true,
       "pullRequest" : "https://github.com/acme/website/pull/212",
-      "root" : "sha256:6b96625261eee3c719db29998433bbacc0029e41848476145d0a0741deee32d7",
+      "root" : "sha256:36b7e812f214c4fe0439caed9d54ed0b07d97d4288e739ac10dcf7b8ab10f28c",
       "seq" : 23,
       "where" : "github-pull-request",
       "written" : true
     },
-    "prev" : "sha256:6b96625261eee3c719db29998433bbacc0029e41848476145d0a0741deee32d7",
-    "hash" : "sha256:824096d82500d28e42ae13033a56728ccdffecfa058ffc70bbd7d2adf03dffdc"
+    "prev" : "sha256:36b7e812f214c4fe0439caed9d54ed0b07d97d4288e739ac10dcf7b8ab10f28c",
+    "hash" : "sha256:6efcd952642cd655143174c2184998e74b7bcd3ca0db83bfc71a3692254c264f"
   }, {
     "seq" : 25,
-    "at" : "2026-11-24T11:44:10.436Z",
+    "at" : "2026-11-24T12:13:05.901Z",
     "type" : "human.decision",
     "actor" : {
       "kind" : "person",
-      "id" : "who:92b584ad10b990d4d90e4763adfccedc"
+      "id" : "who:3f232092b083d011d5fb2d46dbfa97d9"
     },
     "data" : {
       "decision" : "APPLY",
@@ -558,16 +558,16 @@
       "testsFailed" : false,
       "where" : "taskforce"
     },
-    "prev" : "sha256:824096d82500d28e42ae13033a56728ccdffecfa058ffc70bbd7d2adf03dffdc",
-    "hash" : "sha256:8ed0c3e4d2cb4b4d9b7e93ee3300f9f78f96ac108061e25e1848420b3fc22129"
+    "prev" : "sha256:6efcd952642cd655143174c2184998e74b7bcd3ca0db83bfc71a3692254c264f",
+    "hash" : "sha256:6d1132d6b48a54ba81b82d5596efc1f193a58fbd09637af7e1a1d69042fcdabd"
   } ],
-  "root" : "sha256:8ed0c3e4d2cb4b4d9b7e93ee3300f9f78f96ac108061e25e1848420b3fc22129",
+  "root" : "sha256:6d1132d6b48a54ba81b82d5596efc1f193a58fbd09637af7e1a1d69042fcdabd",
   "rules" : {
     "format" : "taskforce-rules/1",
     "workspace" : "acme",
     "project" : 12,
     "version" : 1,
-    "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8",
+    "digest" : "sha256:c60147c95cf476e936402248aa07e4255b0c19353e8912b747ce0cc06171a767",
     "issuedAt" : null,
     "rules" : [ {
       "id" : "read-files",
@@ -586,7 +586,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Reading leaves a trace and changes nothing (R7').",
       "review" : "2027-01-31",
       "layer" : null,
@@ -609,7 +609,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Searching leaves a trace and changes nothing (R7').",
       "review" : "2027-01-31",
       "layer" : null,
@@ -632,7 +632,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Reading leaves a trace and changes nothing (R7').",
       "review" : "2027-01-31",
       "layer" : null,
@@ -655,7 +655,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "The search returns only what the person may read: a private project's notes stay with the people who can see the project.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -678,7 +678,7 @@
       "class" : "irreversible",
       "effect" : "ask",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A web search sends its query out of the machine, where it cannot be taken back.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -701,7 +701,7 @@
       "class" : "irreversible",
       "effect" : "ask",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "An address can carry the mission's data out of the machine, where it cannot be taken back.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -724,7 +724,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Read by default in the company's tools (session 2).",
       "review" : "2027-01-31",
       "layer" : null,
@@ -747,7 +747,7 @@
       "class" : "sandbox-write",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Free but supervised: the copy is the agent's to change.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -770,7 +770,7 @@
       "class" : "sandbox-write",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A local commit stays in the copy.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -793,7 +793,7 @@
       "class" : "sandbox-write",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A mission starts in its own copy; what leaves it follows its own rules.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -816,7 +816,7 @@
       "class" : "irreversible",
       "effect" : "deny",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "TaskForce doesn't start missions on public repositories yet: link a private repository to delegate this task.",
       "review" : "2026-11-30",
       "layer" : null,
@@ -839,7 +839,7 @@
       "class" : "irreversible",
       "effect" : "deny",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "While the computer isn't isolated, the agent doesn't run the repository's scripts: TaskForce runs the project's tests after the agent.",
       "review" : "2026-11-30",
       "layer" : null,
@@ -862,7 +862,7 @@
       "class" : "sandbox-write",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Local git commands that stay in the copy.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -885,7 +885,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Git's read-only forms show the branches, the remotes and the tracked files and change nothing; creating, renaming or deleting a branch still asks.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -908,7 +908,7 @@
       "class" : "read",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Reading in the copy, or printing a line without redirecting it, leaves a trace and changes nothing (R7').",
       "review" : "2027-01-31",
       "layer" : null,
@@ -931,7 +931,7 @@
       "class" : "irreversible",
       "effect" : "deny",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Exits go through the runner, after the tests and under these rules, never through the agent's own shell.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -954,7 +954,7 @@
       "class" : "irreversible",
       "effect" : "deny",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "The GitHub CLI acts outside the copy; the runner does it under these rules.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -977,7 +977,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "delete-branch",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "The agent's branch can be deleted, and a private repository exposes nothing.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1000,7 +1000,7 @@
       "class" : "irreversible",
       "effect" : "ask",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "Pushing to a public repository exposes the code; it cannot be taken back.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1023,7 +1023,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "close-pull-request",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A pull request is closed in one gesture; nothing is merged.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1046,7 +1046,7 @@
       "class" : "irreversible",
       "effect" : "ask",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A pull request on a public repository is public at once.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1069,7 +1069,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "close-issue",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "An issue in the mission's project is closed in one gesture.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1092,7 +1092,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "archive-project",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A project the person asks for in the conversation is created at once; it is archived in one gesture.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1115,7 +1115,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "restore-issue",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "The issue keeps its history; a change is put back from it.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1138,7 +1138,7 @@
       "class" : "irreversible",
       "effect" : "ask",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A deleted issue takes its comments, its checklist and its mission with it; archiving it can be undone.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1161,7 +1161,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "delete-comment",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A comment is deleted in one gesture.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1184,7 +1184,7 @@
       "class" : "reversible-exit",
       "effect" : "allow",
       "inverse" : "delete-note",
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A note the person asks for in the conversation is created at once; it is deleted in one gesture.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1207,7 +1207,7 @@
       "class" : "irreversible",
       "effect" : "ask",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A change in a company tool has no way back that TaskForce knows: a person decides.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1230,7 +1230,7 @@
       "class" : "irreversible",
       "effect" : "allow",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "A person who may change the rules writes a new version of them, in their own name; every version stays in the record.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1253,7 +1253,7 @@
       "class" : "irreversible",
       "effect" : "deny",
       "inverse" : null,
-      "owner" : "ada@example.com",
+      "owner" : "who:3f232092b083d011d5fb2d46dbfa97d9",
       "reason" : "No agent changes the rules.",
       "review" : "2027-01-31",
       "layer" : null,
@@ -1264,57 +1264,57 @@
     "layers" : null
   },
   "texts" : {
-    "sha256:1e4216f432e1b0a37aad8fe2b78980b111c7fcb16128810e1dabcfec1e00d975" : {
-      "salt" : "c67dd1f4547315adcec6d84b0f2dde23",
+    "sha256:0751447e51cdd94a877d413dbb7440448585eb0f4306d8bd960d743bcc5e0335" : {
+      "salt" : "e82282177d83bcd636f77d3ba9422801",
       "text" : "Fix the footer links"
     },
-    "sha256:7612333c182e163060aab15c84ddf16ca243f41f580a3f2bdf53c5ebc483dc5f" : {
-      "salt" : "b2f14dddf0278f9c83c0439569ba8c17",
+    "sha256:07f7c83a754976c164fe4af25e476405a878246074482ccf5749ad9ac3f3d402" : {
+      "salt" : "ad54d0504e8eeb0f13d2ce0009c688f0",
       "text" : "The footer still links to the old documentation site. Point the three links to docs.example.com."
     },
-    "sha256:edea9e05ed83a13ea4de8cbe23545a36a82bf51bd3bc92cabd4d621385681cf5" : {
-      "salt" : "e976570e89ee9bb329fa866ea67330c7",
+    "sha256:8c55024982cebd81e972f2d34753160b89839bc5c8983678e411a3332fd4bb8e" : {
+      "salt" : "e19914db0bcfdf99f0f2d921cfb26c06",
       "text" : "ada@example.com"
     },
-    "sha256:3bd92b007a7c9826cb2412a4ff66369f91eeeadce3d5fb70107c444cc94b6174" : {
-      "salt" : "31df28d82e9086cc60e73f88d1c233f2",
+    "sha256:71052605f9c76b1742444d693baa831902583439c9e8f08112b821754c022e7f" : {
+      "salt" : "4afa31931a7d050fd9e84e4e30b7f431",
       "text" : "Ada"
     },
-    "sha256:ac484cf894d922c112069626186c1bde685377a7ae0011e0f1730e20c47b9af9" : {
-      "salt" : "a76bdc4f67b7782b3107d5d4e64f79f8",
+    "sha256:60972380ce4f7b4a89a1a88147b47cde4d3b22e30176f456b7f60755b9bf77e3" : {
+      "salt" : "f89e2520d39f2f52a2a2cf56ce249e66",
       "text" : "grace@example.com"
     },
-    "sha256:eed256772e9871e571ca61c5d78c3bda54d6f9ffab7ce66e70966c47f096dd6b" : {
-      "salt" : "81d000531e84c5dad6543687077c749f",
+    "sha256:b727909be760d8d79ff77856fc8a0472992c4514396cc5240f8e7452aeb636cb" : {
+      "salt" : "1d06df8d6d28ad5ad689e04f8b7f4243",
       "text" : "Grace"
     },
-    "sha256:675cccfd7a9ee73b612a0f87083fe0c4cde13071edace7442a9bbc4fdbaf1b20" : {
-      "salt" : "1daea5dacb86741fe388cca756b97e1a",
+    "sha256:865cc8b083b4141475f837e1daeb7735a34eb070da74d0a3c7d726e3aa10a665" : {
+      "salt" : "9825dd4db51c2989a605ce3f28f32251",
       "text" : "You are working on a task delegated from TaskForce: WEB-48 - Fix the footer links\n..."
     },
-    "sha256:b6c681dbfa4b4ef84c93356a6e67dc03b33529431a96e437d2c11338a62a0341" : {
-      "salt" : "8252e0b19f8841bf15c99ec778799fe9",
+    "sha256:a8cd6c290d7c04c0929ae55c9727261f90ead7bb63538db8a596db37cf266827" : {
+      "salt" : "1c3db74642c56998a279542bdf354cec",
       "text" : "I will read the footer component first."
     },
-    "sha256:7742ad521ed8532c9b1c9add7147e85ea61703b7e97d624e9e9db5b0bc0a4c73" : {
-      "salt" : "0c4e1a3342ed66fbc3a59f3230c0ef9a",
+    "sha256:cd400d982b8794124f8e18c814503333732a2701aa76f483b5efc413f7353840" : {
+      "salt" : "fbb9f348c4c85a99a96643ab5efa6d24",
       "text" : "Point the three footer links to docs.example.com"
     },
-    "sha256:a9f8b2be331c288d632a74dd66028c2627ed935f7d163f6697ee731dc3348e60" : {
-      "salt" : "9fccad8ef6425f18a57b0acffccbdbbc",
+    "sha256:1731ffd49054e9762a8370dde546ad66cce36ec0520c7df09f7cd4bfcac47126" : {
+      "salt" : "24a6de9ed3149df02366fc1b87590b03",
       "text" : "Check the links on the staging site"
     },
-    "sha256:4de4cf52beb122b4d12463def619e43318f889d0f288e1eeb9e357372d7420f3" : {
-      "salt" : "0aefb678d7201303723511022304343c",
+    "sha256:dd64b6e21fb9ca3d6c2458ef2b7ea6aa1b4cff950ef16a62a4a2fc2ca8a24f1c" : {
+      "salt" : "89aa1fa87398a5172db016123b096545",
       "text" : "## What I did\nI pointed the three footer links to docs.example.com in `src/components/footer.tsx`.\n\n## What to check\n- `src/components/footer.tsx:12`: the addresses.\n\n## What I'm not sure about\nI did not check the staging site."
     }
   },
   "seal" : {
-    "payload" : "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiZm9ybWF0IjoidGFza2ZvcmNlLWV2aWRlbmNlLzEiLCJrZXkiOnsiYWxnb3JpdGhtIjoiZWQyNTUxOSIsImN1c3RvZHkiOiJzYW1lLW1hY2hpbmUiLCJpZCI6InNoYTI1NjozNGUzODYwMjU1NjQ1Mzg0Y2Q3M2QzODc1YmQ4ZjI1MDdhMmYxMzllNWE0OGFkNzBjZmUyMTQwNDFlZmU0ZjM0Iiwia2VwdCI6ZmFsc2UsInB1YmxpY0tleSI6Ik1Db3dCUVlESzJWd0F5RUE0cnBUOUdPZ0p4czFnbWxlRzFjamtJdjlpYWpSa3EydGYxS3F0ZTQ2R1hFPSJ9LCJtaXNzaW9uIjp7ImFnZW50Ijp7ImtpbmQiOiJjbGF1ZGUtY29kZSIsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC01LTIwMjYxMDAxIiwidmVyc2lvbiI6IjIuMS4zMDAifSwiaWQiOjQyLCJpc3N1ZSI6IldFQi00OCIsInByb2plY3QiOjEyLCJyZXF1ZXN0ZWRCeSI6Indobzo5MmI1ODRhZDEwYjk5MGQ0ZDkwZTQ3NjNhZGZjY2VkYyIsInJ1bGVzIjp7ImRpZ2VzdCI6InNoYTI1NjphMjcyYzBkZWQ0Mjg2MThlM2I3NTY0NjhkODY3NDIwY2MxMzEwMzIyZjU2ODVjMTZlNDBjMjM4MmU4ZGU4Y2I4IiwidmVyc2lvbiI6MX0sInJ1bm5lciI6InRmLXJ1bm5lci1hZGEiLCJydW5uZXJGYWN0cyI6ImFnZW50LW1hY2hpbmUiLCJ0YXNrZm9yY2UiOm51bGwsIndvcmtzcGFjZSI6ImFjbWUifSwicm9vdCI6InNoYTI1Njo4ZWQwYzNlNGQyY2I0YjRkOWI3ZTkzZWUzMzAwZjlmNzhmOTZhYzEwODA2MWUyNWUxODQ4NDIwYjNmYzIyMTI5Iiwic2VhbGVkQXQiOiIyMDI2LTExLTI0VDExOjQ0OjEwLjQ0MVoiLCJzZXEiOjI1fSwicHJlZGljYXRlVHlwZSI6Imh0dHBzOi8vdGFza2ZvcmNlLXByb2plY3QuZnIvY29udHJhY3RzL3Rhc2tmb3JjZS1ldmlkZW5jZS8xIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjhlZDBjM2U0ZDJjYjRiNGQ5YjdlOTNlZTMzMDBmOWY3OGY5NmFjMTA4MDYxZTI1ZTE4NDg0MjBiM2ZjMjIxMjkifSwibmFtZSI6InRhc2tmb3JjZS1taXNzaW9uLTQyIn1dfQ==",
+    "payload" : "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiZm9ybWF0IjoidGFza2ZvcmNlLWV2aWRlbmNlLzEiLCJrZXkiOnsiYWxnb3JpdGhtIjoiZWQyNTUxOSIsImN1c3RvZHkiOiJzYW1lLW1hY2hpbmUiLCJpZCI6InNoYTI1NjpjNTY5N2NlZDljYTczMTc5YWNmNDVmODk2ZDNjNGM0MmIwMjIyNWEwY2YwZDIyYTEzN2NhYzg0NTllNGJjYTU4Iiwia2VwdCI6ZmFsc2UsInB1YmxpY0tleSI6Ik1Db3dCUVlESzJWd0F5RUE1TFBjR1d4R1RGK1BNcDROaVo1bWV6UTdnUHErcFVpWGNwckxhdWtRanFZPSJ9LCJtaXNzaW9uIjp7ImFnZW50Ijp7ImtpbmQiOiJjbGF1ZGUtY29kZSIsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC01LTIwMjYxMDAxIiwidmVyc2lvbiI6IjIuMS4zMDAifSwiaWQiOjQyLCJpc3N1ZSI6IldFQi00OCIsInByb2plY3QiOjEyLCJyZXF1ZXN0ZWRCeSI6IndobzozZjIzMjA5MmIwODNkMDExZDVmYjJkNDZkYmZhOTdkOSIsInJ1bGVzIjp7ImRpZ2VzdCI6InNoYTI1NjpjNjAxNDdjOTVjZjQ3NmU5MzY0MDIyNDhhYTA3ZTQyNTViMGMxOTM1M2U4OTEyYjc0N2NlMGNjMDYxNzFhNzY3IiwidmVyc2lvbiI6MX0sInJ1bm5lciI6InRmLXJ1bm5lci1hZGEiLCJydW5uZXJGYWN0cyI6ImFnZW50LW1hY2hpbmUiLCJ0YXNrZm9yY2UiOm51bGwsIndvcmtzcGFjZSI6ImFjbWUifSwicm9vdCI6InNoYTI1Njo2ZDExMzJkNmI0OGE1NGJhODFiODJkNTU5NmVmYzFmMTkzYTU4ZmJkMDk2MzdhZjdlMWExZDY5MDQyZmNkYWJkIiwic2VhbGVkQXQiOiIyMDI2LTExLTI0VDEyOjEzOjA1LjkwMloiLCJzZXEiOjI1fSwicHJlZGljYXRlVHlwZSI6Imh0dHBzOi8vdGFza2ZvcmNlLXByb2plY3QuZnIvY29udHJhY3RzL3Rhc2tmb3JjZS1ldmlkZW5jZS8xIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjZkMTEzMmQ2YjQ4YTU0YmE4MWI4MmQ1NTk2ZWZjMWYxOTNhNThmYmQwOTYzN2FmN2UxYTFkNjkwNDJmY2RhYmQifSwibmFtZSI6InRhc2tmb3JjZS1taXNzaW9uLTQyIn1dfQ==",
     "payloadType" : "application/vnd.in-toto+json",
     "signatures" : [ {
-      "keyid" : "sha256:34e3860255645384cd73d3875bd8f2507a2f139e5a48ad70cfe214041efe4f34",
-      "sig" : "zQgJhPBog3yXmQ/2JtEovSEhgqckNxwUjhQuuHP1zCA1HLw5nYQRkG7huIBV99BvmpzJw07kncckyYS/nr4WDA=="
+      "keyid" : "sha256:c5697ced9ca73179acf45f896d3c4c42b02225a0cf0d22a137cac8459e4bca58",
+      "sig" : "qvMBmeihZqCtWuO5HEoDdJnugyHciBTd8exiprmPofLFieuElW6wSbPvrPrKSobgMyFLedtrqHGim0MmaDeyCQ=="
     } ]
   }
 }

@@ -58,6 +58,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 
 /**
@@ -96,8 +97,11 @@ class EvidenceExampleContractTest {
             assertThat(EvidenceChain.sha256(text.getValue().get("salt").asText() + text.getValue().get("text").asText()))
                 .isEqualTo(text.getKey());
         });
-        // Aucune personne n'y entre par son courriel : son identifiant opaque, son courriel à côté.
+        // Aucune personne n'y entre par son courriel : son identifiant opaque, son courriel à côté ; le paquet de règles non
+        // plus, ni par l'identifiant de son compte (R159, second tour, N3).
         assertThat(file.get("events").toString()).doesNotContain("@example.com");
+        assertThat(file.get("rules").toString()).doesNotContain("@").doesNotContain("\"person:");
+        assertThat(file.get("rules").get("rules").get(0).get("owner").asText()).matches("who:[0-9a-f]{32}");
         assertThat(file.get("mission").get("requestedBy").asText()).matches("who:[0-9a-f]{32}");
         assertThat(file.toString()).doesNotContain("\"person:");
         // Le paquet de règles est celui de la mission, et chaque décision se rejuge à l'identique.
@@ -232,9 +236,12 @@ class EvidenceExampleContractTest {
             HarnessRulesService rulesService = new HarnessRulesService(mock(HarnessRuleSetRepository.class),
                 mock(WorkspaceMemberRepository.class));
             RulesBundle rules = rulesService.bundleFor(workspace, new HarnessRulesService.Work(12L, null, 7L));
+            // Le paquet nomme le propriétaire de la table par son courriel : la copie du dossier le nomme par son identifiant (N3).
+            UserRepository users = mock(UserRepository.class);
+            lenient().when(users.findByEmail("ada@example.com")).thenReturn(Optional.of(ada));
             MissionEvidenceService service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository,
                 textRepository, mock(HarnessRuleSetRepository.class), checklist, people, new EvidenceSigner("", "", ""),
-                mock(ApplicationEventPublisher.class));
+                mock(ApplicationEventPublisher.class), users);
 
             service.open(run, rules, "tf-runner-ada", Map.of());
             int n = 0;

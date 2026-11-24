@@ -95,12 +95,17 @@ and `email` and `name` as texts kept beside the chain. A GitHub account that mer
 way, by the text of its login. When an account is purged, its email and name are erased in every dossier, with their
 salt, and a `note` of kind `erased` (`person`, `texts`, `reason: account-deleted`) says so; the id stays in the
 chains, linked to no one. A chain written before 1.18 named people by their email: it cannot be erased without
-breaking the chain. The rules bundle names who answers for each rule as `taskforce-rules/1` does (`owner`).
+breaking the chain. The copy of the rules bundle the record keeps names people the same way: the `owner` of each
+rule, its `approvers` and the `ref` of a person's layer are opaque ids, each introduced by its note (a person
+TaskForce no longer knows is `who:unknown`). A rule stays that of a named person until their name is erased; then the
+`erased` note says when. The live rules, and the bundle the runner receives, keep their form.
 
 ### What the file carries besides the chain
 
-- `rules`: the rules bundle as the mission received it (`taskforce-rules/1`). Its digest is the one `mission.started`
-  holds; anyone judges each `action.decided` of kind `decision` again with the `facts` it keeps.
+- `rules`: the rules bundle the mission received (`taskforce-rules/1`), each person in it by their opaque id (above).
+  Its digest is computed on this copy and is the one `mission.started` holds, as is each layer's, computed on that
+  layer's rules named the same way: none confirms an email once erased. Anyone judges each `action.decided` of kind
+  `decision` again with the `facts` it keeps.
 - `texts`: the texts kept beside the chain, by their hash, each as `{ "salt": ..., "text": ... }`. The hash is `sha256:`
   and the SHA-256 of the UTF-8 bytes of the salt (32 hex digits, drawn for this text) followed by the text: a short
   text, erased, cannot be confirmed by guessing it. The chain holds only `{ "sha256": ..., "chars": ... }` for the

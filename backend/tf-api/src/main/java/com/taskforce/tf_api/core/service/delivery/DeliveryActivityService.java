@@ -177,8 +177,9 @@ public class DeliveryActivityService {
         // La personne à qui l'on demande, par son identifiant opaque comme partout dans la chaîne (R159, M6).
         asked.put("asked", run.getStartedBy() != null ? evidenceService.person(run, run.getStartedBy()).id() : null);
         if (require != null) {
-            asked.put("require", Map.of("approvers", require.approvers(), "signatures", require.signatures(),
-                "separate", require.separate()));
+            // Ceux qui peuvent accorder, chaque personne par son identifiant opaque, jamais par celui des règles (R159, N3).
+            asked.put("require", Map.of("approvers", evidenceService.approvers(run, require.approvers()), "signatures",
+                require.signatures(), "separate", require.separate()));
         }
         // L'action exacte que la personne accordera (TF-J2-7) : l'empreinte de l'entrée de l'outil et, pour une écriture,
         // celle du contenu que le fichier aura ; les faits jugés, pour qu'un tiers rejuge la demande.

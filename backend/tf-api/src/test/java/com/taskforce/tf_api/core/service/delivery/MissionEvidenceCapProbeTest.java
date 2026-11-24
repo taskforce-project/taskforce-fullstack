@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -49,6 +50,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 
 /**
  * La sonde D de la relecture R159 de #551, second tour (N2) : l'agent remplissait la réserve. Au plafond, il alternait une
@@ -82,7 +84,7 @@ class MissionEvidenceCapProbeTest {
     @BeforeEach
     void setUp() {
         service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository, textRepository, ruleSets,
-            checklist, people, new EvidenceSigner("", "", ""), publisher);
+            checklist, people, new EvidenceSigner("", "", ""), publisher, mock(UserRepository.class));
         User ada = User.builder().id(7L).email("ada@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(3L).slug("acme").owner(ada).build();
         Project project = Project.builder().id(12L).identifier("WEB").workspace(workspace).build();

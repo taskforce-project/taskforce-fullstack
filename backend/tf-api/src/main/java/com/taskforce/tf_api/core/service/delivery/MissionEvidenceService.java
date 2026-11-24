@@ -36,6 +36,7 @@ import com.taskforce.tf_api.core.harness.evidence.EvidenceIntake;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
+import com.taskforce.tf_api.core.harness.rules.RulesDigest;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.DeliveryRunEvidence;
 import com.taskforce.tf_api.core.model.Issue;
@@ -54,6 +55,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -130,6 +132,8 @@ public class MissionEvidenceService {
     private final MissionPersonRepository people;
     private final EvidenceSigner signer;
     private final ApplicationEventPublisher publisher;
+    /** Les personnes que le paquet de règles nomme, pour la copie qu'en garde le dossier (R159, second tour, N3). */
+    private final UserRepository users;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -152,8 +156,15 @@ public class MissionEvidenceService {
     public void open(DeliveryRun run, RulesBundle rules, String runner, Map<String, Object> extras) {
         Issue issue = run.getIssue();
         Project project = issue.getProject();
+        // Les personnes entrent par leur identifiant opaque dans cet espace ; leur courriel et leur nom, à côté, dans des
+        // notes qui suivent l'ouverture (R159, M6 ; second tour, L-a). La copie du paquet de règles aussi (N3).
+        Long workspaceId = project.getWorkspace().getId();
+        List<User> named = new ArrayList<>();
+        String delegator = personIdOf(workspaceId, run.getStartedBy(), named);
+        String reporter = personIdOf(workspaceId, issue.getReporter(), named);
+        ObjectNode copy = rules == null ? null : recordCopy(rules, workspaceId, named);
+        String bundle = copy == null ? null : json(copy);
         MissionDossier dossier = dossiers.findById(run.getId()).orElse(null);
-        String bundle = rules == null ? null : json(rules);
         if (dossier == null) {
             // Écrite tout de suite : les textes et les événements, insérés aussitôt, la désignent.
             dossiers.saveAndFlush(newDossier(run, bundle));
@@ -161,15 +172,10 @@ public class MissionEvidenceService {
             dossier.setRulesBundle(bundle);
             dossiers.saveAndFlush(dossier);
         }
-        // Les personnes entrent par leur identifiant opaque dans cet espace ; leur courriel et leur nom, à côté, dans des
-        // notes qui suivent l'ouverture (R159, M6 ; second tour, L-a).
-        Long workspaceId = project.getWorkspace().getId();
-        List<User> named = new ArrayList<>();
-        String delegator = personIdOf(workspaceId, run.getStartedBy(), named);
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("title", ref(run.getId(), "title", issue.getTitle()));
         request.put("description", ref(run.getId(), "description", blankToNull(issue.getDescription())));
-        request.put("reporter", personIdOf(workspaceId, issue.getReporter(), named));
+        request.put("reporter", reporter);
         request.put("createdAt", utc(issue.getCreatedAt()));
         request.put("importedFrom", issue.getImportedFrom());
         Map<String, Object> origin = new LinkedHashMap<>();
@@ -190,7 +196,7 @@ public class MissionEvidenceService {
         started.put("delegatedAt", utc(run.getCreatedAt()));
         started.put("origin", origin);
         started.put("agent", agent);
-        started.put("rules", rules == null ? null : rulesData(rules, workspaceId, named));
+        started.put("rules", copy == null ? null : rulesData(copy, workspaceId, named));
         started.put("runner", runner);
         if (runner != null) {
             // Ce que le runner rapportera (ses tests, l'agent et son modèle, les numéros de ses événements) vient du poste de
@@ -214,26 +220,112 @@ public class MissionEvidenceService {
         return personId(workspaceId, user);
     }
 
-    /** Les règles de la mission telles que le dossier les garde : version, empreinte, et chaque couche avec son auteur. */
-    private Map<String, Object> rulesData(RulesBundle rules, Long workspaceId, List<User> named) {
+    /**
+     * Les règles de la mission telles que le dossier les garde : version, empreinte, et chaque couche avec son auteur, lues
+     * dans la copie du paquet qu'il garde ({@link #recordCopy}).
+     */
+    private Map<String, Object> rulesData(ObjectNode copy, Long workspaceId, List<User> named) {
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("version", rules.version());
-        data.put("digest", rules.digest());
+        data.put("version", copy.path("version").asInt());
+        data.put("digest", copy.path("digest").asText(null));
         List<Map<String, Object>> layers = new ArrayList<>();
-        if (rules.layers() != null) {
-            for (RulesBundle.Layer layer : rules.layers()) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("scope", layer.scope());
-                entry.put("ref", layer.ref());
-                entry.put("version", layer.version());
-                entry.put("digest", layer.digest());
-                entry.put("author", ruleSets.findByWorkspaceIdAndVersion(workspaceId, layer.version())
-                    .map(set -> personIdOf(workspaceId, set.getCreatedBy(), named)).orElse(null));
-                layers.add(entry);
-            }
+        for (JsonNode layer : copy.path("layers")) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("scope", layer.path("scope").asText(null));
+            entry.put("ref", layer.path("ref").asText(null));
+            entry.put("version", layer.path("version").asInt());
+            entry.put("digest", layer.path("digest").asText(null));
+            entry.put("author", ruleSets.findByWorkspaceIdAndVersion(workspaceId, layer.path("version").asInt())
+                .map(set -> personIdOf(workspaceId, set.getCreatedBy(), named)).orElse(null));
+            layers.add(entry);
         }
         data.put("layers", layers);
         return data;
+    }
+
+    /** Une personne que les règles nomment et que TaskForce ne connaît plus : le dossier ne la nomme pas. */
+    static final String UNKNOWN_PERSON = MissionPerson.PREFIX + "unknown";
+
+    /**
+     * La copie du paquet de règles que le dossier garde (R159, second tour, N3) : chaque personne qu'il nomme l'est par son
+     * identifiant opaque dans l'espace, son courriel et son nom à côté de la chaîne, effaçables comme les autres. Le
+     * propriétaire de chaque règle, ses approbateurs, la couche d'une personne. L'empreinte du paquet se calcule sur cette
+     * copie, et celle de chaque couche sur ses règles nommées de même : aucune ne confirme un courriel une fois effacé. Les
+     * règles vivantes, et le paquet que le runner reçoit, gardent leur forme. Chaque règle reste celle d'une personne nommée
+     * tant que son nom n'est pas effacé ; effacé, le dossier dit quand (la note {@code erased}).
+     */
+    ObjectNode recordCopy(RulesBundle rules, Long workspaceId, List<User> named) {
+        ObjectNode copy = JSON.valueToTree(rules);
+        for (JsonNode rule : copy.path("rules")) {
+            if (rule instanceof ObjectNode object) pseudonymize(object, workspaceId, named);
+        }
+        for (JsonNode layer : copy.path("layers")) {
+            if (!(layer instanceof ObjectNode object)) continue;
+            if ("person".equals(object.path("scope").asText()) && object.hasNonNull("ref")) {
+                object.put("ref", userById(object.get("ref").asText()).map(user -> personIdOf(workspaceId, user, named))
+                    .orElse(UNKNOWN_PERSON));
+            }
+            // Ses règles telles que la couche les garde, nommées comme le dossier les nomme ; ces personnes-là n'y sont pas
+            // présentées : la copie ne les nomme que par cette empreinte.
+            int version = object.path("version").asInt();
+            ruleSets.findByWorkspaceIdAndVersion(workspaceId, version).ifPresent(set -> {
+                JsonNode stored = JSON.valueToTree(set.getRules() == null ? List.of() : set.getRules());
+                for (JsonNode rule : stored) {
+                    if (rule instanceof ObjectNode one) pseudonymize(one, workspaceId, new ArrayList<>());
+                }
+                object.put("digest", RulesDigest.of(stored));
+            });
+        }
+        copy.put("digest", RulesDigest.of(copy));
+        return copy;
+    }
+
+    /** Une règle nommée comme le dossier nomme les personnes : son propriétaire et ses approbateurs par leur identifiant. */
+    private void pseudonymize(ObjectNode rule, Long workspaceId, List<User> named) {
+        String owner = rule.path("owner").asText(null);
+        if (owner != null && owner.contains("@")) {
+            rule.put("owner", users.findByEmail(owner.strip()).map(user -> personIdOf(workspaceId, user, named)).orElse(UNKNOWN_PERSON));
+        }
+        JsonNode approvers = rule.path("require").path("approvers");
+        if (approvers.isArray() && rule.get("require") instanceof ObjectNode require) {
+            ArrayNode mapped = JSON.createArrayNode();
+            approvers.forEach(ref -> mapped.add(approverId(ref.asText(), workspaceId, named)));
+            require.set("approvers", mapped);
+        }
+    }
+
+    /** {@code person:<id>} des règles, par l'identifiant opaque de la personne ; un rôle reste un rôle. */
+    private String approverId(String ref, Long workspaceId, List<User> named) {
+        if (!ref.startsWith("person:")) return ref;
+        return userById(ref.substring("person:".length())).map(user -> personIdOf(workspaceId, user, named)).orElse(UNKNOWN_PERSON);
+    }
+
+    private Optional<User> userById(String id) {
+        try {
+            return users.findById(Long.valueOf(id.strip()));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Ceux qui peuvent accorder une demande, tels que la chaîne les nomme (R159, second tour, N3) : chaque personne par son
+     * identifiant opaque, présentée dans le dossier ; {@code role:} et {@code project-lead} restent ce qu'ils sont.
+     */
+    @Transactional
+    public List<List<String>> approvers(DeliveryRun run, List<List<String>> approvers) {
+        if (approvers == null) return List.of();
+        List<List<String>> out = new ArrayList<>();
+        for (List<String> set : approvers) {
+            List<String> mapped = new ArrayList<>();
+            for (String ref : set == null ? List.<String>of() : set) {
+                mapped.add(ref != null && ref.startsWith("person:")
+                    ? userById(ref.substring("person:".length())).map(user -> person(run, user).id()).orElse(UNKNOWN_PERSON)
+                    : ref);
+            }
+            out.add(mapped);
+        }
+        return out;
     }
 
     // --------------------------------------------------------------------- ajouter
