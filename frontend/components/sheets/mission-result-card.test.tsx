@@ -7,6 +7,13 @@ import { useDeliveryStore } from "@/lib/store/delivery-store";
 import { useUserStore } from "@/lib/store/user-store";
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => nav,
+  useParams: () => ({ workspace: "acme" }),
+  usePathname: () => "/acme/projects/3",
+  useSearchParams: () => new URLSearchParams("issue=28"),
+}));
 
 const RUN: DeliveryRun = {
   id: 100, issueId: 28, issueKey: "TF-28", issueTitle: "Fix the footer links", projectId: 3, projectName: "TaskForce",
@@ -52,6 +59,16 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     expect(screen.getByText("final")).toBeInTheDocument();
     expect(screen.getByText("Move TF-28 to Done")).toBeInTheDocument();
     expect(screen.getByText("Fixed 3 links in the footer.")).toBeInTheDocument();
+  });
+
+  // R208, R161 M8 : la page de vérification s'ouvre depuis « Relire », là où l'on juge, pas seulement depuis la vue du travail.
+  it("opens the verification page, where the person judges", () => {
+    show();
+
+    const link = screen.getByRole("link", { name: /Verification page/ });
+    expect(link).toHaveAttribute("href", "/acme/missions/100/verification");
+    fireEvent.click(link);
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/100/verification", { scroll: false });
   });
 
   it("reads top-down: what is delivered, what the agent says, is it good, what will change, the buttons", () => {

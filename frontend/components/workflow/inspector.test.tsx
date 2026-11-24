@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event"
 
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
+// La page de vérification s'ouvre dans le volet (R161 M8) : le routeur de Next.js, le même d'un rendu à l'autre.
+const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => nav, useParams: () => ({ workspace: "acme" }) }))
 
 import { Inspector, type InspectorMode } from "./inspector"
 import type { NodeGestures } from "./node-gestures"
@@ -189,6 +192,11 @@ describe("Inspector", () => {
     expect(screen.queryByText(/^Proof: /)).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /export\.ts/ }))
     expect(onOpenMission).toHaveBeenCalledWith(1)
+    // La page de vérification, à côté du dossier brut (R208, R161 M8).
+    const page = screen.getByRole("link", { name: "Verification page" })
+    expect(page).toHaveAttribute("href", "/acme/missions/1/verification")
+    fireEvent.click(page)
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/1/verification", { scroll: false })
     fireEvent.click(screen.getByRole("button", { name: "Download the record" }))
     await waitFor(() => expect(useDeliveryStore.getState().downloadEvidence).toHaveBeenCalledWith("acme", 1, "json"))
   })
