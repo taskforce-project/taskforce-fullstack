@@ -1,5 +1,6 @@
 import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { fillText } from "@/lib/delivery/result-card"
+import { MAX_FACT, TEST_SETTING } from "@/lib/evidence/verifier/dossier"
 import { parseServerDate } from "@/lib/utils/server-date"
 
 import { EMAIL, type DossierText, type NotChecked, type PageDecision, type PageRule, type VerificationPage, type Who } from "./verification"
@@ -208,6 +209,10 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   if (d.texts.absent.length > 0) lines.push({ text: fillText(v.erased, { count: d.texts.absent.length }), tone: "muted" })
   if (d.rules.present && !d.rules.digestHolds) lines.push({ text: v.rules, tone: "warn" })
   if (d.rules.differ.length > 0) lines.push({ text: v.rulesDiffer, tone: "warn" })
+  // Une décision prise sur un fait que le dossier n'a gardé qu'en partie ne se rejuge pas (second tour de #551, N2).
+  if (d.rules.cut > 0) {
+    lines.push({ text: fillText(d.rules.cut === 1 ? v.cutOne : v.cut, { count: d.rules.cut, max: MAX_FACT.toLocaleString("en-US") }), tone: "muted" })
+  }
   // La réserve d'abord : une clé que l'agent pouvait lire ne prouve rien du dossier (R198, R161 M5).
   const sameMachine = d.seal.custody !== "separate-machine"
   switch (d.seal.state) {
@@ -247,7 +252,10 @@ export function summarySentence(page: VerificationPage, t: Texts): string {
     const counts = tests.passedCount !== null && tests.total !== null ? fillText(s.counts, { passed: tests.passedCount, total: tests.total }) : ""
     parts.push(fillText(s.testsPassed, { counts }))
   } else if (tests) parts.push(s.testsFailed)
-  else if (page.notChecked.some((n) => n.kind === "testsOwnDefinition")) parts.push(s.testsOwn)
+  else if (page.notChecked.some((n) => n.kind === "testsOwnDefinition")) {
+    const own = page.notChecked.find((n) => n.kind === "testsOwnDefinition")
+    parts.push(own?.kind === "testsOwnDefinition" && own.paths.every((path) => path === TEST_SETTING) ? s.testsSetting : s.testsOwn)
+  }
   else if (page.notChecked.some((n) => n.kind === "noTests")) parts.push(s.noTests)
   else if (!page.running && page.notChecked.some((n) => n.kind === "noTestRecord")) parts.push(s.testsUnknown)
   if (page.end) parts.push(fillText(s.decided, { decision: decisionWords(page.end, t), date: when(page.end.at) }))
@@ -370,6 +378,8 @@ function checks(page: VerificationPage, t: Texts): Line[] {
       }
       lines.push({ text: t.checks.byRunner, tone: "muted" })
       if (check.proof) lines.push({ text: fillText(t.checks.proof, { digest: short(check.proof) }), tone: "muted" })
+      // Ce que le runner a regardé : une liste, jamais « les tests sont les mêmes » (second tour de #551, L-b).
+      if (check.definitions.length > 0) lines.push({ text: fillText(t.checks.definitions, { paths: quoted(check.definitions) }), tone: "muted" })
     } else {
       lines.push({ text: fillText(t.checks.rules, { total: check.total ?? 0 }) })
       lines.push({ text: t.checks.byRules, tone: "muted" })
@@ -388,7 +398,13 @@ function notCheckedLine(item: NotChecked, t: Texts): Line {
     case "noTests": return { text: n.noTests, tone: "warn" }
     case "testsNotRun": return { text: fillText(n.testsNotRun, { why: item.why ?? "" }), tone: "warn" }
     case "testsFailed": return { text: n.testsFailed, tone: "warn" }
-    case "testsOwnDefinition": return { text: fillText(n.testsOwnDefinition, { paths: quoted(item.paths) }), tone: "warn" }
+    case "testsOwnDefinition": {
+      // La commande de test du projet, dans TaskForce, n'est pas un fichier de la branche (second tour de #551, L-b).
+      const files = item.paths.filter((path) => path !== TEST_SETTING)
+      if (files.length === 0) return { text: n.testCommandChanged, tone: "warn" }
+      const setting = files.length < item.paths.length
+      return { text: fillText(setting ? n.testsOwnDefinitionAndCommand : n.testsOwnDefinition, { paths: quoted(files) }), tone: "warn" }
+    }
     case "noCode": return { text: n.noCode }
     case "noTestRecord": return { text: n.noTestRecord, tone: "warn" }
     case "noTestYet": return { text: n.noTestYet, tone: "warn" }
@@ -464,6 +480,8 @@ function model(page: VerificationPage, t: Texts): Line[] {
     const providers = t.providers as Record<string, string>
     const provider = m.provider ? providers[m.provider] : undefined
     lines.push({ text: provider ? fillText(t.model.provider, { provider }) : m.provider === "another-endpoint" ? t.model.providerOther : t.model.providerUnknown })
+    // D'où le runner tient le fournisseur : ce que l'agent a chargé au lancement (second tour de #551, L-c).
+    if (m.provider && m.providerFrom === "launch-configuration") lines.push({ text: t.model.providerFrom, tone: "muted" })
     lines.push({ text: m.fingerprint ? fillText(t.model.fingerprint, { fingerprint: m.fingerprint }) : t.model.noFingerprint, tone: "muted" })
   }
   if (m.session) lines.push({ text: fillText(t.model.session, { digest: short(m.session.sha256) }), tone: "muted" })

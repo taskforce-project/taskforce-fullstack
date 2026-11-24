@@ -144,6 +144,11 @@ export interface PageCheck {
   readonly proof: string | null
   readonly passedCount: number | null
   readonly total: number | null
+  /**
+   * Ce que le runner a regardé de la définition des tests, sans y trouver de changement : une liste, pas la preuve que les
+   * tests sont les mêmes (R159, second tour de #551, L-b).
+   */
+  readonly definitions: readonly string[]
 }
 
 /** 5. Ce qui n'a pas été vérifié, dit en clair. */
@@ -195,6 +200,8 @@ export interface PageModel {
   readonly model: string | null
   readonly served: readonly string[]
   readonly provider: string | null
+  /** Où le runner a lu le fournisseur : la configuration avec laquelle l'agent a été lancé (second tour de #551, L-c). */
+  readonly providerFrom: string | null
   readonly fingerprint: string | null
   readonly session: { readonly sha256: string; readonly bytes: number | null } | null
 }
@@ -522,7 +529,8 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       notChecked.push({ kind: "testsOwnDefinition", paths: ownDefinition })
     } else {
       checks.push({ what: "tests", label: str(t.command) ?? str(t.tool) ?? "tests", result: t.passed === true ? "passed" : "failed",
-        by: "runner", proof: output ? str(output.sha256) : null, passedCount: num(t.passedCount), total: num(t.total) })
+        by: "runner", proof: output ? str(output.sha256) : null, passedCount: num(t.passedCount), total: num(t.total),
+        definitions: Array.isArray(t.definitions) ? t.definitions.filter((p): p is string => typeof p === "string") : [] })
     }
     if (t.passed !== true) notChecked.push({ kind: "testsFailed" })
     const reverted = lastTest ? events.some((e) => e.seq > lastTest.seq && e.type === "action.result" && data(e).kind === "revert"
@@ -537,7 +545,8 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
     notChecked.push({ kind: "noTestRecord" })
   }
   if (judged > 0) {
-    checks.push({ what: "rules", label: "rules", result: "judged", by: "rules", proof: pageClass.digest, passedCount: null, total: judged })
+    checks.push({ what: "rules", label: "rules", result: "judged", by: "rules", proof: pageClass.digest, passedCount: null, total: judged,
+      definitions: [] })
   }
   // La liste de l'issue : ce que l'agent de cette mission a coché est sa déclaration ; ce qui était coché sans que le dossier
   // dise par qui (avant la mission, par un essai précédent, à la main) ne compte pas pour elle (R211, R159 P3).
@@ -616,6 +625,7 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
     model: str(a.model),
     served: Array.isArray(a.served) ? a.served.filter((m): m is string => typeof m === "string" && m.length > 0) : [],
     provider: str(a.provider),
+    providerFrom: str(a.providerFrom),
     fingerprint: str(a.fingerprint),
     session,
   }

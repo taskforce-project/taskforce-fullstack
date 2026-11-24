@@ -323,6 +323,51 @@ describe("le reste du dossier, dit en clair", () => {
     expect(summarySentence(page, t)).toContain(t.summary.testsOwn)
   })
 
+  it("L-b du second tour de #551 : la liste que le runner a regardée, et la commande de test du projet, dites pour ce qu'elles sont", () => {
+    const tested = (data: Record<string, unknown>) => verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: `who:${"1".repeat(32)}` } },
+      { type: "test.result", actor: { kind: "runner", id: "r" }, data: { kind: "test", command: "npm test", ran: true, passed: true, ...data } },
+      { type: "mission.ended", data: { status: "DONE", commits: 1 } },
+    ]))
+    const listed = tested({ definitions: ["package.json", "vitest.config.ts"] })
+    expect(texts(verificationSections(listed, t, context), "checks")).toContain("None of these files, which define how the tests run, changed "
+      + "during the mission: “package.json”; “vitest.config.ts”. It is the list TaskForce looks for, not a proof that the tests are the same.")
+    const setting = tested({ definitionChanged: ["taskforce:test-command"], definitions: ["package.json"] })
+    expect(setting.checks.some((c) => c.what === "tests")).toBe(false)
+    expect(texts(verificationSections(setting, t, context), "notChecked")).toContain(t.notChecked.testCommandChanged)
+    expect(JSON.stringify(verificationSections(setting, t, context))).not.toContain("taskforce:test-command")
+    expect(summarySentence(setting, t)).toContain(t.summary.testsSetting)
+    const both = tested({ definitionChanged: ["package.json", "taskforce:test-command"] })
+    expect(texts(verificationSections(both, t, context), "notChecked")).toContain(t.notChecked.testsOwnDefinitionAndCommand.replace("{paths}", "“package.json”"))
+    expect(summarySentence(both, t)).toContain(t.summary.testsOwn)
+  })
+
+  it("L-c du second tour de #551 : le fournisseur lu dans la configuration du lancement le dit", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", agent: { kind: "claude-code", model: "sonnet" } } },
+      { type: "note", actor: { kind: "agent", id: "claude-code" }, data: { kind: "agent", model: "claude-sonnet-5-20261001", provider: "amazon-bedrock",
+        providerFrom: "launch-configuration", version: "2.1.300" } },
+    ]))
+    expect(page.model.providerFrom).toBe("launch-configuration")
+    expect(texts(verificationSections(page, t, context), "model")).toEqual(expect.arrayContaining(["Served by Amazon Bedrock.", t.model.providerFrom]))
+    expect(texts(verificationSections(verificationPage(example()), t, context), "model")).not.toContain(t.model.providerFrom)
+  })
+
+  it("N2 du second tour de #551 : une décision prise sur un fait coupé pour tenir au dossier ne se rejuge pas, et la page le dit", async () => {
+    const file = example()
+    const events = file.events.filter((e) => !(e.type === "note" && (e.data as { kind?: unknown } | null)?.kind === "witness")).map((e) => {
+      const d = (e.data ?? {}) as Record<string, unknown>
+      const facts = e.seq === 7 && Array.isArray(d.facts) ? (d.facts as Array<Record<string, string>>)
+        .map((part) => ({ ...part, path: `${part.path ?? ""}\n[TaskForce cut this text here: 5000 characters in all]` })) : d.facts
+      return { type: e.type, at: e.at, actor: e.actor, data: facts === undefined ? d : { ...d, facts } }
+    })
+    const record = chained(events, { mission: file.mission, rules: file.rules, texts: file.texts })
+    const page = verificationPage(record, await checkRecord(record, [], at))
+    expect(page.check?.details?.rules).toMatchObject({ cut: 1, digestHolds: true, differ: [] })
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.cutOne.replace("{max}", "4,000"))
+    expect(verdictLines(verificationPage(example(), await checkRecord(example(), [], at)), t).map((l) => l.text).join(" ")).not.toContain("cut at")
+  })
+
   it("une fusion sur GitHub nomme le compte par son texte ; une commande accordée se cite comme l'agent l'a écrite", () => {
     const login = `sha256:${"c".repeat(64)}`
     const page = verificationPage(chained([
