@@ -5,7 +5,7 @@
     "workspace" : "acme",
     "project" : 12,
     "issue" : "WEB-48",
-    "requestedBy" : "person:0122fddd3c572f51270a7ac56918f92e",
+    "requestedBy" : "who:92b584ad10b990d4d90e4763adfccedc",
     "agent" : {
       "kind" : "claude-code",
       "model" : "claude-sonnet-5-20261001",
@@ -21,14 +21,14 @@
   },
   "events" : [ {
     "seq" : 1,
-    "at" : "2026-11-24T09:17:45.769Z",
+    "at" : "2026-11-24T11:44:10.240Z",
     "type" : "mission.started",
     "actor" : {
       "kind" : "server",
       "id" : "taskforce"
     },
     "data" : {
-      "accountable" : "person:0122fddd3c572f51270a7ac56918f92e",
+      "accountable" : "who:92b584ad10b990d4d90e4763adfccedc",
       "agent" : {
         "kind" : "claude-code",
         "model" : "sonnet"
@@ -45,16 +45,16 @@
         "createdAt" : "2026-11-20T09:30:00.000Z",
         "description" : {
           "chars" : 96,
-          "sha256" : "sha256:ed2c673bba220967d231767984501136e2515d2aaa0709ae27faf9c5c89bd911"
+          "sha256" : "sha256:7612333c182e163060aab15c84ddf16ca243f41f580a3f2bdf53c5ebc483dc5f"
         },
         "importedFrom" : null,
-        "reporter" : "person:4bd15d8a302d7c215a3759aec26f425e",
+        "reporter" : "who:3932c385c4aade29ba58601bcb3f7039",
         "title" : {
           "chars" : 20,
-          "sha256" : "sha256:ba63f9771808f11160d5d0fd523015d3d5feafde7f0bd59f52224ec010a16e31"
+          "sha256" : "sha256:1e4216f432e1b0a37aad8fe2b78980b111c7fcb16128810e1dabcfec1e00d975"
         }
       },
-      "requestedBy" : "person:0122fddd3c572f51270a7ac56918f92e",
+      "requestedBy" : "who:92b584ad10b990d4d90e4763adfccedc",
       "rules" : {
         "digest" : "sha256:a272c0ded428618e3b756468d867420cc1310322f5685c16e40c2382e8de8cb8",
         "layers" : [ ],
@@ -66,10 +66,10 @@
       "workspace" : "acme"
     },
     "prev" : "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-    "hash" : "sha256:02262c06281df31120bd14390a40a11677031ed8440fb15b5da060ca4428bd65"
+    "hash" : "sha256:4a31b2f67881e0d92937dc1ba994896470f2f96e2e7c6e919aed2944eac5194f"
   }, {
     "seq" : 2,
-    "at" : "2026-11-24T09:17:45.770Z",
+    "at" : "2026-11-24T11:44:10.245Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -78,20 +78,20 @@
     "data" : {
       "email" : {
         "chars" : 15,
-        "sha256" : "sha256:ed2289f6198527d684fcd0d86542e5efec0b6693b7fe48053992efc507593e75"
+        "sha256" : "sha256:edea9e05ed83a13ea4de8cbe23545a36a82bf51bd3bc92cabd4d621385681cf5"
       },
       "kind" : "person",
       "name" : {
         "chars" : 3,
-        "sha256" : "sha256:fbd5a83f764a5f61d4e4dfca623181754e30413d700fd8cb62d302b1a676f031"
+        "sha256" : "sha256:3bd92b007a7c9826cb2412a4ff66369f91eeeadce3d5fb70107c444cc94b6174"
       },
-      "person" : "person:0122fddd3c572f51270a7ac56918f92e"
+      "person" : "who:92b584ad10b990d4d90e4763adfccedc"
     },
-    "prev" : "sha256:02262c06281df31120bd14390a40a11677031ed8440fb15b5da060ca4428bd65",
-    "hash" : "sha256:daaf5f6846b11bfd879d0fa3ef15cb9cf17129b5f65518d7164ea97a6ee6ad83"
+    "prev" : "sha256:4a31b2f67881e0d92937dc1ba994896470f2f96e2e7c6e919aed2944eac5194f",
+    "hash" : "sha256:17a4b6d70114625f71c8e8b11469c463b863d5217bc9fdcba622f3a1570986ec"
   }, {
     "seq" : 3,
-    "at" : "2026-11-24T09:17:45.770Z",
+    "at" : "2026-11-24T11:44:10.249Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -100,20 +100,20 @@
     "data" : {
       "email" : {
         "chars" : 17,
-        "sha256" : "sha256:547a4b312cf384950644086ace9f234756003d684b3de184f226d9b18eafcc49"
+        "sha256" : "sha256:ac484cf894d922c112069626186c1bde685377a7ae0011e0f1730e20c47b9af9"
       },
       "kind" : "person",
       "name" : {
         "chars" : 5,
-        "sha256" : "sha256:e089a3efab97ce1ea400970552b0331add46227ebc3e88b5819354825014bf47"
+        "sha256" : "sha256:eed256772e9871e571ca61c5d78c3bda54d6f9ffab7ce66e70966c47f096dd6b"
       },
-      "person" : "person:4bd15d8a302d7c215a3759aec26f425e"
+      "person" : "who:3932c385c4aade29ba58601bcb3f7039"
     },
-    "prev" : "sha256:daaf5f6846b11bfd879d0fa3ef15cb9cf17129b5f65518d7164ea97a6ee6ad83",
-    "hash" : "sha256:f2aa0b67d24686da9e18123bbf18bd81c3a7c92c33ce469daed996c8d463c562"
+    "prev" : "sha256:17a4b6d70114625f71c8e8b11469c463b863d5217bc9fdcba622f3a1570986ec",
+    "hash" : "sha256:1ba5f2f6ffa277ba9f09594cb41b66d2b62df68aeae2bd45c9c2eb5a01833a27"
   }, {
     "seq" : 4,
-    "at" : "2026-11-24T09:17:45.770Z",
+    "at" : "2026-11-24T11:44:10.252Z",
     "type" : "note",
     "actor" : {
       "kind" : "runner",
@@ -122,15 +122,15 @@
     "data" : {
       "brief" : {
         "chars" : 85,
-        "sha256" : "sha256:fab227f01be17635c3001909d06bf2e760ddc480a4450e870d4322a1737766ae"
+        "sha256" : "sha256:675cccfd7a9ee73b612a0f87083fe0c4cde13071edace7442a9bbc4fdbaf1b20"
       },
       "kind" : "brief"
     },
-    "prev" : "sha256:f2aa0b67d24686da9e18123bbf18bd81c3a7c92c33ce469daed996c8d463c562",
-    "hash" : "sha256:1353420c2aa0e37938e971106c157e6ac325b0970c665223167fef660e4d5481"
+    "prev" : "sha256:1ba5f2f6ffa277ba9f09594cb41b66d2b62df68aeae2bd45c9c2eb5a01833a27",
+    "hash" : "sha256:288a5bc784e6acab91a06535faad22cf3c576c9236402c27f2c45aca89f2f51c"
   }, {
     "seq" : 5,
-    "at" : "2026-11-24T09:17:45.770Z",
+    "at" : "2026-11-24T11:44:10.256Z",
     "type" : "note",
     "actor" : {
       "kind" : "agent",
@@ -147,11 +147,11 @@
       "text" : "Claude Code 2.1.300 with claude-sonnet-5-20261001",
       "version" : "2.1.300"
     },
-    "prev" : "sha256:1353420c2aa0e37938e971106c157e6ac325b0970c665223167fef660e4d5481",
-    "hash" : "sha256:ebf1cc6a12ae1a4e8cc30b9ba25895a25bd0bad3968f744ccfa8bad410c8151e"
+    "prev" : "sha256:288a5bc784e6acab91a06535faad22cf3c576c9236402c27f2c45aca89f2f51c",
+    "hash" : "sha256:cf0e8efa3e9576a1a419692698389d1dea85932d9fe993fa9772d03cc0f65d45"
   }, {
     "seq" : 6,
-    "at" : "2026-11-24T09:17:45.771Z",
+    "at" : "2026-11-24T11:44:10.262Z",
     "type" : "note",
     "actor" : {
       "kind" : "agent",
@@ -161,14 +161,14 @@
       "kind" : "text",
       "text" : {
         "chars" : 39,
-        "sha256" : "sha256:406e0e7c6b211d0a25f8c007e89c239b2aa544eea3c786f25719809bb00076a5"
+        "sha256" : "sha256:b6c681dbfa4b4ef84c93356a6e67dc03b33529431a96e437d2c11338a62a0341"
       }
     },
-    "prev" : "sha256:ebf1cc6a12ae1a4e8cc30b9ba25895a25bd0bad3968f744ccfa8bad410c8151e",
-    "hash" : "sha256:ecb5ff960c6a5c451b1119985071f43c27ec312635f4c74d69eb6a54a2e20006"
+    "prev" : "sha256:cf0e8efa3e9576a1a419692698389d1dea85932d9fe993fa9772d03cc0f65d45",
+    "hash" : "sha256:51035e2c99658796c9465ae9ffe96241dd051c7b16b724e61efdc57b30a6ba2d"
   }, {
     "seq" : 7,
-    "at" : "2026-11-24T09:17:45.778Z",
+    "at" : "2026-11-24T11:44:10.342Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "rule",
@@ -187,11 +187,11 @@
       "text" : "src/components/footer.tsx",
       "tool" : "Read"
     },
-    "prev" : "sha256:ecb5ff960c6a5c451b1119985071f43c27ec312635f4c74d69eb6a54a2e20006",
-    "hash" : "sha256:61c79289c4122b63645db453e8e215b8550162f98442dfc2052362cd70af84a2"
+    "prev" : "sha256:51035e2c99658796c9465ae9ffe96241dd051c7b16b724e61efdc57b30a6ba2d",
+    "hash" : "sha256:cd91d35d7b7e5500f9397188fe2b69c6fc5634d0288853bcb7ef6ae8baabddfd"
   }, {
     "seq" : 8,
-    "at" : "2026-11-24T09:17:45.778Z",
+    "at" : "2026-11-24T11:44:10.344Z",
     "type" : "action.requested",
     "actor" : {
       "kind" : "agent",
@@ -202,11 +202,11 @@
       "text" : "src/components/footer.tsx",
       "tool" : "Read"
     },
-    "prev" : "sha256:61c79289c4122b63645db453e8e215b8550162f98442dfc2052362cd70af84a2",
-    "hash" : "sha256:67a5c9c05a68f730bd9b1c434a02ee202f19553656558119a29165048bb2d235"
+    "prev" : "sha256:cd91d35d7b7e5500f9397188fe2b69c6fc5634d0288853bcb7ef6ae8baabddfd",
+    "hash" : "sha256:4268dfa7cce036abaa02c35db8ed8bd1e8739940e48b6081ec7e3ffd57fefd7c"
   }, {
     "seq" : 9,
-    "at" : "2026-11-24T09:17:45.779Z",
+    "at" : "2026-11-24T11:44:10.353Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "rule",
@@ -230,11 +230,11 @@
         "sha256" : "sha256:5555555555555555555555555555555555555555555555555555555555555555"
       }
     },
-    "prev" : "sha256:67a5c9c05a68f730bd9b1c434a02ee202f19553656558119a29165048bb2d235",
-    "hash" : "sha256:d4bb9570e70fca5ca203685b120626006df01ae4e80c391c2b0a5e5d13ac5bf3"
+    "prev" : "sha256:4268dfa7cce036abaa02c35db8ed8bd1e8739940e48b6081ec7e3ffd57fefd7c",
+    "hash" : "sha256:f88b06e632102ac0bbe506199f048236e2519bb6b0c7bcac5cebeb9e32cb00dc"
   }, {
     "seq" : 10,
-    "at" : "2026-11-24T09:17:45.780Z",
+    "at" : "2026-11-24T11:44:10.355Z",
     "type" : "action.requested",
     "actor" : {
       "kind" : "agent",
@@ -245,11 +245,11 @@
       "text" : "src/components/footer.tsx",
       "tool" : "Edit"
     },
-    "prev" : "sha256:d4bb9570e70fca5ca203685b120626006df01ae4e80c391c2b0a5e5d13ac5bf3",
-    "hash" : "sha256:7612a68f96fc7f4c7317f3e072c4bb17c796b82b82a59b9da8c62d015d4cbb38"
+    "prev" : "sha256:f88b06e632102ac0bbe506199f048236e2519bb6b0c7bcac5cebeb9e32cb00dc",
+    "hash" : "sha256:2a6271575c22fe12a3e130f08a62652e1437206f81cc73e27184a4e2f12b298b"
   }, {
     "seq" : 11,
-    "at" : "2026-11-24T09:17:45.780Z",
+    "at" : "2026-11-24T11:44:10.357Z",
     "type" : "note",
     "actor" : {
       "kind" : "agent",
@@ -261,14 +261,14 @@
       "kind" : "checklist.checked",
       "text" : {
         "chars" : 48,
-        "sha256" : "sha256:8288454a6ed86589310bc78ba71bbea552d9ebdb492e4cab7ede8cfa1006d74c"
+        "sha256" : "sha256:7742ad521ed8532c9b1c9add7147e85ea61703b7e97d624e9e9db5b0bc0a4c73"
       }
     },
-    "prev" : "sha256:7612a68f96fc7f4c7317f3e072c4bb17c796b82b82a59b9da8c62d015d4cbb38",
-    "hash" : "sha256:c9ab9c12f12ec90fd15ef433bf7dc3fdf3bb6be9d4fccc4c8f89c263ec97aee6"
+    "prev" : "sha256:2a6271575c22fe12a3e130f08a62652e1437206f81cc73e27184a4e2f12b298b",
+    "hash" : "sha256:25b9e626e3dd6a89ed474e288bab9dda6e1fd8054acdc6bd5c61aa971718a0ff"
   }, {
     "seq" : 12,
-    "at" : "2026-11-24T09:17:45.781Z",
+    "at" : "2026-11-24T11:44:10.360Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "rule",
@@ -286,11 +286,11 @@
       "text" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:c9ab9c12f12ec90fd15ef433bf7dc3fdf3bb6be9d4fccc4c8f89c263ec97aee6",
-    "hash" : "sha256:bac142ecf2c0c2fad10d14bc118992268bbe5119d0e8104675f75e76281dacb8"
+    "prev" : "sha256:25b9e626e3dd6a89ed474e288bab9dda6e1fd8054acdc6bd5c61aa971718a0ff",
+    "hash" : "sha256:823a50ce9b8fc9f07285b5defb4e60011b7db9664c1a0a7d28e4d0449b7259cc"
   }, {
     "seq" : 13,
-    "at" : "2026-11-24T09:17:45.781Z",
+    "at" : "2026-11-24T11:44:10.362Z",
     "type" : "action.decided",
     "actor" : {
       "kind" : "server",
@@ -299,7 +299,7 @@
     "data" : {
       "action" : "web.search",
       "approval" : 9,
-      "asked" : "person:0122fddd3c572f51270a7ac56918f92e",
+      "asked" : "who:92b584ad10b990d4d90e4763adfccedc",
       "askedBy" : "agent",
       "effect" : "ask",
       "facts" : [ {
@@ -312,15 +312,15 @@
       "summary" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:bac142ecf2c0c2fad10d14bc118992268bbe5119d0e8104675f75e76281dacb8",
-    "hash" : "sha256:a8950d34b30c1a8662fb9ece4e0977b80cdc5fc28214e03ee50822f4aff22fbe"
+    "prev" : "sha256:823a50ce9b8fc9f07285b5defb4e60011b7db9664c1a0a7d28e4d0449b7259cc",
+    "hash" : "sha256:b69f2afb82740a276dfb1b3274c617debba09cb6fa39746b6d2b9eee8b2e8352"
   }, {
     "seq" : 14,
-    "at" : "2026-11-24T09:17:45.782Z",
+    "at" : "2026-11-24T11:44:10.368Z",
     "type" : "human.decision",
     "actor" : {
       "kind" : "person",
-      "id" : "person:0122fddd3c572f51270a7ac56918f92e"
+      "id" : "who:92b584ad10b990d4d90e4763adfccedc"
     },
     "data" : {
       "action" : "web.search",
@@ -332,11 +332,11 @@
       "summary" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:a8950d34b30c1a8662fb9ece4e0977b80cdc5fc28214e03ee50822f4aff22fbe",
-    "hash" : "sha256:8fa6e947fd6f339a143d03d054fb3317c2f224fa185cd5b94206c1583ab2ea5c"
+    "prev" : "sha256:b69f2afb82740a276dfb1b3274c617debba09cb6fa39746b6d2b9eee8b2e8352",
+    "hash" : "sha256:71aafe4a01c9299966ce33549a8caaf4baa9dcbf618c4120c823292add5b3c6b"
   }, {
     "seq" : 15,
-    "at" : "2026-11-24T09:17:45.782Z",
+    "at" : "2026-11-24T11:44:10.372Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -348,11 +348,11 @@
       "text" : "Event 9 from the runner never arrived.",
       "to" : 9
     },
-    "prev" : "sha256:8fa6e947fd6f339a143d03d054fb3317c2f224fa185cd5b94206c1583ab2ea5c",
-    "hash" : "sha256:1add7f49d634eb26625023768a6c94d84d13bbf11cdb14371ec8f3d363c9328e"
+    "prev" : "sha256:71aafe4a01c9299966ce33549a8caaf4baa9dcbf618c4120c823292add5b3c6b",
+    "hash" : "sha256:6c1ff396bd516e0ec3e9c3ed8ca78521dea46626b73bc110bd7597f4d7d73da7"
   }, {
     "seq" : 16,
-    "at" : "2026-11-24T09:17:45.782Z",
+    "at" : "2026-11-24T11:44:10.374Z",
     "type" : "action.requested",
     "actor" : {
       "kind" : "agent",
@@ -363,11 +363,11 @@
       "text" : "docs.example.com footer links",
       "tool" : "WebSearch"
     },
-    "prev" : "sha256:1add7f49d634eb26625023768a6c94d84d13bbf11cdb14371ec8f3d363c9328e",
-    "hash" : "sha256:2313ad7aacc6affb706366e5d2a7322282d1cf2a13dad31395b97105abaeb3b3"
+    "prev" : "sha256:6c1ff396bd516e0ec3e9c3ed8ca78521dea46626b73bc110bd7597f4d7d73da7",
+    "hash" : "sha256:4c5d5db75a3b01ad6b9a86d059dfe86d41c62e9846a29d7e4810259a07c4a586"
   }, {
     "seq" : 17,
-    "at" : "2026-11-24T09:17:45.782Z",
+    "at" : "2026-11-24T11:44:10.374Z",
     "type" : "exit.result",
     "actor" : {
       "kind" : "runner",
@@ -380,11 +380,11 @@
       "text" : "allowed by the rule push-agent-branch-private",
       "tool" : "git push"
     },
-    "prev" : "sha256:2313ad7aacc6affb706366e5d2a7322282d1cf2a13dad31395b97105abaeb3b3",
-    "hash" : "sha256:830c6e64a02e4af073f0539090cb6cb7f3c947c298ed9c526816f942a3c4cd38"
+    "prev" : "sha256:4c5d5db75a3b01ad6b9a86d059dfe86d41c62e9846a29d7e4810259a07c4a586",
+    "hash" : "sha256:2928761a729368d8aafa08bbbf6197e0535abf6b392c930adcd9ee1d1adf6893"
   }, {
     "seq" : 18,
-    "at" : "2026-11-24T09:17:45.782Z",
+    "at" : "2026-11-24T11:44:10.375Z",
     "type" : "exit.result",
     "actor" : {
       "kind" : "runner",
@@ -397,11 +397,11 @@
       "text" : "allowed by the rule open-pull-request",
       "tool" : "gh pr create"
     },
-    "prev" : "sha256:830c6e64a02e4af073f0539090cb6cb7f3c947c298ed9c526816f942a3c4cd38",
-    "hash" : "sha256:b111c0a492127d07e8edc66b57dcb1ecc126027a1faf63b3ccf13be7885b262b"
+    "prev" : "sha256:2928761a729368d8aafa08bbbf6197e0535abf6b392c930adcd9ee1d1adf6893",
+    "hash" : "sha256:ed9e8ecc4475d7fa2eaa5db441488b43e033e46d3f2c3281ad43e087c988f8f4"
   }, {
     "seq" : 19,
-    "at" : "2026-11-24T09:17:45.783Z",
+    "at" : "2026-11-24T11:44:10.376Z",
     "type" : "note",
     "actor" : {
       "kind" : "runner",
@@ -423,11 +423,11 @@
       "more" : 0,
       "removed" : 3
     },
-    "prev" : "sha256:b111c0a492127d07e8edc66b57dcb1ecc126027a1faf63b3ccf13be7885b262b",
-    "hash" : "sha256:f69ba135331107a1a87235bd39ed604cf7950d0abc31fd7e411c7252cf259dac"
+    "prev" : "sha256:ed9e8ecc4475d7fa2eaa5db441488b43e033e46d3f2c3281ad43e087c988f8f4",
+    "hash" : "sha256:57cfcde27e9985877938c873786fc0c51ca649bcb2b1a2f62e8e7a3bd950bec9"
   }, {
     "seq" : 20,
-    "at" : "2026-11-24T09:17:45.798Z",
+    "at" : "2026-11-24T11:44:10.392Z",
     "type" : "test.result",
     "actor" : {
       "kind" : "runner",
@@ -449,11 +449,11 @@
       "tool" : "npm test",
       "total" : 48
     },
-    "prev" : "sha256:f69ba135331107a1a87235bd39ed604cf7950d0abc31fd7e411c7252cf259dac",
-    "hash" : "sha256:0ba0600113cc9b3e1632d7d71f1dfe3d17b10bef9a54f79e2938edeadf80629f"
+    "prev" : "sha256:57cfcde27e9985877938c873786fc0c51ca649bcb2b1a2f62e8e7a3bd950bec9",
+    "hash" : "sha256:1d7c873c19adf85ab603b3ba0fffd07eca60af37cc5847b953b64f732f095bf5"
   }, {
     "seq" : 21,
-    "at" : "2026-11-24T09:17:45.812Z",
+    "at" : "2026-11-24T11:44:10.407Z",
     "type" : "note",
     "actor" : {
       "kind" : "runner",
@@ -471,11 +471,11 @@
         "sha256" : "sha256:4444444444444444444444444444444444444444444444444444444444444444"
       }
     },
-    "prev" : "sha256:0ba0600113cc9b3e1632d7d71f1dfe3d17b10bef9a54f79e2938edeadf80629f",
-    "hash" : "sha256:a4eab610f5f42ec9322f005f62b9c20fd4bff1fd1bc50b3554d810db8f103e51"
+    "prev" : "sha256:1d7c873c19adf85ab603b3ba0fffd07eca60af37cc5847b953b64f732f095bf5",
+    "hash" : "sha256:3b3d7ba43e2a12f0da527c0661cf442f70dead6544575cd0ec26f261fee59fb2"
   }, {
     "seq" : 22,
-    "at" : "2026-11-24T09:17:45.812Z",
+    "at" : "2026-11-24T11:44:10.408Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -487,23 +487,23 @@
         "id" : 1,
         "text" : {
           "chars" : 48,
-          "sha256" : "sha256:8288454a6ed86589310bc78ba71bbea552d9ebdb492e4cab7ede8cfa1006d74c"
+          "sha256" : "sha256:7742ad521ed8532c9b1c9add7147e85ea61703b7e97d624e9e9db5b0bc0a4c73"
         }
       }, {
         "done" : false,
         "id" : 2,
         "text" : {
           "chars" : 35,
-          "sha256" : "sha256:a3945fca359ae6e2f32491797e28aafde8df391bfb94b054540dd2d39ec2c8c3"
+          "sha256" : "sha256:a9f8b2be331c288d632a74dd66028c2627ed935f7d163f6697ee731dc3348e60"
         }
       } ],
       "kind" : "checklist"
     },
-    "prev" : "sha256:a4eab610f5f42ec9322f005f62b9c20fd4bff1fd1bc50b3554d810db8f103e51",
-    "hash" : "sha256:be954048adbe4d859b97f796d1dce9ab93ca4d980774e156cb56e29589778a18"
+    "prev" : "sha256:3b3d7ba43e2a12f0da527c0661cf442f70dead6544575cd0ec26f261fee59fb2",
+    "hash" : "sha256:ab16a4576ee172d54af2ae04e4c5c8f54a104c0eaf94581f265a4f6a9f787ad8"
   }, {
     "seq" : 23,
-    "at" : "2026-11-24T09:17:45.812Z",
+    "at" : "2026-11-24T11:44:10.409Z",
     "type" : "mission.ended",
     "actor" : {
       "kind" : "server",
@@ -517,14 +517,14 @@
       "status" : "DONE",
       "summary" : {
         "chars" : 227,
-        "sha256" : "sha256:0cac577cad682fe20f7c74cfa7d8be8ff4da0a7541d32607c7a81541202fe367"
+        "sha256" : "sha256:4de4cf52beb122b4d12463def619e43318f889d0f288e1eeb9e357372d7420f3"
       }
     },
-    "prev" : "sha256:be954048adbe4d859b97f796d1dce9ab93ca4d980774e156cb56e29589778a18",
-    "hash" : "sha256:c1c92ee3fb3f23a46248686bf798a64d728d43838d0f5d407d36b89d6de5ad15"
+    "prev" : "sha256:ab16a4576ee172d54af2ae04e4c5c8f54a104c0eaf94581f265a4f6a9f787ad8",
+    "hash" : "sha256:6b96625261eee3c719db29998433bbacc0029e41848476145d0a0741deee32d7"
   }, {
     "seq" : 24,
-    "at" : "2026-11-24T09:17:45.814Z",
+    "at" : "2026-11-24T11:44:10.428Z",
     "type" : "note",
     "actor" : {
       "kind" : "server",
@@ -535,20 +535,20 @@
       "kind" : "witness",
       "pageLinked" : true,
       "pullRequest" : "https://github.com/acme/website/pull/212",
-      "root" : "sha256:c1c92ee3fb3f23a46248686bf798a64d728d43838d0f5d407d36b89d6de5ad15",
+      "root" : "sha256:6b96625261eee3c719db29998433bbacc0029e41848476145d0a0741deee32d7",
       "seq" : 23,
       "where" : "github-pull-request",
       "written" : true
     },
-    "prev" : "sha256:c1c92ee3fb3f23a46248686bf798a64d728d43838d0f5d407d36b89d6de5ad15",
-    "hash" : "sha256:1148e2b0ea194cc39573bafacae42bf6773fd5de326558e9aff9d0ab54de8b30"
+    "prev" : "sha256:6b96625261eee3c719db29998433bbacc0029e41848476145d0a0741deee32d7",
+    "hash" : "sha256:824096d82500d28e42ae13033a56728ccdffecfa058ffc70bbd7d2adf03dffdc"
   }, {
     "seq" : 25,
-    "at" : "2026-11-24T09:17:45.815Z",
+    "at" : "2026-11-24T11:44:10.436Z",
     "type" : "human.decision",
     "actor" : {
       "kind" : "person",
-      "id" : "person:0122fddd3c572f51270a7ac56918f92e"
+      "id" : "who:92b584ad10b990d4d90e4763adfccedc"
     },
     "data" : {
       "decision" : "APPLY",
@@ -558,10 +558,10 @@
       "testsFailed" : false,
       "where" : "taskforce"
     },
-    "prev" : "sha256:1148e2b0ea194cc39573bafacae42bf6773fd5de326558e9aff9d0ab54de8b30",
-    "hash" : "sha256:5ca6729464deee8cb62e90b6084a1239cdb9f56743e49ebd1c412e46fbecdbdb"
+    "prev" : "sha256:824096d82500d28e42ae13033a56728ccdffecfa058ffc70bbd7d2adf03dffdc",
+    "hash" : "sha256:8ed0c3e4d2cb4b4d9b7e93ee3300f9f78f96ac108061e25e1848420b3fc22129"
   } ],
-  "root" : "sha256:5ca6729464deee8cb62e90b6084a1239cdb9f56743e49ebd1c412e46fbecdbdb",
+  "root" : "sha256:8ed0c3e4d2cb4b4d9b7e93ee3300f9f78f96ac108061e25e1848420b3fc22129",
   "rules" : {
     "format" : "taskforce-rules/1",
     "workspace" : "acme",
@@ -1264,57 +1264,57 @@
     "layers" : null
   },
   "texts" : {
-    "sha256:ba63f9771808f11160d5d0fd523015d3d5feafde7f0bd59f52224ec010a16e31" : {
-      "salt" : "5078a50d23bfff1d26313a285d4abb5f",
+    "sha256:1e4216f432e1b0a37aad8fe2b78980b111c7fcb16128810e1dabcfec1e00d975" : {
+      "salt" : "c67dd1f4547315adcec6d84b0f2dde23",
       "text" : "Fix the footer links"
     },
-    "sha256:ed2c673bba220967d231767984501136e2515d2aaa0709ae27faf9c5c89bd911" : {
-      "salt" : "f5250a413c9ea279e2f62d8c88002425",
+    "sha256:7612333c182e163060aab15c84ddf16ca243f41f580a3f2bdf53c5ebc483dc5f" : {
+      "salt" : "b2f14dddf0278f9c83c0439569ba8c17",
       "text" : "The footer still links to the old documentation site. Point the three links to docs.example.com."
     },
-    "sha256:ed2289f6198527d684fcd0d86542e5efec0b6693b7fe48053992efc507593e75" : {
-      "salt" : "905f448437410afdb0f4ccea2a8c1d77",
+    "sha256:edea9e05ed83a13ea4de8cbe23545a36a82bf51bd3bc92cabd4d621385681cf5" : {
+      "salt" : "e976570e89ee9bb329fa866ea67330c7",
       "text" : "ada@example.com"
     },
-    "sha256:fbd5a83f764a5f61d4e4dfca623181754e30413d700fd8cb62d302b1a676f031" : {
-      "salt" : "65e40d6bc80f29e7d738433bf6531227",
+    "sha256:3bd92b007a7c9826cb2412a4ff66369f91eeeadce3d5fb70107c444cc94b6174" : {
+      "salt" : "31df28d82e9086cc60e73f88d1c233f2",
       "text" : "Ada"
     },
-    "sha256:547a4b312cf384950644086ace9f234756003d684b3de184f226d9b18eafcc49" : {
-      "salt" : "014e0fd11fa89e2e9633b049f55492f3",
+    "sha256:ac484cf894d922c112069626186c1bde685377a7ae0011e0f1730e20c47b9af9" : {
+      "salt" : "a76bdc4f67b7782b3107d5d4e64f79f8",
       "text" : "grace@example.com"
     },
-    "sha256:e089a3efab97ce1ea400970552b0331add46227ebc3e88b5819354825014bf47" : {
-      "salt" : "aac10630ff48ead7c683df161021f375",
+    "sha256:eed256772e9871e571ca61c5d78c3bda54d6f9ffab7ce66e70966c47f096dd6b" : {
+      "salt" : "81d000531e84c5dad6543687077c749f",
       "text" : "Grace"
     },
-    "sha256:fab227f01be17635c3001909d06bf2e760ddc480a4450e870d4322a1737766ae" : {
-      "salt" : "c69b45d436b369fb7ad845ed75318fe8",
+    "sha256:675cccfd7a9ee73b612a0f87083fe0c4cde13071edace7442a9bbc4fdbaf1b20" : {
+      "salt" : "1daea5dacb86741fe388cca756b97e1a",
       "text" : "You are working on a task delegated from TaskForce: WEB-48 - Fix the footer links\n..."
     },
-    "sha256:406e0e7c6b211d0a25f8c007e89c239b2aa544eea3c786f25719809bb00076a5" : {
-      "salt" : "f0b4946ee8c358d599cf4f1fda2c3241",
+    "sha256:b6c681dbfa4b4ef84c93356a6e67dc03b33529431a96e437d2c11338a62a0341" : {
+      "salt" : "8252e0b19f8841bf15c99ec778799fe9",
       "text" : "I will read the footer component first."
     },
-    "sha256:8288454a6ed86589310bc78ba71bbea552d9ebdb492e4cab7ede8cfa1006d74c" : {
-      "salt" : "45a4778e1af154b748ce49ca52545400",
+    "sha256:7742ad521ed8532c9b1c9add7147e85ea61703b7e97d624e9e9db5b0bc0a4c73" : {
+      "salt" : "0c4e1a3342ed66fbc3a59f3230c0ef9a",
       "text" : "Point the three footer links to docs.example.com"
     },
-    "sha256:a3945fca359ae6e2f32491797e28aafde8df391bfb94b054540dd2d39ec2c8c3" : {
-      "salt" : "b2f0bb26f2ef5a30e8873f006ead6de7",
+    "sha256:a9f8b2be331c288d632a74dd66028c2627ed935f7d163f6697ee731dc3348e60" : {
+      "salt" : "9fccad8ef6425f18a57b0acffccbdbbc",
       "text" : "Check the links on the staging site"
     },
-    "sha256:0cac577cad682fe20f7c74cfa7d8be8ff4da0a7541d32607c7a81541202fe367" : {
-      "salt" : "756876f31cbd049e557682b45cccf469",
+    "sha256:4de4cf52beb122b4d12463def619e43318f889d0f288e1eeb9e357372d7420f3" : {
+      "salt" : "0aefb678d7201303723511022304343c",
       "text" : "## What I did\nI pointed the three footer links to docs.example.com in `src/components/footer.tsx`.\n\n## What to check\n- `src/components/footer.tsx:12`: the addresses.\n\n## What I'm not sure about\nI did not check the staging site."
     }
   },
   "seal" : {
-    "payload" : "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiZm9ybWF0IjoidGFza2ZvcmNlLWV2aWRlbmNlLzEiLCJrZXkiOnsiYWxnb3JpdGhtIjoiZWQyNTUxOSIsImN1c3RvZHkiOiJzYW1lLW1hY2hpbmUiLCJpZCI6InNoYTI1NjplODczZDFjOTgwNTJkYmQ5MjgwZGQ0M2E2YzM0ODUyMWIyZDdhMjYzMzA3Y2EyMTJkMGU4OGIzNTdlOWM5ZmJlIiwia2VwdCI6ZmFsc2UsInB1YmxpY0tleSI6Ik1Db3dCUVlESzJWd0F5RUF5cHhGREl0eEcvN2VQSGlzSW1ZNm4rM2JSZE12VkRvYlE2S1JmcjdGR2lnPSJ9LCJtaXNzaW9uIjp7ImFnZW50Ijp7ImtpbmQiOiJjbGF1ZGUtY29kZSIsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC01LTIwMjYxMDAxIiwidmVyc2lvbiI6IjIuMS4zMDAifSwiaWQiOjQyLCJpc3N1ZSI6IldFQi00OCIsInByb2plY3QiOjEyLCJyZXF1ZXN0ZWRCeSI6InBlcnNvbjowMTIyZmRkZDNjNTcyZjUxMjcwYTdhYzU2OTE4ZjkyZSIsInJ1bGVzIjp7ImRpZ2VzdCI6InNoYTI1NjphMjcyYzBkZWQ0Mjg2MThlM2I3NTY0NjhkODY3NDIwY2MxMzEwMzIyZjU2ODVjMTZlNDBjMjM4MmU4ZGU4Y2I4IiwidmVyc2lvbiI6MX0sInJ1bm5lciI6InRmLXJ1bm5lci1hZGEiLCJydW5uZXJGYWN0cyI6ImFnZW50LW1hY2hpbmUiLCJ0YXNrZm9yY2UiOm51bGwsIndvcmtzcGFjZSI6ImFjbWUifSwicm9vdCI6InNoYTI1Njo1Y2E2NzI5NDY0ZGVlZThjYjYyZTkwYjYwODRhMTIzOWNkYjlmNTY3NDNlNDllYmQxYzQxMmU0NmZiZWNkYmRiIiwic2VhbGVkQXQiOiIyMDI2LTExLTI0VDA5OjE3OjQ1LjgxNloiLCJzZXEiOjI1fSwicHJlZGljYXRlVHlwZSI6Imh0dHBzOi8vdGFza2ZvcmNlLXByb2plY3QuZnIvY29udHJhY3RzL3Rhc2tmb3JjZS1ldmlkZW5jZS8xIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjVjYTY3Mjk0NjRkZWVlOGNiNjJlOTBiNjA4NGExMjM5Y2RiOWY1Njc0M2U0OWViZDFjNDEyZTQ2ZmJlY2RiZGIifSwibmFtZSI6InRhc2tmb3JjZS1taXNzaW9uLTQyIn1dfQ==",
+    "payload" : "eyJfdHlwZSI6Imh0dHBzOi8vaW4tdG90by5pby9TdGF0ZW1lbnQvdjEiLCJwcmVkaWNhdGUiOnsiZm9ybWF0IjoidGFza2ZvcmNlLWV2aWRlbmNlLzEiLCJrZXkiOnsiYWxnb3JpdGhtIjoiZWQyNTUxOSIsImN1c3RvZHkiOiJzYW1lLW1hY2hpbmUiLCJpZCI6InNoYTI1NjozNGUzODYwMjU1NjQ1Mzg0Y2Q3M2QzODc1YmQ4ZjI1MDdhMmYxMzllNWE0OGFkNzBjZmUyMTQwNDFlZmU0ZjM0Iiwia2VwdCI6ZmFsc2UsInB1YmxpY0tleSI6Ik1Db3dCUVlESzJWd0F5RUE0cnBUOUdPZ0p4czFnbWxlRzFjamtJdjlpYWpSa3EydGYxS3F0ZTQ2R1hFPSJ9LCJtaXNzaW9uIjp7ImFnZW50Ijp7ImtpbmQiOiJjbGF1ZGUtY29kZSIsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC01LTIwMjYxMDAxIiwidmVyc2lvbiI6IjIuMS4zMDAifSwiaWQiOjQyLCJpc3N1ZSI6IldFQi00OCIsInByb2plY3QiOjEyLCJyZXF1ZXN0ZWRCeSI6Indobzo5MmI1ODRhZDEwYjk5MGQ0ZDkwZTQ3NjNhZGZjY2VkYyIsInJ1bGVzIjp7ImRpZ2VzdCI6InNoYTI1NjphMjcyYzBkZWQ0Mjg2MThlM2I3NTY0NjhkODY3NDIwY2MxMzEwMzIyZjU2ODVjMTZlNDBjMjM4MmU4ZGU4Y2I4IiwidmVyc2lvbiI6MX0sInJ1bm5lciI6InRmLXJ1bm5lci1hZGEiLCJydW5uZXJGYWN0cyI6ImFnZW50LW1hY2hpbmUiLCJ0YXNrZm9yY2UiOm51bGwsIndvcmtzcGFjZSI6ImFjbWUifSwicm9vdCI6InNoYTI1Njo4ZWQwYzNlNGQyY2I0YjRkOWI3ZTkzZWUzMzAwZjlmNzhmOTZhYzEwODA2MWUyNWUxODQ4NDIwYjNmYzIyMTI5Iiwic2VhbGVkQXQiOiIyMDI2LTExLTI0VDExOjQ0OjEwLjQ0MVoiLCJzZXEiOjI1fSwicHJlZGljYXRlVHlwZSI6Imh0dHBzOi8vdGFza2ZvcmNlLXByb2plY3QuZnIvY29udHJhY3RzL3Rhc2tmb3JjZS1ldmlkZW5jZS8xIiwic3ViamVjdCI6W3siZGlnZXN0Ijp7InNoYTI1NiI6IjhlZDBjM2U0ZDJjYjRiNGQ5YjdlOTNlZTMzMDBmOWY3OGY5NmFjMTA4MDYxZTI1ZTE4NDg0MjBiM2ZjMjIxMjkifSwibmFtZSI6InRhc2tmb3JjZS1taXNzaW9uLTQyIn1dfQ==",
     "payloadType" : "application/vnd.in-toto+json",
     "signatures" : [ {
-      "keyid" : "sha256:e873d1c98052dbd9280dd43a6c348521b2d7a263307ca212d0e88b357e9c9fbe",
-      "sig" : "jmshmBI1mixo82a1vpOxnyrE/Ij46KAssoEW8dknzV3+bqN/soVCuCEVlT+dBoK98bC8Kw9u8qgQpZ6aUGUSCw=="
+      "keyid" : "sha256:34e3860255645384cd73d3875bd8f2507a2f139e5a48ad70cfe214041efe4f34",
+      "sig" : "zQgJhPBog3yXmQ/2JtEovSEhgqckNxwUjhQuuHP1zCA1HLw5nYQRkG7huIBV99BvmpzJw07kncckyYS/nr4WDA=="
     } ]
   }
 }

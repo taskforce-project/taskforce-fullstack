@@ -86,8 +86,10 @@ only part of its header; the verifier says which fields are not covered, and its
 
 ### People
 
-A person enters the chain by an opaque id, `person:` and 32 hex digits, drawn the first time and the same in every
-mission: `requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the person a request is
+A person enters the chain by an opaque id, `who:` and 32 hex digits, drawn the first time, one per person and
+workspace: the same in every mission of a workspace, and nothing links the ids of one person from a workspace to
+another. The prefix is the record's own: the live rules name a member `person:<id>`, the record never does. The id
+names `requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the person a request is
 `asked` of, and the actor of each gesture. A `note` of kind `person` introduces each one in a dossier, once: `person`,
 and `email` and `name` as texts kept beside the chain. A GitHub account that merges the pull request enters the same
 way, by the text of its login. When an account is purged, its email and name are erased in every dossier, with their

@@ -83,14 +83,19 @@ CREATE TABLE mission_dossier_texts (
 );
 CREATE INDEX idx_mission_dossier_texts_person ON mission_dossier_texts (person) WHERE person IS NOT NULL;
 
--- 6 bis. Une personne entre dans la chaîne par un identifiant opaque et stable (R159, M6), jamais par son courriel :
---    tiré au hasard la première fois, gardé ici, et retiré quand son compte est purgé. L'identifiant reste dans les
---    chaînes ; plus rien ne le relie à la personne.
+-- 6 bis. Une personne entre dans la chaîne par un identifiant opaque (R159, M6), jamais par son courriel : `who:` et 32
+--    chiffres hexadécimaux, tiré au hasard la première fois, un par personne et par espace (R159, second tour, L-a). Il
+--    est stable dans un espace, et rien ne relie les identifiants d'une même personne d'un espace à l'autre. Il est
+--    retiré quand son compte est purgé : l'identifiant reste dans les chaînes, plus rien ne le relie à la personne.
 CREATE TABLE mission_people (
-    user_id     BIGINT       PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    person      VARCHAR(48)  NOT NULL UNIQUE,
-    created_at  TIMESTAMP    NOT NULL DEFAULT now()
+    id            BIGSERIAL    PRIMARY KEY,
+    workspace_id  BIGINT       NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    user_id       BIGINT       NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    person        VARCHAR(48)  NOT NULL UNIQUE,
+    created_at    TIMESTAMP    NOT NULL DEFAULT now(),
+    CONSTRAINT uq_mission_people UNIQUE (workspace_id, user_id)
 );
+CREATE INDEX idx_mission_people_user ON mission_people (user_id);
 
 -- 7. Rien ne se modifie, comme les versions des règles (V125). Un événement ou un sceau ne s'efface qu'avec tout son
 --    dossier, et un dossier qu'avec son espace de travail.

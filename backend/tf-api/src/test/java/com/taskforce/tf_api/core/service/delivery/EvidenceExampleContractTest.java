@@ -98,7 +98,8 @@ class EvidenceExampleContractTest {
         });
         // Aucune personne n'y entre par son courriel : son identifiant opaque, son courriel à côté.
         assertThat(file.get("events").toString()).doesNotContain("@example.com");
-        assertThat(file.get("mission").get("requestedBy").asText()).matches("person:[0-9a-f]{32}");
+        assertThat(file.get("mission").get("requestedBy").asText()).matches("who:[0-9a-f]{32}");
+        assertThat(file.toString()).doesNotContain("\"person:");
         // Le paquet de règles est celui de la mission, et chaque décision se rejuge à l'identique.
         RulesBundle rules = JSON.treeToValue(file.get("rules"), RulesBundle.class);
         assertThat(RulesDigest.of(file.get("rules"))).isEqualTo(rules.digest()).isEqualTo(file.get("mission").get("rules").get("digest").asText());
@@ -164,7 +165,8 @@ class EvidenceExampleContractTest {
 
         String mission() {
             MissionPersonRepository people = mock(MissionPersonRepository.class);
-            lenient().when(people.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))));
+            lenient().when(people.findByWorkspaceIdAndUserId(anyLong(), anyLong()))
+                .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));
             lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
                 MissionPerson person = inv.getArgument(0);
                 persons.put(person.getUserId(), person);

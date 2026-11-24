@@ -85,8 +85,8 @@ class MissionDossierProbeIntegrationTest extends AbstractIntegrationTest {
         JsonNode file = export();
         JsonNode started = file.get("events").get(0).get("data");
 
-        assertThat(started.get("requestedBy").asText()).startsWith("person:");
-        assertThat(file.get("mission").get("requestedBy").asText()).startsWith("person:");
+        assertThat(started.get("requestedBy").asText()).startsWith("who:");
+        assertThat(file.get("mission").get("requestedBy").asText()).startsWith("who:");
         assertThat(file.get("events").toString()).doesNotContain("ada@probe.dev").doesNotContain("Ada Lovelace");
     }
 

@@ -151,13 +151,20 @@ class MissionEvidenceServiceTest {
             .thenAnswer(inv -> texts.stream().filter(t -> inv.getArgument(0).equals(t.getPerson()) && t.getBody() != null).toList());
         lenient().when(repository.existsByRunIdAndType(anyLong(), anyString()))
             .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))));
-        lenient().when(people.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))));
+        // Un seul espace ici : l'identifiant d'une personne se range par son compte.
+        lenient().when(people.findByWorkspaceIdAndUserId(anyLong(), anyLong()))
+            .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));
+        lenient().when(people.findByUserId(anyLong()))
+            .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))).stream().toList());
         lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
             MissionPerson person = inv.getArgument(0);
             persons.put(person.getUserId(), person);
             return person;
         });
-        lenient().doAnswer(inv -> persons.remove(inv.<MissionPerson>getArgument(0).getUserId())).when(people).delete(any());
+        lenient().doAnswer(inv -> {
+            inv.<List<MissionPerson>>getArgument(0).forEach(p -> persons.remove(p.getUserId()));
+            return null;
+        }).when(people).deleteAll(any());
     }
 
     /** Le texte gardé à côté de la chaîne, de cette sorte, et l'empreinte salée que la chaîne en porte. */
@@ -165,7 +172,7 @@ class MissionEvidenceServiceTest {
         return texts.stream().filter(t -> t.getKind().equals(kind)).findFirst().orElseThrow();
     }
 
-    private static final String PERSON = "person:[0-9a-f]{32}";
+    private static final String PERSON = "who:[0-9a-f]{32}";
 
     private static RulesBundle rules() {
         return new RulesBundle("taskforce-rules/1", "acme", 12L, 3, DIGEST, null, List.of(), null,

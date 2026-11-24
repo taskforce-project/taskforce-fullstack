@@ -239,7 +239,7 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         refused("UPDATE mission_dossier_texts SET salt = '0123456789abcdef0123456789abcdef' WHERE run_id = ? AND hash = ?",
             "never changes", run.getId(), title);
         refused("UPDATE mission_dossier_texts SET salt = NULL WHERE run_id = ? AND hash = ?", "never changes", run.getId(), title);
-        refused("UPDATE mission_dossier_texts SET person = 'person:" + "0".repeat(32) + "' WHERE run_id = ? AND kind = 'email'",
+        refused("UPDATE mission_dossier_texts SET person = 'who:" + "0".repeat(32) + "' WHERE run_id = ? AND kind = 'email'",
             "never changes", run.getId());
         refused("DELETE FROM mission_dossier_texts WHERE run_id = ? AND hash = ?", "only erased, never deleted",
             run.getId(), title);
@@ -261,7 +261,7 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
 
         JsonNode file = export();
         String id = jdbc.queryForObject("SELECT person FROM mission_people WHERE user_id = ?", String.class, ada.getId());
-        assertThat(id).matches("person:[0-9a-f]{32}");
+        assertThat(id).matches("who:[0-9a-f]{32}");
         assertThat(file.get("mission").get("requestedBy").asText()).isEqualTo(id);
         assertThat(file.get("events").toString()).doesNotContain("ada@it.dev");
         assertThat(events(file)).filteredOn(e -> "person".equals(e.get("data").path("kind").asText())).hasSize(1);
@@ -275,6 +275,35 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         em.flush();
         assertThat(JSON.readTree(evidence.dossierJson(other.getId()).orElseThrow()).get("mission").get("requestedBy").asText())
             .isEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("R159 second tour, L-a et L-e : un identifiant par espace, que rien ne relie d'un espace à l'autre, et un préfixe à lui")
+    void a_person_has_one_id_per_workspace() throws Exception {
+        mission();
+        Workspace second = workspaceRepository.save(Workspace.builder().name("IT Dossier 2").slug("ws-dossier-it-2").owner(ada).build());
+        Project project = projectRepository.save(Project.builder().workspace(second).name("Docs").identifier("DOC").createdBy(ada).build());
+        IssueStatus backlog = issueStatusRepository.save(IssueStatus.builder().project(project).name("Backlog")
+            .category(IssueStatusCategory.BACKLOG).position((short) 0).build());
+        Issue other = issueRepository.saveAndFlush(Issue.builder().project(project).status(backlog).reporter(ada).sequenceNumber(1)
+            .title("Write the guide").priority(IssuePriority.MEDIUM).build());
+        DeliveryRun elsewhere = runRepository.saveAndFlush(DeliveryRun.builder().issue(other).providerKey("claude-code").model("sonnet")
+            .status(DeliveryRunStatus.RUNNING).startedBy(ada).claimedBy("tf-runner-ada").origin("app").build());
+
+        evidence.open(elsewhere, null, "tf-runner-ada", Map.of());
+        em.flush();
+
+        String here = export().get("mission").get("requestedBy").asText();
+        String there = JSON.readTree(evidence.dossierJson(elsewhere.getId()).orElseThrow()).get("mission").get("requestedBy").asText();
+        assertThat(here).matches("who:[0-9a-f]{32}");
+        assertThat(there).matches("who:[0-9a-f]{32}").isNotEqualTo(here);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE user_id = ?", Integer.class, ada.getId())).isEqualTo(2);
+        // Le compte purgé : ses deux identifiants partent, et ses textes s'effacent dans les deux espaces.
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(2);
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE user_id = ?", Integer.class, ada.getId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE person IN (?, ?) AND body IS NOT NULL",
+            Integer.class, here, there)).isZero();
     }
 
     @Test

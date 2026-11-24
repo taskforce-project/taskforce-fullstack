@@ -150,14 +150,15 @@ public class MissionEvidenceService {
             dossier.setRulesBundle(bundle);
             dossiers.saveAndFlush(dossier);
         }
-        // Les personnes entrent par leur identifiant opaque ; leur courriel et leur nom, à côté, dans des notes qui suivent
-        // l'ouverture (R159, M6).
+        // Les personnes entrent par leur identifiant opaque dans cet espace ; leur courriel et leur nom, à côté, dans des
+        // notes qui suivent l'ouverture (R159, M6 ; second tour, L-a).
+        Long workspaceId = project.getWorkspace().getId();
         List<User> named = new ArrayList<>();
-        String delegator = personIdOf(run.getStartedBy(), named);
+        String delegator = personIdOf(workspaceId, run.getStartedBy(), named);
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("title", ref(run.getId(), "title", issue.getTitle()));
         request.put("description", ref(run.getId(), "description", blankToNull(issue.getDescription())));
-        request.put("reporter", personIdOf(issue.getReporter(), named));
+        request.put("reporter", personIdOf(workspaceId, issue.getReporter(), named));
         request.put("createdAt", utc(issue.getCreatedAt()));
         request.put("importedFrom", issue.getImportedFrom());
         Map<String, Object> origin = new LinkedHashMap<>();
@@ -178,7 +179,7 @@ public class MissionEvidenceService {
         started.put("delegatedAt", utc(run.getCreatedAt()));
         started.put("origin", origin);
         started.put("agent", agent);
-        started.put("rules", rules == null ? null : rulesData(rules, project.getWorkspace().getId(), named));
+        started.put("rules", rules == null ? null : rulesData(rules, workspaceId, named));
         started.put("runner", runner);
         if (runner != null) {
             // Ce que le runner rapportera (ses tests, l'agent et son modèle, les numéros de ses événements) vient du poste de
@@ -191,15 +192,15 @@ public class MissionEvidenceService {
         }
         append(run, "mission.started", Actor.SERVER, started);
         for (User user : named) {
-            personNote(run.getId(), user);
+            personNote(run.getId(), workspaceId, user);
         }
     }
 
-    /** L'identifiant opaque d'une personne, gardée pour sa note ; null sans personne. */
-    private String personIdOf(User user, List<User> named) {
+    /** L'identifiant opaque d'une personne dans cet espace, gardée pour sa note ; null sans personne. */
+    private String personIdOf(Long workspaceId, User user, List<User> named) {
         if (user == null) return null;
         if (named.stream().noneMatch(u -> Objects.equals(u.getId(), user.getId()))) named.add(user);
-        return personId(user);
+        return personId(workspaceId, user);
     }
 
     /** Les règles de la mission telles que le dossier les garde : version, empreinte, et chaque couche avec son auteur. */
@@ -216,7 +217,7 @@ public class MissionEvidenceService {
                 entry.put("version", layer.version());
                 entry.put("digest", layer.digest());
                 entry.put("author", ruleSets.findByWorkspaceIdAndVersion(workspaceId, layer.version())
-                    .map(set -> personIdOf(set.getCreatedBy(), named)).orElse(null));
+                    .map(set -> personIdOf(workspaceId, set.getCreatedBy(), named)).orElse(null));
                 layers.add(entry);
             }
         }
@@ -497,15 +498,22 @@ public class MissionEvidenceService {
     // --------------------------------------------------------------------- les personnes
 
     /**
-     * L'identifiant opaque et stable d'une personne dans les dossiers (R159, M6) : {@code person:} et 32 chiffres
-     * hexadécimaux tirés la première fois, jamais son courriel. Null sans personne.
+     * L'identifiant opaque d'une personne dans les dossiers d'un espace (R159, M6) : {@code who:} et 32 chiffres
+     * hexadécimaux tirés la première fois, jamais son courriel. Un par espace (second tour, L-a) : rien ne relie les
+     * dossiers d'une même personne d'un espace à l'autre. Null sans personne.
      */
-    String personId(User user) {
-        if (user == null || user.getId() == null) {
+    String personId(Long workspaceId, User user) {
+        if (user == null || user.getId() == null || workspaceId == null) {
             return null;
         }
-        return people.findById(user.getId()).map(MissionPerson::getPerson).orElseGet(() -> people.saveAndFlush(MissionPerson.builder()
-            .userId(user.getId()).person("person:" + salt()).createdAt(LocalDateTime.now()).build()).getPerson());
+        return people.findByWorkspaceIdAndUserId(workspaceId, user.getId()).map(MissionPerson::getPerson)
+            .orElseGet(() -> people.saveAndFlush(MissionPerson.builder().workspaceId(workspaceId).userId(user.getId())
+                .person(MissionPerson.PREFIX + salt()).createdAt(LocalDateTime.now()).build()).getPerson());
+    }
+
+    /** L'espace d'un dossier : celui dont ses personnes portent l'identifiant. */
+    private Long workspaceOf(Long runId) {
+        return dossiers.findById(runId).map(MissionDossier::getWorkspace).map(workspace -> workspace.getId()).orElse(null);
     }
 
     /**
@@ -520,13 +528,14 @@ public class MissionEvidenceService {
         // La mission d'abord, puis son dossier : l'ordre de chaque ajout, sans quoi deux ajouts s'attendraient l'un l'autre.
         runRepository.findByIdForUpdate(run.getId());
         ensureDossier(run);
-        personNote(run.getId(), user);
-        return new Actor("person", personId(user));
+        Long workspaceId = workspaceOf(run.getId());
+        personNote(run.getId(), workspaceId, user);
+        return new Actor("person", personId(workspaceId, user));
     }
 
     /** La note qui présente une personne dans ce dossier, une fois : son identifiant, son courriel et son nom à côté. */
-    private void personNote(Long runId, User user) {
-        String id = personId(user);
+    private void personNote(Long runId, Long workspaceId, User user) {
+        String id = personId(workspaceId, user);
         if (id == null || texts.existsByRunIdAndPersonAndKind(runId, id, "email")) {
             return;
         }
@@ -540,32 +549,33 @@ public class MissionEvidenceService {
 
     /**
      * Le compte d'une personne est purgé (GdprService) : ce que les dossiers gardent d'elle s'efface, son courriel et son
-     * nom, avec leur sel ; chaque dossier touché le dit à la suite de sa chaîne et se scelle de nouveau. Son identifiant
-     * opaque reste dans les chaînes, et plus rien ne le relie à elle. Rend le nombre de dossiers touchés.
+     * nom, avec leur sel ; chaque dossier touché le dit à la suite de sa chaîne et se scelle de nouveau. Ses identifiants
+     * opaques, un par espace, restent dans les chaînes, et plus rien ne les relie à elle. Rend le nombre de dossiers touchés.
      */
     @Transactional
     public int forgetPerson(Long userId) {
-        MissionPerson mapping = userId == null ? null : people.findById(userId).orElse(null);
-        if (mapping == null) {
-            return 0;
-        }
+        List<MissionPerson> mappings = userId == null ? List.of() : people.findByUserId(userId);
         Map<Long, List<String>> byDossier = new LinkedHashMap<>();
-        for (MissionDossierText text : texts.findByPersonAndBodyIsNotNull(mapping.getPerson())) {
-            text.setBody(null);
-            text.setSalt(null);
-            text.setErasedAt(LocalDateTime.now());
-            texts.save(text);
-            byDossier.computeIfAbsent(text.getRunId(), id -> new ArrayList<>()).add(text.getHash());
+        Map<Long, String> personOf = new HashMap<>();
+        for (MissionPerson mapping : mappings) {
+            for (MissionDossierText text : texts.findByPersonAndBodyIsNotNull(mapping.getPerson())) {
+                text.setBody(null);
+                text.setSalt(null);
+                text.setErasedAt(LocalDateTime.now());
+                texts.save(text);
+                byDossier.computeIfAbsent(text.getRunId(), id -> new ArrayList<>()).add(text.getHash());
+                personOf.put(text.getRunId(), mapping.getPerson());
+            }
         }
         byDossier.forEach((runId, hashes) -> {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("kind", "erased");
-            data.put("person", mapping.getPerson());
+            data.put("person", personOf.get(runId));
             data.put("texts", hashes);
             data.put("reason", "account-deleted");
             appendToDossier(runId, "note", Actor.SERVER, data);
         });
-        people.delete(mapping);
+        people.deleteAll(mappings);
         log.info("Compte {} oublié des dossiers : {} dossier(s) touché(s)", userId, byDossier.size());
         return byDossier.size();
     }
@@ -920,8 +930,9 @@ public class MissionEvidenceService {
         data.put("kind", "erased");
         data.put("text", hash);
         data.put("what", text.getKind());
-        personNote(runId, by);
-        appendToDossier(runId, "human.decision", new Actor("person", personId(by)), data);
+        Long workspaceId = workspaceOf(runId);
+        personNote(runId, workspaceId, by);
+        appendToDossier(runId, "human.decision", new Actor("person", personId(workspaceId, by)), data);
     }
 
     // ---------------------------------------------------------------------
