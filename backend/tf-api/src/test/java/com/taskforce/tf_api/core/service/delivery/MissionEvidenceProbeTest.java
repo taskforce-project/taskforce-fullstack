@@ -124,6 +124,24 @@ class MissionEvidenceProbeTest {
     }
 
     @Test
+    @DisplayName("M4 : au plafond, la fin, le geste et le témoin s'écrivent encore, dans la réserve")
+    void the_cap_keeps_room_for_the_server_and_the_people() {
+        ObjectNode full = JSON.createObjectNode().put("max", 10_000).put("text", "The evidence of this mission is full.");
+        storedAsBefore("mission.started", JSON.createObjectNode().put("issue", "WEB-12"));
+        DeliveryRunEvidence marker = DeliveryRunEvidence.builder().runId(100L).seq(MissionEvidenceService.MAX_EVENTS)
+            .at("2026-11-22T09:00:00.000Z").type("limit.reached").actorKind("server").actorId("taskforce")
+            .data(CanonicalJson.of(full)).prev(stored.getLast().getHash()).hash("sha256:" + "d".repeat(64)).build();
+        stored.add(marker);
+
+        service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, null, null, null));
+        service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "someone"),
+            Map.of("decision", "DISCARD", "reason", "Wrong approach"));
+
+        assertThat(stored).extracting(DeliveryRunEvidence::getType).contains("mission.ended", "human.decision");
+        assertThat(stored.getLast().getSeq()).isGreaterThan(MissionEvidenceService.MAX_EVENTS);
+    }
+
+    @Test
     @DisplayName("M7 : un dossier d'avant ce lot, avec une demi-paire gardée échappée, se vérifie encore une fois exporté")
     void a_record_with_a_lone_surrogate_still_checks_once_exported() throws Exception {
         rows.put(100L, MissionDossier.builder().runId(100L).workspace(run.getIssue().getProject().getWorkspace()).build());

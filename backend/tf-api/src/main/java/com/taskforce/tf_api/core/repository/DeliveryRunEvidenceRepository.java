@@ -16,4 +16,7 @@ public interface DeliveryRunEvidenceRepository extends JpaRepository<DeliveryRun
 
     /** Le dossier entier, dans l'ordre de la chaîne. */
     List<DeliveryRunEvidence> findByRunIdOrderBySeqAsc(Long runId);
+
+    /** Le dossier a-t-il déjà un événement de ce type (le plafond atteint) ? */
+    boolean existsByRunIdAndType(Long runId, String type);
 }

@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -74,8 +75,18 @@ import lombok.extern.slf4j.Slf4j;
 public class MissionEvidenceService {
 
     public static final String FORMAT = EvidenceSeal.FORMAT;
-    /** Plafond du dossier d'un run, bien au-delà de la chronologie affichée : atteint, un dernier événement le dit. */
+    /**
+     * Plafond des événements du runner, de l'agent et des règles, bien au-delà de la chronologie affichée : atteint, un
+     * événement le dit, et ce qu'ils envoient ensuite n'est plus gardé.
+     */
     static final int MAX_EVENTS = 10_000;
+    /**
+     * Au-delà du plafond, une réserve pour ce que le serveur et les personnes écrivent : la fin, les gestes et leur
+     * raison, le témoin, un effacement (R159, M4). Un agent qui épuise le plafond n'efface pas la décision de fin.
+     */
+    static final int RESERVE = 1_000;
+    /** Les acteurs que le plafond borne : ce qui vient du poste de l'agent. */
+    private static final Set<String> CAPPED = Set.of("agent", "rule", "runner");
     static final String LIMIT_REACHED = "limit.reached";
     /** Ce qu'un événement garde d'un texte en clair (une commande, une erreur), et d'un fait jugé. */
     static final int MAX_TEXT = 2_000;
@@ -203,14 +214,20 @@ public class MissionEvidenceService {
         dossiers.findByIdForUpdate(runId);
         Optional<DeliveryRunEvidence> last = repository.findTopByRunIdOrderBySeqDesc(runId);
         int seq = last.map(DeliveryRunEvidence::getSeq).orElse(0) + 1;
-        if (seq > MAX_EVENTS) {
+        if (seq > MAX_EVENTS + RESERVE) {
+            log.warn("Run {} : réserve du dossier de preuve épuisée, {} non gardé", runId, type);
             return Optional.empty();
         }
-        if (seq == MAX_EVENTS && !LIMIT_REACHED.equals(type)) {
-            log.warn("Run {} : dossier de preuve plein ({} événements)", runId, MAX_EVENTS);
+        // Le plafond borne ce qui vient du poste de l'agent ; la réserve garde la fin, les gestes, le témoin (R159, M4).
+        if (CAPPED.contains(actor.kind()) && seq >= MAX_EVENTS) {
+            if (seq > MAX_EVENTS && repository.existsByRunIdAndType(runId, LIMIT_REACHED)) {
+                return Optional.empty();
+            }
+            log.warn("Run {} : dossier de preuve plein ({} événements du poste de l'agent)", runId, MAX_EVENTS);
             type = LIMIT_REACHED;
             actor = Actor.SERVER;
-            data = Map.of("max", MAX_EVENTS, "text", "The evidence of this mission is full: later events are not kept.");
+            data = Map.of("max", MAX_EVENTS, "text", "The evidence of this mission reached its cap: later events from the "
+                + "agent's computer are not kept. What the server and the people write still is.");
         }
         String prev = last.map(DeliveryRunEvidence::getHash).orElse(EvidenceChain.ZERO_HASH);
         String at = EvidenceChain.AT.format(Instant.now());

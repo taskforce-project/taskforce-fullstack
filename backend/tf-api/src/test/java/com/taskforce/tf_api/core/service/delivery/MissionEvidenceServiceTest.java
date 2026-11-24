@@ -137,6 +137,8 @@ class MissionEvidenceServiceTest {
         lenient().when(textRepository.findByRunIdOrderByIdAsc(100L)).thenAnswer(inv -> List.copyOf(texts));
         lenient().when(textRepository.findByRunIdAndHash(anyLong(), anyString()))
             .thenAnswer(inv -> texts.stream().filter(t -> t.getHash().equals(inv.getArgument(1))).findFirst());
+        lenient().when(repository.existsByRunIdAndType(anyLong(), anyString()))
+            .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))));
     }
 
     private static RulesBundle rules() {
