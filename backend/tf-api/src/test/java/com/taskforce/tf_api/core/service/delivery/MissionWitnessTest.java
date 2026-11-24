@@ -7,9 +7,12 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,6 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,38 +30,50 @@ import org.springframework.transaction.PlatformTransactionManager;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.MissionDossierSeal;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.DeliveryRunEvidenceRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.service.GitHubPullRequests;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 /**
  * Le témoin (Q31, point 9 de la séance n°30) : à la fin de la mission, la tête de son dossier s'écrit dans sa pull
- * request, là où l'exploitant n'est pas seul à écrire, avec le lien de la page et rien d'autre ; ce qui s'est passé
- * entre au dossier.
+ * request, là où l'exploitant n'est pas seul à écrire ; un lien vers la page seulement pour un dépôt que GitHub dit privé,
+ * jamais depuis l'app de bureau ni vers la machine elle-même (R159, B2 et M1) ; ce qui s'est passé entre au dossier, un
+ * échec se retente, et un passage régulier rattrape un témoin perdu (R159, L7).
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Le témoin du dossier, dans la pull request")
 class MissionWitnessTest {
 
     private static final String ROOT = "sha256:" + "9".repeat(64);
+    private static final String HEAD = "TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of mission 100).";
+    private static final String URL = "https://app.taskforce.dev/";
 
     @Mock private DeliveryRunRepository runRepository;
+    @Mock private DeliveryRunEvidenceRepository evidenceRepository;
+    @Mock private MissionDossierSealRepository sealRepository;
     @Mock private GitHubPullRequests pullRequests;
     @Mock private MissionEvidenceService evidence;
     @Mock private PlatformTransactionManager transactionManager;
 
-    private MissionWitness witness;
     private DeliveryRun run;
 
     @BeforeEach
     void setUp() {
-        witness = new MissionWitness(runRepository, pullRequests, evidence, transactionManager, "https://app.taskforce.dev/");
         Workspace workspace = Workspace.builder().id(1L).slug("acme").build();
         Project project = Project.builder().id(12L).workspace(workspace).build();
         run = DeliveryRun.builder().id(100L).issue(Issue.builder().id(55L).project(project).build()).status(DeliveryRunStatus.DONE)
             .resultUrl("https://github.com/acme/website/pull/212").build();
+    }
+
+    /** Le témoin d'un serveur, sans attente entre deux essais. */
+    private MissionWitness witness(String frontendUrl, boolean linkAllowed) {
+        return new MissionWitness(runRepository, evidenceRepository, sealRepository, pullRequests, evidence, transactionManager,
+            frontendUrl, linkAllowed, List.of(Duration.ZERO, Duration.ZERO));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -66,46 +83,111 @@ class MissionWitnessTest {
         return data.getValue();
     }
 
-    @Test
-    @DisplayName("la tête et le lien de la page, rien d'autre ; le dossier garde où le témoin est écrit")
-    void the_head_is_written_in_the_pull_request() {
-        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
-        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
-            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-1"));
-
-        witness.write(new MissionSealed(100L, ROOT, 31));
-
+    private String written() {
         ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
         verify(pullRequests).comment(eq(1L), eq("acme/website"), eq(212), body.capture());
-        assertThat(body.getValue()).isEqualTo("TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of mission 100).\n"
-            + "Verification page: https://app.taskforce.dev/acme/missions/100/verification");
-        assertThat(noted()).containsEntry("kind", "witness").containsEntry("where", "github-pull-request")
-            .containsEntry("written", true).containsEntry("root", ROOT).containsEntry("seq", 31)
-            .containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-1");
+        return body.getValue();
     }
 
     @Test
-    @DisplayName("GitHub refuse ou n'est pas relié : le dossier dit pourquoi le témoin manque")
+    @DisplayName("un dépôt privé : la tête et le lien de la page, rien d'autre ; le dossier garde où le témoin est écrit")
+    void a_private_repository_gets_the_head_and_the_link() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.visibility(1L, "acme/website")).thenReturn(Optional.of("private"));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-1"));
+
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+
+        assertThat(written()).isEqualTo(HEAD + "\nVerification page: https://app.taskforce.dev/acme/missions/100/verification");
+        assertThat(noted()).containsEntry("kind", "witness").containsEntry("where", "github-pull-request")
+            .containsEntry("written", true).containsEntry("root", ROOT).containsEntry("seq", 31).containsEntry("pageLinked", true)
+            .containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-1").doesNotContainKey("pageLeftOut");
+    }
+
+    @ParameterizedTest(name = "visibilité {0} : la tête seule, et le dossier dit pourquoi ({1})")
+    @CsvSource({"public, public-repository", "internal, internal-repository", "'', visibility-unknown"})
+    void a_repository_not_known_private_gets_the_head_only(String visibility, String leftOut) {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.visibility(1L, "acme/website")).thenReturn(visibility.isEmpty() ? Optional.empty() : Optional.of(visibility));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
+
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+
+        assertThat(written()).isEqualTo(HEAD);
+        assertThat(noted()).containsEntry("written", true).containsEntry("pageLinked", false).containsEntry("pageLeftOut", leftOut);
+    }
+
+    @Test
+    @DisplayName("l'app de bureau : jamais de lien, sans même demander la visibilité du dépôt")
+    void the_desktop_app_never_links() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
+
+        witness("http://127.0.0.1:43123", false).write(new MissionSealed(100L, ROOT, 31));
+
+        assertThat(written()).isEqualTo(HEAD);
+        assertThat(noted()).containsEntry("pageLeftOut", "desktop-app");
+        verify(pullRequests, never()).visibility(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("une adresse de la machine elle-même : pas de lien, même pour un dépôt privé")
+    void a_local_address_never_links() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
+
+        witness("http://localhost:3000", true).write(new MissionSealed(100L, ROOT, 31));
+
+        assertThat(written()).isEqualTo(HEAD);
+        assertThat(noted()).containsEntry("pageLeftOut", "local-address");
+    }
+
+    @ParameterizedTest(name = "{0} : locale={1}")
+    @CsvSource({"http://localhost:3000, true", "http://app.localhost, true", "http://127.0.0.1:5173, true", "http://[::1]:8080, true",
+        "http://0.0.0.0, true", "not a url, true", "https://app.taskforce.dev, false", "https://taskforce.intra.acme.fr, false"})
+    void what_is_a_local_address(String url, boolean local) {
+        assertThat(MissionWitness.local(url)).isEqualTo(local);
+    }
+
+    @Test
+    @DisplayName("GitHub refuse à chaque essai : le dossier dit pourquoi le témoin manque, après trois essais")
     void a_refusal_is_kept_in_the_dossier() {
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
             .thenThrow(new BusinessException("Connect GitHub in Settings > Integrations."));
 
-        witness.write(new MissionSealed(100L, ROOT, 31));
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
 
+        verify(pullRequests, times(3)).comment(anyLong(), anyString(), anyInt(), anyString());
         assertThat(noted()).containsEntry("written", false).containsEntry("reason", "Connect GitHub in Settings > Integrations.");
     }
 
     @Test
-    @DisplayName("une mission sans pull request n'a pas de témoin : rien ne s'écrit, la page le dit")
-    void no_pull_request_no_witness() {
+    @DisplayName("R159, L7 : GitHub ne répond pas une fois, le second essai écrit le témoin")
+    void a_passing_failure_is_retried() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
+            .thenThrow(new IllegalStateException("GitHub did not answer"))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-2"));
+
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+
+        verify(pullRequests, times(2)).comment(anyLong(), anyString(), anyInt(), anyString());
+        assertThat(noted()).containsEntry("written", true).doesNotContainKey("reason");
+    }
+
+    @Test
+    @DisplayName("une mission sans pull request : rien ne s'écrit sur GitHub, une note le dit au dossier")
+    void no_pull_request_says_so() {
         run.setResultUrl(null);
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
 
-        witness.write(new MissionSealed(100L, ROOT, 31));
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
 
         verify(pullRequests, never()).comment(anyLong(), any(), anyInt(), any());
-        verify(evidence, never()).appendToDossier(any(), any(), any(), any());
+        assertThat(noted()).containsEntry("kind", "witness").containsEntry("written", false)
+            .containsEntry("reason", "This mission has no pull request.");
     }
 
     @Test
@@ -113,15 +195,31 @@ class MissionWitnessTest {
     void a_vanished_mission_writes_nothing() {
         when(runRepository.findById(100L)).thenReturn(Optional.empty());
 
-        witness.onSealed(new MissionSealed(100L, ROOT, 31));
+        witness(URL, true).onSealed(new MissionSealed(100L, ROOT, 31));
 
         verify(pullRequests, never()).comment(anyLong(), any(), anyInt(), any());
+        verify(evidence, never()).appendToDossier(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("R159, L7 : le passage régulier écrit le témoin d'une mission scellée qui n'en a pas, à sa dernière tête")
+    void the_sweep_writes_a_lost_witness() {
+        when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
+
+        witness(URL, true).sweep();
+
+        assertThat(written()).startsWith(HEAD);
+        assertThat(noted()).containsEntry("written", true).containsEntry("root", ROOT).containsEntry("seq", 31);
     }
 
     @Test
     @DisplayName("le lien de la page suit l'adresse de l'app")
     void the_page_url_follows_the_app() {
-        assertThat(new MissionWitness(runRepository, pullRequests, evidence, transactionManager, "http://127.0.0.1:5173")
-            .pageUrl("acme", 7L)).isEqualTo("http://127.0.0.1:5173/acme/missions/7/verification");
+        assertThat(new MissionWitness(runRepository, pullRequests, evidence, transactionManager, "https://tf.example.com/")
+            .pageUrl("acme", 7L)).isEqualTo("https://tf.example.com/acme/missions/7/verification");
     }
 }

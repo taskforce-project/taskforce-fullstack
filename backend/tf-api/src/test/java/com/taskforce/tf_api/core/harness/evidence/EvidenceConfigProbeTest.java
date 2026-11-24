@@ -32,4 +32,12 @@ class EvidenceConfigProbeTest {
     void the_server_keeps_its_key_in_its_data_volume() throws IOException {
         assertThat(String.valueOf(evidence("prod").get("default-key-file"))).contains("/var/lib/taskforce/evidence/signing-key.pem");
     }
+
+    @Test
+    @DisplayName("l'app de bureau garde sa clé dans son dossier de données, et n'écrit pas de lien dans la pull request")
+    void the_desktop_app_writes_no_link() throws IOException {
+        Map<String, Object> desktop = evidence("desktop");
+        assertThat(String.valueOf(desktop.get("signing-key-file"))).contains("evidence/signing-key.pem");
+        assertThat(desktop.get("witness-link")).isEqualTo(false);
+    }
 }

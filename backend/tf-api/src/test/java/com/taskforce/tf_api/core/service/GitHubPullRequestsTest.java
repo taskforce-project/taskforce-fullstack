@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -113,5 +114,34 @@ class GitHubPullRequestsTest {
     void only_a_github_repository_name() {
         assertThatThrownBy(() -> pullRequests.close(1L, "../../user", 1))
             .isInstanceOf(BusinessException.class).hasMessageContaining("not a GitHub repository");
+    }
+
+    @ParameterizedTest(name = "GitHub répond {0} : visibilité {1}")
+    @DisplayName("R159, B2 : la visibilité du dépôt, telle que GitHub la donne")
+    @CsvSource(delimiter = '|', value = {
+        "{\"visibility\":\"private\",\"private\":true} | private",
+        "{\"visibility\":\"PUBLIC\",\"private\":false} | public",
+        "{\"visibility\":\"internal\"}                 | internal",
+        "{\"private\":true}                            | private",
+        "{\"private\":false}                           | public",
+        "{\"name\":\"website\"}                        | ",
+    })
+    void reads_the_visibility_of_the_repository(String answer, String visibility) {
+        github.expect(requestTo(REPO)).andExpect(method(HttpMethod.GET)).andExpect(header("Authorization", "Bearer gho_test"))
+            .andRespond(withSuccess(answer, MediaType.APPLICATION_JSON));
+
+        assertThat(pullRequests.visibility(1L, "acme/website")).isEqualTo(Optional.ofNullable(visibility));
+        github.verify();
+    }
+
+    @Test
+    @DisplayName("R159, B2 : une visibilité que GitHub ne donne pas est inconnue, et le témoin n'écrit pas de lien")
+    void a_visibility_github_does_not_give_is_unknown() {
+        github.expect(requestTo(REPO)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThat(pullRequests.visibility(1L, "acme/website")).isEmpty();
+
+        when(tokens.token(2L)).thenReturn(Optional.empty());
+        assertThat(pullRequests.visibility(2L, "acme/website")).isEmpty();
+        assertThat(pullRequests.visibility(1L, "../../user")).isEmpty();
     }
 }
