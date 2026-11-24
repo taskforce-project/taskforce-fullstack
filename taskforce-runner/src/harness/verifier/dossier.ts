@@ -1,7 +1,7 @@
 import {
   bundleDigest, canonicalJson, decideAll, firstBrokenLink, type ChainedEvent, type Facts, type Json, type RulesBundle,
 } from "../engine/rules-engine.js";
-import { concat, ed25519Key, fromBase64, sha256, text, utf8, verifyEd25519, type Bytes } from "./crypto.js";
+import { concat, ed25519Key, ed25519Supported, fromBase64, sha256, text, utf8, verifyEd25519, type Bytes } from "./crypto.js";
 
 /**
  * Ce que le vérificateur lit d'un dossier exporté (`taskforce-evidence/1`, contracts/README.md), sans TaskForce ni réseau :
@@ -109,9 +109,9 @@ export interface Line {
 /**
  * Ce que le sceau prouve, pour la première ligne du verdict (R159, B1) : signé par la clé que l'on croit (`trusted`),
  * signé par la seule clé que le fichier porte, que n'importe qui peut fabriquer (`self`), pas de sceau (`none`), ou un
- * sceau qui ne tient pas (`broken`).
+ * sceau qui ne tient pas (`broken`), ou un sceau que cette plateforme ne sait pas vérifier, faute d'Ed25519 (`unchecked`).
  */
-export type SealState = "trusted" | "self" | "none" | "broken";
+export type SealState = "trusted" | "self" | "none" | "broken" | "unchecked";
 
 export interface Reading {
   lines: Line[];
@@ -195,35 +195,105 @@ async function textMatches(hash: string, entry: unknown): Promise<boolean> {
 const RUNNER_FACTS = "The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer "
   + "where the agent works: they are worth what that computer is worth, whatever the custody of the key.";
 
+/** Les champs de l'en-tête qu'un dossier d'avant la 1.18 peut porter sans que la chaîne les couvre. */
+const HEADER_FIELDS = ["id", "workspace", "project", "issue", "requestedBy", "agent", "rules"];
+
+/** L'en-tête face à la chaîne : les champs qu'elle couvre, ceux qui diffèrent, ceux que le fichier n'a plus, et le reste. */
+export interface HeaderCheck {
+  readonly covered: readonly string[];
+  readonly differs: readonly string[];
+  readonly missing: readonly string[];
+  readonly uncovered: readonly string[];
+}
+
 /**
- * Lit un dossier, ligne à ligne. Une ligne `fail` fait échouer la vérification : la chaîne, l'en-tête, un texte, le
- * paquet, une décision rejugée, le sceau ou le témoin ne tiennent pas. Une ligne `warn` dit ce que le dossier ne prouve
- * pas (un trou, pas de sceau, un sceau que n'importe qui peut faire, une clé sur la machine de l'agent) sans faire
- * échouer. Avec `key`, la clé que l'exploitant publie : un dossier sans sceau, ou scellé par une autre clé, échoue.
+ * Les textes gardés à côté de la chaîne, chacun par son empreinte : ceux qui la tiennent, ceux qui ont changé, ceux que
+ * la chaîne ne nomme pas (ajoutés après coup), et ceux qu'elle nomme sans que le fichier les porte (effacés, ou pas exportés).
  */
-export async function readDossier(file: Obj, options: { key?: string } = {}): Promise<Reading> {
-  const lines: Line[] = [];
-  let sealState: SealState = "none";
+export interface TextsCheck {
+  readonly referenced: number;
+  readonly matches: readonly string[];
+  readonly changed: readonly string[];
+  readonly unnamed: readonly string[];
+  readonly absent: readonly string[];
+}
+
+/** Le paquet de règles : là ou non, son empreinte, et chaque décision rejugée qui ne donne pas la même chose. */
+export interface RulesCheck {
+  readonly present: boolean;
+  readonly digestHolds: boolean;
+  readonly judged: number;
+  readonly differ: ReadonlyArray<{ readonly seq: number; readonly effect: string; readonly rule: string; readonly recorded: string; readonly recordedRule: string }>;
+}
+
+/** Le sceau : ce qu'il prouve, et ce que son énoncé dit de lui. */
+export interface SealCheck {
+  readonly state: SealState;
+  /** Pourquoi il ne tient pas, ou pourquoi la clé donnée ne se lit pas. */
+  readonly reason: string | null;
+  readonly kind: "signature" | "subject" | "head" | "header" | "key" | "unreadableKey" | "noSeal" | "unsupported" | null;
+  readonly seq: number | null;
+  readonly sealedAt: string | null;
+  readonly keyId: string | null;
+  readonly custody: "same-machine" | "separate-machine" | null;
+  readonly kept: boolean | null;
+  /** Les événements venus après le sceau : rien ne les signe. */
+  readonly after: number;
+}
+
+/** Un témoin : écrit ou non, et si la tête qu'il nomme est dans cette chaîne. */
+export interface WitnessCheck {
+  readonly seq: number;
+  readonly written: boolean;
+  readonly holds: boolean;
+  readonly root: string | null;
+  readonly at: number | null;
+  readonly where: string | null;
+  readonly reason: string | null;
+}
+
+/** Ce qu'un dossier dont la chaîne tient prouve, et ne prouve pas, champ par champ ; {@link readDossier} le dit en lignes. */
+export interface DossierCheck {
+  readonly header: HeaderCheck;
+  readonly texts: TextsCheck;
+  readonly rules: RulesCheck;
+  readonly gaps: ReadonlyArray<{ readonly seq: number; readonly text: string }>;
+  /** Le runner a pris la mission : ses faits viennent du poste de l'agent (R159, M5). */
+  readonly runnerFacts: boolean;
+  readonly definitionChanged: ReadonlyArray<{ readonly seq: number; readonly paths: readonly string[] }>;
+  readonly seal: SealCheck;
+  readonly witnesses: readonly WitnessCheck[];
+}
+
+export interface CheckOptions {
+  /** La clé que l'on croit, comme `--key` : un dossier sans sceau, ou scellé par une autre clé, ne tient pas. */
+  readonly key?: string;
+  /**
+   * Les clés qu'une instance de TaskForce dit siennes (sa clé d'aujourd'hui et celles qui ont déjà scellé) : un sceau de
+   * l'une d'elles est de confiance ; sans sceau, rien n'échoue pour autant.
+   */
+  readonly keys?: readonly string[];
+}
+
+/**
+ * Ce que prouve un dossier dont la chaîne tient ({@link chainOf}), sans rien écrire : l'en-tête face à la chaîne, les
+ * textes face à leurs empreintes, le paquet de règles et chaque décision rejugée, les trous, ce que le runner rapporte, le
+ * sceau, le témoin. L'app et le vérificateur du runner lisent tous deux ce résultat : le même moteur, le même verdict.
+ */
+export async function checkDossier(file: Obj, options: CheckOptions = {}): Promise<DossierCheck> {
   const events = file.events as ChainedEvent[];
+  const dataOf = (event: ChainedEvent): Obj | null => (isObj(event.data) ? (event.data as Obj) : null);
 
   // L'en-tête : chaque champ que la chaîne couvre doit être là, et être celui du fichier.
   const mission = isObj(file.mission) ? file.mission : {};
   const { header, covered } = headerOf(events);
+  const differs: string[] = [];
+  const missingFields: string[] = [];
   for (const field of covered) {
-    if (!Object.hasOwn(mission, field)) {
-      lines.push({ level: "fail", text: `The header has no ${field}, which the chain gives: the header was changed after it was written.` });
-      continue;
-    }
-    if (!sameJson(mission[field], header[field])) {
-      lines.push({ level: "fail", text: `The header says ${field} ${JSON.stringify(mission[field])}, the chain says ${JSON.stringify(header[field])}: the header was changed after it was written.` });
-    }
+    if (!Object.hasOwn(mission, field)) missingFields.push(field);
+    else if (!sameJson(mission[field], header[field])) differs.push(field);
   }
-  const uncovered = ["id", "workspace", "project", "issue", "requestedBy", "agent", "rules"].filter((f) => !covered.includes(f) && Object.hasOwn(mission, f));
-  if (covered.length > 0 && uncovered.length > 0) {
-    lines.push({ level: "warn", text: `The chain does not cover ${uncovered.join(", ")} of the header (a mission written before TaskForce 1.18).` });
-  } else if (covered.length > 0 && !lines.some((l) => l.level === "fail")) {
-    lines.push({ level: "ok", text: "The header comes from the chain." });
-  }
+  const uncovered = HEADER_FIELDS.filter((f) => !covered.includes(f) && Object.hasOwn(mission, f));
 
   // Les textes gardés à côté : chacun doit être nommé par la chaîne, et avoir l'empreinte qu'elle porte.
   const texts = isObj(file.texts) ? file.texts : {};
@@ -236,22 +306,15 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     }
   };
   events.forEach((e) => walk(e.data));
-  let badTexts = 0;
+  const matches: string[] = [];
+  const changed: string[] = [];
+  const unnamed: string[] = [];
   for (const [hash, entry] of Object.entries(texts)) {
-    if (!referenced.has(hash)) {
-      badTexts++;
-      lines.push({ level: "fail", text: `A text kept beside the chain is not named by the chain (${shortHash(hash)}): it was added after the record was written.` });
-    } else if (!(await textMatches(hash, entry))) {
-      badTexts++;
-      lines.push({ level: "fail", text: `A text kept beside the chain does not match its digest ${shortHash(hash)}: it was changed.` });
-    }
+    if (!referenced.has(hash)) unnamed.push(hash);
+    else if (await textMatches(hash, entry)) matches.push(hash);
+    else changed.push(hash);
   }
-  const missing = [...referenced].filter((h) => !Object.hasOwn(texts, h)).length;
-  if (referenced.size > 0 && badTexts === 0) {
-    lines.push({ level: missing > 0 ? "info" : "ok", text: missing > 0
-      ? `${referenced.size - missing} of ${referenced.size} texts kept beside the chain match their digest; ${missing} were erased or not exported (the chain keeps their digest).`
-      : `The ${referenced.size} texts kept beside the chain match their digests.` });
-  }
+  const absent = [...referenced].filter((h) => !Object.hasOwn(texts, h));
 
   // Le paquet de règles : son empreinte, puis chaque décision rejugée avec les faits que la chaîne garde. Sans ses membres
   // nuls, comme le runner le lit à la réclamation (verifiedBundle) et comme l'empreinte le lit.
@@ -259,124 +322,231 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     ? (JSON.parse(JSON.stringify(file.rules, (_key, v: unknown) => (v === null ? undefined : v))) as RulesBundle)
     : null;
   const declared = isObj(mission.rules) ? mission.rules.digest : undefined;
-  if (!rules) {
-    lines.push({ level: "warn", text: "The rules bundle is not in this file: a third party cannot judge the decisions again." });
-  } else {
+  let digestHolds = false;
+  let judged = 0;
+  const differ: Array<{ seq: number; effect: string; rule: string; recorded: string; recordedRule: string }> = [];
+  if (rules) {
     let digest: string | null = null;
     try {
       digest = bundleDigest(rules);
     } catch {
       digest = null;
     }
-    if (digest !== rules.digest || (declared !== undefined && digest !== declared)) {
-      lines.push({ level: "fail", text: "The rules bundle in this file is not the one the mission received (its digest does not match)." });
-    } else {
-      let judged = 0;
-      let differ = 0;
+    digestHolds = digest === rules.digest && (declared === undefined || digest === declared);
+    if (digestHolds) {
       for (const event of events) {
-        const data = isObj(event.data) ? (event.data as Obj) : null;
+        const data = dataOf(event);
         if (event.type !== "action.decided" || data?.kind !== "decision" || !Array.isArray(data.facts) || data.facts.length === 0) continue;
         const ruleId = event.actor?.id ?? "none";
         if (RUNNER_GATES.test(ruleId)) continue;
         const decision = decideAll(rules, data.facts as Facts[]);
         judged++;
         if (decision.effect !== data.effect || (decision.rule?.id ?? "none") !== ruleId) {
-          differ++;
-          lines.push({ level: "fail", text: `Event ${event.seq}: the rules give ${decision.effect} (${decision.rule?.id ?? "no rule"}), the record says ${String(data.effect)} (${ruleId}).` });
+          differ.push({ seq: event.seq, effect: decision.effect, rule: decision.rule?.id ?? "no rule", recorded: String(data.effect), recordedRule: ruleId });
         }
-      }
-      if (differ === 0) {
-        lines.push({ level: "ok", text: judged > 0
-          ? `The rules bundle matches its digest, and judging the ${judged} recorded actions again gives the same decisions.`
-          : "The rules bundle matches its digest." });
       }
     }
   }
 
-  // Les trous : un lot du runner perdu en route, ou un runner qui s'est tu.
-  for (const event of events) {
-    const data = isObj(event.data) ? (event.data as Obj) : null;
-    if (event.type === "note" && data?.kind === "gap") lines.push({ level: "warn", text: `Event ${event.seq}: ${String(data.text)}` });
-  }
-
-  // Ce que le runner rapporte vaut ce que vaut le poste de l'agent (R159, M5) ; des tests dont la branche a changé la
-  // définition ne disent que ce que donne la version des tests de l'agent.
-  if (header.runnerFacts === "agent-machine") lines.push({ level: "warn", text: RUNNER_FACTS });
-  for (const event of events) {
-    const data = isObj(event.data) ? (event.data as Obj) : null;
-    if (event.type !== "test.result" || !Array.isArray(data?.definitionChanged) || data.definitionChanged.length === 0) continue;
-    lines.push({ level: "warn", text: `Event ${event.seq}: the branch changed ${data.definitionChanged.map(String).join(", ")}, which defines how its tests run: the tests' result only says that the agent's version of the tests passes.` });
-  }
+  // Les trous, ce que le runner rapporte, et des tests dont la branche a changé la définition (R159, M5).
+  const gaps = events.filter((e) => e.type === "note" && dataOf(e)?.kind === "gap").map((e) => ({ seq: e.seq, text: String(dataOf(e)?.text) }));
+  const definitionChanged = events.flatMap((event) => {
+    const data = dataOf(event);
+    if (event.type !== "test.result" || !Array.isArray(data?.definitionChanged) || data.definitionChanged.length === 0) return [];
+    return [{ seq: event.seq, paths: data.definitionChanged.map(String) }];
+  });
 
   // Le sceau. Sans la clé de l'exploitant, une signature qui tient ne prouve que l'accord entre le fichier et la clé
   // qu'il porte lui-même : n'importe qui peut en faire une (R159, B1).
+  const seal = await sealCheck(file, events, mission, options);
+
+  // Le témoin : la tête écrite là où l'exploitant n'est pas seul à écrire.
+  const witnesses = events.filter((e) => e.type === "note" && dataOf(e)?.kind === "witness").map((witness) => {
+    const data = dataOf(witness) as Obj;
+    const at = typeof data.seq === "number" ? data.seq : null;
+    const written = data.written === true;
+    return {
+      seq: witness.seq,
+      written,
+      holds: written && at !== null && events[at - 1]?.hash === data.root,
+      root: typeof data.root === "string" ? data.root : null,
+      at,
+      where: typeof data.comment === "string" ? data.comment : typeof data.pullRequest === "string" ? data.pullRequest : null,
+      reason: typeof data.reason === "string" ? data.reason : null,
+    };
+  });
+
+  return {
+    header: { covered, differs, missing: missingFields, uncovered },
+    texts: { referenced: referenced.size, matches, changed, unnamed, absent },
+    rules: { present: rules !== null, digestHolds, judged, differ },
+    gaps,
+    runnerFacts: header.runnerFacts === "agent-machine",
+    definitionChanged,
+    seal,
+    witnesses,
+  };
+}
+
+/** Le sceau du fichier, ouvert et comparé à sa chaîne, à son en-tête et aux clés que l'on croit. */
+async function sealCheck(file: Obj, events: readonly ChainedEvent[], mission: Obj, options: CheckOptions): Promise<SealCheck> {
+  const empty = { seq: null, sealedAt: null, keyId: null, custody: null, kept: null, after: 0 } as const;
+  if (file.seal === undefined) {
+    return { ...empty, state: "none", reason: null, kind: options.key !== undefined ? "noSeal" : null };
+  }
+  const seal = await openSeal(file.seal);
+  const statement = seal.statement ?? {};
+  const predicate = isObj(statement.predicate) ? statement.predicate : {};
+  const seq = typeof predicate.seq === "number" ? predicate.seq : -1;
+  const sealed = events[seq - 1];
+  const subject = Array.isArray(statement.subject) && isObj(statement.subject[0]) ? statement.subject[0] : {};
+  const subjectDigest = isObj(subject.digest) ? subject.digest.sha256 : undefined;
+  const key = isObj(predicate.key) ? predicate.key : {};
+  const described = {
+    seq: seq !== -1 ? seq : null,
+    sealedAt: typeof predicate.sealedAt === "string" ? predicate.sealedAt : null,
+    keyId: seal.keyId,
+    custody: key.custody === "separate-machine" ? "separate-machine" as const : key.custody === "same-machine" ? "same-machine" as const : null,
+    kept: typeof key.kept === "boolean" ? key.kept : null,
+    after: seq > 0 && seq < events.length ? events.length - seq : 0,
+  };
+  const broken = (kind: SealCheck["kind"], reason: string): SealCheck => ({ ...described, state: "broken", kind, reason });
+  if (!seal.valid && !(await ed25519Supported())) return { ...described, state: "unchecked", kind: "unsupported", reason: null };
+  if (!seal.valid) return broken("signature", seal.reason ?? "unknown reason");
+  if (typeof predicate.root !== "string" || subjectDigest !== predicate.root.replace(/^sha256:/, "")
+    || subject.name !== `taskforce-mission-${String(mission.id ?? (isObj(predicate.mission) ? predicate.mission.id : ""))}`) {
+    return broken("subject", `${String(subject.name)}, ${shortHash(subjectDigest)} ; ${shortHash(predicate.root)}`);
+  }
+  if (!sealed || sealed.hash !== predicate.root) return broken("head", shortHash(predicate.root));
+  const prefix = headerOf(events.slice(0, seq));
+  const expected: Obj = { ...mission };
+  for (const field of prefix.covered) expected[field] = prefix.header[field];
+  if (!sameJson(predicate.mission, expected)) return broken("header", "the header was changed after it was sealed");
+  if (options.key !== undefined) {
+    const trusted = await trustedKeyId(options.key);
+    if (trusted === null) return { ...described, state: "broken", kind: "unreadableKey", reason: null };
+    if (trusted !== seal.keyId) return { ...described, state: "broken", kind: "key", reason: trusted };
+    return { ...described, state: "trusted", kind: null, reason: null };
+  }
+  const known = await Promise.all((options.keys ?? []).map((k) => trustedKeyId(k)));
+  if (seal.keyId !== null && known.includes(seal.keyId)) return { ...described, state: "trusted", kind: null, reason: null };
+  return { ...described, state: "self", kind: null, reason: null };
+}
+
+/**
+ * Lit un dossier, ligne à ligne, depuis {@link checkDossier}. Une ligne `fail` fait échouer la vérification : la chaîne,
+ * l'en-tête, un texte, le paquet, une décision rejugée, le sceau ou le témoin ne tiennent pas. Une ligne `warn` dit ce
+ * que le dossier ne prouve pas (un trou, pas de sceau, un sceau que n'importe qui peut faire, une clé sur la machine de
+ * l'agent) sans faire échouer. Avec `key`, la clé que l'exploitant publie : un dossier sans sceau, ou scellé par une autre
+ * clé, échoue.
+ */
+export async function readDossier(file: Obj, options: { key?: string } = {}): Promise<Reading> {
+  const check = await checkDossier(file, options);
+  const events = file.events as ChainedEvent[];
+  const mission = isObj(file.mission) ? file.mission : {};
+  const lines: Line[] = [];
+
+  // L'en-tête.
+  const { header } = headerOf(events);
+  const failedHeader = check.header.differs.length > 0 || check.header.missing.length > 0;
+  for (const field of check.header.covered) {
+    if (check.header.missing.includes(field)) {
+      lines.push({ level: "fail", text: `The header has no ${field}, which the chain gives: the header was changed after it was written.` });
+    } else if (check.header.differs.includes(field)) {
+      lines.push({ level: "fail", text: `The header says ${field} ${JSON.stringify(mission[field])}, the chain says ${JSON.stringify(header[field])}: the header was changed after it was written.` });
+    }
+  }
+  if (check.header.covered.length > 0 && check.header.uncovered.length > 0) {
+    lines.push({ level: "warn", text: `The chain does not cover ${check.header.uncovered.join(", ")} of the header (a mission written before TaskForce 1.18).` });
+  } else if (check.header.covered.length > 0 && !failedHeader) {
+    lines.push({ level: "ok", text: "The header comes from the chain." });
+  }
+
+  // Les textes.
+  for (const hash of [...check.texts.unnamed, ...check.texts.changed].sort((a, b) => textOrder(file, a) - textOrder(file, b))) {
+    lines.push(check.texts.unnamed.includes(hash)
+      ? { level: "fail", text: `A text kept beside the chain is not named by the chain (${shortHash(hash)}): it was added after the record was written.` }
+      : { level: "fail", text: `A text kept beside the chain does not match its digest ${shortHash(hash)}: it was changed.` });
+  }
+  const referenced = check.texts.referenced;
+  const missing = check.texts.absent.length;
+  if (referenced > 0 && check.texts.unnamed.length === 0 && check.texts.changed.length === 0) {
+    lines.push({ level: missing > 0 ? "info" : "ok", text: missing > 0
+      ? `${referenced - missing} of ${referenced} texts kept beside the chain match their digest; ${missing} were erased or not exported (the chain keeps their digest).`
+      : `The ${referenced} texts kept beside the chain match their digests.` });
+  }
+
+  // Le paquet de règles.
+  if (!check.rules.present) {
+    lines.push({ level: "warn", text: "The rules bundle is not in this file: a third party cannot judge the decisions again." });
+  } else if (!check.rules.digestHolds) {
+    lines.push({ level: "fail", text: "The rules bundle in this file is not the one the mission received (its digest does not match)." });
+  } else {
+    for (const d of check.rules.differ) {
+      lines.push({ level: "fail", text: `Event ${d.seq}: the rules give ${d.effect} (${d.rule}), the record says ${d.recorded} (${d.recordedRule}).` });
+    }
+    if (check.rules.differ.length === 0) {
+      lines.push({ level: "ok", text: check.rules.judged > 0
+        ? `The rules bundle matches its digest, and judging the ${check.rules.judged} recorded actions again gives the same decisions.`
+        : "The rules bundle matches its digest." });
+    }
+  }
+
+  // Les trous, et ce que le runner rapporte.
+  for (const gap of check.gaps) lines.push({ level: "warn", text: `Event ${gap.seq}: ${gap.text}` });
+  if (check.runnerFacts) lines.push({ level: "warn", text: RUNNER_FACTS });
+  for (const d of check.definitionChanged) {
+    lines.push({ level: "warn", text: `Event ${d.seq}: the branch changed ${d.paths.join(", ")}, which defines how its tests run: the tests' result only says that the agent's version of the tests passes.` });
+  }
+
+  // Le sceau.
+  const s = check.seal;
   if (file.seal === undefined) {
     lines.push(options.key !== undefined
       ? { level: "fail", text: "Not sealed: you gave --key, and this record carries no seal, so nothing shows that this key saw its chain." }
       : { level: "warn", text: "Not sealed: the mission had not ended when this file was exported, or it ended before TaskForce signed its evidence." });
-  } else {
-    sealState = "broken";
-    const seal = await openSeal(file.seal);
-    const statement = seal.statement ?? {};
+  } else if (s.kind === "unsupported") {
+    lines.push({ level: "warn", text: "The seal was not checked: this platform cannot check an Ed25519 signature. Check the file with a recent Node or browser." });
+  } else if (s.state === "broken" && s.kind === "signature") {
+    lines.push({ level: "fail", text: `The seal does not hold: ${s.reason ?? "unknown reason"}.` });
+  } else if (s.state === "broken" && s.kind === "subject") {
+    const statement = (await openSeal(file.seal)).statement ?? {};
     const predicate = isObj(statement.predicate) ? statement.predicate : {};
-    const seq = typeof predicate.seq === "number" ? predicate.seq : -1;
-    const sealed = events[seq - 1];
     const subject = Array.isArray(statement.subject) && isObj(statement.subject[0]) ? statement.subject[0] : {};
     const subjectDigest = isObj(subject.digest) ? subject.digest.sha256 : undefined;
-    if (!seal.valid) {
-      lines.push({ level: "fail", text: `The seal does not hold: ${seal.reason ?? "unknown reason"}.` });
-    } else if (typeof predicate.root !== "string" || subjectDigest !== predicate.root.replace(/^sha256:/, "")
-      || subject.name !== `taskforce-mission-${String(mission.id ?? (isObj(predicate.mission) ? predicate.mission.id : ""))}`) {
-      lines.push({ level: "fail", text: `The seal's subject (${String(subject.name)}, ${shortHash(subjectDigest)}) is not the root it names (${shortHash(predicate.root)}): an in-toto tool and this check would not agree.` });
-    } else if (!sealed || sealed.hash !== predicate.root) {
-      lines.push({ level: "fail", text: `The seal names event ${seq} with ${shortHash(predicate.root)}, which is not in this chain.` });
+    lines.push({ level: "fail", text: `The seal's subject (${String(subject.name)}, ${shortHash(subjectDigest)}) is not the root it names (${shortHash(predicate.root)}): an in-toto tool and this check would not agree.` });
+  } else if (s.state === "broken" && s.kind === "head") {
+    lines.push({ level: "fail", text: `The seal names event ${s.seq ?? -1} with ${s.reason ?? "?"}, which is not in this chain.` });
+  } else if (s.state === "broken" && s.kind === "header") {
+    lines.push({ level: "fail", text: "The seal does not hold the header of this file: the header was changed after it was sealed." });
+  } else {
+    const at = `Sealed at event ${s.seq ?? -1} on ${String(s.sealedAt ?? undefined)}`;
+    if (s.kind === "unreadableKey") {
+      lines.push({ level: "fail", text: "The key given with --key cannot be read (a key id sha256:..., or an Ed25519 public key)." });
+    } else if (s.kind === "key") {
+      lines.push({ level: "fail", text: `The seal was signed by ${String(s.keyId)}, not by the key you trust (${String(s.reason)}).` });
+    } else if (s.state === "trusted") {
+      lines.push({ level: "ok", text: `${at} by the key you trust (${String(s.keyId)}): the signature holds.` });
     } else {
-      const prefix = headerOf(events.slice(0, seq));
-      const expected: Obj = { ...mission };
-      for (const field of prefix.covered) expected[field] = prefix.header[field];
-      if (!sameJson(predicate.mission, expected)) {
-        lines.push({ level: "fail", text: "The seal does not hold the header of this file: the header was changed after it was sealed." });
-      } else {
-        const key = isObj(predicate.key) ? predicate.key : {};
-        const at = `Sealed at event ${seq} on ${String(predicate.sealedAt)}`;
-        if (options.key !== undefined) {
-          const trusted = await trustedKeyId(options.key);
-          if (trusted === null) {
-            lines.push({ level: "fail", text: "The key given with --key cannot be read (a key id sha256:..., or an Ed25519 public key)." });
-          } else if (trusted !== seal.keyId) {
-            lines.push({ level: "fail", text: `The seal was signed by ${String(seal.keyId)}, not by the key you trust (${trusted}).` });
-          } else {
-            sealState = "trusted";
-            lines.push({ level: "ok", text: `${at} by the key you trust (${trusted}): the signature holds.` });
-          }
-        } else {
-          sealState = "self";
-          lines.push({ level: "warn", text: `${at} by the key the file carries (${String(seal.keyId)}): the signature holds, but anyone can make such a seal. Check it against the key the operator publishes: npm run verify -- <file> --key <key id>.` });
-        }
-        if (seq < events.length) lines.push({ level: "warn", text: `Events ${seq + 1} to ${events.length} came after the last seal: they are not signed.` });
-        const custody = CUSTODY[String(key.custody)] ?? CUSTODY["same-machine"];
-        lines.push({ level: key.custody === "separate-machine" ? "info" : "warn", text: `Key custody: ${custody}.` });
-        if (key.kept === false) lines.push({ level: "warn", text: "The key was drawn when the server started and is not kept: the operator cannot publish it." });
-      }
+      lines.push({ level: "warn", text: `${at} by the key the file carries (${String(s.keyId)}): the signature holds, but anyone can make such a seal. Check it against the key the operator publishes: npm run verify -- <file> --key <key id>.` });
     }
+    if (s.after > 0 && s.seq !== null) lines.push({ level: "warn", text: `Events ${s.seq + 1} to ${events.length} came after the last seal: they are not signed.` });
+    const custody = CUSTODY[String(s.custody)] ?? CUSTODY["same-machine"];
+    lines.push({ level: s.custody === "separate-machine" ? "info" : "warn", text: `Key custody: ${custody}.` });
+    if (s.kept === false) lines.push({ level: "warn", text: "The key was drawn when the server started and is not kept: the operator cannot publish it." });
   }
 
-  // Le témoin : la tête écrite là où l'exploitant n'est pas seul à écrire.
-  const witnesses = events.filter((e) => e.type === "note" && isObj(e.data) && (e.data as Obj).kind === "witness");
-  for (const witness of witnesses) {
-    const data = witness.data as Obj;
-    if (data.written !== true) {
-      lines.push({ level: "warn", text: `No witness: ${String(data.reason ?? "it was not written")}.` });
-      continue;
-    }
-    const seq = typeof data.seq === "number" ? data.seq : -1;
-    if (events[seq - 1]?.hash !== data.root) {
-      lines.push({ level: "fail", text: `The witness names event ${seq} with ${shortHash(data.root)}, which is not in this chain.` });
+  // Le témoin.
+  for (const w of check.witnesses) {
+    if (!w.written) {
+      lines.push({ level: "warn", text: `No witness: ${w.reason ?? "it was not written"}.` });
+    } else if (!w.holds) {
+      lines.push({ level: "fail", text: `The witness names event ${w.at ?? -1} with ${shortHash(w.root)}, which is not in this chain.` });
     } else {
-      lines.push({ level: "ok", text: `Witness: the head ${String(data.root)} (event ${seq}) was written on ${String(data.comment ?? data.pullRequest)}. Check that the comment there shows the same digest.` });
+      lines.push({ level: "ok", text: `Witness: the head ${String(w.root)} (event ${w.at ?? -1}) was written on ${String(w.where)}. Check that the comment there shows the same digest.` });
     }
   }
-  if (witnesses.length === 0) {
+  if (check.witnesses.length === 0) {
     const ended = [...events].reverse().find((e) => e.type === "mission.ended");
     const url = ended && isObj(ended.data) ? (ended.data as Obj).resultUrl : null;
     lines.push({ level: typeof url === "string" && /\/pull\/\d+/.test(url) ? "warn" : "info",
@@ -384,7 +554,17 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         ? "No witness was written in the pull request: only the operator holds this chain."
         : "No witness: this mission has no pull request, so only the operator holds this chain." });
   }
-  return { lines, seal: sealState };
+  return { lines, seal: s.kind === "noSeal" || s.kind === "unreadableKey" || s.kind === "key" ? sealStateOf(s) : s.state };
+}
+
+/** Ce que la première ligne dit d'un sceau qui ne tient pas pour la clé donnée. */
+function sealStateOf(s: SealCheck): SealState {
+  return s.kind === "noSeal" ? "none" : "broken";
+}
+
+/** L'ordre d'un texte dans le fichier : les lignes des textes suivent l'ordre où le fichier les range. */
+function textOrder(file: Obj, hash: string): number {
+  return Object.keys(isObj(file.texts) ? file.texts : {}).indexOf(hash);
 }
 
 /** Le dossier est-il bien formé, et sa chaîne tient-elle ? Avant tout le reste. */

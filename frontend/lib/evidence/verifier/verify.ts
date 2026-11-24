@@ -28,6 +28,7 @@ const SEAL_WORDS: Record<SealState, string> = {
   self: "Signed by a key the file carries itself: anyone can make this seal. Check it with --key and the key the operator publishes.",
   none: "Not sealed.",
   broken: "The seal does not hold.",
+  unchecked: "The seal was not checked: this platform has no Ed25519.",
 };
 
 export async function verifyEvidence(text: string, options: VerifyOptions = {}): Promise<Verdict> {
