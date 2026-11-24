@@ -174,7 +174,12 @@ export interface RunnerEvent {
   /** `brief` : le texte entier remis à l'agent. */
   body?: string;
   /** `agent` : ce que l'agent dit de lui-même au démarrage. */
-  agent?: { version?: string; model?: string; session?: string; provider?: string };
+  /**
+   * `agent` : l'agent réellement lancé. `model` : le modèle servi quand les réponses l'ont dit, sinon celui de la
+   * configuration (`configured`) ; `served` : chaque modèle que les réponses ont nommé ; `provider` : lu dans
+   * l'environnement de l'agent (R159, L5).
+   */
+  agent?: { version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string };
   /** `test` : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière gardée sur ce poste. */
   test?: {
     command: string; ran: boolean; passed: boolean; passedCount?: number; total?: number; output?: string; outputBytes?: number;

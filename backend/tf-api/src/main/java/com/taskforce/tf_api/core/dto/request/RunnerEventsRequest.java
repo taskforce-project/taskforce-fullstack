@@ -106,15 +106,24 @@ public record RunnerEventsRequest(
     ) {}
 
     /**
-     * L'agent tel qu'il se présente au démarrage (la première ligne de Claude Code) : sa version, le modèle réellement
-     * lancé, sa session, et le fournisseur du modèle quand on le sait.
+     * L'agent réellement lancé : sa version, sa session, le modèle de la mission (celui que ses réponses ont nommé quand
+     * elles l'ont fait, sinon celui de sa configuration), celui de sa configuration, chaque modèle que ses réponses ont
+     * nommé, et qui sert le modèle, lu dans la configuration du poste (R159, L5).
      */
     public record Agent(
         @Size(max = 80) String version,
         @Size(max = 120) String model,
         @Size(max = 64) String session,
-        @Size(max = 80) String provider
-    ) {}
+        @Size(max = 80) String provider,
+        @Size(max = 120) String configured,
+        @Size(max = 10) List<@Size(max = 120) String> served
+    ) {
+
+        /** L'agent comme le décrit un runner d'avant la relecture R159 : ni modèle de configuration ni modèle servi. */
+        public Agent(String version, String model, String session, String provider) {
+            this(version, model, session, provider, null, null);
+        }
+    }
 
     /**
      * Les tests du projet tels que le runner les a lancés : la commande, lancés ou non, passés ou non, les comptes quand

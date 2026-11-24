@@ -348,6 +348,12 @@ public class MissionEvidenceService {
                 data.put("model", agent == null ? null : blankToNull(agent.model()));
                 data.put("session", agent == null ? null : blankToNull(agent.session()));
                 data.put("provider", agent == null ? null : blankToNull(agent.provider()));
+                // Le modèle de la configuration, et ceux que les réponses ont nommés (R159, L5) ; absents d'un runner plus ancien.
+                if (agent != null && agent.configured() != null) data.put("configured", blankToNull(agent.configured()));
+                if (agent != null && agent.served() != null) {
+                    data.put("served", agent.served().stream().filter(m -> m != null && !m.isBlank())
+                        .map(m -> EvidenceIntake.clip(m.strip(), 120)).toList());
+                }
                 // Anthropic ne donne pas d'empreinte du modèle servi : la version datée du modèle en tient lieu.
                 data.put("fingerprint", null);
                 data.put("text", EvidenceIntake.clip(event.text(), MAX_TEXT));

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import type { Claim } from "./api.js";
+import type { Claim, RunnerEvent } from "./api.js";
 import { ApprovalServer, exactAction, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
@@ -250,6 +250,56 @@ export interface AgentRunOptions {
 /** Le plus long brief que le dossier garde à côté de sa chaîne. */
 const MAX_BRIEF = 200_000;
 
+const truthy = (value: string | undefined): boolean => value !== undefined && /^(1|true|yes|on)$/i.test(value.trim());
+
+/**
+ * Qui sert le modèle, lu dans l'environnement que Claude Code reçoit (R159, L5) : Amazon Bedrock, Google Vertex, une
+ * autre adresse que celle d'Anthropic (une passerelle, un modèle local : son adresse n'entre pas au dossier), ou
+ * Anthropic.
+ */
+export function providerOf(env: NodeJS.ProcessEnv): string {
+  if (truthy(env.CLAUDE_CODE_USE_BEDROCK)) return "amazon-bedrock";
+  if (truthy(env.CLAUDE_CODE_USE_VERTEX)) return "google-vertex";
+  const base = env.ANTHROPIC_BASE_URL?.trim();
+  if (base) {
+    try {
+      if (new URL(base).hostname !== "api.anthropic.com") return "another-endpoint";
+    } catch {
+      return "another-endpoint";
+    }
+  }
+  return "anthropic";
+}
+
+/** Le modèle qui a réellement répondu, tel qu'une réponse de l'agent le nomme ; null pour les autres lignes. */
+export function servedModel(message: unknown): string | null {
+  if (!message || typeof message !== "object") return null;
+  const line = message as { type?: unknown; message?: { model?: unknown } };
+  const model = line.type === "assistant" ? line.message?.model : undefined;
+  return typeof model === "string" && model.trim() && !model.startsWith("<") ? model.trim().slice(0, 120) : null;
+}
+
+/**
+ * Le dernier mot du runner sur l'agent : sa version, le modèle de la configuration, ceux que les réponses ont nommés, le
+ * premier d'entre eux comme modèle de la mission, et qui l'a servi. Le dernier événement `agent` fait l'en-tête du dossier.
+ */
+export function agentEvent(info: { version?: string; model?: string; session?: string }, served: readonly string[],
+  provider: string): RunnerEvent {
+  const model = served[0] ?? info.model;
+  return {
+    kind: "agent",
+    text: `Claude Code ${info.version ?? ""} with ${model ?? "its default model"}`.replace(/\s+/g, " "),
+    agent: {
+      ...(info.version ? { version: info.version } : {}),
+      ...(model ? { model } : {}),
+      ...(info.model ? { configured: info.model } : {}),
+      served: [...served],
+      ...(info.session ? { session: info.session } : {}),
+      provider,
+    },
+  };
+}
+
 /**
  * La session brute de l'agent telle que le runner la lit (sa sortie `stream-json`, ligne à ligne) : gardée sur ce poste,
  * à part, et référencée au dossier par son empreinte (R212). Elle sert à l'enquête, pas à la lecture.
@@ -339,7 +389,11 @@ export async function runAgent(
   // long, il est coupé entre deux caractères, et la coupe se dit (R159, L4).
   relay.push([{ kind: "brief", text: "The brief given to Claude Code", body: cut(prompt, MAX_BRIEF) }]);
   const session = new SessionRecord(opts.sessionFile);
-  let announced = false;
+  // agentEnv ne touche pas à ce qui choisit le fournisseur (Bedrock, Vertex, l'adresse de l'API) : il se lit ici.
+  const provider = providerOf(process.env);
+  // Ce que Claude Code dit de lui au démarrage, et chaque modèle que ses réponses nomment (R159, L5).
+  let started: { version?: string; model?: string; session?: string } | null = null;
+  const served: string[] = [];
 
   /** Un passage de l'agent ; `resume` : la session à continuer. */
   const attempt = async (resume: string | null): Promise<AgentOutcome> => {
@@ -360,13 +414,15 @@ export async function runAgent(
           session.line(line);
           try {
             const message: unknown = JSON.parse(line);
-            // L'agent réellement lancé, tel qu'il se présente : sa version, son modèle, sa session (R198).
+            // L'agent réellement lancé, tel qu'il se présente : sa version, son modèle, sa session (R198) ; puis chaque
+            // modèle qui a réellement répondu.
             const info = agentInfo(message);
             if (info) {
-              relay.push([{ kind: "agent", text: `Claude Code ${info.version ?? ""} with ${info.model ?? "its default model"}`.replace(/\s+/g, " "),
-                agent: { ...info, provider: "anthropic" } }]);
-              announced = true;
+              started = { ...(started ?? {}), ...info };
+              relay.push([agentEvent(started, served, provider)]);
             }
+            const model = servedModel(message);
+            if (model && !served.includes(model)) served.push(model);
             relay.push(toEvents(message, workDir));
             if (watcher.wrote(message)) opts.onWrite?.();
             (conversation as AgentConversation | null)?.heard(message);
@@ -396,7 +452,12 @@ export async function runAgent(
       log.warn("The agent's session is no longer on this computer: it starts again from the comments alone.");
       outcome = await attempt(null);
     }
-    if (!announced) log.warn("Claude Code did not say which model it ran: the evidence will say so.");
+    if (!started && served.length === 0) {
+      log.warn("Claude Code did not say which model it ran: the evidence will say so.");
+    } else {
+      // Le dernier mot sur l'agent : le modèle que ses réponses ont nommé, plus seulement celui de sa configuration.
+      relay.push([agentEvent(started ?? {}, served, provider)]);
+    }
     return { ...outcome, session: { ...(outcome.sessionId ? { id: outcome.sessionId } : {}), ...session.digest() } };
   } finally {
     // La chronologie du runner continue après l'agent (les sorties, les tests) : il la ferme lui-même.

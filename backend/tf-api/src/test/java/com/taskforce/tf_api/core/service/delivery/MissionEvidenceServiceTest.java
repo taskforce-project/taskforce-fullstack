@@ -284,6 +284,20 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
+        @DisplayName("R159, L5 : le modèle configuré et ceux que les réponses ont nommés, à côté du modèle retenu")
+        void the_agent_keeps_the_configured_and_the_served_models() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "amazon-bedrock",
+                    "sonnet", List.of("claude-sonnet-5-20261001", " ", "claude-haiku-5-20261001")), null));
+
+            JsonNode agent = data(0);
+            assertThat(agent.get("provider").asText()).isEqualTo("amazon-bedrock");
+            assertThat(agent.get("configured").asText()).isEqualTo("sonnet");
+            assertThat(agent.get("served")).extracting(JsonNode::asText)
+                .containsExactly("claude-sonnet-5-20261001", "claude-haiku-5-20261001");
+        }
+
+        @Test
         @DisplayName("l'agent réellement lancé : sa version, son modèle, sa session")
         void the_agent_that_ran() throws Exception {
             service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300 with claude-sonnet-5-20261001",
