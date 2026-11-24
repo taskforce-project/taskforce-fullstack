@@ -1,18 +1,37 @@
 import type { MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
 
+import type { RecordCheck } from "./verification-check"
+
 /**
  * La page de vérification d'une mission (R212, séance n°30), assemblée par du code depuis son dossier exporté
  * (`taskforce-evidence/1`), et depuis lui seul : jamais par l'agent, jamais à la main. Sept rubriques : la demande, ce qui
- * a changé, la classe du changement, les vérifications, ce qui n'a pas été vérifié, les décisions, le modèle ; puis ce que
- * vaut le dossier lui-même. Une rubrique que le dossier ne sait pas remplir le dit (`known: false`, un texte « absent »).
- * Le seul texte de l'agent est son résumé, et il est marqué comme tel. Rien ici ne dit qu'un changement est conforme à
- * quoi que ce soit (R187) : la page dit ce qui a été demandé, jugé, vérifié, décidé.
+ * a changé, la classe, les vérifications, ce qui n'a pas été vérifié, les décisions, le modèle ; puis ce que vaut le
+ * dossier lui-même, tel que la page l'a vérifié (`RecordCheck`). Une rubrique que le dossier ne sait pas remplir le dit.
+ * Le seul texte de l'agent montré comme tel est son résumé ; ses autres mots (des noms de fichiers, une commande, une
+ * erreur) se citent, marqués. Rien ici ne dit qu'un changement est conforme à quoi que ce soit (R187).
  */
 
-/** Un texte du dossier, gardé à côté de la chaîne : là, effacé (son empreinte reste), absent de l'export, ou inexistant. */
+/** Une personne telle que le dossier la nomme : par son nom ou son courriel, effacés avec son compte, ou pas du tout. */
+export type Who =
+  | { readonly kind: "named"; readonly name: string }
+  | { readonly kind: "erased" }
+  | { readonly kind: "unnamed" }
+
+/** Qui a effacé un texte, quand, et lequel (le titre de la demande, le brief...). */
+export interface Erasure {
+  readonly who: Who
+  readonly at: string
+  readonly what: string | null
+}
+
+/**
+ * Un texte du dossier, gardé à côté de la chaîne : là, changé depuis (il ne tient plus son empreinte), effacé (son
+ * empreinte reste), absent de ce fichier, ou inexistant.
+ */
 export type DossierText =
   | { readonly state: "text"; readonly text: string }
-  | { readonly state: "erased" }
+  | { readonly state: "changed" }
+  | { readonly state: "erased"; readonly erasure: Erasure | null }
   | { readonly state: "missing" }
   | { readonly state: "none" }
 
@@ -27,28 +46,28 @@ export interface PageRequest {
   readonly title: DossierText
   readonly description: DossierText
   /** Qui a écrit la demande (l'issue), et quand. */
-  readonly writtenBy: string | null
+  readonly writtenBy: Who | null
   readonly writtenAt: string | null
   /** Qui l'a confiée à l'agent, quand, et d'où. */
-  readonly delegatedBy: string | null
+  readonly delegatedBy: Who | null
   readonly delegatedAt: string | null
   readonly origin: string | null
   readonly originRun: number | null
   readonly importedFrom: string | null
   /** La personne qui répond de la mission : elle seule tranche son résultat. */
-  readonly accountable: string | null
+  readonly accountable: Who | null
   /** Le brief tel qu'il est parti à l'agent. */
   readonly brief: { readonly text: DossierText; readonly chars: number | null; readonly sha256: string | null } | null
 }
 
-/** Un fichier de la mission, tel qu'il reste, et l'écriture jugée par les règles qui a laissé ce contenu. */
+/** Un fichier de la mission, tel qu'il reste, nommé par l'agent, et la décision des règles qui a permis son contenu. */
 export interface PageFile {
   readonly path: string
   readonly status: string
   readonly added: number | null
   readonly removed: number | null
   readonly sha256: string | null
-  /** Le rang de la décision des règles dont l'écriture a laissé ce contenu, quand on la retrouve. */
+  /** Le numéro, dans le dossier, de la décision des règles dont l'écriture a laissé ce contenu, quand on la retrouve. */
   readonly writtenAt: number | null
 }
 
@@ -76,16 +95,30 @@ export interface PageRule {
   /** La couche de l'entreprise d'où elle vient ; nulle pour la table de TaskForce. */
   readonly layer: string | null
   /** Qui a écrit sa version : l'auteur de la couche ; pour la table de TaskForce, TaskForce. */
-  readonly author: string | null
-  /** La personne nommée qui répond de la règle. */
+  readonly author: Who | "taskforce" | null
+  /** La personne nommée qui répond de la règle, telle que le paquet la nomme. */
   readonly owner: string | null
   readonly version: number | null
 }
 
-/** 3. La classe du changement : la plus lourde des actions faites, la règle qui l'a donnée, le paquet. */
+/** Une action qu'une règle a jugée, avec ce qu'elle était. */
+export interface PageRuleUse {
+  readonly rule: PageRule
+  /** L'outil ou la commande (`git push`, `gh pr create`, `WebSearch`). */
+  readonly tool: string | null
+  /** Ce que l'agent a demandé, tel qu'il l'a écrit. */
+  readonly what: string | null
+  readonly seq: number
+}
+
+/**
+ * 3. La classe : TaskForce ne calcule pas encore de classe sur le changement lui-même (R210) ; la page nomme les règles qui
+ * ont jugé sa sortie de la copie (la branche poussée, la pull request ouverte), et l'action la plus lourde de la mission,
+ * sous ce nom-là.
+ */
 export interface PageClass {
-  readonly class: ChangeClass | null
-  readonly rule: PageRule | null
+  readonly exits: readonly PageRuleUse[]
+  readonly heaviest: (PageRuleUse & { readonly class: ChangeClass }) | null
   readonly rulesKnown: boolean
   readonly version: number | null
   readonly digest: string | null
@@ -96,11 +129,10 @@ export interface PageClass {
 
 /** Une vérification : ce qui a été vérifié, son résultat, qui ou quoi l'a vérifié, l'empreinte de sa preuve. */
 export interface PageCheck {
-  readonly what: "tests" | "rules" | "checklist"
+  readonly what: "tests" | "rules"
   readonly label: string
-  readonly result: "passed" | "failed" | "done" | "judged"
-  /** `declared` : l'agent le dit, personne ne l'a vérifié (point 8 de la séance n°30). */
-  readonly by: "runner" | "rules" | "person" | "declared"
+  readonly result: "passed" | "failed" | "judged"
+  readonly by: "runner" | "rules"
   readonly proof: string | null
   readonly passedCount: number | null
   readonly total: number | null
@@ -111,14 +143,18 @@ export type NotChecked =
   | { readonly kind: "noTests" }
   | { readonly kind: "testsNotRun"; readonly why: string | null }
   | { readonly kind: "testsFailed" }
+  | { readonly kind: "testsOwnDefinition"; readonly paths: readonly string[] }
   | { readonly kind: "noCode" }
   | { readonly kind: "noTestRecord" }
+  | { readonly kind: "noTestYet" }
   | { readonly kind: "testsStale" }
   | { readonly kind: "declaredByAgent"; readonly items: readonly string[] }
+  | { readonly kind: "doneUnattributed"; readonly items: readonly string[] }
   | { readonly kind: "openItems"; readonly items: readonly string[] }
   | { readonly kind: "summary" }
   | { readonly kind: "noReviewer" }
   | { readonly kind: "ciNotRead" }
+  | { readonly kind: "nothingChecked" }
 
 /** Une décision d'une personne, ou de ce qui en tient lieu (une demande échue, la fusion sur GitHub). */
 export interface PageDecision {
@@ -126,29 +162,40 @@ export interface PageDecision {
   readonly at: string
   readonly kind: "approval" | "signature" | "expired" | "gesture" | "erased"
   readonly decision: string
-  readonly who: string | null
+  readonly who: Who | null
   readonly where: string | null
   readonly reason: string | null
-  /** Pour un accord : ce qui était demandé, la règle, et l'action exacte (l'empreinte de l'entrée, du contenu écrit). */
+  /** Pour un accord : l'outil, ce que l'agent a demandé, la règle, et l'action exacte (l'empreinte de l'entrée, du contenu). */
+  readonly tool: string | null
   readonly action: string | null
-  readonly rule: string | null
+  readonly rule: PageRule | null
+  readonly ruleId: string | null
   readonly input: string | null
   readonly written: string | null
   readonly scope: string | null
+  /** Pour un effacement : ce qui a été effacé. */
+  readonly erased: string | null
 }
 
-/** 7. Le modèle : lequel a réellement tourné, sa version, local ou non. */
+/** 7. Le modèle : lequel a réellement tourné, sa version, et qui le sert, tels que le dossier le dit. */
 export interface PageModel {
   readonly known: boolean
   readonly agent: string | null
   readonly agentVersion: string | null
   readonly chosen: string | null
+  readonly configured: string | null
   readonly model: string | null
+  readonly served: readonly string[]
   readonly provider: string | null
-  /** Vrai : sur la machine ; faux : chez un fournisseur ; nul : on ne sait pas. */
-  readonly local: boolean | null
   readonly fingerprint: string | null
   readonly session: { readonly sha256: string; readonly bytes: number | null } | null
+}
+
+/** Un trou : les numéros du runner qui ne sont jamais arrivés (`to` nul : le runner s'est tu), et où le dossier le note. */
+export interface PageGap {
+  readonly from: number
+  readonly to: number | null
+  readonly noted: number
 }
 
 /** Ce que vaut le dossier lui-même : sa tête, son sceau, la garde de la clé, son témoin, ses trous. */
@@ -166,11 +213,17 @@ export interface PageRecord {
   } | null
   readonly witness: { readonly written: boolean; readonly root: string | null; readonly seq: number | null; readonly url: string | null; readonly reason: string | null } | null
   readonly pullRequest: boolean
-  readonly gaps: ReadonlyArray<{ readonly from: number; readonly to: number }>
+  readonly gaps: readonly PageGap[]
+  /** Le runner a pris la mission : ce qu'il rapporte vient du poste de l'agent (R159 M5 de #551). */
+  readonly runnerFacts: boolean
 }
 
 export interface VerificationPage {
   readonly mission: { readonly id: number | null; readonly workspace: string | null; readonly issue: string | null }
+  /** La mission tourne encore : son dossier n'a pas de `mission.ended`. */
+  readonly running: boolean
+  /** Le dossier est d'avant la 1.18 : la chaîne ne couvre pas son en-tête, et bien des faits n'y sont pas. */
+  readonly older: boolean
   readonly request: PageRequest
   readonly changes: PageChanges
   readonly classOf: PageClass
@@ -181,6 +234,8 @@ export interface VerificationPage {
   readonly end: PageDecision | null
   readonly model: PageModel
   readonly record: PageRecord
+  /** Ce que la page a vérifié du dossier ; nul tant qu'elle vérifie. */
+  readonly check: RecordCheck | null
 }
 
 type Obj = Record<string, unknown>
@@ -196,16 +251,10 @@ const GESTURES = new Set([...END_GESTURES, "ASK_FOR_CHANGES", "REVERT_FILE", "CO
 /** Le dossier exporté tel que la page le lit : les champs de `taskforce-evidence/1`. */
 export type DossierFile = MissionEvidence
 
-/** Le texte d'une référence de la chaîne (`{ sha256, chars }`), pris à côté ; effacé quand la chaîne le dit. */
-function textOf(ref: unknown, texts: Record<string, string>, erased: ReadonlySet<string>): DossierText {
-  if (!isObj(ref) || typeof ref.sha256 !== "string") return { state: "none" }
-  const text = texts[ref.sha256]
-  if (typeof text === "string") return { state: "text", text }
-  return erased.has(ref.sha256) ? { state: "erased" } : { state: "missing" }
-}
-
-function classOf(value: unknown): ChangeClass | null {
-  return typeof value === "string" && (CLASSES as readonly string[]).includes(value) ? (value as ChangeClass) : null
+/** Ce que l'export garde d'un texte : `{ salt, text }` depuis la relecture R159 (M6), une chaîne avant. */
+function keptText(entry: unknown): string | null {
+  if (typeof entry === "string") return entry
+  return isObj(entry) && typeof entry.text === "string" ? entry.text : null
 }
 
 /** Le paquet de règles du dossier, par identifiant. */
@@ -216,7 +265,11 @@ function rulesById(rules: Obj | undefined): Map<string, Obj> {
   return out
 }
 
-/** Le contenu du statement du sceau (une enveloppe DSSE), sans vérifier la signature : le vérificateur du runner le fait. */
+function classOf(value: unknown): ChangeClass | null {
+  return typeof value === "string" && (CLASSES as readonly string[]).includes(value) ? (value as ChangeClass) : null
+}
+
+/** Le contenu de l'énoncé du sceau (une enveloppe DSSE) ; sa signature, la page la vérifie à part (`RecordCheck`). */
 function sealStatement(seal: Obj | undefined): Obj | null {
   if (!seal || typeof seal.payload !== "string") return null
   try {
@@ -229,21 +282,53 @@ function sealStatement(seal: Obj | undefined): Obj | null {
   }
 }
 
-/** Assemble la page depuis le dossier exporté, et lui seul. */
-export function verificationPage(file: DossierFile): VerificationPage {
+/** Assemble la page depuis le dossier exporté, et lui seul, avec ce que la page en a vérifié quand elle l'a fait. */
+export function verificationPage(file: DossierFile, check: RecordCheck | null = null): VerificationPage {
   const events = file.events ?? []
-  const texts = file.texts ?? {}
-  const erased = new Set<string>()
-  for (const e of events) {
-    const d = data(e)
-    if (e.type === "human.decision" && d.kind === "erased" && typeof d.text === "string") erased.add(d.text)
-  }
+  const texts: Record<string, unknown> = isObj(file.texts) ? file.texts : {}
+  const changedTexts = new Set(check?.details?.texts.changed ?? [])
   const started = events.find((e) => e.type === "mission.started")
   const s = started ? data(started) : {}
   const notes = (kind: string) => events.filter((e) => e.type === "note" && data(e).kind === kind)
   const ended = [...events].reverse().find((e) => e.type === "mission.ended")
   const end = ended ? data(ended) : {}
   const header = isObj(file.mission) ? file.mission : {}
+
+  // Les personnes : l'identifiant opaque de la chaîne, et ce que leur note dit d'elles (R159 M6 de #551) ; un dossier d'avant
+  // la relecture les nomme par leur courriel.
+  const persons = new Map<string, { name: unknown; email: unknown }>()
+  for (const e of notes("person")) {
+    const d = data(e)
+    if (typeof d.person === "string") persons.set(d.person, { name: d.name, email: d.email })
+  }
+  const refText = (ref: unknown): string | null => (isObj(ref) && typeof ref.sha256 === "string" && !changedTexts.has(ref.sha256)
+    ? keptText(texts[ref.sha256]) : null)
+  const who = (id: unknown): Who | null => {
+    if (typeof id !== "string" || id.length === 0) return null
+    if (!id.startsWith("person:")) return id === "unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
+    const person = persons.get(id)
+    if (!person) return { kind: "unnamed" }
+    const name = refText(person.name) ?? refText(person.email)
+    return name ? { kind: "named", name } : { kind: "erased" }
+  }
+  const actor = (e: MissionEvidenceEvent): Who | null => (e.actor.kind === "person" ? who(e.actor.id) : null)
+
+  // Les effacements : qui, quand, et quel texte.
+  const erasures = new Map<string, Erasure>()
+  for (const e of events) {
+    const d = data(e)
+    if (e.type === "human.decision" && d.kind === "erased" && typeof d.text === "string") {
+      erasures.set(d.text, { who: actor(e) ?? { kind: "unnamed" }, at: e.at, what: str(d.what) })
+    }
+  }
+  const textOf = (ref: unknown): DossierText => {
+    if (!isObj(ref) || typeof ref.sha256 !== "string") return { state: "none" }
+    if (changedTexts.has(ref.sha256)) return { state: "changed" }
+    const text = keptText(texts[ref.sha256])
+    if (text !== null) return { state: "text", text }
+    const erasure = erasures.get(ref.sha256)
+    return erasure ? { state: "erased", erasure } : { state: "missing" }
+  }
 
   // 1. La demande.
   const request = isObj(s.request) ? s.request : null
@@ -253,22 +338,20 @@ export function verificationPage(file: DossierFile): VerificationPage {
   const pageRequest: PageRequest = {
     known: request !== null,
     issue: str(s.issue) ?? str(header.issue),
-    title: request ? textOf(request.title, texts, erased) : { state: "none" },
-    description: request ? textOf(request.description, texts, erased) : { state: "none" },
-    writtenBy: request ? str(request.reporter) : null,
+    title: request ? textOf(request.title) : { state: "none" },
+    description: request ? textOf(request.description) : { state: "none" },
+    writtenBy: request ? who(request.reporter) : null,
     writtenAt: request ? str(request.createdAt) : null,
-    delegatedBy: str(s.requestedBy) ?? str(header.requestedBy),
+    delegatedBy: who(s.requestedBy) ?? who(header.requestedBy),
     delegatedAt: str(s.delegatedAt) ?? started?.at ?? null,
     origin: str(origin.channel),
     originRun: num(origin.run),
     importedFrom: request ? str(request.importedFrom) : null,
-    accountable: str(s.accountable),
-    brief: isObj(brief)
-      ? { text: textOf(brief, texts, erased), chars: num(brief.chars), sha256: str(brief.sha256) }
-      : null,
+    accountable: who(s.accountable),
+    brief: isObj(brief) ? { text: textOf(brief), chars: num(brief.chars), sha256: str(brief.sha256) } : null,
   }
 
-  // 2. Ce qui a changé, et l'écriture jugée par les règles qui a laissé chaque contenu.
+  // 2. Ce qui a changé, et la décision des règles qui a permis chaque contenu.
   const writes = new Map<string, number>()
   for (const e of events) {
     const d = data(e)
@@ -290,11 +373,11 @@ export function verificationPage(file: DossierFile): VerificationPage {
     writtenAt: typeof f.sha256 === "string" ? (writes.get(f.sha256) ?? null) : null,
   })) : []
   const resultUrl = str(end.resultUrl)
-  const pullRequest = resultUrl && /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/.test(resultUrl) ? resultUrl : null
+  const pullRequest = resultUrl && /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/\d+$/.test(resultUrl) ? resultUrl : null
   const changes: PageChanges = {
     status: str(end.status),
     error: str(end.error),
-    summary: textOf(end.summary, texts, erased),
+    summary: textOf(end.summary),
     known: snapshot !== undefined,
     files,
     more: num(snap.more) ?? 0,
@@ -306,11 +389,12 @@ export function verificationPage(file: DossierFile): VerificationPage {
     pullRequest,
   }
 
-  // 3. La classe du changement : la plus lourde des actions qui ont eu lieu, et la règle qui l'a donnée.
+  // 3. Les règles : celles qui ont jugé la sortie du changement, et l'action la plus lourde de la mission.
   const bundle = rulesById(file.rules)
   const rulesStarted = isObj(s.rules) ? s.rules : {}
   const layers = Array.isArray(rulesStarted.layers) ? rulesStarted.layers.filter(isObj) : []
-  const ruleOf = (id: string): PageRule | null => {
+  const ruleOf = (id: string | null): PageRule | null => {
+    if (!id) return null
     const rule = bundle.get(id)
     if (!rule) return null
     const layer = str(rule.layer)
@@ -320,7 +404,7 @@ export function verificationPage(file: DossierFile): VerificationPage {
       class: classOf(rule.class),
       reason: str(rule.text) ?? str(rule.reason),
       layer,
-      author: layer ? (ofLayer ? str(ofLayer.author) : null) : "TaskForce",
+      author: layer ? (ofLayer ? who(ofLayer.author) : null) : "taskforce",
       owner: str(rule.owner),
       version: layer ? (ofLayer ? num(ofLayer.version) : null) : num(rulesStarted.version),
     }
@@ -330,15 +414,16 @@ export function verificationPage(file: DossierFile): VerificationPage {
     const d = data(e)
     if (e.type === "human.decision" && d.decision === "ALLOWED" && typeof d.rule === "string") approved.add(d.rule)
   }
-  const top: { value: { class: ChangeClass; rule: string } | null } = { value: null }
+  // Une boîte : TypeScript ne suit pas une affectation faite dans une fonction.
+  const top: { value: (PageRuleUse & { class: ChangeClass }) | null } = { value: null }
+  const exits: PageRuleUse[] = []
   let judged = 0
   let asked = 0
   let refused = 0
-  const weigh = (ruleId: string | null): void => {
-    const rule = ruleId ? bundle.get(ruleId) : undefined
-    const c = classOf(rule?.class)
-    if (!c || !ruleId) return
-    if (!top.value || CLASSES.indexOf(c) > CLASSES.indexOf(top.value.class)) top.value = { class: c, rule: ruleId }
+  const weigh = (ruleId: string | null, tool: string | null, what: string | null, seq: number): void => {
+    const rule = ruleOf(ruleId)
+    if (!rule?.class) return
+    if (!top.value || CLASSES.indexOf(rule.class) > CLASSES.indexOf(top.value.class)) top.value = { rule, class: rule.class, tool, what, seq }
   }
   for (const e of events) {
     const d = data(e)
@@ -346,15 +431,24 @@ export function verificationPage(file: DossierFile): VerificationPage {
       judged++
       if (d.effect === "ask") asked++
       if (d.effect === "deny") refused++
-      if (d.effect === "allow" && e.actor.kind === "rule") weigh(e.actor.id)
-      if (d.effect === "ask" && e.actor.kind === "rule" && approved.has(e.actor.id)) weigh(e.actor.id)
+      const facts = Array.isArray(d.facts) && isObj(d.facts[0]) ? d.facts[0] : {}
+      const what = str(d.text) ?? str(facts.query) ?? str(facts.path) ?? str(facts.command)
+      if (d.effect === "allow" && e.actor.kind === "rule") weigh(e.actor.id, str(d.tool), what, e.seq)
+      if (d.effect === "ask" && e.actor.kind === "rule" && approved.has(e.actor.id)) weigh(e.actor.id, str(d.tool), what, e.seq)
     }
-    if (e.type === "exit.result" && d.effect === "allow") weigh(str(d.rule))
+    if (e.type === "exit.result") {
+      judged++
+      if (d.effect === "deny") refused++
+      if (d.effect === "allow") {
+        const rule = ruleOf(str(d.rule))
+        if (rule) exits.push({ rule, tool: str(d.tool), what: null, seq: e.seq })
+        weigh(str(d.rule), str(d.tool), null, e.seq)
+      }
+    }
   }
-  const heaviestRule = top.value
   const pageClass: PageClass = {
-    class: heaviestRule ? heaviestRule.class : null,
-    rule: heaviestRule ? ruleOf(heaviestRule.rule) : null,
+    exits,
+    heaviest: top.value,
     rulesKnown: bundle.size > 0,
     version: num(rulesStarted.version) ?? (isObj(header.rules) ? num(header.rules.version) : null),
     digest: str(rulesStarted.digest) ?? (isObj(header.rules) ? str(header.rules.digest) : null),
@@ -362,6 +456,7 @@ export function verificationPage(file: DossierFile): VerificationPage {
   }
 
   // 4. Les vérifications, et 5. ce qui ne l'a pas été.
+  const running = started !== undefined && ended === undefined
   const checks: PageCheck[] = []
   const notChecked: NotChecked[] = []
   const tests = events.filter((e) => e.type === "test.result")
@@ -373,20 +468,31 @@ export function verificationPage(file: DossierFile): VerificationPage {
     notChecked.push({ kind: "testsNotRun", why: str(t.text) })
   } else if (t) {
     const output = isObj(t.output) ? t.output : null
-    checks.push({ what: "tests", label: str(t.command) ?? str(t.tool) ?? "tests", result: t.passed === true ? "passed" : "failed",
-      by: "runner", proof: output ? str(output.sha256) : null, passedCount: num(t.passedCount), total: num(t.total) })
+    const ownDefinition = Array.isArray(t.definitionChanged) ? t.definitionChanged.filter((p): p is string => typeof p === "string") : []
+    if (ownDefinition.length > 0) {
+      // La branche a changé ce qui dit comment ses tests tournent : leur résultat ne compte pas comme une vérification.
+      notChecked.push({ kind: "testsOwnDefinition", paths: ownDefinition })
+    } else {
+      checks.push({ what: "tests", label: str(t.command) ?? str(t.tool) ?? "tests", result: t.passed === true ? "passed" : "failed",
+        by: "runner", proof: output ? str(output.sha256) : null, passedCount: num(t.passedCount), total: num(t.total) })
+    }
     if (t.passed !== true) notChecked.push({ kind: "testsFailed" })
     const reverted = lastTest ? events.some((e) => e.seq > lastTest.seq && e.type === "action.result" && data(e).kind === "revert"
       && data(e).ok === true) : false
     if (reverted) notChecked.push({ kind: "testsStale" })
+  } else if (running) {
+    notChecked.push({ kind: "noTestYet" })
   } else if (changes.commits === null || changes.commits === 0) {
     if (changes.status === "DONE") notChecked.push({ kind: "noCode" })
+    else notChecked.push({ kind: "noTestRecord" })
   } else {
     notChecked.push({ kind: "noTestRecord" })
   }
   if (judged > 0) {
     checks.push({ what: "rules", label: "rules", result: "judged", by: "rules", proof: pageClass.digest, passedCount: null, total: judged })
   }
+  // La liste de l'issue : ce que l'agent de cette mission a coché est sa déclaration ; ce qui était coché sans que le dossier
+  // dise par qui (avant la mission, par un essai précédent, à la main) ne compte pas pour elle (R211, R159 P3).
   const declared = new Map<number, boolean>()
   for (const e of notes("checklist.checked")) {
     const d = data(e)
@@ -395,23 +501,24 @@ export function verificationPage(file: DossierFile): VerificationPage {
   const listNote = notes("checklist").at(-1)
   const items = listNote && Array.isArray(data(listNote).items) ? (data(listNote).items as unknown[]).filter(isObj) : []
   const byAgent: string[] = []
+  const unattributed: string[] = []
   const open: string[] = []
   for (const item of items) {
-    const text = textOf(item.text, texts, erased)
+    const text = textOf(item.text)
     const label = text.state === "text" ? text.text : `#${String(item.id)}`
     if (item.done !== true) open.push(label)
-    else if (typeof item.id === "number" && declared.get(item.id) === true) {
-      byAgent.push(label)
-      checks.push({ what: "checklist", label, result: "done", by: "declared", proof: null, passedCount: null, total: null })
-    } else {
-      checks.push({ what: "checklist", label, result: "done", by: "person", proof: null, passedCount: null, total: null })
-    }
+    else if (typeof item.id === "number" && declared.get(item.id) === true) byAgent.push(label)
+    else unattributed.push(label)
   }
   if (byAgent.length > 0) notChecked.push({ kind: "declaredByAgent", items: byAgent })
+  if (unattributed.length > 0) notChecked.push({ kind: "doneUnattributed", items: unattributed })
   if (open.length > 0) notChecked.push({ kind: "openItems", items: open })
   if (changes.summary.state !== "none") notChecked.push({ kind: "summary" })
   if (changes.commits !== null && changes.commits > 0) notChecked.push({ kind: "noReviewer" })
   if (pullRequest) notChecked.push({ kind: "ciNotRead" })
+  if (checks.length === 0 && !notChecked.some((n) => n.kind === "noTestRecord" || n.kind === "noTestYet")) {
+    notChecked.push({ kind: "nothingChecked" })
+  }
 
   // 6. Les décisions : chaque accord sur l'action exacte, chaque geste, la décision de fin.
   const asks = new Map<number, Obj>()
@@ -424,10 +531,11 @@ export function verificationPage(file: DossierFile): VerificationPage {
     const d = data(e)
     const ask = typeof d.approval === "number" ? asks.get(d.approval) : undefined
     const writtenRef = ask && isObj(ask.written) ? str(ask.written.sha256) : null
+    const ruleId = str(d.rule) ?? str(ask?.rule)
     const base = {
-      seq: e.seq, at: e.at, who: e.actor.kind === "person" ? e.actor.id : null, reason: str(d.reason),
-      action: str(d.summary) ?? str(ask?.summary), rule: str(d.rule) ?? str(ask?.rule), input: str(ask?.input),
-      written: writtenRef, scope: str(d.scope), where: str(d.where),
+      seq: e.seq, at: e.at, who: actor(e), reason: str(d.reason), tool: str(d.tool) ?? str(ask?.tool),
+      action: str(d.summary) ?? str(ask?.summary), rule: ruleOf(ruleId), ruleId, input: str(ask?.input),
+      written: writtenRef, scope: str(d.scope), where: str(d.where), erased: null,
     }
     if (e.type === "human.decision" && typeof d.approval === "number") {
       decisions.push({ ...base, kind: d.decision === "SIGNED" ? "signature" : "approval", decision: String(d.decision ?? ""),
@@ -435,11 +543,12 @@ export function verificationPage(file: DossierFile): VerificationPage {
     } else if (e.type === "action.decided" && typeof d.approval === "number" && d.effect === "deny" && e.actor.kind === "server") {
       decisions.push({ ...base, kind: "expired", decision: "EXPIRED", who: null, where: "taskforce" })
     } else if (e.type === "human.decision" && typeof d.decision === "string" && GESTURES.has(d.decision)) {
-      decisions.push({ ...base, kind: "gesture", decision: d.decision, action: str(d.pullRequest) ?? str(d.path), rule: null,
-        input: null, written: null, scope: null })
+      const merger = d.decision === "MERGE" ? (refText(d.by) ?? str(d.by)) : null
+      decisions.push({ ...base, kind: "gesture", decision: d.decision, action: str(d.pullRequest) ?? str(d.path),
+        who: merger ? { kind: "named", name: merger } : base.who, rule: null, ruleId: null, input: null, written: null, scope: null })
     } else if (e.type === "human.decision" && d.kind === "erased") {
-      decisions.push({ ...base, kind: "erased", decision: "ERASED", action: str(d.what), rule: null, input: null, written: null,
-        scope: null, where: "taskforce" })
+      decisions.push({ ...base, kind: "erased", decision: "ERASED", erased: str(d.what), action: null, rule: null, ruleId: null,
+        input: null, written: null, scope: null, where: "taskforce" })
     }
   }
   const final = [...decisions].reverse().find((d) => d.kind === "gesture" && END_GESTURES.has(d.decision)) ?? null
@@ -448,7 +557,6 @@ export function verificationPage(file: DossierFile): VerificationPage {
   const agentNote = notes("agent").at(-1)
   const a = agentNote ? data(agentNote) : {}
   const sAgent = isObj(s.agent) ? s.agent : {}
-  const provider = str(a.provider)
   const session = isObj(runner.session) && typeof runner.session.sha256 === "string"
     ? { sha256: runner.session.sha256, bytes: num(runner.session.bytes) } : null
   const model: PageModel = {
@@ -456,9 +564,10 @@ export function verificationPage(file: DossierFile): VerificationPage {
     agent: str(sAgent.kind) ?? (isObj(header.agent) ? str(header.agent.kind) : null),
     agentVersion: str(a.version),
     chosen: str(sAgent.model),
+    configured: str(a.configured),
     model: str(a.model),
-    provider,
-    local: provider === "anthropic" || provider === "openai" ? false : provider === "ollama" ? true : null,
+    served: Array.isArray(a.served) ? a.served.filter((m): m is string => typeof m === "string" && m.length > 0) : [],
+    provider: str(a.provider),
     fingerprint: str(a.fingerprint),
     session,
   }
@@ -469,10 +578,11 @@ export function verificationPage(file: DossierFile): VerificationPage {
   const witnessNote = notes("witness").at(-1)
   const w = witnessNote ? data(witnessNote) : null
   const seq = predicate ? num(predicate.seq) : null
+  const headerFromChain = typeof s.mission === "number" && typeof s.workspace === "string"
   const record: PageRecord = {
     events: events.length,
     root: file.root,
-    headerFromChain: typeof s.mission === "number" && typeof s.workspace === "string",
+    headerFromChain,
     seal: predicate && seq !== null ? {
       seq,
       sealedAt: str(predicate.sealedAt),
@@ -484,11 +594,14 @@ export function verificationPage(file: DossierFile): VerificationPage {
     witness: w ? { written: w.written === true, root: str(w.root), seq: num(w.seq), url: str(w.comment) ?? str(w.pullRequest),
       reason: str(w.reason) } : null,
     pullRequest: pullRequest !== null,
-    gaps: notes("gap").map((e) => ({ from: num(data(e).from) ?? 0, to: num(data(e).to) ?? 0 })),
+    gaps: notes("gap").map((e) => ({ from: num(data(e).from) ?? 0, to: num(data(e).to), noted: e.seq })),
+    runnerFacts: s.runnerFacts === "agent-machine",
   }
 
   return {
     mission: { id: num(s.mission) ?? num(header.id), workspace: str(s.workspace) ?? str(header.workspace), issue: pageRequest.issue },
+    running,
+    older: started !== undefined && !headerFromChain,
     request: pageRequest,
     changes,
     classOf: pageClass,
@@ -498,5 +611,6 @@ export function verificationPage(file: DossierFile): VerificationPage {
     end: final,
     model,
     record,
+    check,
   }
 }

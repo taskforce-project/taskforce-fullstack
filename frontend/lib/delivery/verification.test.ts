@@ -1,176 +1,296 @@
-import { readFileSync } from "node:fs"
-import path from "node:path"
-
 import { describe, expect, it } from "vitest"
 
-import type { MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
-import { verificationPage, type DossierFile } from "./verification"
-import { short, verificationSections, when } from "./verification-words"
+import { brokenChain, chained, example, exampleKey, inheritedTicks, olderFailed, running, tamperedTitle } from "./__tests__/records"
+import { verificationPage } from "./verification"
+import { checkRecord } from "./verification-check"
+import {
+  inlineParts, linkable, pageTitle, short, summaryBlocks, summarySentence, verdictLines, verificationSections, when, whoWords,
+  type Section,
+} from "./verification-words"
 
 /**
- * La page de vérification (R212), remplie depuis le dossier seul : l'exemple de contracts/evidence est l'export d'une
- * mission entière, écrit et scellé par le serveur. Rien d'autre n'entre dans la page.
+ * La page de vérification (R212), remplie depuis le dossier seul, et vérifiée avant d'en rien dire : l'exemple de
+ * contracts/evidence est l'export d'une mission entière, écrit et scellé par le serveur ; les dossiers d'état de la revue
+ * des écrans (R161) en sont tirés. Chaque essai part d'une sonde ou d'une capture des relectures R159 et R161 de #552.
  */
-const EXAMPLE = path.resolve(__dirname, "../../../contracts/evidence/example-mission.json")
-const example = (): DossierFile => JSON.parse(readFileSync(EXAMPLE, "utf8")) as DossierFile
 const t = CONSTANTS_EN.verification
-
-/** Un dossier minimal, écrit ici, pour ce que l'exemple ne montre pas. */
-function dossier(events: Array<Partial<MissionEvidenceEvent> & { type: string; data: Record<string, unknown> }>,
-                 extra: Partial<MissionEvidence> = {}): DossierFile {
-  return {
-    format: "taskforce-evidence/1",
-    root: `sha256:${"0".repeat(64)}`,
-    events: events.map((e, i) => ({ seq: i + 1, at: "2026-11-22T08:00:00.000Z", actor: { kind: "server", id: "taskforce" },
-      prev: "", hash: `sha256:${String(i).padStart(64, "0")}`, ...e })),
-    ...extra,
-  }
-}
+const context = { runId: 42, desktop: false }
+const at = () => new Date("2026-11-24T09:00:00.000Z")
+const texts = (sections: Section[], id: string) => sections.find((s) => s.id === id)?.lines.map((l) => l.text) ?? []
+const all = (sections: Section[]) => sections.flatMap((s) => s.lines.flatMap((l) => [l.text, ...(l.list?.lines.map((x) => x.text) ?? [])]))
 
 describe("la page, depuis l'exemple d'une mission entière", () => {
   const page = verificationPage(example())
 
-  it("1. la demande : le titre et la description pris à côté de la chaîne, qui l'a écrite, qui l'a confiée, qui en répond", () => {
+  it("1. la demande : le titre pris à côté de la chaîne, les personnes par leur nom, jamais par leur identifiant", () => {
     expect(page.request.known).toBe(true)
     expect(page.request.issue).toBe("WEB-48")
     expect(page.request.title).toEqual({ state: "text", text: "Fix the footer links" })
-    expect(page.request.description.state).toBe("text")
-    expect(page.request.writtenBy).toBe("grace@example.com")
-    expect(page.request.delegatedBy).toBe("ada@example.com")
-    expect(page.request.accountable).toBe("ada@example.com")
-    expect(page.request.origin).toBe("app")
-    expect(page.request.brief?.text.state).toBe("text")
-    expect(page.request.brief?.sha256).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(page.request.writtenBy).toEqual({ kind: "named", name: "Grace" })
+    expect(page.request.delegatedBy).toEqual({ kind: "named", name: "Ada" })
+    expect(page.request.accountable).toEqual({ kind: "named", name: "Ada" })
+    expect(JSON.stringify(verificationSections(page, t, context))).not.toMatch(/person:[0-9a-f]{32}/)
   })
 
-  it("2. ce qui a changé : le résumé de l'agent, les fichiers, et l'écriture jugée qui a laissé chaque contenu", () => {
-    expect(page.changes.status).toBe("DONE")
-    expect(page.changes.summary.state).toBe("text")
-    expect(page.changes.files).toHaveLength(1)
+  it("2. ce qui a changé : les fichiers tels que l'agent les a nommés, et la décision qui a permis leur contenu", () => {
     expect(page.changes.files[0]?.path).toBe("src/components/footer.tsx")
     expect(page.changes.files[0]?.writtenAt).toBeGreaterThan(0)
-    expect(page.changes.pullRequest).toBe("https://github.com/acme/website/pull/212")
-    expect(page.changes.head).toMatch(/^[0-9a-f]{40}$/)
+    const changed = verificationSections(page, t, context).find((s) => s.id === "changed")
+    expect(changed?.lines[0]?.text).toContain("as the agent wrote it")
+    expect(changed?.lines[0]?.list?.lines[0]?.text).toMatch(/^“src\/components\/footer\.tsx” \(modified, \+3 −3\); its content is the one the rules allowed at event \d+$/)
   })
 
-  it("3. la classe : la plus lourde des actions faites, la règle qui l'a donnée, sa version, qui l'a écrite", () => {
-    expect(page.classOf.class).toBe("irreversible")
-    expect(page.classOf.rule?.id).toBe("search-web")
-    expect(page.classOf.rule?.author).toBe("TaskForce")
-    expect(page.classOf.rule?.owner).toBe("ada@example.com")
-    expect(page.classOf.rulesKnown).toBe(true)
-    expect(page.classOf.judged).toBeGreaterThan(0)
-    expect(page.classOf.asked).toBe(1)
+  it("3. R161 B2 : la classe du changement n'est pas celle d'une recherche web ; les règles de sa sortie sont nommées", () => {
+    expect(page.classOf.exits.map((e) => e.rule.id)).toEqual(["push-agent-branch-private", "open-pull-request"])
+    expect(page.classOf.heaviest?.rule.id).toBe("search-web")
+    // La lecture, l'écriture et la recherche, puis les deux sorties : la demande posée par le serveur n'est pas un jugement de plus.
+    expect(page.classOf.judged).toBe(page.classOf.exits.length + 3)
+    const lines = texts(verificationSections(page, t, context), "classification")
+    expect(lines[0]).toBe(t.classification.notComputed)
+    expect(lines.some((l) => l.startsWith("The branch was pushed under the rule"))).toBe(true)
+    expect(lines.some((l) => l.startsWith("The pull request was opened under the rule"))).toBe(true)
+    expect(lines.some((l) => l.startsWith("Heaviest action of the mission: WebSearch “docs.example.com footer links”"))).toBe(true)
+    expect(lines.join(" ")).not.toMatch(/Class of the change/)
   })
 
-  it("4 et 5. les vérifications, et ce qui ne l'a pas été : le runner a testé, l'agent a déclaré, une ligne reste ouverte", () => {
-    const tests = page.checks.find((c) => c.what === "tests")
-    expect(tests).toMatchObject({ result: "passed", by: "runner", passedCount: 48, total: 48 })
-    expect(tests?.proof).toMatch(/^sha256:/)
-    expect(page.checks.find((c) => c.what === "checklist")?.by).toBe("declared")
-    const kinds = page.notChecked.map((n) => n.kind)
-    expect(kinds).toEqual(expect.arrayContaining(["declaredByAgent", "openItems", "summary", "noReviewer", "ciNotRead"]))
+  it("4 et 5. R161 M9, R159 P3 : sous les vérifications, le runner et les règles seuls ; la coche de l'agent est une déclaration", () => {
+    expect(page.checks.map((c) => c.what)).toEqual(["tests", "rules"])
+    expect(page.checks[0]).toMatchObject({ result: "passed", by: "runner", passedCount: 48, total: 48 })
+    expect(page.notChecked.map((n) => n.kind)).toEqual(expect.arrayContaining(["declaredByAgent", "openItems", "summary", "noReviewer", "ciNotRead"]))
+    const sections = verificationSections(page, t, context)
+    expect(all(sections).some((l) => l.startsWith("Checked off"))).toBe(false)
+    expect(texts(sections, "checks")).toContain(t.checks.byRunner)
   })
 
-  it("6. les décisions : l'accord sur l'action exacte, avec sa raison, puis la décision de fin, qui, où", () => {
+  it("6. R161 F3 : un accord se lit avec son objet ; la règle par sa phrase, son identifiant ensuite", () => {
     const approval = page.decisions.find((d) => d.kind === "approval")
-    expect(approval).toMatchObject({ decision: "ALLOWED", who: "ada@example.com", rule: "search-web", scope: "ONCE" })
-    expect(approval?.input).toMatch(/^sha256:/)
-    expect(approval?.reason).toContain("public docs site")
-    expect(page.end).toMatchObject({ decision: "APPLY", who: "ada@example.com", where: "taskforce" })
+    expect(approval).toMatchObject({ decision: "ALLOWED", who: { kind: "named", name: "Ada" }, tool: "WebSearch", ruleId: "search-web", scope: "ONCE" })
+    const lines = texts(verificationSections(page, t, context), "decisions")
+    expect(lines[0]).toBe("Final decision: Applied by Ada.")
+    expect(lines.some((l) => /^Ada allowed a web search for “docs\.example\.com footer links”, \d{4}-\d\d-\d\d \d\d:\d\d UTC, in TaskForce\.$/.test(l))).toBe(true)
+    expect(lines.some((l) => /^Under the rule “.+” \(search-web\)\.$/.test(l))).toBe(true)
   })
 
-  it("7. le modèle : celui qui a réellement tourné, sa version, chez qui", () => {
-    expect(page.model).toMatchObject({ known: true, agent: "claude-code", agentVersion: "2.1.300", chosen: "sonnet",
-      model: "claude-sonnet-5-20261001", provider: "anthropic", local: false, fingerprint: null })
-    expect(page.model.session?.sha256).toMatch(/^sha256:/)
+  it("7. R159 P8, R161 F1 : le fournisseur et le modèle lus dans le dossier, en noms d'affichage", () => {
+    expect(page.model).toMatchObject({ known: true, agent: "claude-code", agentVersion: "2.1.300", configured: "sonnet",
+      model: "claude-sonnet-5-20261001", served: ["claude-sonnet-5-20261001"], provider: "anthropic" })
+    const lines = texts(verificationSections(page, t, context), "model")
+    expect(lines).toEqual(expect.arrayContaining(["Agent: Claude Code, version 2.1.300.", "Served by Anthropic."]))
+    expect(lines.join(" ")).not.toMatch(/claude-code|not on this computer/)
   })
 
-  it("le dossier lui-même : son sceau, la garde de sa clé, son témoin, son trou", () => {
-    expect(page.record.headerFromChain).toBe(true)
-    expect(page.record.seal).toMatchObject({ custody: "same-machine", kept: false, coversAll: true })
-    expect(page.record.witness).toMatchObject({ written: true })
-    expect(page.record.gaps).toEqual([{ from: 9, to: 9 }])
+  it("le dossier : R161 M5, la garde de la clé avant le sceau ; R161 F2, une seule numérotation des événements", () => {
+    const lines = texts(verificationSections(page, t, context), "record")
+    const custody = lines.indexOf(t.record.custody["same-machine"])
+    expect(custody).toBeGreaterThan(0)
+    expect(lines[custody + 1]).toMatch(/^The seal covers the record up to event \d+/)
+    expect(lines).toContain("The runner's event 9 never arrived (noted at event 15 of the record).")
+    expect(lines.some((l) => /^Witness: the head of the record at event 23 \(sha256:[0-9a-f]{12}\), when it was sealed,/.test(l))).toBe(true)
+    expect(lines).toContain("Events after 23, such as the final decision, came after the witness.")
   })
 
-  it("les mots : sept rubriques et le dossier, dans l'ordre de R212 ; le résumé seul est de l'agent ; jamais « conforme »", () => {
-    const sections = verificationSections(page, t)
+  it("R161 M6 : la consigne nomme le bon fichier, et ne demande pas une clé que l'instance ne garde pas", () => {
+    const lines = texts(verificationSections(page, t, context), "record")
+    expect(lines).toContain("Download the record (JSON) below, then, in taskforce-runner: npm run verify -- evidence-run-42.json")
+    expect(lines).toContain(t.record.verifyNoKeyMeans)
+    const kept = { ...page, record: { ...page.record, seal: page.record.seal ? { ...page.record.seal, kept: true } : null } }
+    expect(texts(verificationSections(kept, t, context), "record").join(" ")).toMatch(/--key sha256:[0-9a-f]{64}/)
+    expect(texts(verificationSections(kept, t, { runId: 42, desktop: true }), "record").join(" ")).not.toContain("--key")
+    const noId = verificationPage(chained([{ type: "mission.started", data: {} }]))
+    expect(texts(verificationSections(noId, t, { runId: 77, desktop: false }), "record").join(" ")).toContain("evidence-run-77.json")
+  })
+
+  it("les mots : sept rubriques puis le dossier, dans l'ordre de R212 ; seul le résumé est de l'agent ; jamais « conforme »", () => {
+    const sections = verificationSections(page, t, context)
     expect(sections.map((s) => s.id)).toEqual(["request", "changed", "classification", "checks", "notChecked", "decisions", "model", "record"])
     const agent = sections.flatMap((s) => s.lines).filter((l) => l.tone === "agent")
     expect(agent).toHaveLength(1)
-    expect(agent[0]?.text).toBe(t.changed.summary)
-    const words = JSON.stringify(sections) + JSON.stringify(t)
-    expect(words).not.toMatch(/complian|complies|conforme/i)
-    expect(sections.find((s) => s.id === "record")?.lines.map((l) => l.text).join(" ")).toContain("same machine as the agent")
-    const changed = sections.find((s) => s.id === "changed")?.lines.map((l) => l.text) ?? []
-    expect(changed.find((l) => l.startsWith("Branch "))).toMatch(/, 1 commit, last commit /)
+    expect(agent[0]?.blocks?.length).toBeGreaterThan(0)
+    expect(JSON.stringify(sections) + JSON.stringify(t)).not.toMatch(/complian|complies|conforme/i)
+    expect(pageTitle(page, t)).toBe("Verification of WEB-48: Fix the footer links")
+  })
+
+  it("R161 M1 : une phrase d'abord, assemblée par le code", () => {
+    const decided = when(example().events.at(-1)?.at ?? null)
+    expect(summarySentence(page, t)).toBe("Ada asked for “Fix the footer links”. 1 file changed, in a pull request. "
+      + `The tests passed (48 of 48), run by TaskForce's runner on the agent's computer. Applied by Ada on ${decided}.`)
   })
 })
 
-describe("une rubrique que le dossier ne sait pas remplir le dit", () => {
-  it("un dossier d'avant la 1.18 : ni la demande, ni le modèle, ni le sceau, ni les règles", () => {
-    const page = verificationPage(dossier([
-      { type: "mission.started", data: { issue: "WEB-12", requestedBy: "ada@example.com", agent: { kind: "claude-code", model: null },
-        rules: { version: 1, digest: `sha256:${"a".repeat(64)}` } } },
-      { type: "mission.ended", data: { status: "FAILED", error: "Runner lost" } },
-    ]))
-    const sections = verificationSections(page, t)
-    const text = (id: string) => sections.find((s) => s.id === id)?.lines.map((l) => l.text) ?? []
-    expect(page.request.known).toBe(false)
-    expect(text("request")).toContain(t.unknown)
-    expect(text("changed")).toContain(t.changed.notTracked)
-    expect(text("classification")).toEqual(expect.arrayContaining([t.classification.noDecision, t.classification.noRules]))
-    expect(text("checks")).toEqual([t.checks.none])
-    expect(text("model")).toContain(t.model.unknown)
-    expect(text("record")).toEqual(expect.arrayContaining([t.record.older, t.record.notSealed, t.record.noPullRequest]))
-    expect(text("decisions")).toEqual(expect.arrayContaining([t.decisions.none, t.decisions.undecided]))
+describe("R161 B1, R159 P5 : la page dit ce qu'elle a vérifié, où et quand", () => {
+  it("l'exemple tient : la première ligne le dit, la garde de la clé d'abord, et les faits du runner", async () => {
+    const page = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
+    const lines = verdictLines(page, t)
+    expect(lines[0]?.text).toMatch(/^Checked in this app on 2026-11-24 09:00 UTC: every digest of the chain holds \(25 events\), the header comes from the chain, and the \d+ texts kept beside it match their digests\.$/)
+    expect(lines.map((l) => l.text)).toEqual(expect.arrayContaining([t.verdict.trustedSameMachine, t.verdict.runnerFacts]))
+    expect(lines.map((l) => l.text).join(" ")).not.toMatch(/intact|chained|Sealed at/)
   })
 
-  it("aucun test configuré, un texte effacé, un témoin qui manque, une demande échue", () => {
-    const erasedHash = `sha256:${"e".repeat(64)}`
-    const page = verificationPage(dossier([
-      { type: "mission.started", data: { mission: 7, workspace: "acme", request: { title: { sha256: erasedHash, chars: 5 } },
-        origin: { channel: "retry", run: 6 } } },
-      { type: "action.decided", actor: { kind: "server", id: "taskforce" }, data: { approval: 3, effect: "ask", summary: "npm install", rule: "x" } },
-      { type: "action.decided", actor: { kind: "server", id: "taskforce" }, data: { approval: 3, effect: "deny", reason: "No answer in time." } },
-      { type: "test.result", actor: { kind: "runner", id: "r" }, data: { kind: "test", configured: false, ran: false } },
-      { type: "mission.ended", data: { status: "DONE", commits: 2, resultUrl: "https://github.com/acme/website/pull/9" } },
-      { type: "note", data: { kind: "witness", written: false, reason: "Connect GitHub" } },
-      { type: "human.decision", actor: { kind: "person", id: "ada@example.com" }, data: { kind: "erased", text: erasedHash, what: "title" } },
-    ]))
-    expect(page.request.title).toEqual({ state: "erased" })
-    expect(page.request.origin).toBe("retry")
-    expect(page.notChecked.map((n) => n.kind)).toEqual(expect.arrayContaining(["noTests", "noReviewer", "ciNotRead"]))
-    expect(page.decisions.map((d) => d.kind)).toEqual(["expired", "erased"])
-    expect(page.record.witness).toMatchObject({ written: false, reason: "Connect GitHub" })
-    const lines = verificationSections(page, t).flatMap((s) => s.lines.map((l) => l.text))
-    expect(lines).toEqual(expect.arrayContaining([t.erased, t.notChecked.noTests, "No witness: Connect GitHub",
-      "Tried again from mission 6."]))
+  it("avant la fin de la vérification, la page dit qu'elle vérifie", () => {
+    expect(verdictLines(verificationPage(example()), t)).toEqual([{ text: t.checking, tone: "muted" }])
   })
 
-  it("des tests qui échouent, puis un fichier remis : la vérification dit qu'elle porte sur une autre version", () => {
-    const page = verificationPage(dossier([
-      { type: "mission.started", data: {} },
-      { type: "test.result", actor: { kind: "runner", id: "r" }, data: { kind: "test", command: "npm test", ran: true, passed: false } },
-      { type: "action.result", actor: { kind: "runner", id: "r" }, data: { kind: "revert", ok: true, path: "a.ts" } },
+  it("une chaîne cassée se dit en tête, avec l'événement où elle casse", async () => {
+    const { file, at: seq } = brokenChain()
+    const lines = verdictLines(verificationPage(file, await checkRecord(file, [], at)), t)
+    expect(lines).toEqual([{ text: `Checked in this app on 2026-11-24 09:00 UTC: this record was changed after it was written. Its chain breaks at event ${seq}, so nothing below can be trusted.`, tone: "warn" }])
+  })
+
+  it("un texte changé se dit à sa place, et n'est pas montré comme la demande", async () => {
+    const { file } = tamperedTitle()
+    const page = verificationPage(file, await checkRecord(file, [], at))
+    expect(page.request.title).toEqual({ state: "changed" })
+    const sections = verificationSections(page, t, context)
+    expect(texts(sections, "request")[0]).toBe("The request's title was changed after the record was written: it no longer matches its digest, so it is not shown.")
+    expect(JSON.stringify(sections)).not.toContain("Fix the header links")
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.textsOne)
+  })
+
+  it("un sceau d'une clé que l'instance ne connaît pas, ou sans les clés de l'instance", async () => {
+    const self = verdictLines(verificationPage(example(), await checkRecord(example(), [], at)), t).map((l) => l.text)
+    expect(self).toContain(t.verdict.self)
+    const unknown = verdictLines(verificationPage(example(), await checkRecord(example(), null, at)), t).map((l) => l.text)
+    expect(unknown).toContain(t.verdict.selfNoKeys)
+  })
+})
+
+describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier montre", () => {
+  it("une mission en cours dit qu'elle tourne ; ni « ran before TaskForce kept one », ni « nothing left unchecked »", async () => {
+    const file = running()
+    const page = verificationPage(file, await checkRecord(file, [], at))
+    expect(page.running).toBe(true)
+    const sections = verificationSections(page, t, context)
+    expect(texts(sections, "changed")[0]).toBe(t.changed.noFilesYet)
+    expect(texts(sections, "record")).toContain(t.record.noWitnessYet)
+    expect(texts(sections, "notChecked")).toContain(t.notChecked.noTestYet)
+    expect(all(sections)).not.toContain(t.notChecked.none)
+    expect(all(sections).join(" ")).not.toMatch(/ran before TaskForce kept one/)
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.notSealedRunning)
+    expect(summarySentence(page, t)).toContain(t.summary.working)
+  })
+
+  it("une mission d'avant la 1.18 finie en échec : finie avant le sceau, plus ancienne que ces faits, une seule phrase vraie", async () => {
+    const file = olderFailed()
+    const page = verificationPage(file, await checkRecord(file, [], at))
+    expect(page.older).toBe(true)
+    const sections = verificationSections(page, t, context)
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.notSealedEnded)
+    expect(texts(sections, "model")[0]).toBe(t.older)
+    expect(texts(sections, "request")).toContain(t.older)
+    expect(texts(sections, "changed")[0]).toBe(t.changed.notTrackedOlder)
+    expect(texts(sections, "checks")).toEqual([t.checks.none])
+    expect(texts(sections, "notChecked")).not.toContain(t.notChecked.none)
+    expect(texts(sections, "changed")).toContain("The mission did not finish. Its error, as it was reported: “Runner lost”")
+    expect(all(sections).join(" ")).not.toMatch(/the agent did not report it|has not ended/)
+  })
+
+  it("R159 P3 : des coches héritées, que l'agent de cette mission n'a pas cochées, ne comptent pas pour elle", () => {
+    const page = verificationPage(inheritedTicks())
+    expect(page.checks.some((c) => c.what === "tests")).toBe(false)
+    expect(page.notChecked).toEqual(expect.arrayContaining([{ kind: "doneUnattributed", items: ["#1", "#2"] }, { kind: "openItems", items: ["#3"] }]))
+    expect(page.record.runnerFacts).toBe(true)
+  })
+
+  it("rien de vérifié : une seule phrase vraie", () => {
+    const page = verificationPage(chained([{ type: "mission.started", data: { mission: 1, workspace: "acme" } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Stopped by the person who delegated it." } }]))
+    expect(page.notChecked.map((n) => n.kind)).toEqual(["noTestRecord"])
+    const sections = verificationSections(page, t, context)
+    expect(texts(sections, "checks")).toEqual([t.checks.none])
+    expect(texts(sections, "notChecked")).toEqual([t.notChecked.noTestRecord])
+  })
+})
+
+describe("le reste du dossier, dit en clair", () => {
+  it("R161 F7 : un texte effacé dit lequel, par qui et quand", () => {
+    const erased = `sha256:${"e".repeat(64)}`
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", request: { title: { sha256: erased, chars: 5 } } } },
+      { type: "note", data: { kind: "person", person: `person:${"1".repeat(32)}`, name: { sha256: `sha256:${"f".repeat(64)}`, chars: 3 } } },
+      { type: "human.decision", at: "2026-11-23T10:00:00.000Z", actor: { kind: "person", id: `person:${"1".repeat(32)}` },
+        data: { kind: "erased", text: erased, what: "title" } },
+    ], { texts: { [`sha256:${"f".repeat(64)}`]: { salt: "0".repeat(32), text: "Ada" } } }))
+    expect(page.request.title).toMatchObject({ state: "erased", erasure: { who: { kind: "named", name: "Ada" }, what: "title" } })
+    expect(texts(verificationSections(page, t, context), "request")[0]).toBe("The request's title was erased by Ada on 2026-11-23 10:00 UTC: its digest stays in the record.")
+  })
+
+  it("une personne dont le compte a été purgé : ses textes sont effacés, la page ne montre pas son identifiant", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", requestedBy: `person:${"2".repeat(32)}` } },
+      { type: "note", data: { kind: "person", person: `person:${"2".repeat(32)}`, email: { sha256: `sha256:${"d".repeat(64)}`, chars: 9 } } },
+    ]))
+    expect(page.request.delegatedBy).toEqual({ kind: "erased" })
+    expect(whoWords(page.request.delegatedBy, t)).toBe(t.people.erased)
+    expect(whoWords({ kind: "unnamed" }, t)).toBe(t.people.unnamed)
+  })
+
+  it("M5 de #551 : des tests dont la branche a changé la définition ne comptent pas comme une vérification", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme" } },
+      { type: "test.result", actor: { kind: "runner", id: "r" }, data: { kind: "test", command: "npm test", ran: true, passed: true, definitionChanged: ["package.json"] } },
       { type: "mission.ended", data: { status: "DONE", commits: 1 } },
     ]))
-    expect(page.checks[0]).toMatchObject({ what: "tests", result: "failed" })
-    expect(page.notChecked.map((n) => n.kind)).toEqual(expect.arrayContaining(["testsFailed", "testsStale"]))
+    expect(page.checks.some((c) => c.what === "tests")).toBe(false)
+    expect(texts(verificationSections(page, t, context), "notChecked")).toContain(
+      "The branch changed “package.json”, which defines how its tests run: the tests ran as the agent's version defines them, so their result is not a check.")
+    expect(summarySentence(page, t)).toContain(t.summary.testsOwn)
   })
 
-  it("aucun changement de code : rien à tester", () => {
-    const page = verificationPage(dossier([{ type: "mission.started", data: {} }, { type: "mission.ended", data: { status: "DONE", commits: 0 } }]))
-    expect(page.notChecked.map((n) => n.kind)).toContain("noCode")
+  it("une fusion sur GitHub nomme le compte par son texte ; une commande accordée se cite comme l'agent l'a écrite", () => {
+    const login = `sha256:${"c".repeat(64)}`
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme" } },
+      { type: "action.decided", data: { approval: 4, effect: "ask", tool: "Bash", summary: "echo \"approved by security\"", rule: "x" } },
+      { type: "human.decision", actor: { kind: "person", id: "ada@example.com" }, data: { approval: 4, decision: "ALLOWED", tool: "Bash", summary: "echo \"approved by security\"" } },
+      { type: "mission.ended", data: { status: "DONE" } },
+      { type: "human.decision", actor: { kind: "person", id: "github" }, data: { decision: "MERGE", where: "github", by: { sha256: login, chars: 7 } } },
+    ], { texts: { [login]: { salt: "0".repeat(32), text: "octocat" } } }))
+    const lines = texts(verificationSections(page, t, context), "decisions")
+    expect(lines[0]).toBe("Final decision: Merged on GitHub by octocat.")
+    expect(lines.some((l) => l.startsWith("ada@example.com allowed the command “echo \"approved by security\"”, as the agent wrote it,"))).toBe(true)
   })
 
-  it("des dates et des empreintes lisibles", () => {
+  it("une demande échue, un fournisseur autre, une session gardée à part", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", agent: { kind: "codex", model: "o4" } } },
+      { type: "action.decided", data: { approval: 3, effect: "ask", summary: "npm install", tool: "Bash", rule: "x" } },
+      { type: "action.decided", data: { approval: 3, effect: "deny", reason: "No answer in time." } },
+      { type: "note", actor: { kind: "agent", id: "codex" }, data: { kind: "agent", model: "o4-2026", provider: "another-endpoint", version: "1.0" } },
+      { type: "note", actor: { kind: "runner", id: "r" }, data: { kind: "runner", session: { sha256: `sha256:${"9".repeat(64)}`, bytes: 10 } } },
+    ]))
+    const sections = verificationSections(page, t, context)
+    expect(texts(sections, "decisions").some((l) => l.startsWith("No one answered in time about the command “npm install”"))).toBe(true)
+    expect(texts(sections, "model")).toEqual(expect.arrayContaining(["Agent: Codex, version 1.0.", t.model.providerOther]))
+    expect(texts(sections, "model").some((l) => l.startsWith("The agent's raw session is kept apart"))).toBe(true)
+  })
+
+  it("R161 M2 : le résumé de l'agent en blocs simples, sans lien ni image, son code cité", () => {
+    expect(summaryBlocks("## What I did\nI fixed `a.ts` and [the docs](https://x.y).\n\n- one\n* two\n```\ncode line\n```\n![img](u)"))
+      .toEqual([
+        { kind: "heading", parts: [{ code: false, text: "What I did" }] },
+        { kind: "paragraph", parts: [{ code: false, text: "I fixed " }, { code: true, text: "a.ts" }, { code: false, text: " and the docs." }] },
+        { kind: "item", parts: [{ code: false, text: "one" }] },
+        { kind: "item", parts: [{ code: false, text: "two" }] },
+        { kind: "paragraph", parts: [{ code: true, text: "code line" }] },
+        { kind: "paragraph", parts: [{ code: false, text: "img" }] },
+      ])
+    expect(inlineParts("**bold** __too__")).toEqual([{ code: false, text: "bold too" }])
+  })
+
+  it("R159 P7 : un lien seulement vers GitHub ; R161 F4, des empreintes sans points de suspension", () => {
+    expect(linkable("https://github.com/acme/website/pull/212")).toBe(true)
+    expect(linkable("javascript:alert(1)")).toBe(false)
+    expect(linkable("https://evil.example/github.com")).toBe(false)
+    const page = verificationPage(chained([{ type: "mission.started", data: { mission: 7, workspace: "acme" } },
+      { type: "mission.ended", data: { status: "DONE", resultUrl: "javascript:alert(1)//github.com/a/b/pull/1" } }]))
+    expect(page.changes.pullRequest).toBeNull()
+    expect(short(`sha256:${"a".repeat(64)}`)).toBe("sha256:aaaaaaaaaaaa")
+    expect(short("abcdef0123456789")).toBe("abcdef012345")
+    expect(short(null)).toBe("?")
     expect(when("2026-11-22T08:00:00.000Z")).toBe("2026-11-22 08:00 UTC")
     expect(when(null)).toBe("?")
     expect(when("not a date")).toBe("not a date")
-    expect(short(`sha256:${"a".repeat(64)}`)).toBe("sha256:aaaaaaaaaaaa...")
-    expect(short(null)).toBe("?")
   })
 })
