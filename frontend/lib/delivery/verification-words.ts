@@ -217,6 +217,10 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
     case "broken": lines.push({ text: v.broken, tone: "warn" }); break
     case "unchecked": lines.push({ text: v.unchecked, tone: "warn" }); break
   }
+  // Un sceau tardif tient, mais ne prouve rien d'avant sa date (R159, second tour de #551, N5).
+  if (d.seal.late && (d.seal.state === "trusted" || d.seal.state === "self")) {
+    lines.push({ text: fillText(v.late, { date: when(d.seal.sealedAt) }), tone: "warn" })
+  }
   if (d.runnerFacts) lines.push({ text: v.runnerFacts, tone: "warn" })
   return lines
 }
@@ -478,7 +482,8 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   if (r.seal) {
     // La garde de la clé d'abord : « scellé » n'est pas une garantie quand l'agent pouvait lire la clé (R161 M5).
     lines.push({ text: rec.custody[r.seal.custody], tone: r.seal.custody === "same-machine" ? "warn" : "muted" })
-    lines.push({ text: fillText(rec.sealedAt, { seq: r.seal.seq, date: when(r.seal.sealedAt), key: short(r.seal.keyId) }), tone: "muted" })
+    lines.push({ text: fillText(r.seal.late ? rec.sealedLate : rec.sealedAt, { seq: r.seal.seq, date: when(r.seal.sealedAt), key: short(r.seal.keyId) }),
+      tone: r.seal.late ? "warn" : "muted" })
     if (!r.seal.coversAll) lines.push({ text: fillText(rec.notAll, { from: r.seal.seq + 1, to: r.events }), tone: "warn" })
     if (!r.seal.kept) lines.push({ text: rec.notKept, tone: "warn" })
   }

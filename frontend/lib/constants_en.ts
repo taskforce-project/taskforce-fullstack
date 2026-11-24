@@ -2317,6 +2317,7 @@ export const CONSTANTS_EN = {
       notSealedRunning: "It is not sealed yet: the mission is still running.",
       notSealedEnded: "It is not sealed: the mission finished before TaskForce sealed its records.",
       broken: "Its seal does not hold: it was not made over this record as it is.",
+      late: "It was sealed late, on {date}, after its mission had ended: the seal proves the record as it was on that date, not what happened before.",
       unchecked: "This browser cannot check a seal (Ed25519): the seal was not checked.",
       runnerFacts: "What the runner reports (its tests, the agent and its model, the numbers of its events) comes from the computer where the agent works: it is worth what that computer is worth, whatever the seal says.",
     },
@@ -2516,6 +2517,7 @@ export const CONSTANTS_EN = {
       gapLost: "The runner stopped answering: from its event {from}, any event may be missing (noted at event {noted} of the record).",
       legacyErased: "A person's account was deleted on {date}. Their email stays in events {events}, written before TaskForce 1.18, which cannot change without breaking the chain: this page hides it.",
       sealedAt: "The seal covers the record up to event {seq}, signed on {date} with the key {key}.",
+      sealedLate: "The seal covers the record up to event {seq}, signed late, on {date}, with the key {key}: TaskForce sealed this record after its mission had ended, so the seal proves nothing of what came before.",
       notAll: "Events {from} to {to} came after the seal: no signature covers them.",
       custody: {
         "same-machine": "The signing key is on the same computer as the agent: the agent could have read it, so the seal does not prove that the record was not changed during the mission.",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
-import { brokenChain, chained, example, exampleKey, inheritedTicks, olderFailed, running, tamperedTitle } from "./__tests__/records"
+import { brokenChain, chained, example, exampleKey, inheritedTicks, lateSealed, olderFailed, running, tamperedTitle } from "./__tests__/records"
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
 import {
@@ -152,6 +152,20 @@ describe("R161 B1, R159 P5 : la page dit ce qu'elle a vérifié, où et quand", 
     expect(texts(sections, "request")[0]).toBe("The request's title was changed after the record was written: it no longer matches its digest, so it is not shown.")
     expect(JSON.stringify(sections)).not.toContain("Fix the header links")
     expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.textsOne)
+  })
+
+  it("N5 du second tour de #551 : un sceau tardif tient, et la page dit qu'il ne prouve rien d'avant sa date", async () => {
+    const { file, key } = lateSealed()
+    const page = verificationPage(file, await checkRecord(file, [key], at))
+    expect(page.record.seal?.late).toBe(true)
+    const verdict = verdictLines(page, t).map((l) => l.text)
+    expect(verdict).toContain(t.verdict.trustedSameMachine)
+    expect(verdict).toContain("It was sealed late, on 2026-11-25 08:00 UTC, after its mission had ended: the seal proves the record as it was on that date, not what happened before.")
+    expect(texts(verificationSections(page, t, context), "record")
+      .some((l) => l.startsWith("The seal covers the record up to event 23, signed late, on 2026-11-25 08:00 UTC, with the key sha256:"))).toBe(true)
+    // Un sceau posé à la fin de la mission ne parle pas de retard.
+    const timely = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
+    expect(JSON.stringify(verdictLines(timely, t)) + JSON.stringify(verificationSections(timely, t, context))).not.toMatch(/sealed late|signed late/i)
   })
 
   it("un sceau d'une clé que l'instance ne connaît pas, ou sans les clés de l'instance", async () => {

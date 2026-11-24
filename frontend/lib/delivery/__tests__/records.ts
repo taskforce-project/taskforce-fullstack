@@ -1,9 +1,10 @@
-import { createHash } from "node:crypto"
+import { createHash, generateKeyPairSync, sign } from "node:crypto"
 import { readFileSync } from "node:fs"
 import path from "node:path"
 
 import type { MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
-import { chain, type EventInput, type Json } from "@/lib/evidence/engine/rules-engine"
+import { canonicalJson, chain, type EventInput, type Json } from "@/lib/evidence/engine/rules-engine"
+import { pae, PAYLOAD_TYPE, PREDICATE_TYPE, STATEMENT_TYPE } from "@/lib/evidence/verifier/dossier"
 
 /**
  * Les dossiers d'état de la revue des écrans de #552 (R161), gardés comme essais de la page : l'exemple d'une mission
@@ -80,6 +81,33 @@ export function olderFailed(): MissionEvidence {
       rules: { version: 1, digest: `sha256:${"a".repeat(64)}` } } },
     { type: "mission.ended", data: { status: "FAILED", error: "Runner lost" } },
   ], { mission: { id: 3, workspace: "acme", issue: "WEB-12", requestedBy: "ada@example.com" } })
+}
+
+/**
+ * Un dossier fini avant que TaskForce ne scelle, scellé tard par le passage au démarrage (R159, second tour de #551, N5) :
+ * l'exemple jusqu'à sa fin, sans témoin, la chaîne refaite, puis un sceau `late: true` d'une clé tirée ici.
+ */
+export function lateSealed(): { file: MissionEvidence; key: string } {
+  const file = example()
+  const kept = file.events.filter((e) => e.seq <= 23 && !(e.type === "note" && (e.data as { kind?: unknown } | null)?.kind === "witness"))
+  const events = chain(kept.map((e, i) => ({ seq: i + 1, at: e.at, type: e.type, actor: e.actor, data: e.data as { [key: string]: Json } }))) as unknown as MissionEvidenceEvent[]
+  const root = events.at(-1)?.hash ?? ""
+  const pair = generateKeyPairSync("ed25519")
+  const spki = Buffer.from(pair.publicKey.export({ format: "der", type: "spki" }))
+  const key = `sha256:${createHash("sha256").update(spki).digest("hex")}`
+  const predicate = { format: "taskforce-evidence/1", mission: file.mission, root, seq: events.length, sealedAt: "2026-11-25T08:00:00.000Z",
+    key: { id: key, algorithm: "ed25519", publicKey: spki.toString("base64"), custody: "same-machine", kept: true }, late: true }
+  const statement = { _type: STATEMENT_TYPE, subject: [{ name: `taskforce-mission-${String(file.mission?.id)}`, digest: { sha256: root.slice(7) } }],
+    predicateType: PREDICATE_TYPE, predicate }
+  const payload = Buffer.from(canonicalJson(statement as unknown as Json), "utf8")
+  const sig = sign(null, pae(PAYLOAD_TYPE, new Uint8Array(payload)), pair.privateKey).toString("base64")
+  const named = new Set(JSON.stringify(events).match(/sha256:[0-9a-f]{64}/g) ?? [])
+  const texts = Object.fromEntries(Object.entries(file.texts ?? {}).filter(([hash]) => named.has(hash)))
+  return {
+    key,
+    file: { format: file.format, mission: file.mission, events, root, rules: file.rules, texts,
+      seal: { payload: payload.toString("base64"), payloadType: PAYLOAD_TYPE, signatures: [{ keyid: key, sig }] } },
+  }
 }
 
 /** Des coches héritées : la liste dit deux lignes cochées à la fin, que l'agent de cette mission n'a pas cochées. */

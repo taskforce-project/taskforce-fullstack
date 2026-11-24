@@ -218,6 +218,8 @@ export interface PageRecord {
     readonly custody: "same-machine" | "separate-machine"
     readonly kept: boolean
     readonly coversAll: boolean
+    /** Posé tard, sur un dossier fini avant que TaskForce ne scelle : il ne prouve rien de ce qui précède (second tour, N5). */
+    readonly late: boolean
   } | null
   readonly witness: { readonly written: boolean; readonly root: string | null; readonly seq: number | null; readonly url: string | null; readonly reason: string | null } | null
   readonly pullRequest: boolean
@@ -627,6 +629,7 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       custody: key.custody === "separate-machine" ? "separate-machine" : "same-machine",
       kept: key.kept !== false,
       coversAll: seq === events.length,
+      late: predicate.late === true,
     } : null,
     witness: w ? { written: w.written === true, root: str(w.root), seq: num(w.seq), url: str(w.comment) ?? str(w.pullRequest),
       reason: str(w.reason) } : null,
