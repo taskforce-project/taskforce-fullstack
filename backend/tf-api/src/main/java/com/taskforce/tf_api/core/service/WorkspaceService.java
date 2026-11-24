@@ -393,7 +393,9 @@ public class WorkspaceService {
      * collision.
      */
     static final Set<String> RESERVED_SLUGS = Set.of(
-        "account", "auth", "invitations", "legal-notices", "onboarding", "privacy-policy");
+        "account", "auth", "invitations", "legal-notices", "onboarding", "privacy-policy",
+        // Le lien du témoin d'un dossier (R159, second tour, M-b) : /verify/{id}.
+        "verify");
 
     /** Adresse d'espace libre pour ce nom (« Acme » → « acme », ou « acme-3f2a1b » si elle est prise ou réservée). */
     public String uniqueSlug(String name) {

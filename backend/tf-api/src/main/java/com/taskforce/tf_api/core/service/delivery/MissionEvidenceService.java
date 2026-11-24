@@ -875,26 +875,51 @@ public class MissionEvidenceService {
      * réécrit, chaque empreinte tient toujours.
      */
     @Transactional
-    public void appendAfterEnd(DeliveryRun run, String type, Actor actor, Map<String, ?> data) {
+    public Optional<String> appendAfterEnd(DeliveryRun run, String type, Actor actor, Map<String, ?> data) {
         Optional<String> hash = append(run, type, actor, data);
         if (run.getEvidenceRoot() != null && hash.isPresent()) {
             run.setEvidenceRoot(hash.get());
             seal(run.getId(), false);
         }
+        return hash;
     }
 
-    /** La même chose sur un dossier dont la mission peut ne plus exister (un texte effacé, le témoin). */
+    /**
+     * La même chose sur un dossier dont la mission peut ne plus exister (un texte effacé, le témoin). Rend l'empreinte de
+     * l'événement, ou rien quand il n'est pas gardé.
+     */
     @Transactional
-    public void appendToDossier(Long runId, String type, Actor actor, Map<String, ?> data) {
+    public Optional<String> appendToDossier(Long runId, String type, Actor actor, Map<String, ?> data) {
         DeliveryRun run = runRepository.findByIdForUpdate(runId).orElse(null);
         if (run != null) {
-            appendAfterEnd(run, type, actor, data);
-            return;
+            return appendAfterEnd(run, type, actor, data);
         }
         Optional<String> hash = appendTo(runId, type, actor, data);
         if (hash.isPresent() && seals.findTopByRunIdOrderBySeqDesc(runId).isPresent()) {
             seal(runId, false);
         }
+        return hash;
+    }
+
+    /**
+     * Ce que porte le lien du témoin vers la page du dossier (R159, second tour, M-b) : un identifiant du dossier, opaque et
+     * tiré au hasard (128 bits), sans l'espace ni le numéro de la mission, posé la première fois qu'il sert. La page qu'il
+     * ouvre garde ses contrôles d'accès.
+     */
+    @Transactional
+    public String linkId(Long runId) {
+        String current = dossiers.findLinkId(runId);
+        if (current != null) {
+            return current;
+        }
+        dossiers.setLinkId(runId, salt());
+        return dossiers.findLinkId(runId);
+    }
+
+    /** Le témoin a fini d'essayer pour ce dossier, écrit ou non : le passage régulier ne le relance plus (N2). */
+    @Transactional
+    public void witnessed(Long runId) {
+        dossiers.markWitnessed(runId);
     }
 
     /** La sorte de la note d'un sceau tardif (R159, second tour, N5). */
@@ -958,7 +983,7 @@ public class MissionEvidenceService {
         seals.save(MissionDossierSeal.builder().runId(runId).seq(seq).root(root).sealedAt(at).keyId(signer.key().id())
             .envelope(envelope.toString()).late(lateSeal).build());
         if (atEnd && !lateSeal) {
-            publisher.publishEvent(new MissionSealed(runId, root, seq));
+            publisher.publishEvent(new MissionSealed(runId, root, seq, signer.key().id()));
         }
     }
 

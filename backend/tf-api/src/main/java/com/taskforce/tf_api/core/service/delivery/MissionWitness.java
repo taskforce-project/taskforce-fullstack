@@ -97,8 +97,8 @@ public class MissionWitness {
         this.retries = List.copyOf(retries);
     }
 
-    /** Ce qu'il faut pour écrire le témoin d'une mission : sa pull request et l'adresse de sa page. */
-    record Target(Long workspaceId, String slug, String repo, int number, String pullRequest) {
+    /** Ce qu'il faut pour écrire le témoin d'une mission : sa pull request, et l'espace dont le jeton la commente. */
+    record Target(Long workspaceId, String repo, int number, String pullRequest) {
     }
 
     @Async
@@ -121,11 +121,16 @@ public class MissionWitness {
         List<Long> runs = tx.execute(status -> evidenceRepository.findUnwitnessed(now.minus(SWEEP_WINDOW), now.minus(SWEEP_GRACE)));
         for (Long runId : runs == null ? List.<Long>of() : runs) {
             sealRepository.findTopByRunIdOrderBySeqDesc(runId)
-                .ifPresent(seal -> write(new MissionSealed(runId, seal.getRoot(), seal.getSeq())));
+                .ifPresent(seal -> write(new MissionSealed(runId, seal.getRoot(), seal.getSeq(), seal.getKeyId())));
         }
     }
 
-    /** Écrit la tête du dossier dans la pull request de la mission, puis le dit au dossier. */
+    /**
+     * Écrit la tête du dossier dans la pull request de la mission, puis le dit au dossier. Avant de poster, et avant chaque
+     * nouvel essai, il cherche cette tête dans les commentaires de la pull request : une réponse de GitHub perdue ne fait
+     * jamais deux commentaires, et il n'en modifie jamais un (R159, second tour, M-a). Puis il a fini : le passage régulier
+     * ne relance pas une mission dont la note ne s'écrit pas (N2).
+     */
     void write(MissionSealed sealed) {
         Optional<Optional<Target>> found = tx.execute(status -> runRepository.findById(sealed.runId()).map(MissionWitness::target));
         if (found == null || found.isEmpty()) {
@@ -145,13 +150,24 @@ public class MissionWitness {
         data.put("pullRequest", target.pullRequest());
         data.put("root", sealed.root());
         data.put("seq", sealed.seq());
+        // La clé qui a scellé cette tête, écrite aussi dans le commentaire : publique, datée par GitHub (R159, second tour, N6).
+        if (sealed.keyId() != null) data.put("key", sealed.keyId());
         String leftOut = linkLeftOut(target);
         data.put("pageLinked", leftOut == null);
         if (leftOut != null) data.put("pageLeftOut", leftOut);
-        String body = body(target, sealed, leftOut == null);
+        String link = leftOut == null ? tx.execute(status -> evidence.linkId(sealed.runId())) : null;
+        String body = body(sealed, link);
         String reason = null;
         for (int attempt = 0; attempt <= retries.size(); attempt++) {
             try {
+                Optional<String> existing = pullRequests.findComment(target.workspaceId(), target.repo(), target.number(), sealed.root());
+                if (existing.isPresent()) {
+                    data.put("written", true);
+                    data.put("comment", existing.get());
+                    reason = null;
+                    log.info("Run {} : témoin déjà écrit sur {}", sealed.runId(), target.pullRequest());
+                    break;
+                }
                 String url = pullRequests.comment(target.workspaceId(), target.repo(), target.number(), body).orElse(null);
                 data.put("written", true);
                 data.put("comment", url);
@@ -171,11 +187,21 @@ public class MissionWitness {
         keep(sealed.runId(), data);
     }
 
+    /**
+     * Le témoin entre au dossier, puis il a fini : une note qui ne s'écrit pas met fin aux essais au lieu de les relancer
+     * (R159, second tour, N2). Sans la fin posée, le passage régulier la retrouverait, et la reposterait sept jours durant.
+     */
     private void keep(Long runId, Map<String, Object> data) {
         try {
-            tx.executeWithoutResult(status -> evidence.appendToDossier(runId, "note", MissionEvidenceService.Actor.SERVER, data));
+            Optional<String> kept = tx.execute(status -> evidence.appendToDossier(runId, "note", MissionEvidenceService.Actor.SERVER, data));
+            if (kept == null || kept.isEmpty()) log.warn("Run {} : le témoin n'est pas entré au dossier : il ne sera pas relancé", runId);
         } catch (RuntimeException e) {
             log.warn("Run {} : le témoin n'a pas pu entrer au dossier : {}", runId, LogSafe.of(e.getMessage()));
+        }
+        try {
+            tx.executeWithoutResult(status -> evidence.witnessed(runId));
+        } catch (RuntimeException e) {
+            log.warn("Run {} : la fin du témoin n'a pas pu se noter : {}", runId, LogSafe.of(e.getMessage()));
         }
     }
 
@@ -194,16 +220,17 @@ public class MissionWitness {
         Matcher pr = DeliveryRunner.PULL_REQUEST.matcher(run.getResultUrl() == null ? "" : run.getResultUrl());
         if (!pr.matches()) return Optional.empty();
         var workspace = run.getIssue().getProject().getWorkspace();
-        return Optional.of(new Target(workspace.getId(), workspace.getSlug(), pr.group(1), Integer.parseInt(pr.group(2)),
+        return Optional.of(new Target(workspace.getId(), pr.group(1), Integer.parseInt(pr.group(2)),
             "https://github.com/" + pr.group(1) + "/pull/" + pr.group(2)));
     }
 
     /**
      * Pourquoi le commentaire ne porte pas de lien, ou null s'il peut en porter un : l'app de bureau (sa page n'existe que
-     * sur la machine), une adresse de la machine elle-même, un dépôt que GitHub ne dit pas privé, ou dont on ne sait rien.
+     * sur la machine), l'exploitant qui l'a coupé ({@code witness-link: false}, R159, second tour, M-b), une adresse de la
+     * machine elle-même, un dépôt que GitHub ne dit pas privé, ou dont on ne sait rien.
      */
     String linkLeftOut(Target target) {
-        if (!linkAllowed) return "desktop-app";
+        if (!linkAllowed) return local(frontendUrl) ? "desktop-app" : "turned-off";
         if (local(frontendUrl)) return "local-address";
         String visibility = pullRequests.visibility(target.workspaceId(), target.repo()).orElse(null);
         if (visibility == null) return "visibility-unknown";
@@ -224,15 +251,21 @@ public class MissionWitness {
             || host.equals("[::1]") || host.equals("::1");
     }
 
-    /** Le commentaire : l'empreinte de tête scellée, et le lien de la page quand il est permis ; rien d'autre (R212). */
-    String body(Target target, MissionSealed sealed, boolean link) {
-        String head = "TaskForce evidence of this pull request: `" + sealed.root() + "` (event " + sealed.seq() + " of mission "
-            + sealed.runId() + ").";
-        return link ? head + "\nVerification page: " + pageUrl(target.slug(), sealed.runId()) : head;
+    /**
+     * Le commentaire : l'empreinte de tête scellée et la clé qui l'a scellée, puis le lien de la page quand il est permis ;
+     * rien d'autre (R212). Ni l'espace, ni le numéro de la mission, ni une personne (R159, second tour, M-b et N6).
+     */
+    String body(MissionSealed sealed, String linkId) {
+        String head = "TaskForce evidence of this pull request: `" + sealed.root() + "` (event " + sealed.seq() + " of its record)"
+            + (sealed.keyId() == null ? "." : ", sealed with the key `" + sealed.keyId() + "`.");
+        return linkId == null ? head : head + "\nVerification page: " + pageUrl(linkId);
     }
 
-    /** La page de vérification de la mission, dans l'app. */
-    String pageUrl(String slug, Long runId) {
-        return frontendUrl + "/" + slug + "/missions/" + runId + "/verification";
+    /**
+     * La page de vérification, sur l'adresse publique de l'instance : un identifiant du dossier, opaque, et rien qui dise
+     * l'espace ou la mission. La page demande de se connecter, et garde ses contrôles d'accès.
+     */
+    String pageUrl(String linkId) {
+        return frontendUrl + "/verify/" + linkId;
     }
 }

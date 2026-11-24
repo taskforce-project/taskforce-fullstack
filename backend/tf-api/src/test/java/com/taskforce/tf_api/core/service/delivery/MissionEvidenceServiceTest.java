@@ -519,7 +519,10 @@ class MissionEvidenceServiceTest {
             assertThat(seals.getFirst().getRoot()).isEqualTo(run.getEvidenceRoot());
             ArgumentCaptor<MissionSealed> sealed = ArgumentCaptor.forClass(MissionSealed.class);
             verify(publisher).publishEvent(sealed.capture());
-            assertThat(sealed.getValue()).isEqualTo(new MissionSealed(100L, run.getEvidenceRoot(), 4));
+            // Le témoin écrit aussi la clé qui a scellé la tête (R159, second tour, N6).
+            assertThat(sealed.getValue()).extracting(MissionSealed::runId, MissionSealed::root, MissionSealed::seq)
+                .containsExactly(100L, run.getEvidenceRoot(), 4);
+            assertThat(sealed.getValue().keyId()).isEqualTo(seals.getFirst().getKeyId());
         }
 
         @Test

@@ -467,6 +467,37 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("R159 second tour, N2 (sonde C) : le témoin a fini, sa note écrite ou non : le passage régulier ne le relance plus")
+    void a_witness_that_is_done_is_not_tried_again() {
+        mission();
+        LocalDateTime now = LocalDateTime.now();
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(1), run.getId());
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).contains(run.getId());
+
+        // La note du témoin ne s'est pas écrite ; il a fini quand même.
+        evidence.witnessed(run.getId());
+        em.flush();
+
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).doesNotContain(run.getId());
+        // Posé une fois : la base refuse de le changer ensuite.
+        refused("UPDATE mission_dossiers SET witnessed_at = now() - interval '1 day' WHERE run_id = ?", "never changes", run.getId());
+    }
+
+    @Test
+    @DisplayName("R159 second tour, M-b : le lien du témoin est un identifiant opaque du dossier, tiré une fois, qui mène à lui seul")
+    void the_witness_link_is_an_opaque_id_drawn_once() {
+        mission();
+
+        String link = evidence.linkId(run.getId());
+        em.flush();
+
+        assertThat(link).matches("[0-9a-f]{32}");
+        assertThat(evidence.linkId(run.getId())).isEqualTo(link);
+        assertThat(dossiers.findByLinkId(link)).get().extracting(d -> d.getRunId()).isEqualTo(run.getId());
+        refused("UPDATE mission_dossiers SET link_id = '" + "0".repeat(32) + "' WHERE run_id = ?", "never changes", run.getId());
+    }
+
+    @Test
     @DisplayName("la base refuse de vider d'un coup les tables du dossier")
     void the_dossier_tables_are_never_emptied() {
         mission();

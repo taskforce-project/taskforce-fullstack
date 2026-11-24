@@ -137,7 +137,14 @@ Anyone can check an exported file without TaskForce, with `npm run verify -- evi
 `taskforce-runner`. Publish your key id where the people who check your records can find it: a member of a workspace
 also reads it at `GET /api/workspaces/{slug}/delivery/evidence/key`, with the keys that sealed the workspace's records
 before and when each was used. The file carries its own public key, so a check without `--key` only says that the seal
-matches the key in the file, which anyone can make.
+matches the key in the file, which anyone can make. That list comes from your own database: what anchors a key is a
+place you do not hold alone. When a mission ends, its head is written in its pull request on GitHub, with the id of the
+key that sealed it; GitHub dates the comment. Compare the key id you are given with the one in the comment.
+
+On a private repository, the comment also links the record's verification page: `<TF_APP_URL>/verify/<id>`, with an
+opaque id of the record, never the workspace or the mission number, and the page asks for a sign-in. If a private
+repository may become public, set `DELIVERY_EVIDENCE_WITNESS_LINK=false` in `.env`: the comment then carries the head
+and the key only.
 
 Records written before TaskForce 1.18 name people by their email in their chain: who delegated, who was asked, who
 answered. These events cannot change without breaking the chain, so purging an account cannot remove the email from

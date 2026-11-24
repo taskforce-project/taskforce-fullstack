@@ -60,4 +60,15 @@ public class MissionDossier {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * Ce que porte le lien du témoin (R159, second tour, M-b) : un identifiant du dossier, opaque et tiré au hasard (128
+     * bits, en hexadécimal), sans l'espace ni le numéro de la mission. Posé une fois, la première fois qu'il sert.
+     */
+    @Column(name = "link_id", length = 32, unique = true)
+    private String linkId;
+
+    /** Quand le témoin a fini d'essayer, écrit ou non : le passage régulier ne le relance plus (N2). */
+    @Column(name = "witnessed_at")
+    private LocalDateTime witnessedAt;
 }

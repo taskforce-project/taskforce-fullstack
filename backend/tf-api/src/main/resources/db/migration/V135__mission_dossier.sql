@@ -25,7 +25,12 @@ CREATE TABLE mission_dossiers (
     issue_key     VARCHAR(80),
     delegated_by  BIGINT       REFERENCES users(id) ON DELETE SET NULL,
     rules_bundle  TEXT,
-    created_at    TIMESTAMP    NOT NULL DEFAULT now()
+    created_at    TIMESTAMP    NOT NULL DEFAULT now(),
+    -- Le lien du témoin (R159, second tour, M-b) : un identifiant du dossier, opaque et tiré au hasard (128 bits), sans
+    -- l'espace ni le numéro de la mission. Posé une fois.
+    link_id       VARCHAR(32)  UNIQUE,
+    -- Quand le témoin a fini d'essayer, écrit ou non (N2) : le passage régulier ne le relance plus. Posé une fois.
+    witnessed_at  TIMESTAMP
 );
 CREATE INDEX idx_mission_dossiers_workspace ON mission_dossiers (workspace_id);
 
@@ -122,8 +127,8 @@ CREATE TRIGGER trg_mission_dossier_seals_immutable
     BEFORE UPDATE OR DELETE ON mission_dossier_seals
     FOR EACH ROW EXECUTE FUNCTION mission_evidence_immutable();
 
--- Seuls changent : la personne qui a délégué, quand son compte est supprimé (elle passe à NULL), et le paquet de règles
--- d'un dossier ouvert avant ce lot, posé une fois.
+-- Seuls changent : la personne qui a délégué, quand son compte est supprimé (elle passe à NULL), le paquet de règles
+-- d'un dossier ouvert avant ce lot, le lien du témoin et la fin de ses essais, chacun posé une fois.
 CREATE OR REPLACE FUNCTION mission_dossiers_guard() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -136,6 +141,8 @@ BEGIN
        OR NEW.project_id IS DISTINCT FROM OLD.project_id OR NEW.issue_id IS DISTINCT FROM OLD.issue_id
        OR NEW.issue_key IS DISTINCT FROM OLD.issue_key OR NEW.created_at IS DISTINCT FROM OLD.created_at
        OR (NEW.rules_bundle IS DISTINCT FROM OLD.rules_bundle AND OLD.rules_bundle IS NOT NULL)
+       OR (NEW.link_id IS DISTINCT FROM OLD.link_id AND OLD.link_id IS NOT NULL)
+       OR (NEW.witnessed_at IS DISTINCT FROM OLD.witnessed_at AND OLD.witnessed_at IS NOT NULL)
        OR (NEW.delegated_by IS DISTINCT FROM OLD.delegated_by AND NEW.delegated_by IS NOT NULL) THEN
         RAISE EXCEPTION 'The dossier of a mission never changes';
     END IF;

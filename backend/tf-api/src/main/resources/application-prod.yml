@@ -206,6 +206,9 @@ delivery:
     signing-key-file: ${DELIVERY_EVIDENCE_SIGNING_KEY_FILE:}
     default-key-file: ${DELIVERY_EVIDENCE_DEFAULT_KEY_FILE:/var/lib/taskforce/evidence/signing-key.pem}
     key-custody: ${DELIVERY_EVIDENCE_KEY_CUSTODY:same-machine}
+    # Le lien de la page de vérification dans le commentaire témoin, sur un dépôt privé (R159, second tour, M-b) : false
+    # pour ne jamais l'écrire, par exemple si un dépôt privé peut devenir public. L'empreinte de tête s'écrit toujours.
+    witness-link: ${DELIVERY_EVIDENCE_WITNESS_LINK:true}
 
 # Logging Configuration
 logging:

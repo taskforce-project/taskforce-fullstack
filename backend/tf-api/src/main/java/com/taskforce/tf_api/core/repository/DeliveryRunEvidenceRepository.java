@@ -54,7 +54,8 @@ public interface DeliveryRunEvidenceRepository extends JpaRepository<DeliveryRun
      */
     @Query(value = "SELECT r.id FROM delivery_runs r "
         + "WHERE r.evidence_root IS NOT NULL AND r.ended_at BETWEEN :since AND :before "
-        + "AND EXISTS (SELECT 1 FROM mission_dossier_seals s WHERE s.run_id = r.id) "
+        + "AND EXISTS (SELECT 1 FROM mission_dossier_seals s WHERE s.run_id = r.id AND NOT s.late) "
+        + "AND NOT EXISTS (SELECT 1 FROM mission_dossiers d WHERE d.run_id = r.id AND d.witnessed_at IS NOT NULL) "
         + "AND NOT EXISTS (SELECT 1 FROM delivery_run_evidence e WHERE e.run_id = r.id AND e.type = 'note' "
         + "AND CAST(e.data AS jsonb) ->> 'kind' = 'witness') ORDER BY r.ended_at LIMIT 50", nativeQuery = true)
     List<Long> findUnwitnessed(@Param("since") LocalDateTime since,

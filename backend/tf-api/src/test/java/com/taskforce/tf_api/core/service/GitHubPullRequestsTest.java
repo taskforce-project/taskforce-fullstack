@@ -144,4 +144,35 @@ class GitHubPullRequestsTest {
         assertThat(pullRequests.visibility(2L, "acme/website")).isEmpty();
         assertThat(pullRequests.visibility(1L, "../../user")).isEmpty();
     }
+
+    @Test
+    @DisplayName("R159 second tour, M-a : le témoin trouve la tête déjà écrite parmi les commentaires, page après page")
+    void finds_a_witness_already_written() {
+        String head = "sha256:" + "9".repeat(64);
+        StringBuilder full = new StringBuilder("[");
+        for (int i = 0; i < 100; i++) full.append(i == 0 ? "" : ",").append("{\"body\":\"LGTM\",\"html_url\":\"https://github.com/c/").append(i).append("\"}");
+        full.append("]");
+        github.expect(requestTo(REPO + "/issues/212/comments?per_page=100&page=1")).andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(full.toString(), MediaType.APPLICATION_JSON));
+        github.expect(requestTo(REPO + "/issues/212/comments?per_page=100&page=2"))
+            .andRespond(withSuccess("[{\"body\":\"TaskForce evidence of this pull request: `" + head + "`\","
+                + "\"html_url\":\"https://github.com/acme/website/pull/212#issuecomment-7\"}]", MediaType.APPLICATION_JSON));
+
+        assertThat(pullRequests.findComment(1L, "acme/website", 212, head))
+            .contains("https://github.com/acme/website/pull/212#issuecomment-7");
+        github.verify();
+    }
+
+    @Test
+    @DisplayName("R159 second tour, M-a : pas encore écrit, il le dit ; une lecture refusée se dit comme un envoi")
+    void a_witness_not_written_yet_is_not_found() {
+        github.expect(requestTo(REPO + "/issues/212/comments?per_page=100&page=1"))
+            .andRespond(withSuccess("[{\"body\":\"LGTM\"}]", MediaType.APPLICATION_JSON));
+        assertThat(pullRequests.findComment(1L, "acme/website", 212, "sha256:" + "9".repeat(64))).isEmpty();
+        github.verify();
+        github.reset();
+
+        github.expect(requestTo(REPO + "/issues/212/comments?per_page=100&page=1")).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        assertThatThrownBy(() -> pullRequests.findComment(1L, "acme/website", 212, "x")).isInstanceOf(BusinessException.class);
+    }
 }

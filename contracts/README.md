@@ -188,13 +188,19 @@ key (`publicKey`, base64-decoded, as DER) to a third, then
 ### Witness
 
 At the end of the mission, the server writes the sealed head in the mission's pull request, then keeps a `note` of kind
-`witness` (`root`, `seq`, `pullRequest`, `comment`, or `written: false` and its `reason`). GitHub dates the comment and
-keeps its edits: a chain rewritten afterwards no longer holds that head. The comment always carries the head; it links
-the verification page only when GitHub says the repository is private, never from the desktop app or to the machine
-itself, and never names a workspace, a person or a host otherwise: `pageLinked`, and `pageLeftOut` (`desktop-app`,
-`local-address`, `visibility-unknown`, `public-repository`, `internal-repository`). A failure is tried again, and a
-regular pass writes the witness of a sealed mission that has none. A mission without a pull request gets a `witness`
-note with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
+`witness` (`root`, `seq`, `key`, `pullRequest`, `comment`, or `written: false` and its `reason`). GitHub dates the
+comment: a chain rewritten afterwards no longer holds that head. The comment carries the head and the id of the key
+that sealed it (`key`), from the desktop app too: compare the key id you are given with the one in the comment, which
+the operator does not hold alone. It never names a workspace, a mission number, a person or a host. It links the
+verification page only when GitHub says the repository is private, never from the desktop app or to the machine
+itself: the link is `<the instance's address>/verify/<id>`, where `id` is an opaque, random id of the record (128
+bits), and the page asks for a sign-in and checks access as any other. `pageLinked`, and `pageLeftOut` (`desktop-app`,
+`turned-off` when the operator sets `witness-link: false`, `local-address`, `visibility-unknown`, `public-repository`,
+`internal-repository`). Before posting, and before each new attempt, the server looks for the head among the comments
+of the pull request: a reply from GitHub lost after the comment was written never makes a second one, and a comment is
+never edited. Once it has tried, written or not, a regular pass no longer tries again, even when its note could not be
+kept; that pass only writes the witness of a sealed mission the server restarted before. A mission without a pull
+request gets a `witness` note with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
 drawn for it; both sides check it.
 
 ## Mission steps: two codes, one set of cases

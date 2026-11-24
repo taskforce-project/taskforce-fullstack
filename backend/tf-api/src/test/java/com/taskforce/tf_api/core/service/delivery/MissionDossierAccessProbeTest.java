@@ -45,6 +45,7 @@ class MissionDossierAccessProbeTest {
     @Mock private WorkspaceRepository workspaces;
     @Mock private MissionDossierSealRepository seals;
     @Mock private EvidenceSigner signer;
+    @Mock private com.taskforce.tf_api.core.repository.MissionDossierRepository dossiers;
     @InjectMocks private MissionDossierAccess access;
 
     @Test
@@ -82,5 +83,24 @@ class MissionDossierAccessProbeTest {
             .isInstanceOf(ForbiddenException.class);
         assertThat(access.export("acme", 100L, 8L, MissionDossierAccess.Format.MARKDOWN)).contains("# Evidence");
         assertThat(access.export("acme", 100L, 9L, MissionDossierAccess.Format.JSON)).contains("{}");
+    }
+
+    @Test
+    @DisplayName("R159 second tour, M-b : le lien du témoin mène à son dossier pour qui peut le lire, et ne dit rien aux autres")
+    void a_witness_link_keeps_its_access_checks() {
+        Workspace workspace = Workspace.builder().id(3L).slug("acme").build();
+        MissionDossier dossier = MissionDossier.builder().runId(100L).workspace(workspace).projectId(12L).build();
+        String link = "0123456789abcdef0123456789abcdef";
+        lenient().when(dossiers.findByLinkId(link)).thenReturn(Optional.of(dossier));
+        lenient().when(evidence.dossier(100L)).thenReturn(Optional.of(dossier));
+        lenient().when(projects.findById(12L)).thenReturn(Optional.of(com.taskforce.tf_api.core.model.Project.builder().id(12L).build()));
+        lenient().when(members.findByWorkspaceIdAndUserId(3L, 8L)).thenReturn(Optional.of(WorkspaceMember.builder().build()));
+        lenient().when(members.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty());
+
+        assertThat(access.byLink(link, 8L)).isEqualTo(new MissionDossierAccess.Linked("acme", 100L));
+        // Quelqu'un hors de l'espace, ou un lien qui ne mène à rien : la même réponse, sans dire lequel.
+        assertThatThrownBy(() -> access.byLink(link, 7L)).isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class);
+        assertThatThrownBy(() -> access.byLink("f".repeat(32), 8L))
+            .isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class);
     }
 }
