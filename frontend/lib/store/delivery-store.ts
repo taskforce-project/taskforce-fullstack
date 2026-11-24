@@ -72,7 +72,10 @@ interface DeliveryState {
   activity: Record<number, DeliveryRunActivity>;
   /** Par runId : pourquoi le dernier geste sur la carte de résultat n'a pas abouti (GitHub refuse, conflits...). */
   resultErrors: Record<number, string>;
-  /** Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier. */
+  /**
+   * Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier, ou un dossier
+   * que la personne ne peut pas lire (la page de vérification le dit d'un seul message, R159 P2).
+   */
   evidence: Record<number, MissionEvidence | null>;
   /**
    * Par espace : les identifiants des clés qui scellent les dossiers de l'instance (celle d'aujourd'hui, puis celles qui ont
@@ -583,8 +586,10 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       set((state) => ({ evidence: { ...state.evidence, [runId]: evidence } }));
       return evidence;
     } catch (e) {
-      // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1). Une autre erreur garde la lecture d'avant.
-      if (getErrorStatus(e) === 404) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
+      // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1) ; 403 : la personne ne peut pas le lire.
+      // Les deux se disent d'un seul message, qui ne dit pas lequel (R159 P2). Une autre erreur garde la lecture d'avant.
+      const status = getErrorStatus(e);
+      if (status === 404 || status === 403) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
       return null;
     }
   },

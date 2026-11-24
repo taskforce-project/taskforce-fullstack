@@ -392,6 +392,18 @@ describe('delivery-store', () => {
     expect(svc.getEvidence).toHaveBeenCalledWith('acme', 100);
   });
 
+  // La page de vérification (R159 P2) : qui ne peut pas lire le dossier lit le même message que s'il n'existait pas.
+  it('fetchEvidence reads a 403 like a 404: no record to show, and nothing that says which', async () => {
+    const denied = new AxiosError('Forbidden', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 403, data: {}, headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidence).mockRejectedValueOnce(denied);
+    act(() => useDeliveryStore.setState({ evidence: {} }));
+
+    await act(async () => { await useDeliveryStore.getState().fetchEvidence('acme', 101); });
+
+    expect(useDeliveryStore.getState().evidence[101]).toBeNull();
+  });
+
   // La page vérifie le sceau face aux clés de l'instance (R161 B1) : la clé du moment et celles qui ont servi.
   it('fetchEvidenceKeys keeps the ids of the keys of the instance, null when it cannot read them', async () => {
     vi.mocked(svc.getEvidenceKeys)
