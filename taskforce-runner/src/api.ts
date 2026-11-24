@@ -194,7 +194,11 @@ export interface RunnerEvent {
    * configuration (`configured`) ; `served` : chaque modèle que les réponses ont nommé ; `provider` : lu dans
    * l'environnement de l'agent (R159, L5).
    */
-  agent?: { version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string };
+  agent?: {
+    version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string;
+    /** D'où vient `provider` : `launch-configuration`, l'environnement et les réglages que Claude Code lit au lancement (L-c). */
+    providerFrom?: string;
+  };
   /** `test` : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière gardée sur ce poste. */
   test?: {
     command: string; ran: boolean; passed: boolean; passedCount?: number; total?: number; output?: string; outputBytes?: number;

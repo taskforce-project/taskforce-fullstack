@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import type { Claim, RunnerEvent } from "./api.js";
@@ -271,6 +272,36 @@ export function providerOf(env: NodeJS.ProcessEnv): string {
   return "anthropic";
 }
 
+/** Les réglages gérés par l'organisation, que Claude Code lit toujours, selon le système. */
+function managedSettingsPath(platform: NodeJS.Platform = process.platform): string {
+  if (platform === "win32") return join(process.env.ProgramData ?? "C:\\ProgramData", "ClaudeCode", "managed-settings.json");
+  if (platform === "darwin") return "/Library/Application Support/ClaudeCode/managed-settings.json";
+  return "/etc/claude-code/managed-settings.json";
+}
+
+/** L'`env` d'un fichier de réglages de Claude Code ; vide s'il manque ou ne se lit pas. */
+function settingsEnv(path: string): Record<string, string> {
+  try {
+    const env = (JSON.parse(readFileSync(path, "utf8")) as { env?: unknown }).env;
+    if (!env || typeof env !== "object" || Array.isArray(env)) return {};
+    return Object.fromEntries(Object.entries(env as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * L'environnement qui choisit le fournisseur au lancement de Claude Code (R159, second tour, L-c) : celui que le runner
+ * lui passe, puis l'`env` des réglages qu'il charge, dans l'ordre où ils l'emportent : ceux de l'utilisateur
+ * (`CLAUDE_CONFIG_DIR`, sinon `~/.claude`), puis ceux de l'organisation. Ceux du dépôt n'y sont pas : le runner lance
+ * Claude Code avec `--setting-sources user` (voir {@link agentArgs}), qui ne les lit pas. Un script de l'agent peut récrire
+ * les réglages de l'utilisateur pour les missions suivantes : le dossier dit que c'est la configuration du lancement.
+ */
+export function launchEnv(env: NodeJS.ProcessEnv, home: string = homedir(), managed: string = managedSettingsPath()): NodeJS.ProcessEnv {
+  const configDir = env.CLAUDE_CONFIG_DIR?.trim() || join(home, ".claude");
+  return { ...env, ...settingsEnv(join(configDir, "settings.json")), ...settingsEnv(managed) };
+}
+
 /** Le modèle qui a réellement répondu, tel qu'une réponse de l'agent le nomme ; null pour les autres lignes. */
 export function servedModel(message: unknown): string | null {
   if (!message || typeof message !== "object") return null;
@@ -296,6 +327,8 @@ export function agentEvent(info: { version?: string; model?: string; session?: s
       served: [...served],
       ...(info.session ? { session: info.session } : {}),
       provider,
+      // Le fournisseur tel que la configuration le disait au lancement (R159, second tour, L-c).
+      providerFrom: "launch-configuration",
     },
   };
 }
@@ -389,8 +422,9 @@ export async function runAgent(
   // long, il est coupé entre deux caractères, et la coupe se dit (R159, L4).
   relay.push([{ kind: "brief", text: "The brief given to Claude Code", body: cut(prompt, MAX_BRIEF) }]);
   const session = new SessionRecord(opts.sessionFile);
-  // agentEnv ne touche pas à ce qui choisit le fournisseur (Bedrock, Vertex, l'adresse de l'API) : il se lit ici.
-  const provider = providerOf(process.env);
+  // agentEnv ne touche pas à ce qui choisit le fournisseur (Bedrock, Vertex, l'adresse de l'API) : il se lit ici, avec
+  // les réglages que Claude Code charge au lancement (R159, second tour, L-c).
+  const provider = providerOf(launchEnv(process.env));
   // Ce que Claude Code dit de lui au démarrage, et chaque modèle que ses réponses nomment (R159, L5).
   let started: { version?: string; model?: string; session?: string } | null = null;
   const served: string[] = [];

@@ -465,6 +465,16 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
+        @DisplayName("R159 second tour, L-c : le dossier dit que le fournisseur est celui de la configuration du lancement")
+        void the_provider_is_the_launch_configuration() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "another-endpoint",
+                    "sonnet", List.of(), "launch-configuration"), null));
+
+            assertThat(data(0).get("providerFrom").asText()).isEqualTo("launch-configuration");
+        }
+
+        @Test
         @DisplayName("l'agent réellement lancé : sa version, son modèle, sa session")
         void the_agent_that_ran() throws Exception {
             service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300 with claude-sonnet-5-20261001",

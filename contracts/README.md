@@ -131,7 +131,10 @@ test command in TaskForce is no longer the one the runner ran. The result then o
 the tests passes. `definitions` lists the files of that kind the runner found, changed or not: it is the list
 TaskForce looks for, so "none of these files changed", never "the tests are the same". The `note` of kind `agent` gives
 the model the configuration asked for (`configured`), each model the answers named (`served`), and who serves it
-(`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or `another-endpoint`).
+(`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or `another-endpoint`), as the configuration said when
+the agent was launched (`providerFrom: launch-configuration`): the runner's environment, then the `env` of Claude
+Code's user settings and of the organization's managed settings. The repository's settings are not read: the runner
+launches Claude Code without them.
 
 ### Gaps and the cap
 
