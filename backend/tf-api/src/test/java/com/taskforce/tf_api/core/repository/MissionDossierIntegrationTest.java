@@ -32,6 +32,7 @@ import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.DeliveryRun;
 import com.taskforce.tf_api.core.model.Issue;
+import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
@@ -333,6 +334,68 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE user_id = ?", Integer.class, ada.getId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE person = ? AND (body IS NOT NULL OR salt IS NOT NULL)",
             Integer.class, id)).isZero();
+    }
+
+    /** Un dossier d'avant la 1.18 : sa ligne, et une chaîne qui nomme la personne par son courriel, sans sceau. */
+    private void legacyRecord() {
+        dossiers.saveAndFlush(MissionDossier.builder().runId(run.getId()).workspace(workspace).projectId(issue.getProject().getId())
+            .issueId(issue.getId()).issueKey("WEB-1").delegatedBy(ada).createdAt(LocalDateTime.now()).build());
+        String prev = EvidenceChain.ZERO_HASH;
+        List<Object[]> rows = new ArrayList<>();
+        Object[][] events = {
+            {"mission.started", "server", "taskforce", JSON.createObjectNode().put("issue", "WEB-1").put("requestedBy", "ada@it.dev")},
+            {"action.decided", "server", "taskforce", JSON.createObjectNode().put("approval", 3).put("effect", "ask").put("asked", "ada@it.dev")},
+            {"human.decision", "person", "ada@it.dev", JSON.createObjectNode().put("approval", 3).put("decision", "ALLOWED")},
+            {"mission.ended", "server", "taskforce", JSON.createObjectNode().put("status", "DONE")},
+        };
+        for (int i = 0; i < events.length; i++) {
+            Object[] e = events[i];
+            String at = "2026-10-01T10:00:0" + i + ".000Z";
+            String hash = EvidenceChain.link(prev, EvidenceChain.event(i + 1, at, (String) e[0], (String) e[1], (String) e[2], (ObjectNode) e[3]))
+                .get("hash").asText();
+            rows.add(new Object[] {run.getId(), i + 1, at, e[0], e[1], e[2], CanonicalJson.of((ObjectNode) e[3]), prev, hash});
+            prev = hash;
+        }
+        jdbc.batchUpdate("INSERT INTO delivery_run_evidence (run_id, seq, at, type, actor_kind, actor_id, data, prev, hash) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows);
+        jdbc.update("UPDATE delivery_runs SET status = 'DONE', evidence_root = ? WHERE id = ?", prev, run.getId());
+        em.clear();
+    }
+
+    @Test
+    @DisplayName("R159 second tour, N4 : à la purge, un dossier d'avant la 1.18 le dit sans nommer personne, et se scelle tard")
+    void a_purge_marks_the_chains_from_before_1_18() throws Exception {
+        legacyRecord();
+        assertThat(evidence.legacy(run.getId())).isTrue();
+
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(1);
+        em.flush();
+
+        JsonNode file = export();
+        assertThat(EvidenceChain.firstBrokenLink(events(file))).isEqualTo(-1);
+        JsonNode note = events(file).getLast().get("data");
+        assertThat(note.get("kind").asText()).isEqualTo("erased");
+        assertThat(note.get("legacy").asBoolean()).isTrue();
+        assertThat(note.get("events")).extracting(JsonNode::asInt).containsExactly(1, 2, 3);
+        assertThat(note.get("reason").asText()).isEqualTo("account-deleted");
+        assertThat(note.toString()).doesNotContain("ada@it.dev").doesNotContain("who:");
+        EvidenceSeal.Opened seal = EvidenceSeal.open(file.get("seal"));
+        assertThat(seal.valid()).isTrue();
+        assertThat(seal.statement().get("predicate").get("late").asBoolean()).isTrue();
+        // L'export lisible masque chaque courriel de la chaîne.
+        assertThat(evidence.dossierMarkdown(run.getId()).orElseThrow()).doesNotContain("ada@it.dev").contains("(email hidden)");
+    }
+
+    @Test
+    @DisplayName("R159 second tour, N4 : un dossier d'après la 1.18 n'est pas d'avant, et la purge n'y ajoute pas de note ancienne")
+    void a_record_from_1_18_is_not_legacy() throws Exception {
+        mission();
+
+        assertThat(evidence.legacy(run.getId())).isFalse();
+        evidence.forgetPerson(ada.getId());
+        em.flush();
+
+        assertThat(events(export())).noneMatch(e -> e.get("data").path("legacy").asBoolean(false));
     }
 
     @Test

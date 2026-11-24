@@ -739,9 +739,62 @@ public class MissionEvidenceService {
             appendToDossier(runId, "note", Actor.SERVER, data);
         });
         people.deleteAll(mappings);
-        log.info("Compte {} oublié des dossiers : {} dossier(s) touché(s)", userId, byDossier.size());
-        return byDossier.size();
+        int legacy = forgetInLegacyChains(userId);
+        log.info("Compte {} oublié des dossiers : {} dossier(s) touché(s), dont {} d'avant la 1.18", userId, byDossier.size() + legacy, legacy);
+        return byDossier.size() + legacy;
     }
+
+    /**
+     * Une chaîne écrite avant la 1.18 nomme les personnes par leur courriel (R159, second tour, N4) : celui qui a délégué,
+     * à qui l'on a demandé, l'acteur de chaque geste. Ces événements ne changent pas sans casser la chaîne. À la purge, chaque
+     * dossier ancien qui nomme ce courriel le dit à la suite de sa chaîne, dans une note du serveur qui ne nomme personne : la
+     * date, et que le courriel reste dans ces événements. Puis un sceau tardif le couvre. TaskForce masque ces courriels
+     * quand il montre le dossier ({@link #dossierMarkdown}, la page), et n'en ouvre le JSON qu'aux responsables de l'espace.
+     */
+    private int forgetInLegacyChains(Long userId) {
+        String email = userId == null ? null : users.findById(userId).map(User::getEmail).map(String::strip)
+            .filter(e -> !e.isEmpty()).orElse(null);
+        if (email == null) {
+            return 0;
+        }
+        String pattern = "%\"" + email.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "\"%";
+        int touched = 0;
+        for (Long runId : repository.findLegacyRunsNaming(email, pattern)) {
+            DeliveryRun run = runRepository.findByIdForUpdate(runId).orElse(null);
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("kind", "erased");
+            data.put("legacy", true);
+            data.put("events", repository.findSeqsNaming(runId, email, pattern));
+            data.put("reason", "account-deleted");
+            data.put("text", "A person's account was deleted on " + EvidenceChain.AT.format(Instant.now()) + ". Their email stays in "
+                + "the events listed here, written before TaskForce 1.18, which cannot change without breaking the chain: "
+                + "TaskForce hides it when it shows this record.");
+            Optional<String> hash = appendTo(runId, "note", Actor.SERVER, data);
+            if (hash.isEmpty()) {
+                continue;
+            }
+            if (run != null && run.getEvidenceRoot() != null) run.setEvidenceRoot(hash.get());
+            seal(runId, false, true);
+            touched++;
+        }
+        return touched;
+    }
+
+    /**
+     * Ce dossier vient-il d'avant la 1.18 (R159, second tour, N4) ? Sa chaîne nomme alors les personnes par leur courriel :
+     * son {@code mission.started} n'a pas de {@code accountable}, ou il n'en a pas.
+     */
+    @Transactional(readOnly = true)
+    public boolean legacy(Long runId) {
+        return repository.findFirstByRunIdAndTypeOrderBySeqAsc(runId, "mission.started")
+            .map(started -> !parse(started.getData()).has("accountable")).orElse(true);
+    }
+
+    /** Un courriel, où qu'il soit dans un texte. */
+    private static final java.util.regex.Pattern EMAIL = java.util.regex.Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+");
+
+    /** Ce que TaskForce écrit à la place d'un courriel qu'une chaîne d'avant la 1.18 garde (R159, second tour, N4). */
+    static final String HIDDEN_EMAIL = "(email hidden)";
 
     // --------------------------------------------------------------------- finir, sceller
 
@@ -1033,7 +1086,11 @@ public class MissionEvidenceService {
             .append("canonical JSON of the event without its `hash` (contracts/README.md). The last one is the root. ")
             .append("The JSON export carries the signed seal: `npm run verify -- evidence-run-").append(runId)
             .append(".json --key <the key id the operator publishes>` in taskforce-runner checks both.\n");
-        return Optional.of(EvidenceIntake.text(md.toString()));
+        // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : l'export lisible les masque tous (R159, N4).
+        boolean legacy = events.stream().filter(e -> "mission.started".equals(e.get("type").asText())).findFirst()
+            .map(e -> !e.get("data").has("accountable")).orElse(true);
+        String text = legacy ? EMAIL.matcher(md.toString()).replaceAll(HIDDEN_EMAIL) : md.toString();
+        return Optional.of(EvidenceIntake.text(text));
     }
 
     /** Ce que le sceau dit de sa clé, lu dans son énoncé et non dans la clé d'aujourd'hui (R159, M2). */

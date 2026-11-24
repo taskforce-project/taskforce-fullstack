@@ -139,6 +139,13 @@ also reads it at `GET /api/workspaces/{slug}/delivery/evidence/key`, with the ke
 before and when each was used. The file carries its own public key, so a check without `--key` only says that the seal
 matches the key in the file, which anyone can make.
 
+Records written before TaskForce 1.18 name people by their email in their chain: who delegated, who was asked, who
+answered. These events cannot change without breaking the chain, so purging an account cannot remove the email from
+them. TaskForce adds a note to each such record, saying the date and which events keep the email, seals it again, and
+hides these emails wherever it shows the record; only owners and admins of the workspace can export it as JSON.
+Whether to keep these records, and for how long, is your decision as the operator: TaskForce keeps them until their
+workspace is deleted.
+
 ## Integrations
 
 GitHub and Slack need an OAuth app of your own; `.env.selfhost.example` lists the callback URLs and the Slack scopes.

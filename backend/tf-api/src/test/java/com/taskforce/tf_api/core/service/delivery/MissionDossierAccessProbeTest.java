@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,8 @@ import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
 import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.model.WorkspaceMember;
+import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
@@ -56,5 +59,28 @@ class MissionDossierAccessProbeTest {
 
         assertThatThrownBy(() -> access.export("acme", 100L, 7L, MissionDossierAccess.Format.JSON))
             .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    @DisplayName("R159 second tour, N4 : le JSON et le sceau d'un dossier d'avant la 1.18 ne s'exportent que pour un responsable")
+    void a_record_from_before_1_18_exports_only_for_a_manager() {
+        Workspace workspace = Workspace.builder().id(3L).slug("acme").build();
+        MissionDossier dossier = MissionDossier.builder().runId(100L).workspace(workspace).projectId(12L).build();
+        when(evidence.dossier(100L)).thenReturn(Optional.of(dossier));
+        lenient().when(projects.findById(12L)).thenReturn(Optional.of(com.taskforce.tf_api.core.model.Project.builder().id(12L).build()));
+        lenient().when(evidence.legacy(100L)).thenReturn(true);
+        lenient().when(evidence.dossierJson(100L)).thenReturn(Optional.of("{}"));
+        lenient().when(evidence.dossierMarkdown(100L)).thenReturn(Optional.of("# Evidence"));
+        lenient().when(members.findByWorkspaceIdAndUserId(3L, 8L)).thenReturn(Optional.of(WorkspaceMember.builder()
+            .role(WorkspaceRole.MEMBER).build()));
+        lenient().when(members.findByWorkspaceIdAndUserId(3L, 9L)).thenReturn(Optional.of(WorkspaceMember.builder()
+            .role(WorkspaceRole.ADMIN).build()));
+
+        assertThatThrownBy(() -> access.export("acme", 100L, 8L, MissionDossierAccess.Format.JSON))
+            .isInstanceOf(ForbiddenException.class).hasMessageContaining("before TaskForce 1.18");
+        assertThatThrownBy(() -> access.export("acme", 100L, 8L, MissionDossierAccess.Format.DSSE))
+            .isInstanceOf(ForbiddenException.class);
+        assertThat(access.export("acme", 100L, 8L, MissionDossierAccess.Format.MARKDOWN)).contains("# Evidence");
+        assertThat(access.export("acme", 100L, 9L, MissionDossierAccess.Format.JSON)).contains("{}");
     }
 }

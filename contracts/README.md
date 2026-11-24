@@ -94,8 +94,12 @@ names `requestedBy`, `accountable`, `request.reporter`, the `author` of each rul
 and `email` and `name` as texts kept beside the chain. A GitHub account that merges the pull request enters the same
 way, by the text of its login. When an account is purged, its email and name are erased in every dossier, with their
 salt, and a `note` of kind `erased` (`person`, `texts`, `reason: account-deleted`) says so; the id stays in the
-chains, linked to no one. A chain written before 1.18 named people by their email: it cannot be erased without
-breaking the chain. The copy of the rules bundle the record keeps names people the same way: the `owner` of each
+chains, linked to no one. A chain written before 1.18 named people by their email (its `mission.started` has no
+`accountable`): those events cannot change without breaking the chain. When the account of a person it names is
+purged, the record gets a `note` of kind `erased` with `legacy: true`, the `events` that keep the email and the
+`reason`, naming no one, then a late seal (below). TaskForce hides the emails of such a record when it shows it (the
+page, the Markdown export), and only an owner or admin of the workspace exports its JSON or its seal, which carry them.
+The copy of the rules bundle the record keeps names people the same way: the `owner` of each
 rule, its `approvers` and the `ref` of a person's layer are opaque ids, each introduced by its note (a person
 TaskForce no longer knows is `who:unknown`). A rule stays that of a named person until their name is erased; then the
 `erased` note says when. The live rules, and the bundle the runner receives, keep their form.
