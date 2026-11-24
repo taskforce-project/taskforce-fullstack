@@ -73,6 +73,8 @@ export const DELIVERY_ROUTES = {
     `/api/workspaces/${slug}/delivery/runs/${runId}/approvals/${approvalId}`,
   /** Dossier de preuve d'un run, `?format=json|md` (GET, fichier sans enveloppe ; 404 pour un run de la v1). */
   EVIDENCE: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/evidence`,
+  /** Les clés qui scellent les dossiers de l'instance : celle d'aujourd'hui et celles qui ont déjà scellé (GET, R159 M3). */
+  EVIDENCE_KEY: (slug: string) => `/api/workspaces/${slug}/delivery/evidence/key`,
   /** Les gestes de la carte de résultat (POST, R78) : fusionner la PR, l'écarter, ou relancer la mission. */
   APPLY: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/apply`,
   DISCARD: (slug: string, runId: number) => `/api/workspaces/${slug}/delivery/runs/${runId}/discard`,

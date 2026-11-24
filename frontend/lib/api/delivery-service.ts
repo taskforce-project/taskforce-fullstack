@@ -454,8 +454,33 @@ export interface MissionEvidence {
   root: string;
   mission?: Record<string, unknown>;
   rules?: Record<string, unknown>;
-  texts?: Record<string, string>;
+  /** Chaque texte par son empreinte : le SHA-256 de son sel suivi du texte (R159, M6). */
+  texts?: Record<string, { salt: string; text: string }>;
   seal?: Record<string, unknown>;
+}
+
+/** Une clé qui scelle, ou a scellé, les dossiers de l'instance (R159, M3). */
+export interface EvidenceKey {
+  id: string;
+  algorithm: string;
+  publicKey: string | null;
+  custody: string | null;
+  kept: boolean | null;
+  firstUsed: string | null;
+  lastUsed: string | null;
+  seals: number | null;
+}
+
+/** Les clés de l'instance : celle qui scelle aujourd'hui, et celles qui ont déjà scellé des dossiers de l'espace. */
+export interface EvidenceKeys {
+  current: EvidenceKey;
+  used: EvidenceKey[];
+}
+
+/** Les clés qui scellent les dossiers de cette instance, pour vérifier un sceau dans l'app. Une erreur remonte. */
+export async function getEvidenceKeys(slug: string): Promise<EvidenceKeys> {
+  const res = await apiClient.get<{ data: EvidenceKeys }>(DELIVERY_ROUTES.EVIDENCE_KEY(slug), { silentError: true });
+  return res.data.data;
 }
 
 /**

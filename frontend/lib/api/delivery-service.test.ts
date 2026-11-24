@@ -11,6 +11,7 @@ import {
   decideApproval,
   downloadEvidence,
   getEvidence,
+  getEvidenceKeys,
   applyRun,
   discardRun,
   markRunDone,
@@ -243,6 +244,15 @@ describe('delivery-service', () => {
     await expect(getEvidence(SLUG, 100)).resolves.toEqual(evidence);
 
     expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.EVIDENCE(SLUG, 100), { params: { format: 'json' }, silentError: true });
+  });
+
+  it('GET les clés qui scellent les dossiers de l\'instance, pour vérifier un sceau dans l\'app (R161 B1)', async () => {
+    const keys = { current: { id: 'sha256:aa' }, used: [] };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(keys));
+
+    await expect(getEvidenceKeys(SLUG)).resolves.toEqual(keys);
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/workspaces/acme/delivery/evidence/key', { silentError: true });
   });
 
   it('GET les agents pour un projet donné', async () => {

@@ -15,6 +15,7 @@ import {
   stopRun as stopRunApi,
   downloadEvidence as downloadEvidenceApi,
   getEvidence,
+  getEvidenceKeys,
   provisionRunner as provisionRunnerApi,
   getMissionChanges,
   getMissionFileDiff,
@@ -73,6 +74,11 @@ interface DeliveryState {
   resultErrors: Record<number, string>;
   /** Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier. */
   evidence: Record<number, MissionEvidence | null>;
+  /**
+   * Par espace : les identifiants des clés qui scellent les dossiers de l'instance (celle d'aujourd'hui, puis celles qui ont
+   * déjà scellé) ; `null` : la route ne s'est pas lue, et la page ne compare un sceau à aucune clé.
+   */
+  evidenceKeys: Record<string, string[] | null>;
   /** Par runId : les fichiers changés et ce que la personne peut en faire (R139). */
   missionChanges: Record<number, MissionChanges>;
   /** Par runId puis par fichier : le diff lu ; `null` : il n'a pas pu se lire. */
@@ -131,6 +137,8 @@ interface DeliveryState {
    * encore, run de la v1) ou en cas d'erreur, où le dossier lu d'avant reste.
    */
   fetchEvidence: (slug: string, runId: number) => Promise<MissionEvidence | null>;
+  /** Lit les clés de l'instance pour cet espace ; `null` en cas d'échec, gardé tel quel. */
+  fetchEvidenceKeys: (slug: string) => Promise<string[] | null>;
   /**
    * Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. `reason` :
    * pourquoi, si la personne le dit ; elle entre au dossier de la mission avec le geste (TF-J2-7).
@@ -263,6 +271,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   activity: {},
   resultErrors: {},
   evidence: {},
+  evidenceKeys: {},
   missionChanges: {},
   fileDiffs: {},
   changeComments: {},
@@ -576,6 +585,18 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     } catch (e) {
       // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1). Une autre erreur garde la lecture d'avant.
       if (getErrorStatus(e) === 404) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
+      return null;
+    }
+  },
+
+  fetchEvidenceKeys: async (slug) => {
+    try {
+      const keys = await getEvidenceKeys(slug);
+      const ids = [keys.current.id, ...keys.used.map((key) => key.id)].filter((id): id is string => typeof id === "string");
+      set((state) => ({ evidenceKeys: { ...state.evidenceKeys, [slug]: ids } }));
+      return ids;
+    } catch {
+      set((state) => ({ evidenceKeys: { ...state.evidenceKeys, [slug]: null } }));
       return null;
     }
   },

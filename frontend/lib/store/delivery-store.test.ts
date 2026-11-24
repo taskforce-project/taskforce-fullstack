@@ -17,6 +17,7 @@ vi.mock('../api/delivery-service', () => ({
   decideApproval: vi.fn(),
   downloadEvidence: vi.fn(),
   getEvidence: vi.fn(),
+  getEvidenceKeys: vi.fn(),
   applyRun: vi.fn(),
   discardRun: vi.fn(),
   markRunDone: vi.fn(),
@@ -389,6 +390,20 @@ describe('delivery-store', () => {
     await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
     expect(useDeliveryStore.getState().evidence[100]).toBeNull();
     expect(svc.getEvidence).toHaveBeenCalledWith('acme', 100);
+  });
+
+  // La page vérifie le sceau face aux clés de l'instance (R161 B1) : la clé du moment et celles qui ont servi.
+  it('fetchEvidenceKeys keeps the ids of the keys of the instance, null when it cannot read them', async () => {
+    vi.mocked(svc.getEvidenceKeys)
+      .mockResolvedValueOnce({ current: { id: 'sha256:aa', custody: 'same-machine', kept: false, publicKey: 'k' }, used: [{ id: 'sha256:bb' }] } as Awaited<ReturnType<typeof svc.getEvidenceKeys>>)
+      .mockRejectedValueOnce(new Error('offline'));
+    act(() => useDeliveryStore.setState({ evidenceKeys: {} }));
+
+    await expect(useDeliveryStore.getState().fetchEvidenceKeys('acme')).resolves.toEqual(['sha256:aa', 'sha256:bb']);
+    expect(useDeliveryStore.getState().evidenceKeys.acme).toEqual(['sha256:aa', 'sha256:bb']);
+    await expect(useDeliveryStore.getState().fetchEvidenceKeys('acme')).resolves.toBeNull();
+    expect(useDeliveryStore.getState().evidenceKeys.acme).toBeNull();
+    expect(svc.getEvidenceKeys).toHaveBeenCalledWith('acme');
   });
 
   it('decideApproval returns false when the server refuses', async () => {
