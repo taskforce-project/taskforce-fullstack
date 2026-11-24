@@ -587,6 +587,18 @@ public class MissionEvidenceService {
         return data;
     }
 
+    /** La marque que le runner pose au bout d'un fait coupé pour tenir au dossier (R159, L4 ; second tour, N2). */
+    private static final java.util.regex.Pattern CUT_MARK =
+        java.util.regex.Pattern.compile("\\n\\[TaskForce cut this text here: \\d+ characters in all]$");
+
+    /**
+     * Un fait que le runner a coupé pour tenir au dossier : les règles ont jugé le fait entier, que le serveur n'a pas. Le
+     * dossier le garde ainsi ; une demande d'accord ne part jamais sur lui (R159, troisième tour, C1).
+     */
+    static boolean cutToFit(String value) {
+        return value != null && CUT_MARK.matcher(value).find();
+    }
+
     /** Les faits jugés, bornés : de quoi rejuger l'action avec le paquet exporté. */
     static List<Map<String, String>> facts(List<Map<String, String>> facts) {
         List<Map<String, String>> out = new ArrayList<>();
