@@ -86,6 +86,11 @@ export function whoWords(who: Who | null | undefined, t: Texts): string {
   return who.name
 }
 
+/** Une phrase qui commence par une personne que le dossier ne nomme pas (« a person (email hidden) ») prend sa majuscule. */
+function upperFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 /** Chaque courriel d'un texte, masqué comme l'export Markdown le masque (R159, second tour, N4). */
 export function hideEmails(text: string, t: Texts): string {
   return text.replace(new RegExp(EMAIL.source, "g"), t.emailHidden)
@@ -260,7 +265,7 @@ export function summarySentence(page: VerificationPage, t: Texts): string {
   else if (!page.running && page.notChecked.some((n) => n.kind === "noTestRecord")) parts.push(s.testsUnknown)
   if (page.end) parts.push(fillText(s.decided, { decision: decisionWords(page.end, t), date: when(page.end.at) }))
   else if (!page.running) parts.push(s.undecided)
-  const sentence = parts.join(" ")
+  const sentence = parts.map(upperFirst).join(" ")
   return page.legacy ? hideEmails(sentence, t) : sentence
 }
 
@@ -443,7 +448,7 @@ function decisions(page: VerificationPage, t: Texts): Line[] {
   const lines: Line[] = []
   const where = t.decisions.where as Record<string, string>
   for (const d of page.decisions) {
-    lines.push({ text: fillText(t.decisions.at, { what: decisionWords(d, t), date: when(d.at), where: where[d.where ?? "taskforce"] ?? d.where ?? "" }) })
+    lines.push({ text: fillText(t.decisions.at, { what: upperFirst(decisionWords(d, t)), date: when(d.at), where: where[d.where ?? "taskforce"] ?? d.where ?? "" }) })
     if (d.kind === "approval" || d.kind === "signature" || d.kind === "expired") {
       if (d.rule?.reason) lines.push({ text: fillText(t.decisions.rule, { reason: d.rule.reason, id: d.rule.id }), tone: "muted" })
       else if (d.ruleId) lines.push({ text: fillText(t.decisions.ruleId, { id: d.ruleId }), tone: "muted" })

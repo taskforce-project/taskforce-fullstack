@@ -235,6 +235,8 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
     expect(texts(sections, "request")).toContain(`Given to the agent by a person (email hidden) on ${when(file.events[0]?.at ?? null)}.`)
     expect(texts(sections, "changed")).toContain("The mission did not finish. Its error, as it was reported: “Stopped by (email hidden).”")
     expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.legacy)
+    // La phrase d'abord prend sa majuscule, même quand elle commence par une personne masquée.
+    expect(summarySentence(page, t)).toMatch(/^A person \(email hidden\) gave WEB-12 to the agent\./)
     expect(texts(sections, "record")).toContain("A person's account was deleted on 2026-11-24 08:00 UTC. Their email stays in events 1, 2, "
       + "written before TaskForce 1.18, which cannot change without breaking the chain: this page hides it.")
     // La page exportée ne porte pas ce dossier : seul un responsable de l'espace l'exporte en JSON.
@@ -389,7 +391,7 @@ describe("le reste du dossier, dit en clair", () => {
     const lines = texts(verificationSections(page, t, context), "decisions")
     expect(lines[0]).toBe("Final decision: Merged on GitHub by octocat.")
     // Une chaîne d'avant la 1.18 (pas de `accountable`) nomme la personne par son courriel : la page le masque (N4).
-    expect(lines.some((l) => l.startsWith("a person (email hidden) allowed the command “echo \"approved by security\"”, as the agent wrote it,"))).toBe(true)
+    expect(lines.some((l) => l.startsWith("A person (email hidden) allowed the command “echo \"approved by security\"”, as the agent wrote it,"))).toBe(true)
   })
 
   it("une demande échue, un fournisseur autre, une session gardée à part", () => {
