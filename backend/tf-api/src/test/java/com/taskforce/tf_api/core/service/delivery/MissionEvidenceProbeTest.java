@@ -138,4 +138,24 @@ class MissionEvidenceProbeTest {
 
         assertThat(EvidenceChain.firstBrokenLink(events)).isEqualTo(-1);
     }
+
+    @Test
+    @DisplayName("L6 : un runner perdu laisse la marque des événements qui peuvent manquer")
+    void a_lost_runner_leaves_a_mark() throws Exception {
+        service.append(run, "mission.started", MissionEvidenceService.Actor.SERVER, Map.of("issue", "WEB-12"));
+        run.setEvidenceRunnerSeq(14);
+
+        service.end(run, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
+            "Runner lost: no heartbeat for more than 10 min. Restart the runner and delegate the task again."));
+
+        JsonNode gap = null;
+        for (DeliveryRunEvidence e : stored) {
+            JsonNode data = JSON.readTree(e.getData());
+            if ("note".equals(e.getType()) && "gap".equals(data.path("kind").asText())) gap = data;
+        }
+        assertThat(gap).as("a gap note").isNotNull();
+        assertThat(gap.get("from").asInt()).isEqualTo(15);
+        assertThat(gap.get("to").isNull()).isTrue();
+        assertThat(gap.get("text").asText()).contains("after its event 14");
+    }
 }

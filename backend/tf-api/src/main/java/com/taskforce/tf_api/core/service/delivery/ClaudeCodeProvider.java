@@ -29,6 +29,8 @@ import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 public class ClaudeCodeProvider implements DeliveryAgentProvider {
 
     public static final String KEY = "claude-code";
+    /** Le début de l'erreur d'une mission dont le runner s'est tu : le dossier la reconnaît et marque le trou (R159, L6). */
+    public static final String RUNNER_LOST = "Runner lost: ";
 
     /** Ce que la personne lit quand son runner signale un problème (codes de {@code taskforce-runner/src/readiness.ts}). */
     private static final Map<String, String> RUNNER_PROBLEMS = Map.of(
@@ -93,7 +95,7 @@ public class ClaudeCodeProvider implements DeliveryAgentProvider {
         LocalDateTime deadline = run.getHeartbeatAt().plus(settings.heartbeatTimeout());
         if (LocalDateTime.now().isAfter(deadline)) {
             return new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
-                "Runner lost: no heartbeat for more than " + settings.heartbeatTimeout().toMinutes()
+                RUNNER_LOST + "no heartbeat for more than " + settings.heartbeatTimeout().toMinutes()
                     + " min. Restart the runner and delegate the task again.");
         }
         return new DeliveryPoll(DeliveryRunStatus.RUNNING, null, null, null);

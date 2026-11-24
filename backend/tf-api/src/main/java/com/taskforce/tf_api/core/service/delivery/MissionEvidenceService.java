@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
+import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceHeader;
@@ -275,6 +276,22 @@ public class MissionEvidenceService {
         append(run, "note", runnerActor(run), data);
     }
 
+    /**
+     * Le runner s'est tu (R159, L6) : ce qu'il a peut-être envoyé après son dernier événement reçu n'est jamais arrivé, et
+     * il ne dira pas combien. La marque le dit, sans fin connue ({@code to} nul).
+     */
+    private void lost(DeliveryRun run) {
+        int last = run.getEvidenceRunnerSeq();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "gap");
+        data.put("from", last + 1);
+        data.put("to", null);
+        data.put("text", last == 0
+            ? "The runner stopped answering before its first event: whatever it did, if anything, never arrived."
+            : "The runner stopped answering after its event " + last + ": any event after it never arrived.");
+        append(run, "note", Actor.SERVER, data);
+    }
+
     /** La marque d'un trou : les numéros du runner qui ne sont jamais arrivés. */
     private void gap(DeliveryRun run, int from, int to) {
         Map<String, Object> data = new LinkedHashMap<>();
@@ -405,6 +422,9 @@ public class MissionEvidenceService {
             return;
         }
         checklistAtEnd(run);
+        if (poll.status() == DeliveryRunStatus.FAILED && poll.error() != null && poll.error().startsWith(ClaudeCodeProvider.RUNNER_LOST)) {
+            lost(run);
+        }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("status", poll.status().name());
         // Le seul texte de l'agent que la page montre (R212, rubrique 2), gardé à côté de la chaîne.
