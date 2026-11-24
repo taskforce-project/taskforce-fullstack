@@ -231,6 +231,11 @@ export interface PageRecord {
    * changent pas sans casser la chaîne (R159, second tour, N4).
    */
   readonly legacyErasures: ReadonlyArray<{ readonly at: string; readonly events: readonly number[] }>
+  /**
+   * Le dossier a atteint son plafond : à quel événement, lequel, et si TaskForce a arrêté la mission pour que rien ne
+   * continue sans être écrit (R159, second tour de #551, N2). Nul sinon.
+   */
+  readonly cap: { readonly seq: number; readonly max: number; readonly stopped: boolean } | null
 }
 
 export interface VerificationPage {
@@ -616,6 +621,8 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
   const key = predicate && isObj(predicate.key) ? predicate.key : {}
   const witnessNote = notes("witness").at(-1)
   const w = witnessNote ? data(witnessNote) : null
+  // Le plafond du dossier, que seul le serveur constate ; le runner a ses propres limites (tours, durée), dites autrement.
+  const capped = events.find((e) => e.type === "limit.reached" && e.actor.kind === "server" && typeof data(e).max === "number")
   const seq = predicate ? num(predicate.seq) : null
   const headerFromChain = typeof s.mission === "number" && typeof s.workspace === "string"
   const record: PageRecord = {
@@ -640,6 +647,7 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       const seqs = data(e).events
       return { at: e.at, events: Array.isArray(seqs) ? seqs.filter((n): n is number => typeof n === "number") : [] }
     }),
+    cap: capped ? { seq: capped.seq, max: num(data(capped).max) ?? 0, stopped: data(capped).stopped === true } : null,
   }
 
   return {

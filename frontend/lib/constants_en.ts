@@ -2333,6 +2333,7 @@ export const CONSTANTS_EN = {
       changedOne: "1 file changed.",
       noFiles: "No file changed.",
       notFinished: "The mission did not finish.",
+      capped: "TaskForce stopped the mission: its record was full.",
       testsPassed: "The tests passed{counts}, run by TaskForce's runner on the agent's computer.",
       testsFailed: "The tests failed.",
       testsOwn: "The tests ran as the branch itself defines them, so they do not count as a check.",
@@ -2373,6 +2374,7 @@ export const CONSTANTS_EN = {
     changed: {
       finished: "The mission finished.",
       failed: "The mission did not finish. Its error, as it was reported: “{error}”",
+      capped: "TaskForce stopped the mission: its record reached {max} events, the most it keeps for one mission, and the agent can't go on without a record.",
       summary: "What the agent says it did, in its own words. TaskForce did not check it.",
       files: "{count} files changed: {added} lines added, {removed} removed. Their names, as the agent wrote them:",
       oneFile: "1 file changed: {added} lines added, {removed} removed. Its name, as the agent wrote it:",
@@ -2515,6 +2517,7 @@ export const CONSTANTS_EN = {
       gap: "The runner's events {from} to {to} never arrived (noted at event {noted} of the record).",
       gapOne: "The runner's event {from} never arrived (noted at event {noted} of the record).",
       gapLost: "The runner stopped answering: from its event {from}, any event may be missing (noted at event {noted} of the record).",
+      cap: "The record reached its cap of {max} events at event {seq}: later events were not kept, except the end, the people's decisions and the witness.",
       legacyErased: "A person's account was deleted on {date}. Their email stays in events {events}, written before TaskForce 1.18, which cannot change without breaking the chain: this page hides it.",
       sealedAt: "The seal covers the record up to event {seq}, signed on {date} with the key {key}.",
       sealedLate: "The seal covers the record up to event {seq}, signed late, on {date}, with the key {key}: TaskForce sealed this record after its mission had ended, so the seal proves nothing of what came before.",

@@ -233,6 +233,27 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
     expect(exportHowTo(today, t, context)).toBe(t.export.howTo.replaceAll("{id}", "42").replace("{key}", ""))
   })
 
+  it("N2 du second tour de #551 : au plafond du dossier, TaskForce a arrêté la mission, et la page le dit dans ses mots", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: `who:${"1".repeat(32)}` } },
+      { type: "limit.reached", data: { max: 10000, stopped: true, text: "The evidence of this mission reached its cap of 10000 events." } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Evidence cap reached: TaskForce stopped the mission." } },
+    ]))
+    expect(page.record.cap).toEqual({ seq: 2, max: 10000, stopped: true })
+    const sections = verificationSections(page, t, context)
+    expect(texts(sections, "changed")).toContain("TaskForce stopped the mission: its record reached 10,000 events, the most it keeps for one mission, "
+      + "and the agent can't go on without a record.")
+    expect(texts(sections, "changed").join(" ")).not.toContain("Its error, as it was reported")
+    expect(texts(sections, "record")).toContain("The record reached its cap of 10,000 events at event 2: later events were not kept, "
+      + "except the end, the people's decisions and the witness.")
+    expect(summarySentence(page, t)).toContain(t.summary.capped)
+    // Une limite du runner (ses tours, sa durée) n'est pas le plafond du dossier.
+    const turns = verificationPage(chained([{ type: "mission.started", data: { mission: 7, workspace: "acme" } },
+      { type: "limit.reached", actor: { kind: "runner", id: "r" }, data: { kind: "limit", text: "Turn limit reached." } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Turn limit reached." } }]))
+    expect(turns.record.cap).toBeNull()
+  })
+
   it("R159 P3 : des coches héritées, que l'agent de cette mission n'a pas cochées, ne comptent pas pour elle", () => {
     const page = verificationPage(inheritedTicks())
     expect(page.checks.some((c) => c.what === "tests")).toBe(false)

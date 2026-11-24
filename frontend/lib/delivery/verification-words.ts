@@ -237,7 +237,7 @@ export function summarySentence(page: VerificationPage, t: Texts): string {
   const c = page.changes
   const count = c.files.length + c.more
   if (page.running) parts.push(s.working)
-  else if (c.status && c.status !== "DONE") parts.push(s.notFinished)
+  else if (c.status && c.status !== "DONE") parts.push(page.record.cap?.stopped ? s.capped : s.notFinished)
   else if (c.known && count === 0) parts.push(s.noFiles)
   else if (c.known) {
     parts.push(c.pullRequest ? (count === 1 ? s.changedPrOne : fillText(s.changedPr, { count })) : (count === 1 ? s.changedOne : fillText(s.changed, { count })))
@@ -304,7 +304,10 @@ function changed(page: VerificationPage, t: Texts): Line[] {
     lines.push({ text: fillText(count === 1 ? t.changed.oneFile : t.changed.files, { count, added: c.added, removed: c.removed }),
       list: { lines: files, fold: FOLD } })
   }
+  // Au plafond du dossier, TaskForce arrête la mission : la page le dit dans ses mots, comme la vue du travail (N2).
+  const cap = page.record.cap
   if (c.status === "DONE") lines.push({ text: t.changed.finished, tone: "muted" })
+  else if (cap?.stopped) lines.push({ text: fillText(t.changed.capped, { max: cap.max.toLocaleString("en-US") }), tone: "warn" })
   else if (c.status) lines.push({ text: fillText(t.changed.failed, { error: c.error ?? c.status }), tone: "warn" })
   if (c.summary.state === "text") lines.push({ text: t.changed.summary, tone: "agent", blocks: summaryBlocks(c.summary.text) })
   else {
@@ -475,6 +478,8 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     lines.push({ text: gap.to === null ? fillText(rec.gapLost, { from: gap.from, noted: gap.noted })
       : fillText(gap.from === gap.to ? rec.gapOne : rec.gap, { from: gap.from, to: gap.to, noted: gap.noted }), tone: "warn" })
   }
+  // Le plafond : ce que le dossier n'a plus gardé ensuite (N2).
+  if (r.cap) lines.push({ text: fillText(rec.cap, { seq: r.cap.seq, max: r.cap.max.toLocaleString("en-US") }), tone: "warn" })
   // La purge d'un compte qu'une chaîne d'avant la 1.18 nomme par son courriel : ce qui reste, et pourquoi (N4).
   for (const erasure of r.legacyErasures) {
     lines.push({ text: fillText(rec.legacyErased, { date: when(erasure.at), events: erasure.events.join(", ") || "?" }), tone: "muted" })
