@@ -355,7 +355,8 @@ class MissionEvidenceServiceTest {
             Map<String, Object> other = service.ref(101L, "text", "Done.");
 
             assertThat(data(1).get("text")).isEqualTo(data(0).get("text"));
-            assertThat(texts).hasSize(2);
+            // La référence de l'autre dossier n'est nommée par aucun événement : son texte n'est pas gardé (R159, second tour, N1).
+            assertThat(texts).hasSize(1);
             assertThat(other.get("sha256")).isNotEqualTo(data(0).get("text").get("sha256").asText());
         }
 

@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -258,6 +259,8 @@ public class MissionEvidenceService {
             data = Map.of("max", MAX_EVENTS, "text", "The evidence of this mission reached its cap: later events from the "
                 + "agent's computer are not kept. What the server and the people write still is.");
         }
+        // Les textes que l'événement nomme pour la première fois se gardent avec lui, jamais sans lui (R159, second tour, N1).
+        keepTexts(data);
         String prev = last.map(DeliveryRunEvidence::getHash).orElse(EvidenceChain.ZERO_HASH);
         String at = EvidenceChain.AT.format(Instant.now());
         // Ce qui entre dans l'empreinte est du I-JSON : la RFC 8785 et tout outil JCS y retrouvent la même chaîne.
@@ -475,17 +478,45 @@ public class MissionEvidenceService {
             return null;
         }
         String clean = EvidenceIntake.text(text);
-        String hash = person != null ? null
+        int chars = clean.codePointCount(0, clean.length());
+        String kept = person != null ? null
             : texts.findFirstByRunIdAndKindAndBody(runId, kind, clean).map(MissionDossierText::getHash).orElse(null);
-        if (hash == null) {
-            String salt = salt();
-            hash = EvidenceChain.sha256(salt + clean);
-            texts.save(MissionDossierText.builder().runId(runId).hash(hash).kind(kind).salt(salt).body(clean).person(person).build());
+        if (kept != null) {
+            Map<String, Object> ref = new LinkedHashMap<>();
+            ref.put("sha256", kept);
+            ref.put("chars", chars);
+            return ref;
         }
-        Map<String, Object> ref = new LinkedHashMap<>();
-        ref.put("sha256", hash);
-        ref.put("chars", clean.codePointCount(0, clean.length()));
-        return ref;
+        String salt = salt();
+        return new Pending(MissionDossierText.builder().runId(runId).hash(EvidenceChain.sha256(salt + clean)).kind(kind).salt(salt)
+            .body(clean).person(person).build(), chars);
+    }
+
+    /**
+     * La référence d'un texte que la chaîne va nommer, et le texte, pas encore gardé (R159, second tour, N1) : l'événement
+     * porte la référence ({@code sha256}, {@code chars}), et le texte n'est gardé qu'avec lui. Un événement que le plafond
+     * écarte ne laisse ainsi aucun texte à côté de la chaîne, qu'un vérificateur dirait ajouté après coup.
+     */
+    static final class Pending extends LinkedHashMap<String, Object> {
+        private static final long serialVersionUID = 1L;
+        private final transient MissionDossierText text;
+
+        Pending(MissionDossierText text, int chars) {
+            this.text = text;
+            put("sha256", text.getHash());
+            put("chars", chars);
+        }
+    }
+
+    /** Garde les textes que ces données nomment pour la première fois, où qu'elles les portent. */
+    private void keepTexts(Object value) {
+        if (value instanceof Pending pending) {
+            texts.save(pending.text);
+        } else if (value instanceof Map<?, ?> map) {
+            map.values().forEach(this::keepTexts);
+        } else if (value instanceof Collection<?> list) {
+            list.forEach(this::keepTexts);
+        }
     }
 
     /** Un sel neuf : 128 bits, en 32 chiffres hexadécimaux. */
