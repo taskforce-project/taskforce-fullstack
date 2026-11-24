@@ -121,6 +121,11 @@ export interface Reading {
    * cette date. Il prouve la chaîne telle qu'elle était ce jour-là, rien de ce qui précède. Null sinon.
    */
   lateOn: string | null;
+  /**
+   * Les décisions que le vérificateur n'a pas pu rejuger (R159, troisième tour, c-b) : prises sur un fait coupé pour tenir
+   * au dossier, ou sans leurs faits. La première ligne les compte.
+   */
+  notJudged: { cut: number; noFacts: number };
 }
 
 export interface SealReading {
@@ -181,11 +186,21 @@ const RUNNER_GATES = /^(cap:|allowed for this mission)/;
 
 /** Ce que le dossier garde d'un fait jugé ; au-delà, le runner le coupe et le dit (R159, L4 ; second tour, N2). */
 export const MAX_FACT = 4000;
-const CUT_MARK = /\n\[TaskForce cut this text here: \d+ characters in all\]$/;
+const CUT_MARK = /\n\[TaskForce cut this text here: (\d+) characters in all\]$/;
+
+/**
+ * Un fait que le runner a coupé pour tenir au dossier (R159 de #551, troisième tour, c-b) : la marque au bout d'un fait de
+ * la longueur de la coupe, {@link MAX_FACT} unités, ou une de moins quand la coupe a reculé devant une paire de
+ * substitution, et qui annonce plus de {@link MAX_FACT} caractères. Une marque ailleurs ne soustrait rien au rejugement.
+ */
+function cutToFit(value: unknown): boolean {
+  if (typeof value !== "string" || (value.length !== MAX_FACT && value.length !== MAX_FACT - 1)) return false;
+  const mark = CUT_MARK.exec(value);
+  return mark !== null && Number(mark[1]) > MAX_FACT;
+}
 
 /** Des faits dont l'un a été coupé pour tenir au dossier : les règles ont jugé le fait entier, qu'on n'a plus. */
-const cutFacts = (facts: readonly Facts[]): boolean =>
-  facts.some((part) => isObj(part) && Object.values(part).some((value) => typeof value === "string" && CUT_MARK.test(value)));
+const cutFacts = (facts: readonly Facts[]): boolean => facts.some((part) => isObj(part) && Object.values(part).some(cutToFit));
 
 const shortHash = (hash: unknown): string => (typeof hash === "string" ? `${hash.slice(0, 19)}...` : String(hash));
 
@@ -221,6 +236,7 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
   const lines: Line[] = [];
   let sealState: SealState = "none";
   let lateOn: string | null = null;
+  const notJudged = { cut: 0, noFacts: 0 };
   const events = file.events as ChainedEvent[];
 
   // L'en-tête : chaque champ que la chaîne couvre doit être là, et être celui du fichier.
@@ -293,12 +309,18 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
       let cutShort = 0;
       for (const event of events) {
         const data = isObj(event.data) ? (event.data as Obj) : null;
-        if (event.type !== "action.decided" || data?.kind !== "decision" || !Array.isArray(data.facts) || data.facts.length === 0) continue;
+        if (event.type !== "action.decided" || data?.kind !== "decision") continue;
         const ruleId = event.actor?.id ?? "none";
         if (RUNNER_GATES.test(ruleId)) continue;
+        // Une décision sans ses faits ne se rejuge pas : la première ligne la compte (R159, troisième tour, c-b).
+        if (!Array.isArray(data.facts) || data.facts.length === 0) {
+          if (event.actor?.kind === "rule") notJudged.noFacts++;
+          continue;
+        }
         // Les règles ont jugé le fait entier ; le dossier n'en garde que le début (R159, second tour, N2).
         if (cutFacts(data.facts as Facts[])) {
           cutShort++;
+          notJudged.cut++;
           continue;
         }
         const decision = decideAll(rules, data.facts as Facts[]);
@@ -428,7 +450,7 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         ? "No witness was written in the pull request: only the operator holds this chain."
         : "No witness: this mission has no pull request, so only the operator holds this chain." });
   }
-  return { lines, seal: sealState, lateOn: sealState === "trusted" || sealState === "self" ? lateOn : null };
+  return { lines, seal: sealState, lateOn: sealState === "trusted" || sealState === "self" ? lateOn : null, notJudged };
 }
 
 /** Le dossier est-il bien formé, et sa chaîne tient-elle ? Avant tout le reste. */
