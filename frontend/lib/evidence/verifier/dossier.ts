@@ -413,6 +413,10 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     const seq = typeof data.seq === "number" ? data.seq : -1;
     if (events[seq - 1]?.hash !== data.root) {
       lines.push({ level: "fail", text: `The witness names event ${seq} with ${shortHash(data.root)}, which is not in this chain.` });
+    } else if (typeof data.key === "string") {
+      // Le commentaire porte aussi la clé qui a scellé cette tête : datée par GitHub, elle ancre ce que la liste des clés de
+      // l'exploitant ne peut pas ancrer (R159, second tour, N6).
+      lines.push({ level: "ok", text: `Witness: the head ${String(data.root)} (event ${seq}), sealed by the key ${data.key}, was written on ${String(data.comment ?? data.pullRequest)}. Check that the comment there shows the same digest and the same key, and that this key is the one you were given.` });
     } else {
       lines.push({ level: "ok", text: `Witness: the head ${String(data.root)} (event ${seq}) was written on ${String(data.comment ?? data.pullRequest)}. Check that the comment there shows the same digest.` });
     }

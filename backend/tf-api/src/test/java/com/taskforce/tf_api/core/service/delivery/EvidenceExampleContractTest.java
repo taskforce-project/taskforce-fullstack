@@ -146,6 +146,14 @@ class EvidenceExampleContractTest {
         example().get("events").forEach(e -> kinds.add(e.get("type").asText() + "/" + e.get("data").path("kind").asText(e.get("data").path("decision").asText())));
         assertThat(kinds).contains("note/person", "note/brief", "note/agent", "note/text", "note/gap", "test.result/test", "note/changes",
             "note/runner", "note/checklist", "note/checklist.checked", "note/witness", "human.decision/ALLOWED", "human.decision/APPLY");
+        // Le témoin nomme la clé qui a scellé sa tête, comme son commentaire (R159, second tour, N6).
+        JsonNode witness = null;
+        for (JsonNode e : example().get("events")) {
+            if ("witness".equals(e.get("data").path("kind").asText())) witness = e.get("data");
+        }
+        assertThat(witness).isNotNull();
+        String key = EvidenceSeal.open(example().get("seal")).statement().get("predicate").get("key").get("id").asText();
+        assertThat(witness.path("key").asText()).as("the witness's key").matches("sha256:[0-9a-f]{64}").isEqualTo(key);
     }
 
     @Test
@@ -326,6 +334,8 @@ class EvidenceExampleContractTest {
             witness.put("pullRequest", "https://github.com/acme/website/pull/212");
             witness.put("root", end.getRoot());
             witness.put("seq", end.getSeq());
+            // La clé qui a scellé cette tête, que le commentaire porte aussi (R159, second tour, N6).
+            witness.put("key", end.getKeyId());
             // Un dépôt que GitHub dit privé : le commentaire porte le lien de la page (R159, B2).
             witness.put("pageLinked", true);
             witness.put("written", true);
