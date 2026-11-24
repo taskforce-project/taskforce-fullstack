@@ -77,10 +77,11 @@ export function linkable(url: string | null | undefined): url is string {
   return typeof url === "string" && /^https:\/\/github\.com\/[^\s"'<>]+$/.test(url)
 }
 
-/** Une personne telle que le dossier la nomme. */
+/** Une personne telle que le dossier la nomme ; effacée, le dossier dit quand quand il le sait (R210). */
 export function whoWords(who: Who | null | undefined, t: Texts): string {
   if (!who || who.kind === "unnamed") return t.people.unnamed
-  return who.kind === "erased" ? t.people.erased : who.name
+  if (who.kind === "erased") return who.on ? fillText(t.people.erasedOn, { date: when(who.on) }) : t.people.erased
+  return who.name
 }
 
 /** Le résumé de l'agent, en blocs simples : les titres, les listes et le code cité de son Markdown, sans ses signes. */
@@ -315,7 +316,7 @@ function classification(page: VerificationPage, t: Texts): Line[] {
     const h = k.heaviest
     const action = h.what ? fillText(c.heaviestWhat, { tool: h.tool ?? "", what: h.what }).trim() : fillText(c.heaviestTool, { tool: h.tool ?? "?" })
     lines.push({ text: fillText(c.heaviest, { action, reason: h.rule.reason ?? h.rule.id, id: h.rule.id, class: c.classes[h.class] }) })
-    if (h.rule.owner) lines.push({ text: fillText(c.owner, { owner: h.rule.owner }), tone: "muted" })
+    if (h.rule.owner) lines.push({ text: fillText(c.owner, { owner: whoWords(h.rule.owner, t) }), tone: "muted" })
   }
   if (k.judged > 0) lines.push({ text: fillText(c.counts, { judged: k.judged, asked: k.asked, refused: k.refused }) })
   else lines.push({ text: c.noDecision, tone: "warn" })

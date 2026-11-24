@@ -11,10 +11,13 @@ import type { RecordCheck } from "./verification-check"
  * erreur) se citent, marqués. Rien ici ne dit qu'un changement est conforme à quoi que ce soit (R187).
  */
 
-/** Une personne telle que le dossier la nomme : par son nom ou son courriel, effacés avec son compte, ou pas du tout. */
+/**
+ * Une personne telle que le dossier la nomme : par son nom ou son courriel, gardés à côté de la chaîne ; effacés avec son
+ * compte, et le dossier dit quand (`on`, la note de la purge, R210) ; ou pas du tout.
+ */
 export type Who =
   | { readonly kind: "named"; readonly name: string }
-  | { readonly kind: "erased" }
+  | { readonly kind: "erased"; readonly on?: string }
   | { readonly kind: "unnamed" }
 
 /** Qui a effacé un texte, quand, et lequel (le titre de la demande, le brief...). */
@@ -96,8 +99,11 @@ export interface PageRule {
   readonly layer: string | null
   /** Qui a écrit sa version : l'auteur de la couche ; pour la table de TaskForce, TaskForce. */
   readonly author: Who | "taskforce" | null
-  /** La personne nommée qui répond de la règle, telle que le paquet la nomme. */
-  readonly owner: string | null
+  /**
+   * La personne nommée qui répond de la règle : la copie du paquet au dossier la nomme par son identifiant opaque, son
+   * nom à côté de la chaîne (R159, second tour, N3).
+   */
+  readonly owner: Who | null
   readonly version: number | null
 }
 
@@ -244,6 +250,9 @@ const str = (v: unknown): string | null => (typeof v === "string" && v.length > 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null)
 const data = (e: MissionEvidenceEvent): Obj => (isObj(e.data) ? e.data : {})
 
+/** L'identifiant opaque d'une personne dans le dossier : `who:` depuis le second tour de R159, `person:` au premier. */
+const OPAQUE_PERSON = /^(who|person):[0-9a-f]{32}$/
+
 /** Les gestes de la personne sur le résultat : la décision de fin est le dernier d'entre eux. */
 const END_GESTURES = new Set(["APPLY", "DISCARD", "RETRY", "MARK_DONE", "MERGE", "STOP"])
 const GESTURES = new Set([...END_GESTURES, "ASK_FOR_CHANGES", "REVERT_FILE", "CORRECTION"])
@@ -294,22 +303,31 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
   const end = ended ? data(ended) : {}
   const header = isObj(file.mission) ? file.mission : {}
 
-  // Les personnes : l'identifiant opaque de la chaîne, et ce que leur note dit d'elles (R159 M6 de #551) ; un dossier d'avant
-  // la relecture les nomme par leur courriel.
+  // Les personnes : l'identifiant opaque de la chaîne, un par personne et par espace (`who:`, R159, second tour, L-a et L-e ;
+  // `person:` au premier tour), et ce que leur note dit d'elles ; un dossier d'avant la 1.18 les nomme par leur courriel.
   const persons = new Map<string, { name: unknown; email: unknown }>()
   for (const e of notes("person")) {
     const d = data(e)
     if (typeof d.person === "string") persons.set(d.person, { name: d.name, email: d.email })
   }
+  // La purge d'un compte : la note du serveur dit quelle personne, et quand (R210 : une règle reste celle d'une personne
+  // nommée tant que son nom n'est pas effacé ; ensuite, le dossier dit quand il l'a été).
+  const purged = new Map<string, string>()
+  for (const e of notes("erased")) {
+    const d = data(e)
+    if (typeof d.person === "string" && !purged.has(d.person)) purged.set(d.person, e.at)
+  }
   const refText = (ref: unknown): string | null => (isObj(ref) && typeof ref.sha256 === "string" && !changedTexts.has(ref.sha256)
     ? keptText(texts[ref.sha256]) : null)
   const who = (id: unknown): Who | null => {
     if (typeof id !== "string" || id.length === 0) return null
-    if (!id.startsWith("person:")) return id === "unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
+    if (!OPAQUE_PERSON.test(id)) return id === "unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
     const person = persons.get(id)
     if (!person) return { kind: "unnamed" }
     const name = refText(person.name) ?? refText(person.email)
-    return name ? { kind: "named", name } : { kind: "erased" }
+    if (name) return { kind: "named", name }
+    const on = purged.get(id)
+    return on ? { kind: "erased", on } : { kind: "erased" }
   }
   const actor = (e: MissionEvidenceEvent): Who | null => (e.actor.kind === "person" ? who(e.actor.id) : null)
 
@@ -405,7 +423,7 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       reason: str(rule.text) ?? str(rule.reason),
       layer,
       author: layer ? (ofLayer ? who(ofLayer.author) : null) : "taskforce",
-      owner: str(rule.owner),
+      owner: who(rule.owner),
       version: layer ? (ofLayer ? num(ofLayer.version) : null) : num(rulesStarted.version),
     }
   }

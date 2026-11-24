@@ -31,7 +31,9 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(page.request.writtenBy).toEqual({ kind: "named", name: "Grace" })
     expect(page.request.delegatedBy).toEqual({ kind: "named", name: "Ada" })
     expect(page.request.accountable).toEqual({ kind: "named", name: "Ada" })
-    expect(JSON.stringify(verificationSections(page, t, context))).not.toMatch(/person:[0-9a-f]{32}/)
+    // Les personnes entrent au dossier par un identifiant `who:` (R159, second tour, L-e) : la page ne le montre jamais.
+    expect(JSON.stringify(example().events)).toMatch(/who:[0-9a-f]{32}/)
+    expect(JSON.stringify(verificationSections(page, t, context)) + summarySentence(page, t)).not.toMatch(/(who|person):[0-9a-f]{32}/)
   })
 
   it("2. ce qui a changé : les fichiers tels que l'agent les a nommés, et la décision qui a permis leur contenu", () => {
@@ -53,6 +55,10 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(lines.some((l) => l.startsWith("The pull request was opened under the rule"))).toBe(true)
     expect(lines.some((l) => l.startsWith("Heaviest action of the mission: WebSearch “docs.example.com footer links”"))).toBe(true)
     expect(lines.join(" ")).not.toMatch(/Class of the change/)
+    // La copie du paquet nomme qui répond de la règle par son identifiant ; la page le dit par son nom (second tour, N3).
+    expect(JSON.stringify(example().rules)).toMatch(/"owner":"who:[0-9a-f]{32}"/)
+    expect(page.classOf.heaviest?.rule.owner).toEqual({ kind: "named", name: "Ada" })
+    expect(lines).toContain("Answered for by Ada.")
   })
 
   it("4 et 5. R161 M9, R159 P3 : sous les vérifications, le runner et les règles seuls ; la coche de l'agent est une déclaration", () => {
@@ -208,8 +214,8 @@ describe("le reste du dossier, dit en clair", () => {
     const erased = `sha256:${"e".repeat(64)}`
     const page = verificationPage(chained([
       { type: "mission.started", data: { mission: 7, workspace: "acme", request: { title: { sha256: erased, chars: 5 } } } },
-      { type: "note", data: { kind: "person", person: `person:${"1".repeat(32)}`, name: { sha256: `sha256:${"f".repeat(64)}`, chars: 3 } } },
-      { type: "human.decision", at: "2026-11-23T10:00:00.000Z", actor: { kind: "person", id: `person:${"1".repeat(32)}` },
+      { type: "note", data: { kind: "person", person: `who:${"1".repeat(32)}`, name: { sha256: `sha256:${"f".repeat(64)}`, chars: 3 } } },
+      { type: "human.decision", at: "2026-11-23T10:00:00.000Z", actor: { kind: "person", id: `who:${"1".repeat(32)}` },
         data: { kind: "erased", text: erased, what: "title" } },
     ], { texts: { [`sha256:${"f".repeat(64)}`]: { salt: "0".repeat(32), text: "Ada" } } }))
     expect(page.request.title).toMatchObject({ state: "erased", erasure: { who: { kind: "named", name: "Ada" }, what: "title" } })
@@ -218,12 +224,26 @@ describe("le reste du dossier, dit en clair", () => {
 
   it("une personne dont le compte a été purgé : ses textes sont effacés, la page ne montre pas son identifiant", () => {
     const page = verificationPage(chained([
-      { type: "mission.started", data: { mission: 7, workspace: "acme", requestedBy: `person:${"2".repeat(32)}` } },
-      { type: "note", data: { kind: "person", person: `person:${"2".repeat(32)}`, email: { sha256: `sha256:${"d".repeat(64)}`, chars: 9 } } },
+      { type: "mission.started", data: { mission: 7, workspace: "acme", requestedBy: `who:${"2".repeat(32)}` } },
+      { type: "note", data: { kind: "person", person: `who:${"2".repeat(32)}`, email: { sha256: `sha256:${"d".repeat(64)}`, chars: 9 } } },
     ]))
     expect(page.request.delegatedBy).toEqual({ kind: "erased" })
     expect(whoWords(page.request.delegatedBy, t)).toBe(t.people.erased)
     expect(whoWords({ kind: "unnamed" }, t)).toBe(t.people.unnamed)
+  })
+
+  it("R210, second tour de #551 (N3) : la règle d'une personne dont le compte a été purgé dit quand son nom a été effacé", () => {
+    const owner = `who:${"3".repeat(32)}`
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", rules: { version: 2, layers: [] } } },
+      { type: "note", data: { kind: "person", person: owner, name: { sha256: `sha256:${"b".repeat(64)}`, chars: 3 } } },
+      { type: "action.decided", actor: { kind: "rule", id: "push" }, data: { kind: "decision", effect: "allow", tool: "Bash", facts: [{ command: "git push" }] } },
+      { type: "mission.ended", data: { status: "DONE" } },
+      { type: "note", at: "2026-11-23T11:00:00.000Z", data: { kind: "erased", person: owner, texts: [`sha256:${"b".repeat(64)}`], reason: "account-deleted" } },
+    ], { rules: { rules: [{ id: "push", class: "reversible-exit", owner, reason: "Push the agent's branch." }] } }))
+    expect(page.classOf.heaviest?.rule.owner).toEqual({ kind: "erased", on: "2026-11-23T11:00:00.000Z" })
+    expect(texts(verificationSections(page, t, context), "classification"))
+      .toContain("Answered for by a person whose details were erased on 2026-11-23 11:00 UTC.")
   })
 
   it("M5 de #551 : des tests dont la branche a changé la définition ne comptent pas comme une vérification", () => {
