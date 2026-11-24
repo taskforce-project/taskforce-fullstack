@@ -81,11 +81,17 @@ public class MissionDossierAccess {
         return signer.key();
     }
 
-    /** Le dossier, si cette personne peut le lire. */
+    /**
+     * Le dossier, si cette personne peut le lire. Elle doit être membre de son espace, vérifié ici et pas seulement par
+     * l'intercepteur des routes (R159, L8) : la personne qui a délégué et qui a quitté l'espace ne le lit plus.
+     */
     MissionDossier readable(String slug, Long runId, Long userId) {
         MissionDossier dossier = evidence.dossier(runId).orElseThrow(() -> new ResourceNotFoundException(NOT_FOUND));
         if (dossier.getWorkspace() == null || !slug.equals(dossier.getWorkspace().getSlug())) {
             throw new ResourceNotFoundException(NOT_FOUND);
+        }
+        if (members.findByWorkspaceIdAndUserId(dossier.getWorkspace().getId(), userId).isEmpty()) {
+            throw new ForbiddenException("Access denied: you're not a member of this workspace");
         }
         Project project = dossier.getProjectId() == null ? null : projects.findById(dossier.getProjectId()).orElse(null);
         if (project != null) {

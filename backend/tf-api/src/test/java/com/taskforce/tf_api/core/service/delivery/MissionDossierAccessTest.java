@@ -39,8 +39,8 @@ import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 /**
- * Qui lit un dossier qui survit à son issue et à son projet, et qui en efface un texte : tant que le projet existe, qui le
- * voit ; ensuite, la personne qui a délégué et les responsables de l'espace.
+ * Qui lit un dossier qui survit à son issue et à son projet, et qui en efface un texte : un membre de l'espace, et tant
+ * que le projet existe, qui le voit ; ensuite, la personne qui a délégué et les responsables de l'espace.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Lire et effacer un dossier qui survit à son issue")
@@ -76,10 +76,11 @@ class MissionDossierAccessTest {
     }
 
     @Test
-    @DisplayName("le projet existe : le lit qui voit le projet")
+    @DisplayName("le projet existe : le lit le membre qui voit le projet")
     void while_the_project_lives_its_viewers_read() {
         Project project = Project.builder().id(12L).build();
         when(projects.findById(12L)).thenReturn(Optional.of(project));
+        role(8L, WorkspaceRole.MEMBER);
 
         assertThat(access.export("acme", 100L, 8L, MissionDossierAccess.Format.JSON)).contains("{}");
         verify(visibilityGuard).assertCanView(project, 8L);
@@ -90,15 +91,27 @@ class MissionDossierAccessTest {
     void a_private_project_stays_private() {
         Project project = Project.builder().id(12L).build();
         when(projects.findById(12L)).thenReturn(Optional.of(project));
+        role(8L, WorkspaceRole.MEMBER);
         doThrow(new ForbiddenException("no")).when(visibilityGuard).assertCanView(project, 8L);
 
         assertThatThrownBy(() -> access.export("acme", 100L, 8L, MissionDossierAccess.Format.JSON)).isInstanceOf(ForbiddenException.class);
     }
 
     @Test
-    @DisplayName("le projet n'existe plus : la personne qui a délégué lit encore")
+    @DisplayName("R159, L8 : qui n'est pas membre de l'espace ne lit pas, même s'il voit le projet ou a délégué la mission")
+    void a_non_member_does_not_read() {
+        when(members.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> access.export("acme", 100L, 7L, MissionDossierAccess.Format.JSON)).isInstanceOf(ForbiddenException.class);
+        verify(projects, never()).findById(any());
+        verify(evidence, never()).dossierJson(anyLong());
+    }
+
+    @Test
+    @DisplayName("le projet n'existe plus : la personne qui a délégué, toujours membre, lit encore")
     void after_the_project_the_delegator_reads() {
         when(projects.findById(12L)).thenReturn(Optional.empty());
+        role(7L, WorkspaceRole.MEMBER);
 
         assertThat(access.export("acme", 100L, 7L, MissionDossierAccess.Format.JSON)).contains("{}");
     }
@@ -135,6 +148,7 @@ class MissionDossierAccessTest {
     @DisplayName("les trois formes : le dossier, sa page technique, son sceau seul")
     void the_three_forms() {
         when(projects.findById(12L)).thenReturn(Optional.empty());
+        role(7L, WorkspaceRole.MEMBER);
         when(evidence.dossierMarkdown(100L)).thenReturn(Optional.of("# md"));
         when(evidence.envelope(100L)).thenReturn(Optional.of("{\"payloadType\":\"application/vnd.in-toto+json\"}"));
 
@@ -146,6 +160,7 @@ class MissionDossierAccessTest {
     @DisplayName("effacer un texte : la personne qui a délégué")
     void the_delegator_erases_a_text() {
         when(projects.findById(12L)).thenReturn(Optional.of(Project.builder().id(12L).build()));
+        role(7L, WorkspaceRole.MEMBER);
         when(users.findById(7L)).thenReturn(Optional.of(ada));
 
         access.eraseText("acme", 100L, HASH, 7L);
