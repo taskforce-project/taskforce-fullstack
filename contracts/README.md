@@ -149,11 +149,16 @@ verifier says how many.
 No format of TaskForce's own (E34): the seal is an in-toto Statement v1 whose subject is the head of the chain
 (`taskforce-mission-<id>`, `sha256` digest of the root), with predicate type
 `https://taskforce-project.fr/contracts/taskforce-evidence/1` and the predicate `{ format, mission, root, seq,
-sealedAt, key: { id, algorithm, publicKey, custody, kept } }`. The payload is the canonical JSON of the statement. It is
+sealedAt, key: { id, algorithm, publicKey, custody, kept }, late }` (`late` only on a late seal, below). The payload is the canonical JSON of the statement. It is
 signed in Ed25519 over the DSSE pre-authentication encoding, `DSSEv1 <len> application/vnd.in-toto+json <len>
 <payload>` (lengths in bytes), and kept in a DSSE envelope: `{ payload (base64), payloadType, signatures: [{ keyid, sig
 (base64) }] }`. The key id is `sha256:` and the SHA-256 of the public key in SubjectPublicKeyInfo DER. The server seals
 at the end of the mission, and again after each later gesture; `GET .../evidence?format=dsse` gives the envelope alone.
+
+A record whose mission ended before TaskForce sealed records is sealed once, when the server starts: a `note` of kind
+`late-seal` says so at the end of its chain, with the date, and the seal's predicate carries `late: true`. A late seal
+proves the chain as it was on `sealedAt`, not what happened before; every later seal of that record is late too. The
+verifier accepts it with `--key`, and its first line says "Sealed late, on ...".
 
 `custody` says where the private key lives: `same-machine` (the default, and always in the desktop app) when an agent
 may run on the machine that holds it, `separate-machine` when the operator declares that none does. A seal proves that

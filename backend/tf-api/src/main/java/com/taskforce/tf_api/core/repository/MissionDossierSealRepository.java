@@ -19,6 +19,9 @@ public interface MissionDossierSealRepository extends JpaRepository<MissionDossi
 
     boolean existsByRunIdAndSeq(Long runId, Integer seq);
 
+    /** Le dossier a-t-il déjà été scellé tard (R159, second tour, N5) ? Ses sceaux suivants le sont aussi. */
+    boolean existsByRunIdAndLateTrue(Long runId);
+
     /** Une clé qui a scellé des dossiers d'un espace : son identifiant, son premier et son dernier sceau, combien. */
     interface KeyUse {
         String getKeyId();

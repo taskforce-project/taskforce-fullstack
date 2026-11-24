@@ -51,7 +51,9 @@ ALTER TABLE delivery_run_evidence
     ADD CONSTRAINT fk_delivery_run_evidence_dossier FOREIGN KEY (run_id) REFERENCES mission_dossiers (run_id) ON DELETE CASCADE;
 
 -- 5. Les sceaux : la tête de la chaîne signée (une enveloppe DSSE d'un énoncé in-toto), un par état scellé, jamais
---    réécrits. Le dernier couvre tout le dossier.
+--    réécrits. Le dernier couvre tout le dossier. Un sceau tardif (R159, second tour, N5) est posé sur un dossier fini
+--    avant que TaskForce ne scelle : il ne prouve que la chaîne telle qu'elle était ce jour-là, et ceux qui le suivent non
+--    plus.
 CREATE TABLE mission_dossier_seals (
     id          BIGSERIAL    PRIMARY KEY,
     run_id      BIGINT       NOT NULL REFERENCES mission_dossiers (run_id) ON DELETE CASCADE,
@@ -60,6 +62,7 @@ CREATE TABLE mission_dossier_seals (
     sealed_at   VARCHAR(32)  NOT NULL,
     key_id      VARCHAR(71)  NOT NULL,
     envelope    TEXT         NOT NULL,
+    late        BOOLEAN      NOT NULL DEFAULT false,
     CONSTRAINT uq_mission_dossier_seal UNIQUE (run_id, seq)
 );
 

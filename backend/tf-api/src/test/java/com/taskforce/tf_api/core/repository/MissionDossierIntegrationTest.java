@@ -38,6 +38,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.service.delivery.DeliveryPoll;
 import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
+import com.taskforce.tf_api.core.service.delivery.MissionLateSeals;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
 /**
@@ -332,6 +333,41 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE user_id = ?", Integer.class, ada.getId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE person = ? AND (body IS NOT NULL OR salt IS NOT NULL)",
             Integer.class, id)).isZero();
+    }
+
+    @Test
+    @DisplayName("R159 second tour, N5 : un dossier fini sans sceau se scelle une fois, tard, et le dit ; ses sceaux suivants aussi")
+    void a_record_from_before_the_seal_is_sealed_late_once() throws Exception {
+        // Un dossier d'avant ce lot : sa chaîne, aucun sceau, sa mission finie, sa racine posée sur la mission.
+        evidence.open(run, null, "tf-runner-ada", Map.of());
+        em.flush();
+        String head = jdbc.queryForObject("SELECT hash FROM delivery_run_evidence WHERE run_id = ? ORDER BY seq DESC LIMIT 1",
+            String.class, run.getId());
+        jdbc.update("UPDATE delivery_runs SET status = 'DONE', evidence_root = ? WHERE id = ?", head, run.getId());
+        em.clear();
+        MissionLateSeals pass = new MissionLateSeals(dossiers, evidence);
+
+        assertThat(pass.seal()).isEqualTo(1);
+        em.flush();
+        assertThat(pass.seal()).isZero();
+
+        JsonNode file = export();
+        EvidenceSeal.Opened seal = EvidenceSeal.open(file.get("seal"));
+        assertThat(seal.valid()).isTrue();
+        assertThat(seal.statement().get("predicate").get("late").asBoolean()).isTrue();
+        assertThat(seal.statement().get("predicate").get("seq").asInt()).isEqualTo(events(file).size());
+        JsonNode note = events(file).getLast().get("data");
+        assertThat(note.get("kind").asText()).isEqualTo("late-seal");
+        assertThat(note.get("text").asText()).startsWith("TaskForce sealed this record late, on ");
+        assertThat(EvidenceChain.firstBrokenLink(events(file))).isEqualTo(-1);
+        // Un geste qui suit : son sceau est tardif lui aussi ; un sceau ne le cache pas.
+        DeliveryRun ended = runRepository.findById(run.getId()).orElseThrow();
+        evidence.appendAfterEnd(ended, "human.decision", evidence.person(ended, ada), Map.of("decision", "MARK_DONE", "where", "taskforce"));
+        em.flush();
+        EvidenceSeal.Opened after = EvidenceSeal.open(export().get("seal"));
+        assertThat(after.statement().get("predicate").get("late").asBoolean()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_seals WHERE run_id = ? AND late", Integer.class, run.getId()))
+            .isEqualTo(2);
     }
 
     @Test

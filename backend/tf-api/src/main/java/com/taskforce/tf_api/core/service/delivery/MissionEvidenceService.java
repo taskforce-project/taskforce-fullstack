@@ -844,12 +844,47 @@ public class MissionEvidenceService {
         }
     }
 
+    /** La sorte de la note d'un sceau tardif (R159, second tour, N5). */
+    static final String LATE_SEAL = "late-seal";
+
+    /**
+     * Scelle tard un dossier fini avant que TaskForce ne scelle (R159, second tour, N5) : une note le dit à la suite de sa
+     * chaîne, avec la date, puis un sceau qui le dit aussi ({@code late}). Il prouve la chaîne telle qu'elle est ce jour-là,
+     * rien de ce qui précède. Rien pour un dossier qui a déjà un sceau. Rend vrai s'il l'a scellé.
+     */
+    @Transactional
+    public boolean sealLate(Long runId) {
+        DeliveryRun run = runRepository.findByIdForUpdate(runId).orElse(null);
+        if (seals.findTopByRunIdOrderBySeqDesc(runId).isPresent()) {
+            return false;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", LATE_SEAL);
+        data.put("text", "TaskForce sealed this record late, on " + EvidenceChain.AT.format(Instant.now()) + ", after its mission "
+            + "had ended: the seal proves the chain as it was on that date, not what happened before.");
+        Optional<String> hash = appendTo(runId, "note", Actor.SERVER, data);
+        if (hash.isEmpty()) {
+            return false;
+        }
+        if (run != null && run.getEvidenceRoot() != null) run.setEvidenceRoot(hash.get());
+        seal(runId, false, true);
+        return true;
+    }
+
     /**
      * Scelle le dossier à sa tête : l'énoncé in-toto (l'en-tête, la tête, son rang, l'heure, la clé et sa garde) signé
      * en Ed25519 sous une enveloppe DSSE. Un sceau par rang, jamais réécrit. Celui de la fin annonce la mission scellée :
      * sa tête s'écrit chez un témoin.
      */
     void seal(Long runId, boolean atEnd) {
+        seal(runId, atEnd, false);
+    }
+
+    /**
+     * Le sceau, tardif ou non. Un dossier scellé tard l'est pour de bon : un sceau qui le suit ne prouve rien de plus ancien
+     * que le premier, et le dit aussi (R159, second tour, N5).
+     */
+    private void seal(Long runId, boolean atEnd, boolean late) {
         MissionDossier dossier = dossiers.findById(runId).orElse(null);
         List<ObjectNode> events = events(runId);
         if (dossier == null || events.isEmpty()) {
@@ -861,14 +896,15 @@ public class MissionEvidenceService {
         if (seals.existsByRunIdAndSeq(runId, seq)) {
             return;
         }
+        boolean lateSeal = late || seals.existsByRunIdAndLateTrue(runId);
         String at = EvidenceChain.AT.format(Instant.now());
-        ObjectNode statement = EvidenceSeal.statement(header(dossier, events), root, seq, at, signer.key());
+        ObjectNode statement = EvidenceSeal.statement(header(dossier, events), root, seq, at, signer.key(), lateSeal);
         byte[] payload = EvidenceSeal.payload(statement);
         byte[] signature = signer.sign(EvidenceSeal.pae(EvidenceSeal.PAYLOAD_TYPE, payload));
         ObjectNode envelope = EvidenceSeal.envelope(payload, signer.key().id(), signature);
         seals.save(MissionDossierSeal.builder().runId(runId).seq(seq).root(root).sealedAt(at).keyId(signer.key().id())
-            .envelope(envelope.toString()).build());
-        if (atEnd) {
+            .envelope(envelope.toString()).late(lateSeal).build());
+        if (atEnd && !lateSeal) {
             publisher.publishEvent(new MissionSealed(runId, root, seq));
         }
     }

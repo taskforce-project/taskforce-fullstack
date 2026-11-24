@@ -123,6 +123,9 @@ instead, generate one and put the line it prints (the key, in base64) in `DELIVE
 openssl genpkey -algorithm ed25519 | sed -n 2p
 ```
 
+Records of missions that ended before TaskForce sealed records are sealed once, when the server starts: the seal says
+it was made late, with its date, and proves the chain as it was then, nothing before.
+
 If the server can neither read nor create its key file, it draws a key at each start, says so in its log, and a seal
 can no longer be compared with a key you publish. If no coding agent runs on the machine of the server, set
 `DELIVERY_EVIDENCE_KEY_CUSTODY=separate-machine`: each seal, and each verification page, says where the key lives.

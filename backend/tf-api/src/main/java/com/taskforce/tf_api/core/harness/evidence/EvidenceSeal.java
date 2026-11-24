@@ -58,6 +58,15 @@ public final class EvidenceSeal {
 
     /** L'énoncé in-toto du sceau : la tête de la chaîne pour sujet, l'en-tête et la clé pour prédicat. */
     public static ObjectNode statement(JsonNode header, String root, int seq, String sealedAt, Key key) {
+        return statement(header, root, seq, sealedAt, key, false);
+    }
+
+    /**
+     * L'énoncé d'un sceau, tardif ou non (R159, second tour, N5) : {@code late} vrai, le sceau est posé sur un dossier fini
+     * avant que TaskForce ne scelle, et ne prouve que la chaîne telle qu'elle était à {@code sealedAt}. Un sceau ordinaire
+     * ne porte pas le champ : son énoncé ne change pas.
+     */
+    public static ObjectNode statement(JsonNode header, String root, int seq, String sealedAt, Key key, boolean late) {
         ObjectNode statement = JsonNodeFactory.instance.objectNode();
         statement.put("_type", STATEMENT_TYPE);
         ArrayNode subject = statement.putArray("subject");
@@ -71,6 +80,9 @@ public final class EvidenceSeal {
         predicate.put("root", root);
         predicate.put("seq", seq);
         predicate.put("sealedAt", sealedAt);
+        if (late) {
+            predicate.put("late", true);
+        }
         ObjectNode signer = predicate.putObject("key");
         signer.put("id", key.id());
         signer.put("algorithm", ALGORITHM);

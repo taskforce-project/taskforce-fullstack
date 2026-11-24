@@ -116,6 +116,11 @@ export type SealState = "trusted" | "self" | "none" | "broken";
 export interface Reading {
   lines: Line[];
   seal: SealState;
+  /**
+   * Le sceau qui tient a été posé tard (R159, second tour, N5) : sur un dossier fini avant que TaskForce ne scelle, à
+   * cette date. Il prouve la chaîne telle qu'elle était ce jour-là, rien de ce qui précède. Null sinon.
+   */
+  lateOn: string | null;
 }
 
 export interface SealReading {
@@ -212,6 +217,7 @@ const RUNNER_FACTS = "The runner's facts (its tests, the agent and its model, th
 export async function readDossier(file: Obj, options: { key?: string } = {}): Promise<Reading> {
   const lines: Line[] = [];
   let sealState: SealState = "none";
+  let lateOn: string | null = null;
   const events = file.events as ChainedEvent[];
 
   // L'en-tête : chaque champ que la chaîne couvre doit être là, et être celui du fichier.
@@ -355,7 +361,13 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         lines.push({ level: "fail", text: "The seal does not hold the header of this file: the header was changed after it was sealed." });
       } else {
         const key = isObj(predicate.key) ? predicate.key : {};
-        const at = `Sealed at event ${seq} on ${String(predicate.sealedAt)}`;
+        // Un sceau tardif (R159, second tour, N5) : posé sur un dossier fini avant que TaskForce ne scelle.
+        const late = predicate.late === true;
+        const at = `${late ? "Sealed late" : "Sealed"} at event ${seq} on ${String(predicate.sealedAt)}`;
+        if (late) {
+          lateOn = String(predicate.sealedAt);
+          lines.push({ level: "warn", text: `This record was sealed late, on ${lateOn}, after its mission had ended: the seal proves the chain as it was on that date, not what happened before.` });
+        }
         if (options.key !== undefined) {
           const trusted = await trustedKeyId(options.key);
           if (trusted === null) {
@@ -401,7 +413,7 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         ? "No witness was written in the pull request: only the operator holds this chain."
         : "No witness: this mission has no pull request, so only the operator holds this chain." });
   }
-  return { lines, seal: sealState };
+  return { lines, seal: sealState, lateOn: sealState === "trusted" || sealState === "self" ? lateOn : null };
 }
 
 /** Le dossier est-il bien formé, et sa chaîne tient-elle ? Avant tout le reste. */
