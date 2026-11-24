@@ -57,6 +57,8 @@ export function headerOf(events: readonly ChainedEvent[]): { header: Obj; covere
     covered.push("rules");
   }
   copy("runner", "runner");
+  // D'où viennent les faits du runner (R159, M5) : du poste de l'agent. Absent d'une mission sans runner.
+  copy("runnerFacts", "runnerFacts");
   copy("taskforce", "taskforce");
   return { header, covered };
 }
@@ -189,6 +191,9 @@ async function textMatches(hash: string, entry: unknown): Promise<boolean> {
   return (await sha256(`${entry.salt}${entry.text}`)) === hash;
 }
 
+const RUNNER_FACTS = "The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer "
+  + "where the agent works: they are worth what that computer is worth, whatever the custody of the key.";
+
 /**
  * Lit un dossier, ligne à ligne. Une ligne `fail` fait échouer la vérification : la chaîne, l'en-tête, un texte, le
  * paquet, une décision rejugée, le sceau ou le témoin ne tiennent pas. Une ligne `warn` dit ce que le dossier ne prouve
@@ -287,10 +292,19 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     }
   }
 
-  // Les trous : un lot du runner perdu en route.
+  // Les trous : un lot du runner perdu en route, ou un runner qui s'est tu.
   for (const event of events) {
     const data = isObj(event.data) ? (event.data as Obj) : null;
     if (event.type === "note" && data?.kind === "gap") lines.push({ level: "warn", text: `Event ${event.seq}: ${String(data.text)}` });
+  }
+
+  // Ce que le runner rapporte vaut ce que vaut le poste de l'agent (R159, M5) ; des tests dont la branche a changé la
+  // définition ne disent que ce que donne la version des tests de l'agent.
+  if (header.runnerFacts === "agent-machine") lines.push({ level: "warn", text: RUNNER_FACTS });
+  for (const event of events) {
+    const data = isObj(event.data) ? (event.data as Obj) : null;
+    if (event.type !== "test.result" || !Array.isArray(data?.definitionChanged) || data.definitionChanged.length === 0) continue;
+    lines.push({ level: "warn", text: `Event ${event.seq}: the branch changed ${data.definitionChanged.map(String).join(", ")}, which defines how its tests run: the tests' result only says that the agent's version of the tests passes.` });
   }
 
   // Le sceau. Sans la clé de l'exploitant, une signature qui tient ne prouve que l'accord entre le fichier et la clé

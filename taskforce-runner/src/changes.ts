@@ -327,6 +327,12 @@ export function removeLiveIndex(path: string): void {
   rmSync(`${path}.lock`, { force: true });
 }
 
+/** Les chemins que les commits de la branche changent depuis sa base ; vide s'ils ne se lisent pas. */
+export async function changedPaths(dir: string, base: string): Promise<string[]> {
+  const result = await run("git", ["-C", dir, ...SAFE_GIT, "diff", "--name-only", "-z", ...DIFF, base, "HEAD"]).catch(() => null);
+  return result?.code === 0 ? result.stdout.split("\0").filter(Boolean) : [];
+}
+
 /** `git rev-list --count` sur la branche : les commits qu'elle porte depuis sa base. */
 export async function commitsSince(dir: string, base: string): Promise<number> {
   const result = await run("git", ["-C", dir, "rev-list", "--count", `${base}..HEAD`]);

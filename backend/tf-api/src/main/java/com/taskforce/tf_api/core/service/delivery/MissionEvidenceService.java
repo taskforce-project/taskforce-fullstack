@@ -87,6 +87,8 @@ public class MissionEvidenceService {
     static final int RESERVE = 1_000;
     /** Les acteurs que le plafond borne : ce qui vient du poste de l'agent. */
     private static final Set<String> CAPPED = Set.of("agent", "rule", "runner");
+    /** Les faits que le runner rapporte viennent du poste de l'agent, quelle que soit la garde de la clé (R159, M5). */
+    static final String AGENT_MACHINE = "agent-machine";
     static final String LIMIT_REACHED = "limit.reached";
     /** Ce qu'un événement garde d'un texte en clair (une commande, une erreur), et d'un fait jugé. */
     static final int MAX_TEXT = 2_000;
@@ -167,6 +169,11 @@ public class MissionEvidenceService {
         started.put("agent", agent);
         started.put("rules", rules == null ? null : rulesData(rules, project.getWorkspace().getId()));
         started.put("runner", runner);
+        if (runner != null) {
+            // Ce que le runner rapportera (ses tests, l'agent et son modèle, les numéros de ses événements) vient du poste de
+            // l'agent : le sceau dit où vit la clé, pas ce que valent ces faits (R159, M5).
+            started.put("runnerFacts", AGENT_MACHINE);
+        }
         started.put("taskforce", null);
         if (extras != null) {
             started.putAll(extras);
@@ -386,6 +393,11 @@ public class MissionEvidenceService {
                 output.put("bytes", test.outputBytes());
                 output.put("kept", "runner");
                 data.put("output", output);
+            }
+            // La branche a changé ce qui dit comment ses tests tournent : le résultat ne vaut que pour sa version (R159, M5).
+            if (test.definitionChanged() != null && !test.definitionChanged().isEmpty()) {
+                data.put("definitionChanged", test.definitionChanged().stream().filter(p -> p != null && !p.isBlank())
+                    .map(p -> EvidenceIntake.clip(p.strip(), 300)).toList());
             }
         }
         return data;
@@ -650,7 +662,24 @@ public class MissionEvidenceService {
             ? "checked when exported, every hash holds."
             : "BROKEN at event " + events.get(broken).get("seq").asInt() + ": this file was changed after it was written.").append('\n');
         md.append("- Seal: ").append(seal.map(s -> "event " + s.getSeq() + ", signed by key `" + s.getKeyId() + "` at "
-            + s.getSealedAt() + " (" + custodyWords(s) + ")").orElse("none yet: the mission has not ended.")).append("\n\n");
+            + s.getSealedAt() + " (" + custodyWords(s) + ")").orElse("none yet: the mission has not ended.")).append('\n');
+        // Ce que le runner rapporte vient du poste de l'agent, quelle que soit la garde de la clé (R159, M5).
+        if (AGENT_MACHINE.equals(mission.path("runnerFacts").asText(null))) {
+            md.append("- The runner's facts (its tests, the agent and its model, the numbers of its events) come from the ")
+                .append("computer where the agent works: they are worth what that computer is worth, whatever the custody ")
+                .append("of the key. The seal only says where the key lives.\n");
+        }
+        for (ObjectNode e : events) {
+            JsonNode changed = e.get("data").path("definitionChanged");
+            if ("test.result".equals(e.get("type").asText()) && changed.isArray() && !changed.isEmpty()) {
+                List<String> paths = new ArrayList<>();
+                changed.forEach(p -> paths.add("`" + p.asText() + "`"));
+                md.append("- Not checked: the branch changed ").append(String.join(", ", paths))
+                    .append(", which defines how its tests run, so the tests' result only says that the agent's version of ")
+                    .append("the tests passes (event ").append(e.get("seq").asInt()).append(").\n");
+            }
+        }
+        md.append('\n');
         md.append("| # | At (UTC) | Type | Actor | What |\n| --- | --- | --- | --- | --- |\n");
         for (ObjectNode e : events) {
             md.append("| ").append(e.get("seq").asInt())
@@ -699,6 +728,9 @@ public class MissionEvidenceService {
         header.set("agent", projection.covered().contains("agent") ? from.get("agent") : JSON.createObjectNode().putNull("kind"));
         header.set("rules", projection.covered().contains("rules") ? from.get("rules") : JSON.createObjectNode());
         header.set("runner", projection.covered().contains("runner") ? from.get("runner") : JsonNodeFactory.instance.nullNode());
+        if (projection.covered().contains("runnerFacts")) {
+            header.set("runnerFacts", from.get("runnerFacts"));
+        }
         header.set("taskforce", projection.covered().contains("taskforce") ? from.get("taskforce") : JsonNodeFactory.instance.nullNode());
         return header;
     }

@@ -163,7 +163,11 @@ describe("l'agent réellement lancé et sa session brute, gardée à part", () =
 const nodeKeyId = (spki: Buffer): string => `sha256:${createHash("sha256").update(spki).digest("hex")}`;
 
 /** Un dossier scellé, écrit ici comme le serveur l'écrit (MissionEvidenceService, EvidenceSeal). */
-function dossier(options: { key?: KeyObject; tamper?: (file: Record<string, unknown>) => void; seal?: boolean; sealedRoot?: string } = {}) {
+function dossier(options: {
+  key?: KeyObject; tamper?: (file: Record<string, unknown>) => void; seal?: boolean; sealedRoot?: string;
+  /** Change les événements avant que la chaîne ne les lie : ce que le serveur aurait écrit. */
+  edit?: (events: EventInput[]) => void;
+} = {}) {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const key = options.key ?? privateKey;
   const spki = Buffer.from(publicKey.export({ format: "der", type: "spki" }));
@@ -187,6 +191,7 @@ function dossier(options: { key?: KeyObject; tamper?: (file: Record<string, unkn
     { seq: 5, at: "2026-11-22T08:10:00.000Z", type: "mission.ended", actor: { kind: "server", id: "taskforce" },
       data: { status: "DONE", resultUrl: "https://github.com/acme/website/pull/212" } },
   ];
+  options.edit?.(events);
   const chained = chain(events);
   const head = chained.at(-1);
   const mission = headerOf(chained).header;
@@ -195,7 +200,7 @@ function dossier(options: { key?: KeyObject; tamper?: (file: Record<string, unkn
   if (options.seal !== false) {
     const root = options.sealedRoot ?? head?.hash;
     const statement = { _type: STATEMENT_TYPE, subject: [{ name: "taskforce-mission-42", digest: { sha256: String(root).slice(7) } }],
-      predicateType: PREDICATE_TYPE, predicate: { format: "taskforce-evidence/1", mission, root, seq: 5,
+      predicateType: PREDICATE_TYPE, predicate: { format: "taskforce-evidence/1", mission, root, seq: chained.length,
         sealedAt: "2026-11-22T08:10:00.100Z", key: { id: nodeKeyId(spki), algorithm: "ed25519", publicKey: spki.toString("base64"),
           custody: "same-machine", kept: true } } };
     const payload = Buffer.from(canonicalJson(statement as Json), "utf8");
@@ -255,6 +260,22 @@ describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
       /does not match its digest/);
     await fails(dossier({ tamper: (f) => { f.texts = { [titleHash]: { salt: "ffffffffffffffffffffffffffffffff", text: "Fix the footer links" } }; } }).text,
       /does not match its digest/);
+  });
+
+  it("R159 M5 : les faits du runner viennent du poste de l'agent, et des tests dont la branche change la définition se notent", async () => {
+    const edit = (events: EventInput[]): void => {
+      (events[0]?.data as Record<string, Json>).runnerFacts = "agent-machine";
+      events.splice(4, 0, { seq: 5, at: "2026-11-22T08:09:00.000Z", type: "test.result", actor: { kind: "runner", id: "tf-runner-ada" },
+        data: { kind: "test", command: "npm test", passed: true, definitionChanged: ["package.json", "vitest.config.ts"] } });
+      events.forEach((event, i) => { event.seq = i + 1; });
+    };
+    const verdict = await verifyEvidence(dossier({ edit }).text);
+    assert.equal(verdict.ok, true, verdict.message);
+    assert.match(verdict.message, /\[!!\] The runner's facts \(its tests, the agent and its model, the numbers of its events\) come from the computer where the agent works/);
+    assert.match(verdict.message, /\[!!\] Event 5: the branch changed package\.json, vitest\.config\.ts, which defines how its tests run/);
+    // Le champ couvert retiré de l'en-tête : la chaîne le donne encore.
+    await fails(dossier({ edit, tamper: (f) => { delete (f.mission as Record<string, unknown>).runnerFacts; } }).text,
+      /The header has no runnerFacts, which the chain gives/);
   });
 
   it("un paquet de règles changé se voit, et une décision que les règles ne donnent pas aussi", async () => {

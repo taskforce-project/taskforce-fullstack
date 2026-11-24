@@ -19,7 +19,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
 import { askInTaskForce } from "./approvals.js";
-import { ChangeTracker, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges } from "./changes.js";
+import { ChangeTracker, changedPaths, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges } from "./changes.js";
 import { LiveMissions, pollCommands } from "./commands.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
 import { EventRelay } from "./events.js";
@@ -31,9 +31,10 @@ import { startHeartbeat } from "./heartbeat.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
+import { testDefinitions } from "./test-definitions.js";
 import { ApprovedTests, runProjectTests } from "./tests.js";
-import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 import { cut, cutEnd } from "./text.js";
+import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
 // Lancé par l'app desktop avec le Node d'Electron (ELECTRON_RUN_AS_NODE) : ni git, ni gh, ni Claude Code ne doivent
 // en hériter.
@@ -192,6 +193,11 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         const tests = await runProjectTests(claim.testCommand, claim.repoFullName, worktree.path, TEST_TIMEOUT_MS,
           { ask, approved: ApprovedTests.in(config.home), outputFile: join(kept, "tests.log") }, signal);
         log.info(tests.summary);
+        // La branche a changé ce qui dit comment les tests tournent : le résultat ne vaut que pour sa version (R159, M5).
+        const definitionChanged = testDefinitions(await changedPaths(worktree.path, open.baseSha), claim.testCommand);
+        if (definitionChanged.length > 0) {
+          log.warn(`The branch changes how the tests run (${definitionChanged.join(", ")}): the evidence will say so.`);
+        }
         // Les tests au dossier : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière, la preuve,
         // que ce poste garde (R212, rubrique 4). Une coupe se dit, entre deux caractères (R159, L4).
         relay.push([{
@@ -200,6 +206,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
             command: cut(tests.command, 500), ran: tests.ran, passed: tests.passed,
             ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
             ...(tests.output ? { output: tests.output.sha256, outputBytes: tests.output.bytes } : {}),
+            ...(definitionChanged.length > 0 ? { definitionChanged } : {}),
           },
         }]);
         await relay.flush();

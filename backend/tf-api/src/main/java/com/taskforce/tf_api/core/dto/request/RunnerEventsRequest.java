@@ -128,7 +128,9 @@ public record RunnerEventsRequest(
     /**
      * Les tests du projet tels que le runner les a lancés : la commande, lancés ou non, passés ou non, les comptes quand
      * la sortie les donne, et l'empreinte de la sortie entière, que le runner garde sur le poste. {@code configured} faux :
-     * le projet n'a pas de commande de test, rien n'a tourné.
+     * le projet n'a pas de commande de test, rien n'a tourné. {@code definitionChanged} : les fichiers de la branche qui
+     * disent comment les tests tournent, ou que la commande nomme ; le résultat ne dit alors que ce que donne la version
+     * des tests de l'agent (R159, M5).
      */
     public record Test(
         @NotBlank @Size(max = 500) String command,
@@ -138,12 +140,19 @@ public record RunnerEventsRequest(
         @Min(0) Integer total,
         @Pattern(regexp = SHA256, message = "output must be a sha256 digest") String output,
         @Min(0) Long outputBytes,
-        Boolean configured
+        Boolean configured,
+        @Size(max = 20) List<@Size(max = 300) String> definitionChanged
     ) {
 
         /** Des tests lancés, comme les décrit un runner qui ne dit pas si une commande est configurée. */
         public Test(String command, boolean ran, boolean passed, Integer passedCount, Integer total, String output, Long outputBytes) {
-            this(command, ran, passed, passedCount, total, output, outputBytes, null);
+            this(command, ran, passed, passedCount, total, output, outputBytes, null, null);
+        }
+
+        /** Des tests, comme les décrit un runner d'avant la relecture R159 : rien sur la définition des tests. */
+        public Test(String command, boolean ran, boolean passed, Integer passedCount, Integer total, String output, Long outputBytes,
+                    Boolean configured) {
+            this(command, ran, passed, passedCount, total, output, outputBytes, configured, null);
         }
     }
 }

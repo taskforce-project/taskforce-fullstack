@@ -187,6 +187,8 @@ class MissionEvidenceServiceTest {
             assertThat(started.get("origin").get("channel").asText()).isEqualTo("mcp");
             assertThat(started.get("agent").get("model").asText()).isEqualTo("claude-sonnet-5");
             assertThat(started.get("rules").get("layers").get(0).get("author").asText()).isEqualTo("carol@taskforce.dev");
+            // Les faits que le runner rapportera viennent du poste de l'agent (R159, M5).
+            assertThat(started.get("runnerFacts").asText()).isEqualTo("agent-machine");
             JsonNode request = started.get("request");
             assertThat(request.get("reporter").asText()).isEqualTo("bob@taskforce.dev");
             assertThat(request.get("createdAt").asText()).isEqualTo("2026-11-20T09:30:00.000Z");
@@ -201,6 +203,14 @@ class MissionEvidenceServiceTest {
         private void when_layer_author(String email) {
             lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3))
                 .thenReturn(Optional.of(HarnessRuleSet.builder().version(3).createdBy(User.builder().email(email).build()).build()));
+        }
+
+        @Test
+        @DisplayName("sans runner, rien ne dit d'où viennent ses faits : il n'en rapporte pas")
+        void without_a_runner_there_are_no_runner_facts() throws Exception {
+            service.open(run, rules(), null, Map.of());
+
+            assertThat(data(0).has("runnerFacts")).isFalse();
         }
 
         @Test
@@ -295,6 +305,16 @@ class MissionEvidenceServiceTest {
             assertThat(agent.get("configured").asText()).isEqualTo("sonnet");
             assertThat(agent.get("served")).extracting(JsonNode::asText)
                 .containsExactly("claude-sonnet-5-20261001", "claude-haiku-5-20261001");
+        }
+
+        @Test
+        @DisplayName("R159, M5 : des tests dont la branche a changé la définition le disent")
+        void the_tests_say_when_the_branch_changed_their_definition() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null, new RunnerEventsRequest.Test("npm test", true, true, 42, 42,
+                    "sha256:" + "1".repeat(64), 5000L, true, List.of("package.json", " ", "vitest.config.ts"))));
+
+            assertThat(data(0).get("definitionChanged")).extracting(JsonNode::asText).containsExactly("package.json", "vitest.config.ts");
         }
 
         @Test
@@ -433,6 +453,7 @@ class MissionEvidenceServiceTest {
             assertThat(file.get("mission").get("agent").get("model").asText()).isEqualTo("claude-sonnet-5-20261001");
             assertThat(file.get("mission").get("agent").get("version").asText()).isEqualTo("2.1.300");
             assertThat(file.get("rules").get("digest").asText()).isEqualTo(DIGEST);
+            assertThat(file.get("mission").get("runnerFacts").asText()).isEqualTo("agent-machine");
             assertThat(file.get("texts").get(EvidenceChain.sha256("Fix the footer")).asText()).isEqualTo("Fix the footer");
             List<ObjectNode> events = new ArrayList<>();
             file.get("events").forEach(e -> events.add((ObjectNode) e));

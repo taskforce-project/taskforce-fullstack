@@ -185,6 +185,11 @@ export interface RunnerEvent {
     command: string; ran: boolean; passed: boolean; passedCount?: number; total?: number; output?: string; outputBytes?: number;
     /** Faux : le projet n'a pas de commande de test, rien n'a tourné. */
     configured?: boolean;
+    /**
+     * Les fichiers de la branche qui disent comment les tests tournent (scripts, configuration), ou que la commande
+     * nomme : le résultat ne dit alors que ce que donne la version des tests de l'agent (R159, M5).
+     */
+    definitionChanged?: string[];
   };
 }
 

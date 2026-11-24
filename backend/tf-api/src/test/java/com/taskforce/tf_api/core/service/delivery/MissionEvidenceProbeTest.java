@@ -191,4 +191,18 @@ class MissionEvidenceProbeTest {
         assertThat(gap.get("to").isNull()).isTrue();
         assertThat(gap.get("text").asText()).contains("after its event 14");
     }
+
+    @Test
+    @DisplayName("M5 : l'en-tête dit que les faits du runner viennent du poste de l'agent, et l'export Markdown aussi")
+    void the_header_says_where_the_runner_s_facts_come_from() {
+        ObjectNode started = JSON.createObjectNode().put("type", "mission.started");
+        started.putObject("data").put("mission", 100).put("runner", "tf-runner-ada").put("runnerFacts", "agent-machine");
+        EvidenceHeader.Projection projection = EvidenceHeader.of(List.of(started));
+        assertThat(projection.covered()).contains("runnerFacts");
+        assertThat(projection.header().get("runnerFacts").asText()).isEqualTo("agent-machine");
+
+        service.append(run, "mission.started", MissionEvidenceService.Actor.SERVER,
+            Map.of("mission", 100, "runner", "tf-runner-ada", "runnerFacts", "agent-machine"));
+        assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("come from the computer where the agent works");
+    }
 }
