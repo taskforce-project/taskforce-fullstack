@@ -102,9 +102,10 @@ export function MissionSteps({ steps, showCommands, waiting, waitingLabel }: Rea
           <>
             <MissionStepIcon state={step.state} label={stateName} />
             <span className="w-[72px] shrink-0 font-medium text-foreground">{step.name}</span>
+            {/* Une étape pas commencée ou sautée se lit plus pâle, au gris tertiaire : il tient 4,5:1 dans les deux thèmes, une opacité non. */}
             <span
               title={step.sentence}
-              className={cn("min-w-0 flex-1 truncate", step.state === "not-started" || step.state === "skipped" ? "text-muted-foreground/70" : "text-muted-foreground")}
+              className={cn("min-w-0 flex-1 truncate", step.state === "not-started" || step.state === "skipped" ? "text-subtle" : "text-muted-foreground")}
             >
               {step.sentence}
             </span>
