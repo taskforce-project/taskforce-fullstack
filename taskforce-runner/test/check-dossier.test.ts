@@ -60,6 +60,20 @@ describe("checkDossier : ce que prouve un dossier dont la chaîne tient", () => 
     assert.deepEqual(check.header.differs, ["issue"]);
   });
 
+  it("une chaîne rompue dit pourquoi, et l'événement où elle casse", () => {
+    const file = example();
+    (file.events[1]!.data as Obj).kind = "changed";
+    const chain = chainOf(file);
+    assert.equal(chain.ok, false);
+    assert.equal(!chain.ok && chain.reason, "link");
+    assert.equal(!chain.ok && chain.brokenAt, 2);
+    const cut = example();
+    cut.events.pop();
+    const root = chainOf(cut);
+    assert.equal(!root.ok && root.reason, "root");
+    assert.equal(!chainOf({ format: "other" }).ok && (chainOf({ format: "other" }) as { reason: string }).reason, "format");
+  });
+
   it("une plateforme qui ne sait pas Ed25519 ne dit pas le sceau faux : elle sait le vérifier ici", async () => {
     assert.equal(await ed25519Supported(), true);
   });

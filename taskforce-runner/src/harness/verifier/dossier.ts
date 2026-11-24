@@ -567,10 +567,17 @@ function textOrder(file: Obj, hash: string): number {
   return Object.keys(isObj(file.texts) ? file.texts : {}).indexOf(hash);
 }
 
-/** Le dossier est-il bien formé, et sa chaîne tient-elle ? Avant tout le reste. */
-export function chainOf(file: Obj): { ok: true; events: ChainedEvent[] } | { ok: false; message: string } {
+/** Pourquoi une chaîne ne tient pas : pas un dossier, un événement illisible, un maillon rompu, une racine qui n'est pas la tête. */
+export type ChainFailure = "format" | "unreadable" | "link" | "root";
+
+/**
+ * Le dossier est-il bien formé, et sa chaîne tient-elle ? Avant tout le reste. Une chaîne rompue dit le numéro de
+ * l'événement où elle casse (`brokenAt`).
+ */
+export function chainOf(file: Obj): { ok: true; events: ChainedEvent[] }
+  | { ok: false; message: string; reason: ChainFailure; brokenAt?: number } {
   if (file.format !== FORMAT || !Array.isArray(file.events) || file.events.length === 0) {
-    return { ok: false, message: "Not a TaskForce evidence file (taskforce-evidence/1) with events." };
+    return { ok: false, reason: "format", message: "Not a TaskForce evidence file (taskforce-evidence/1) with events." };
   }
   const events = file.events as ChainedEvent[];
   let broken: number;
@@ -578,13 +585,14 @@ export function chainOf(file: Obj): { ok: true; events: ChainedEvent[] } | { ok:
     broken = firstBrokenLink(events);
   } catch (e) {
     // Un événement que le moteur ne sait pas lire (autre chose qu'un objet, un nombre décimal) : rien ne tient.
-    return { ok: false, message: `The chain cannot be checked: ${(e as Error).message}` };
+    return { ok: false, reason: "unreadable", message: `The chain cannot be checked: ${(e as Error).message}` };
   }
   if (broken >= 0) {
-    return { ok: false, message: `The chain breaks at event ${events[broken]?.seq ?? broken + 1}: the file was changed after it was written.` };
+    const at = events[broken]?.seq ?? broken + 1;
+    return { ok: false, reason: "link", brokenAt: at, message: `The chain breaks at event ${at}: the file was changed after it was written.` };
   }
   if (events.at(-1)?.hash !== file.root) {
-    return { ok: false, message: "Every event holds, but the root is not the hash of the last event: an event was removed at the end." };
+    return { ok: false, reason: "root", message: "Every event holds, but the root is not the hash of the last event: an event was removed at the end." };
   }
   return { ok: true, events };
 }
