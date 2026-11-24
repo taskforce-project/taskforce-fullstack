@@ -124,6 +124,21 @@ class MissionEvidenceProbeTest {
     }
 
     @Test
+    @DisplayName("M2 : l'export Markdown dit la garde de la clé telle que le sceau l'a dite, pas celle d'aujourd'hui")
+    void the_markdown_reads_the_custody_in_the_seal() {
+        service.append(run, "mission.started", MissionEvidenceService.Actor.SERVER, Map.of("issue", "WEB-12"));
+        service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, null, null, null));
+        // L'exploitant déclare ensuite la clé ailleurs : l'ancien sceau ne change pas pour autant.
+        EvidenceSeal.Key now = signer.key();
+        // Le code corrigé ne la relit plus pour l'export : la clé d'aujourd'hui ne sert qu'au code d'avant.
+        lenient().doReturn(new EvidenceSeal.Key(now.id(), now.publicKey(), EvidenceSeal.SEPARATE_MACHINE, true)).when(signer).key();
+
+        String md = service.dossierMarkdown(100L).orElseThrow();
+
+        assertThat(md).contains("same machine as the agent").doesNotContain("kept where no agent runs");
+    }
+
+    @Test
     @DisplayName("M4 : au plafond, la fin, le geste et le témoin s'écrivent encore, dans la réserve")
     void the_cap_keeps_room_for_the_server_and_the_people() {
         ObjectNode full = JSON.createObjectNode().put("max", 10_000).put("text", "The evidence of this mission is full.");

@@ -644,7 +644,7 @@ public class MissionEvidenceService {
             ? "checked when exported, every hash holds."
             : "BROKEN at event " + events.get(broken).get("seq").asInt() + ": this file was changed after it was written.").append('\n');
         md.append("- Seal: ").append(seal.map(s -> "event " + s.getSeq() + ", signed by key `" + s.getKeyId() + "` at "
-            + s.getSealedAt() + " (" + custodyWords() + ")").orElse("none yet: the mission has not ended.")).append("\n\n");
+            + s.getSealedAt() + " (" + custodyWords(s) + ")").orElse("none yet: the mission has not ended.")).append("\n\n");
         md.append("| # | At (UTC) | Type | Actor | What |\n| --- | --- | --- | --- | --- |\n");
         for (ObjectNode e : events) {
             md.append("| ").append(e.get("seq").asInt())
@@ -657,14 +657,19 @@ public class MissionEvidenceService {
         md.append("\nTo check this file without TaskForce: each `hash` is the SHA-256 of `prev`, a line feed, then the ")
             .append("canonical JSON of the event without its `hash` (contracts/README.md). The last one is the root. ")
             .append("The JSON export carries the signed seal: `npm run verify -- evidence-run-").append(runId)
-            .append(".json` in taskforce-runner checks both.\n");
+            .append(".json --key <the key id the operator publishes>` in taskforce-runner checks both.\n");
         return Optional.of(EvidenceIntake.text(md.toString()));
     }
 
-    private String custodyWords() {
-        return EvidenceSeal.SEPARATE_MACHINE.equals(signer.key().custody())
-            ? "the operator declares the key is kept where no agent runs"
-            : "the key is on the same machine as the agent";
+    /** Ce que le sceau dit de sa clé, lu dans son énoncé et non dans la clé d'aujourd'hui (R159, M2). */
+    private static String custodyWords(MissionDossierSeal seal) {
+        EvidenceSeal.Opened opened = EvidenceSeal.open(parse(seal.getEnvelope()));
+        JsonNode key = opened.statement() == null ? null : opened.statement().path("predicate").path("key");
+        String custody = key == null ? EvidenceSeal.SAME_MACHINE : key.path("custody").asText(EvidenceSeal.SAME_MACHINE);
+        String words = EvidenceSeal.SEPARATE_MACHINE.equals(custody)
+            ? "the operator declared, when it sealed, that the key is kept where no agent runs"
+            : "the key was on the same machine as the agent";
+        return key != null && !key.path("kept").asBoolean(true) ? words + "; the key was drawn at the server's start and is not kept" : words;
     }
 
     /**
