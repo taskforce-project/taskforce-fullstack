@@ -425,7 +425,8 @@ public class MissionEvidenceService {
             }
             run.setEvidenceRunnerSeq(n);
         }
-        append(run, RUNNER_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event), dataOf(run.getId(), event));
+        append(run, RUNNER_TYPE.getOrDefault(event.kind(), "note"), actorOf(run, event),
+            dataOf(run.getId(), event, event.test() == null ? null : testCommandOf(run)));
         return true;
     }
 
@@ -496,11 +497,30 @@ public class MissionEvidenceService {
     }
 
     /**
+     * Ce que {@code definitionChanged} porte quand la commande de test du projet, dans TaskForce, n'est plus celle que le
+     * runner a lancée : le réglage a changé pendant la mission (R159, second tour, L-b).
+     */
+    static final String TEST_SETTING = "taskforce:test-command";
+
+    /** Des chemins tels que le runner les envoie, nettoyés et bornés. */
+    private static List<String> paths(List<String> paths) {
+        return paths == null ? List.of() : paths.stream().filter(p -> p != null && !p.isBlank())
+            .map(p -> EvidenceIntake.clip(p.strip(), 300)).toList();
+    }
+
+    /** La commande de test du projet de la mission, telle que TaskForce la garde aujourd'hui ; null sans projet. */
+    private static String testCommandOf(DeliveryRun run) {
+        Issue issue = run.getIssue();
+        Project project = issue == null ? null : issue.getProject();
+        return project == null ? null : project.getTestCommand();
+    }
+
+    /**
      * Ce que le dossier garde d'un événement du runner. Ce que l'agent raconte, et le brief, n'y entrent que par leur
      * empreinte ; une décision garde les faits jugés et l'empreinte de l'action exacte ; les tests, leur résultat et
      * l'empreinte de leur sortie.
      */
-    private Map<String, Object> dataOf(Long runId, RunnerEventsRequest.Event event) {
+    private Map<String, Object> dataOf(Long runId, RunnerEventsRequest.Event event, String testCommand) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("kind", event.kind());
         switch (event.kind()) {
@@ -551,11 +571,16 @@ public class MissionEvidenceService {
                 output.put("kept", "runner");
                 data.put("output", output);
             }
-            // La branche a changé ce qui dit comment ses tests tournent : le résultat ne vaut que pour sa version (R159, M5).
-            if (test.definitionChanged() != null && !test.definitionChanged().isEmpty()) {
-                data.put("definitionChanged", test.definitionChanged().stream().filter(p -> p != null && !p.isBlank())
-                    .map(p -> EvidenceIntake.clip(p.strip(), 300)).toList());
+            // La branche a changé ce qui dit comment ses tests tournent : le résultat ne vaut que pour sa version (R159, M5). Le
+            // réglage de test du projet dans TaskForce aussi : changé pendant la mission, il ne nomme plus la commande lancée
+            // (second tour, L-b).
+            List<String> changed = new ArrayList<>(paths(test.definitionChanged()));
+            if (testCommand != null && !testCommand.strip().equals(test.command() == null ? "" : test.command().strip())) {
+                changed.add(TEST_SETTING);
             }
+            if (!changed.isEmpty()) data.put("definitionChanged", changed);
+            // La liste que le runner a regardée : « aucun de ces fichiers n'a changé », pas « les tests sont les mêmes ».
+            if (test.definitions() != null && !test.definitions().isEmpty()) data.put("definitions", paths(test.definitions()));
         }
         return data;
     }
@@ -1087,13 +1112,22 @@ public class MissionEvidenceService {
                 .append("of the key. The seal only says where the key lives.\n");
         }
         for (ObjectNode e : events) {
+            if (!"test.result".equals(e.get("type").asText())) continue;
             JsonNode changed = e.get("data").path("definitionChanged");
-            if ("test.result".equals(e.get("type").asText()) && changed.isArray() && !changed.isEmpty()) {
+            JsonNode looked = e.get("data").path("definitions");
+            if (changed.isArray() && !changed.isEmpty()) {
+                List<String> what = new ArrayList<>();
+                changed.forEach(p -> what.add(TEST_SETTING.equals(p.asText()) ? "the project's test command in TaskForce" : "`" + p.asText() + "`"));
+                md.append("- Not checked: what defines how the tests run changed during the mission (").append(String.join(", ", what))
+                    .append("), so the tests' result only says that the agent's version of the tests passes (event ")
+                    .append(e.get("seq").asInt()).append(").\n");
+            } else if (looked.isArray() && !looked.isEmpty()) {
+                // Une liste de ce que TaskForce cherche, pas la preuve que les tests sont les mêmes (R159, second tour, L-b).
                 List<String> paths = new ArrayList<>();
-                changed.forEach(p -> paths.add("`" + p.asText() + "`"));
-                md.append("- Not checked: the branch changed ").append(String.join(", ", paths))
-                    .append(", which defines how its tests run, so the tests' result only says that the agent's version of ")
-                    .append("the tests passes (event ").append(e.get("seq").asInt()).append(").\n");
+                looked.forEach(p -> paths.add("`" + p.asText() + "`"));
+                md.append("- None of these files, which define how the tests run, changed: ").append(String.join(", ", paths))
+                    .append(" (event ").append(e.get("seq").asInt()).append("). It is the list TaskForce looks for, not a proof ")
+                    .append("that the tests are the same.\n");
             }
         }
         md.append('\n');

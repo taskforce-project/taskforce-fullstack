@@ -438,6 +438,33 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
+        @DisplayName("R159 second tour, L-b : la liste que le runner a regardée, et le réglage de test du projet changé pendant la mission")
+        void the_tests_say_what_the_runner_looked_at() throws Exception {
+            run.getIssue().getProject().setTestCommand("npm run test:ci");
+
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null, new RunnerEventsRequest.Test("npm test", true, true, 42, 42,
+                    "sha256:" + "1".repeat(64), 5000L, true, null, List.of("package.json", "vitest.config.ts"))));
+
+            assertThat(data(0).get("definitions")).extracting(JsonNode::asText).containsExactly("package.json", "vitest.config.ts");
+            assertThat(data(0).get("definitionChanged")).extracting(JsonNode::asText).containsExactly(MissionEvidenceService.TEST_SETTING);
+            String md = service.dossierMarkdown(100L).orElseThrow();
+            assertThat(md).contains("changed during the mission (the project's test command in TaskForce)");
+        }
+
+        @Test
+        @DisplayName("R159 second tour, L-b : rien de changé, le Markdown dit une liste, jamais que les tests sont les mêmes")
+        void nothing_changed_is_said_as_a_list() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null, new RunnerEventsRequest.Test("npm test", true, true, 42, 42,
+                    "sha256:" + "1".repeat(64), 5000L, true, null, List.of("package.json"))));
+
+            assertThat(data(0).has("definitionChanged")).isFalse();
+            assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("None of these files, which define how the tests run, changed: `package.json`")
+                .contains("not a proof that the tests are the same");
+        }
+
+        @Test
         @DisplayName("l'agent réellement lancé : sa version, son modèle, sa session")
         void the_agent_that_ran() throws Exception {
             service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300 with claude-sonnet-5-20261001",

@@ -123,11 +123,15 @@ TaskForce no longer knows is `who:unknown`). A rule stays that of a named person
 The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer where the
 agent works, under the same user: they are worth what that computer is worth, whatever the custody of the key. When a
 runner takes the mission, `mission.started` says so with `runnerFacts: "agent-machine"`, and the verifier repeats it.
-A `test.result` lists in `definitionChanged` the files of the branch that define how the tests run (`package.json`,
-`pom.xml`, `pyproject.toml` and the like, or a script the command names): the result then only says that the agent's
-version of the tests passes. The `note` of kind `agent` gives the model the configuration asked for (`configured`), each
-model the answers named (`served`), and who serves it (`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or
-`another-endpoint`).
+A `test.result` lists in `definitionChanged` what changed of what defines how the tests run: the files of the branch
+(`package.json` and the scripts its commands run, `pom.xml`, `mvnw` and `.mvn/`, Gradle's files and wrapper,
+`pyproject.toml`, `setup.cfg`, `tox.ini`, `pytest.ini`, `conftest.py`, `noxfile.py`, Jest, Vitest and Playwright
+configurations, Makefiles, a script the command names, and the like), and `taskforce:test-command` when the project's
+test command in TaskForce is no longer the one the runner ran. The result then only says that the agent's version of
+the tests passes. `definitions` lists the files of that kind the runner found, changed or not: it is the list
+TaskForce looks for, so "none of these files changed", never "the tests are the same". The `note` of kind `agent` gives
+the model the configuration asked for (`configured`), each model the answers named (`served`), and who serves it
+(`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or `another-endpoint`).
 
 ### Gaps and the cap
 

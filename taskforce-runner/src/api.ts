@@ -205,6 +205,11 @@ export interface RunnerEvent {
      * nomme : le résultat ne dit alors que ce que donne la version des tests de l'agent (R159, M5).
      */
     definitionChanged?: string[];
+    /**
+     * Ceux que le runner a trouvés dans le dépôt, changés ou non : la liste qu'il a regardée, qui ne prouve pas que les
+     * tests sont les mêmes (R159, second tour, L-b).
+     */
+    definitions?: string[];
   };
 }
 

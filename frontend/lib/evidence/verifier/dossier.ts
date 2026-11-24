@@ -206,6 +206,9 @@ async function textMatches(hash: string, entry: unknown): Promise<boolean> {
   return (await sha256(`${entry.salt}${entry.text}`)) === hash;
 }
 
+/** Ce que `definitionChanged` porte quand le réglage de test du projet, dans TaskForce, a changé (R159, second tour, L-b). */
+export const TEST_SETTING = "taskforce:test-command";
+
 const RUNNER_FACTS = "The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer "
   + "where the agent works: they are worth what that computer is worth, whatever the custody of the key.";
 
@@ -328,8 +331,16 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
   if (header.runnerFacts === "agent-machine") lines.push({ level: "warn", text: RUNNER_FACTS });
   for (const event of events) {
     const data = isObj(event.data) ? (event.data as Obj) : null;
-    if (event.type !== "test.result" || !Array.isArray(data?.definitionChanged) || data.definitionChanged.length === 0) continue;
-    lines.push({ level: "warn", text: `Event ${event.seq}: the branch changed ${data.definitionChanged.map(String).join(", ")}, which defines how its tests run: the tests' result only says that the agent's version of the tests passes.` });
+    if (event.type !== "test.result" || !data) continue;
+    const changed = Array.isArray(data.definitionChanged) ? data.definitionChanged.map(String) : [];
+    const looked = Array.isArray(data.definitions) ? data.definitions.map(String) : [];
+    if (changed.length > 0) {
+      const what = changed.map((path) => (path === TEST_SETTING ? "the project's test command in TaskForce" : path)).join(", ");
+      lines.push({ level: "warn", text: `Event ${event.seq}: what defines how its tests run changed during the mission (${what}): the tests' result only says that the agent's version of the tests passes.` });
+    } else if (looked.length > 0) {
+      // Une liste de ce que TaskForce cherche, pas la preuve que les tests sont les mêmes (R159, second tour, L-b).
+      lines.push({ level: "info", text: `Event ${event.seq}: none of these files, which define how the tests run, changed: ${looked.join(", ")}. It is the list TaskForce looks for, not a proof that the tests are the same.` });
+    }
   }
 
   // Le sceau. Sans la clé de l'exploitant, une signature qui tient ne prouve que l'accord entre le fichier et la clé

@@ -130,7 +130,8 @@ public record RunnerEventsRequest(
      * la sortie les donne, et l'empreinte de la sortie entière, que le runner garde sur le poste. {@code configured} faux :
      * le projet n'a pas de commande de test, rien n'a tourné. {@code definitionChanged} : les fichiers de la branche qui
      * disent comment les tests tournent, ou que la commande nomme ; le résultat ne dit alors que ce que donne la version
-     * des tests de l'agent (R159, M5).
+     * des tests de l'agent (R159, M5). {@code definitions} : ceux que le runner a trouvés dans le dépôt, changés ou non, la
+     * liste qu'il a regardée (second tour, L-b).
      */
     public record Test(
         @NotBlank @Size(max = 500) String command,
@@ -141,18 +142,25 @@ public record RunnerEventsRequest(
         @Pattern(regexp = SHA256, message = "output must be a sha256 digest") String output,
         @Min(0) Long outputBytes,
         Boolean configured,
-        @Size(max = 20) List<@Size(max = 300) String> definitionChanged
+        @Size(max = 20) List<@Size(max = 300) String> definitionChanged,
+        @Size(max = 20) List<@Size(max = 300) String> definitions
     ) {
 
         /** Des tests lancés, comme les décrit un runner qui ne dit pas si une commande est configurée. */
         public Test(String command, boolean ran, boolean passed, Integer passedCount, Integer total, String output, Long outputBytes) {
-            this(command, ran, passed, passedCount, total, output, outputBytes, null, null);
+            this(command, ran, passed, passedCount, total, output, outputBytes, null, null, null);
         }
 
         /** Des tests, comme les décrit un runner d'avant la relecture R159 : rien sur la définition des tests. */
         public Test(String command, boolean ran, boolean passed, Integer passedCount, Integer total, String output, Long outputBytes,
                     Boolean configured) {
-            this(command, ran, passed, passedCount, total, output, outputBytes, configured, null);
+            this(command, ran, passed, passedCount, total, output, outputBytes, configured, null, null);
+        }
+
+        /** Des tests, comme les décrit un runner du premier tour : ce qui a changé, sans la liste regardée. */
+        public Test(String command, boolean ran, boolean passed, Integer passedCount, Integer total, String output, Long outputBytes,
+                    Boolean configured, List<String> definitionChanged) {
+            this(command, ran, passed, passedCount, total, output, outputBytes, configured, definitionChanged, null);
         }
     }
 }

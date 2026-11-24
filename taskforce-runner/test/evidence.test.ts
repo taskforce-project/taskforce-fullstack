@@ -284,7 +284,7 @@ describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
     const verdict = await verifyEvidence(dossier({ edit }).text);
     assert.equal(verdict.ok, true, verdict.message);
     assert.match(verdict.message, /\[!!\] The runner's facts \(its tests, the agent and its model, the numbers of its events\) come from the computer where the agent works/);
-    assert.match(verdict.message, /\[!!\] Event 5: the branch changed package\.json, vitest\.config\.ts, which defines how its tests run/);
+    assert.match(verdict.message, /\[!!\] Event 5: what defines how its tests run changed during the mission \(package\.json, vitest\.config\.ts\)/);
     // Le champ couvert retiré de l'en-tête : la chaîne le donne encore.
     await fails(dossier({ edit, tamper: (f) => { delete (f.mission as Record<string, unknown>).runnerFacts; } }).text,
       /The header has no runnerFacts, which the chain gives/);
