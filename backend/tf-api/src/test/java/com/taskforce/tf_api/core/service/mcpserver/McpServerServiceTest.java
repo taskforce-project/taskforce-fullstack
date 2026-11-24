@@ -80,7 +80,7 @@ class McpServerServiceTest {
         TaskforceMcpTools tools = new TaskforceMcpTools(mapper, projectService, issueService, smartAssignService,
             brainSearchService, analyticsService, agentService, gestures, projectGestures);
         service = new McpServerService(tools, mapper, userRepository, identityResolver,
-            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members), workspaces, audit);
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members, com.taskforce.tf_api.core.service.TestPersonIds.inMemory()), workspaces, audit);
         lenient().when(workspaces.findBySlug("acme")).thenReturn(Optional.of(com.taskforce.tf_api.core.model.Workspace.builder()
             .id(3L).slug("acme").owner(User.builder().id(1L).email("owner@taskforce.dev").build()).build()));
         // Sans clé d'issue, les arguments passent tels quels ; les gestes répondent par leur phrase.

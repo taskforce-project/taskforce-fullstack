@@ -23,6 +23,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,6 +61,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.PersonIds;
 
 /**
  * L'exemple de {@code contracts/evidence/example-mission.json} : le dossier exporté d'une mission complète, écrit par le
@@ -159,12 +161,16 @@ class EvidenceExampleContractTest {
     @Test
     @DisplayName("une mission neuve, du début à la fin, exporte un dossier qui tient (et refait l'exemple dans target/)")
     void a_fresh_mission_exports_a_dossier_that_holds() throws Exception {
-        String file = new Scripted().mission();
+        Scripted scripted = new Scripted();
+        String file = scripted.mission();
         Path out = Path.of("target", "example-mission.json");
         Files.createDirectories(out.getParent());
         Files.writeString(out, file, StandardCharsets.UTF_8);
 
         holds(JSON.readTree(file));
+        // Le paquet nomme ses propriétaires par leur identifiant : le dossier le garde tel que le runner l'a reçu, avec
+        // l'empreinte que le runner a vérifiée à la réclamation.
+        assertThat(JSON.readTree(file).get("rules").get("digest").asText()).isEqualTo(scripted.received);
     }
 
     /** Une mission jouée de bout en bout contre le vrai service, ses dépôts en mémoire. */
@@ -174,6 +180,8 @@ class EvidenceExampleContractTest {
         final List<MissionDossierSeal> seals = new ArrayList<>();
         final List<MissionDossierText> texts = new ArrayList<>();
         final Map<Long, MissionPerson> persons = new HashMap<>();
+        /** L'empreinte du paquet que le runner a reçu et vérifié à la réclamation. */
+        String received;
 
         String mission() {
             MissionPersonRepository people = mock(MissionPersonRepository.class);
@@ -184,6 +192,8 @@ class EvidenceExampleContractTest {
                 persons.put(person.getUserId(), person);
                 return person;
             });
+            lenient().when(people.findByWorkspaceIdAndPerson(anyLong(), anyString()))
+                .thenAnswer(inv -> persons.values().stream().filter(p -> p.getPerson().equals(inv.getArgument(1))).findFirst());
             DeliveryRunEvidenceRepository repository = mock(DeliveryRunEvidenceRepository.class);
             DeliveryRunRepository runRepository = mock(DeliveryRunRepository.class);
             MissionDossierRepository dossiers = mock(MissionDossierRepository.class);
@@ -241,12 +251,14 @@ class EvidenceExampleContractTest {
                 IssueChecklistItem.builder().id(2L).issueId(55L).content("Check the links on the staging site").done(false).build());
             lenient().when(checklist.findByIssueIdOrderByPositionAscIdAsc(55L)).thenReturn(items);
 
-            HarnessRulesService rulesService = new HarnessRulesService(mock(HarnessRuleSetRepository.class),
-                mock(WorkspaceMemberRepository.class));
-            RulesBundle rules = rulesService.bundleFor(workspace, new HarnessRulesService.Work(12L, null, 7L));
-            // Le paquet nomme le propriétaire de la table par son courriel : la copie du dossier le nomme par son identifiant (N3).
             UserRepository users = mock(UserRepository.class);
-            lenient().when(users.findByEmail("ada@example.com")).thenReturn(Optional.of(ada));
+            lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
+            // Le paquet nomme le propriétaire de la table par l'identifiant que le dossier lui donne dans l'espace : le dossier
+            // garde le paquet tel que le runner l'a reçu, empreinte comprise.
+            HarnessRulesService rulesService = new HarnessRulesService(mock(HarnessRuleSetRepository.class),
+                mock(WorkspaceMemberRepository.class), new PersonIds(people, users, mock(PlatformTransactionManager.class)));
+            RulesBundle rules = rulesService.bundleFor(workspace, new HarnessRulesService.Work(12L, null, 7L));
+            received = rules.digest();
             MissionEvidenceService service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository,
                 textRepository, mock(HarnessRuleSetRepository.class), checklist, people, new EvidenceSigner("", "", ""),
                 mock(ApplicationEventPublisher.class), users);

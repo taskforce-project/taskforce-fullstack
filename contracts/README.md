@@ -6,7 +6,7 @@ cases.
 
 | Contract | Files | Read by | Proved by |
 | --- | --- | --- | --- |
-| Rules bundle, `taskforce-rules/1` | `rules/taskforce-rules-1.schema.json`, `rules/default.rules.json` | the server publishes it and judges its own tools with it, the runner applies it to the agent's actions | `rules/cases.json`: the same actions must get the same decision on both sides |
+| Rules bundle, `taskforce-rules/1` | `rules/taskforce-rules-1.schema.json`, `rules/default.rules.json` | the server publishes it and judges its own tools with it, the runner applies it to the agent's actions | `rules/cases.json`: the same actions must get the same decision, and the same bundle the same digest, on both sides |
 | Evidence file, `taskforce-evidence/1` | `evidence/taskforce-evidence-1.schema.json` | the server writes the chain, anyone can check an export | `evidence/chain-cases.json`: the same events must give the same hashes on both sides |
 | Agent adapter | `agent/adapter.md` | the runner, one adapter per agent | the adapter tests in `taskforce-runner` |
 | Mission step, `taskforce-mission-steps/1` | `mission-steps/cases.json` | the server gives the step of each mission to the workflow view (`MissionSteps`), the screen draws the steps of one mission (`frontend/lib/delivery/mission-sequence.ts`) | the same cases: the same status, timeline and requests must give the same step on both sides |
@@ -45,7 +45,16 @@ compiles the module again from the Java sources and refuses a difference with th
    effect outside its session) is allowed, with no rule.
 6. The bundle's `digest` is `sha256:` followed by the hex SHA-256 of the canonical JSON (see below) of the bundle
    without its `digest` field and without any member whose value is `null`, at every level. The runner recomputes it
-   and refuses a bundle that does not match: no mission starts without rules.
+   and refuses a bundle that does not match: no mission starts without rules. The case `issued` of `cases.json` is a
+   bundle in the form the server issues it, replayed on both sides.
+7. Each rule names who answers for it (`owner`, R2 and invariant 8): a person, never a role (R32 replaced the generic
+   `workspace-owner` with a named person) and never an email. The bundle names them by their opaque id in the
+   workspace, `who:` and 32 hex digits, the id the evidence record names them by (People, below): TaskForce's table
+   is answered for by the owner of the workspace, a company rule by the person who added it. A version of a layer
+   stored before 1.18 named its author by email, and never changes: the server names them by their id when it issues
+   the bundle, and gives that layer the digest of its rules named the same way, so that no digest of the bundle
+   confirms an email. `who:unknown` names no one, a person TaskForce cannot find any more; `workspace-owner` is only
+   the placeholder of `default.rules.json`. The owner never changes a decision.
 
 ## Evidence: how the chain is built
 
@@ -88,10 +97,12 @@ only part of its header; the verifier says which fields are not covered, and its
 
 A person enters the chain by an opaque id, `who:` and 32 hex digits, drawn the first time, one per person and
 workspace: the same in every mission of a workspace, and nothing links the ids of one person from a workspace to
-another. The prefix is the record's own: the live rules name a member `person:<id>`, the record never does. The id
-names `requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the person a request is
-`asked` of, and the actor of each gesture. A `note` of kind `person` introduces each one in a dossier, once: `person`,
-and `email` and `name` as texts kept beside the chain. A GitHub account that merges the pull request enters the same
+another. The prefix is the record's own, and the rules bundle uses it for the owner of each rule (rule 7 above):
+where the live rules need a member, they name them `person:<id>`, which the record never does. The id names
+`requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the `owner` of each rule, the
+person a request is `asked` of, and the actor of each gesture. A `note` of kind `person` introduces each one in a
+dossier, once: `person`, and `email` and `name` as texts kept beside the chain. A GitHub account that merges the pull
+request enters the same
 way, by the text of its login. When an account is purged, its email and name are erased in every dossier, with their
 salt, and a `note` of kind `erased` (`person`, `texts`, `reason: account-deleted`) says so; the id stays in the
 chains, linked to no one. A chain written before 1.18 named people by their email (its `mission.started` has no
@@ -99,16 +110,20 @@ chains, linked to no one. A chain written before 1.18 named people by their emai
 purged, the record gets a `note` of kind `erased` with `legacy: true`, the `events` that keep the email and the
 `reason`, naming no one, then a late seal (below). TaskForce hides the emails of such a record when it shows it (the
 page, the Markdown export), and only an owner or admin of the workspace exports its JSON or its seal, which carry them.
-The copy of the rules bundle the record keeps names people the same way: the `owner` of each
-rule, its `approvers` and the `ref` of a person's layer are opaque ids, each introduced by its note (a person
-TaskForce no longer knows is `who:unknown`). A rule stays that of a named person until their name is erased; then the
-`erased` note says when. The live rules, and the bundle the runner receives, keep their form.
+The rules bundle names the `owner` of each rule by their opaque id already, and the record introduces each owner by
+their note. Where the live rules name a member by their account, `person:<id>` among the `approvers` of a rule and as
+the `ref` of a person's layer, the copy of the bundle the record keeps names them by their opaque id too, each
+introduced by its note (a person TaskForce no longer knows is `who:unknown`). A rule stays that of a named person
+until their name is erased; then the `erased` note says when.
 
 ### What the file carries besides the chain
 
 - `rules`: the rules bundle the mission received (`taskforce-rules/1`), each person in it by their opaque id (above).
-  Its digest is computed on this copy and is the one `mission.started` holds, as is each layer's, computed on that
-  layer's rules named the same way: none confirms an email once erased. Anyone judges each `action.decided` of kind
+  When no rule of the bundle or of its layers names a member among its approvers, and no layer is a person's, it is
+  the bundle the runner received, member for member: its digest is the one the runner checked at claim time, the one
+  the mission notes, and the one `mission.started` holds. Otherwise the copy names those members by their id, and its
+  digest, the one `mission.started` holds, is computed on the copy, as is each layer's, on that layer's rules named
+  the same way: none confirms an email or an account once erased. Anyone judges each `action.decided` of kind
   `decision` again with the `facts` it keeps.
 - `texts`: the texts kept beside the chain, by their hash, each as `{ "salt": ..., "text": ... }`. The hash is `sha256:`
   and the SHA-256 of the UTF-8 bytes of the salt (32 hex digits, drawn for this text) followed by the text: a short

@@ -33,6 +33,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.core.service.rules.RuleApprovers;
@@ -91,7 +92,7 @@ class McpImportServiceTest {
             WorkspaceMember.builder().workspace(ws).role(WorkspaceRole.OWNER).build()));
         service = new McpImportService(workspaceMcp, projectService, issueService, llm, json,
             new com.taskforce.tf_api.core.service.AiMeter(aiUsageService, llm),
-            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
+            new CortexGate(new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()), workspaces, projectRepository, issueRepository, json), records,
             approvers(), new com.taskforce.tf_api.core.service.AuthorizationService(members));
     }
 

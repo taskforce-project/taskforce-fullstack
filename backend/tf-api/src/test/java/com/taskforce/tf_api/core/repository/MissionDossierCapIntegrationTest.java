@@ -38,6 +38,7 @@ import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.core.service.delivery.DeliveryPoll;
 import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
@@ -48,7 +49,7 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
  * vérifie tient, la chaîne, les textes gardés à côté (chacun nommé par la chaîne) et le sceau, par la clé du serveur.
  * L'export est aussi écrit dans target/, pour le passer au vérificateur du runner.
  */
-@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class})
+@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class, PersonIds.class})
 @DisplayName("Le dossier au plafond se vérifie encore (intégration Postgres)")
 class MissionDossierCapIntegrationTest extends AbstractIntegrationTest {
 

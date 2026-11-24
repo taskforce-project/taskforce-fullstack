@@ -159,6 +159,8 @@ class MissionEvidenceServiceTest {
             .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));
         lenient().when(people.findByUserId(anyLong()))
             .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))).stream().toList());
+        lenient().when(people.findByWorkspaceIdAndPerson(anyLong(), anyString()))
+            .thenAnswer(inv -> persons.values().stream().filter(p -> p.getPerson().equals(inv.getArgument(1))).findFirst());
         lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
             MissionPerson person = inv.getArgument(0);
             persons.put(person.getUserId(), person);
@@ -263,7 +265,50 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
-        @DisplayName("R159 second tour, N3 : la copie du paquet nomme chaque personne par son identifiant ; ses empreintes se calculent sur elle")
+        @DisplayName("un paquet qui nomme ses propriétaires par leur identifiant : le dossier le garde tel que le runner l'a reçu, "
+            + "empreinte comprise, et présente chaque propriétaire")
+        void a_bundle_named_by_ids_is_kept_as_the_runner_received_it() throws Exception {
+            lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
+            // Carol n'a ni délégué ni écrit l'issue : elle n'entre au dossier que comme propriétaire d'une règle.
+            User carol = User.builder().id(9L).email("carol@taskforce.dev").displayName("Carol").build();
+            lenient().when(users.findById(9L)).thenReturn(Optional.of(carol));
+            String ada7 = service.personId(3L, ada);
+            String carol9 = service.personId(3L, carol);
+            // La couche de Carol telle qu'elle est gardée depuis la 1.18 : son propriétaire par son identifiant.
+            Map<String, Object> layerRule = new java.util.LinkedHashMap<>();
+            layerRule.put("id", "ledger");
+            layerRule.put("effect", "ask");
+            layerRule.put("owner", carol9);
+            layerRule.put("require", Map.of("approvers", List.of("role:admin")));
+            String layerDigest = com.taskforce.tf_api.core.harness.rules.HarnessRulesService.digestOf(List.of(layerRule));
+            lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3)).thenReturn(Optional.of(HarnessRuleSet.builder().version(3)
+                .createdBy(carol).rules(List.of(layerRule)).build()));
+            RulesBundle.Rule table = new RulesBundle.Rule("read-files", new RulesBundle.Condition("file.read", null, null, null, null,
+                null, null, null), "read", "allow", null, ada7, "Reading changes nothing.", "2027-01-01");
+            RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
+                null, null, null, null), "reversible-exit", "ask", null, carol9, "Ask Carol first.", "2027-01-01", "workspace",
+                "Ask Carol first.", new RulesBundle.Require(List.of("role:admin"), 1, false));
+            RulesBundle unsigned = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, null, null, List.of(ledger, table), null,
+                List.of(new RulesBundle.Layer("workspace", null, 3, layerDigest)));
+            String digest = com.taskforce.tf_api.core.harness.rules.RulesDigest.of(JSON.valueToTree(unsigned));
+            RulesBundle live = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, digest, null, List.of(ledger, table), null,
+                List.of(new RulesBundle.Layer("workspace", null, 3, layerDigest)));
+
+            service.open(run, live, "tf-runner-ada", Map.of());
+
+            JsonNode copy = JSON.readTree(rows.get(100L).getRulesBundle());
+            // Le même paquet, membre pour membre : la copie ne réécrit rien.
+            assertThat(CanonicalJson.of(copy)).isEqualTo(CanonicalJson.of(JSON.valueToTree(live)));
+            assertThat(copy.get("digest").asText()).isEqualTo(digest).isEqualTo(data(0).get("rules").get("digest").asText());
+            assertThat(copy.get("layers").get(0).get("digest").asText()).isEqualTo(layerDigest);
+            // Ada a délégué, Bob a écrit l'issue, Carol répond d'une règle : chacun est présenté par sa note, une fois.
+            assertThat(stored.stream().filter(e -> e.getData().contains("\"kind\":\"person\"")).map(e -> e.getData()))
+                .hasSize(3).anySatisfy(note -> assertThat(note).contains(ada7)).anySatisfy(note -> assertThat(note).contains(carol9));
+        }
+
+        @Test
+        @DisplayName("R159 second tour, N3 : la copie d'un paquet d'avant la 1.18 nomme chaque personne par son identifiant ; ses "
+            + "empreintes se calculent sur elle")
         void the_rules_copy_names_people_by_their_id() throws Exception {
             User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
             lenient().when(users.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +25,7 @@ import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
+import com.taskforce.tf_api.core.enums.RuleScope;
 import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
@@ -31,12 +33,14 @@ import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.DeliveryRun;
+import com.taskforce.tf_api.core.model.HarnessRuleSet;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.core.service.delivery.DeliveryPoll;
 import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.core.service.delivery.MissionLateSeals;
@@ -47,7 +51,7 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
  * (rien ne cascade), il s'exporte et se vérifie encore après elle, et la base refuse de modifier ou d'effacer un de ses
  * événements ou de ses sceaux, comme elle le refuse aux versions des règles. Il ne part qu'avec son espace de travail.
  */
-@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class})
+@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class, PersonIds.class})
 @DisplayName("Le dossier d'une mission survit à son issue (intégration Postgres)")
 class MissionDossierIntegrationTest extends AbstractIntegrationTest {
 
@@ -67,6 +71,7 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     @Autowired private MissionDossierSealRepository seals;
     @Autowired private DeliveryRunEvidenceRepository evidenceRepository;
     @Autowired private EvidenceSigner signer;
+    @Autowired private HarnessRuleSetRepository ruleSets;
 
     private User ada;
     private Workspace workspace;
@@ -334,6 +339,47 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE user_id = ?", Integer.class, ada.getId())).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE person = ? AND (body IS NOT NULL OR salt IS NOT NULL)",
             Integer.class, id)).isZero();
+    }
+
+    @Test
+    @DisplayName("le paquet nomme qui répond de chaque règle par son identifiant : le dossier le garde tel que le runner l'a "
+        + "reçu, empreinte comprise, et la purge du compte n'y laisse aucun courriel")
+    void the_record_keeps_the_bundle_the_runner_received() throws Exception {
+        // Une règle de l'organisation écrite avant la 1.18 : elle nomme son auteur par son courriel, et sa version ne change pas.
+        Map<String, Object> rule = new LinkedHashMap<>();
+        rule.put("id", "ws-ask-comments");
+        rule.put("when", Map.of("action", "comment.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "ask");
+        rule.put("owner", "ada@it.dev");
+        rule.put("reason", "Ask before commenting.");
+        rule.put("review", "2027-05-24");
+        ruleSets.saveAndFlush(HarnessRuleSet.builder().workspace(workspace).version(2).scope(RuleScope.WORKSPACE).rules(List.of(rule))
+            .digest(HarnessRulesService.digestOf(List.of(rule))).createdBy(ada).createdAt(LocalDateTime.now()).build());
+        RulesBundle bundle = rules.bundleFor(workspace, new HarnessRulesService.Work(issue.getProject().getId(), null, ada.getId()));
+        String id = jdbc.queryForObject("SELECT person FROM mission_people WHERE user_id = ?", String.class, ada.getId());
+        assertThat(bundle.rules()).allSatisfy(r -> assertThat(r.owner()).isEqualTo(id));
+        assertThat(JSON.writeValueAsString(bundle)).doesNotContain("ada@it.dev");
+
+        evidence.open(run, bundle, "tf-runner-ada", Map.of());
+        em.flush();
+        em.clear();
+
+        JsonNode file = export();
+        // Le même paquet, membre pour membre, et la même empreinte : celle que le runner a vérifiée à la réclamation.
+        assertThat(CanonicalJson.of(file.get("rules"))).isEqualTo(CanonicalJson.of(JSON.valueToTree(bundle)));
+        assertThat(file.get("mission").get("rules").get("digest").asText()).isEqualTo(bundle.digest());
+        // Le propriétaire est présenté au dossier, une fois : il a aussi délégué.
+        assertThat(events(file)).filteredOn(e -> "person".equals(e.get("data").path("kind").asText())).hasSize(1);
+
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(1);
+        em.flush();
+        em.clear();
+        JsonNode purged = export();
+        String record = purged.get("events").toString() + purged.get("mission") + purged.get("texts") + purged.get("rules");
+        assertThat(record).doesNotContain("ada@it.dev");
+        assertThat(purged.get("rules")).isEqualTo(file.get("rules"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE person = ?", Integer.class, id)).isZero();
     }
 
     /** Un dossier d'avant la 1.18 : sa ligne, et une chaîne qui nomme la personne par son courriel, sans sceau. */

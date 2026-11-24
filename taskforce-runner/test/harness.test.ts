@@ -22,6 +22,7 @@ const contract = <T>(path: string): T => JSON.parse(readFileSync(new URL(`../../
 
 interface RuleCases {
   digest: { expected: string };
+  issued: { bundle: RulesBundle; expected: string };
   globs: Array<{ pattern: string; value: string; match: boolean }>;
   decisions: Array<{ name: string; facts: Facts; expect: { effect: string; rule: string | null } }>;
 }
@@ -89,6 +90,16 @@ describe("contrat des règles : empreinte du paquet", () => {
   it("accepte un paquet dont l'empreinte tient", () => {
     const signed = { ...defaults, digest: bundleDigest(defaults) };
     assert.equal(verifiedBundle(signed).version, defaults.version);
+  });
+
+  it("un paquet tel que le serveur l'émet, chaque propriétaire par son identifiant, a l'empreinte du serveur", () => {
+    const { bundle, expected } = ruleCases.issued;
+    assert.equal(bundleDigest(bundle), expected);
+    const noisy = { ...bundle, digest: `sha256:${"f".repeat(64)}`, issuedAt: null, process: null } as unknown as RulesBundle;
+    assert.equal(bundleDigest(noisy), expected);
+    // La réclamation l'accepte, et aucun propriétaire n'y est un courriel (R159, M6).
+    assert.equal(verifiedBundle({ ...bundle, digest: expected }).version, bundle.version);
+    for (const rule of bundle.rules) assert.match(rule.owner, /^(who:([0-9a-f]{32}|unknown)|workspace-owner)$/);
   });
 
   it("un paquet tel que le serveur l'envoie, conditions vides à null, juge comme le contrat", () => {

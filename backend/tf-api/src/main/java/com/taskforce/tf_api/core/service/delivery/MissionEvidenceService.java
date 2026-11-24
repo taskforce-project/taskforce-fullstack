@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +36,7 @@ import com.taskforce.tf_api.core.harness.evidence.EvidenceHeader;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceIntake;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
+import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.harness.rules.RulesDigest;
 import com.taskforce.tf_api.core.model.DeliveryRun;
@@ -247,17 +249,22 @@ public class MissionEvidenceService {
     static final String UNKNOWN_PERSON = MissionPerson.PREFIX + "unknown";
 
     /**
-     * La copie du paquet de règles que le dossier garde (R159, second tour, N3) : chaque personne qu'il nomme l'est par son
-     * identifiant opaque dans l'espace, son courriel et son nom à côté de la chaîne, effaçables comme les autres. Le
-     * propriétaire de chaque règle, ses approbateurs, la couche d'une personne. L'empreinte du paquet se calcule sur cette
-     * copie, et celle de chaque couche sur ses règles nommées de même : aucune ne confirme un courriel une fois effacé. Les
-     * règles vivantes, et le paquet que le runner reçoit, gardent leur forme. Chaque règle reste celle d'une personne nommée
-     * tant que son nom n'est pas effacé ; effacé, le dossier dit quand (la note {@code erased}).
+     * La copie du paquet de règles que le dossier garde (R159, second tour, N3) : chaque personne qu'il nomme l'est par
+     * son identifiant opaque dans l'espace, son courriel et son nom à côté de la chaîne, effaçables comme les autres.
+     * Le paquet nomme déjà ainsi le propriétaire de chaque règle ({@code HarnessRulesService}) : la copie le présente,
+     * et nomme de même ce que les règles vivantes désignent par le compte, les approbateurs ({@code person:<id>}) et la
+     * couche d'une personne. Sans eux, la copie est le paquet que le runner a reçu, membre pour membre, et son
+     * empreinte celle qu'il a vérifiée ; avec eux, l'empreinte du paquet se calcule sur cette copie, et celle de chaque
+     * couche sur ses règles nommées de même : aucune ne confirme un courriel ou un compte une fois effacé. Chaque règle
+     * reste celle d'une personne nommée tant que son nom n'est pas effacé ; effacé, le dossier dit quand (la note
+     * {@code erased}).
      */
     ObjectNode recordCopy(RulesBundle rules, Long workspaceId, List<User> named) {
         ObjectNode copy = JSON.valueToTree(rules);
+        // La table de TaskForce nomme trente fois le même propriétaire : chaque identifiant n'est cherché qu'une fois.
+        Set<String> presented = new HashSet<>();
         for (JsonNode rule : copy.path("rules")) {
-            if (rule instanceof ObjectNode object) pseudonymize(object, workspaceId, named);
+            if (rule instanceof ObjectNode object) pseudonymize(object, workspaceId, named, presented);
         }
         for (JsonNode layer : copy.path("layers")) {
             if (!(layer instanceof ObjectNode object)) continue;
@@ -271,7 +278,7 @@ public class MissionEvidenceService {
             ruleSets.findByWorkspaceIdAndVersion(workspaceId, version).ifPresent(set -> {
                 JsonNode stored = JSON.valueToTree(set.getRules() == null ? List.of() : set.getRules());
                 for (JsonNode rule : stored) {
-                    if (rule instanceof ObjectNode one) pseudonymize(one, workspaceId, new ArrayList<>());
+                    if (rule instanceof ObjectNode one) pseudonymize(one, workspaceId, new ArrayList<>(), null);
                 }
                 object.put("digest", RulesDigest.of(stored));
             });
@@ -280,11 +287,24 @@ public class MissionEvidenceService {
         return copy;
     }
 
-    /** Une règle nommée comme le dossier nomme les personnes : son propriétaire et ses approbateurs par leur identifiant. */
-    private void pseudonymize(ObjectNode rule, Long workspaceId, List<User> named) {
+    /**
+     * Une règle nommée comme le dossier nomme les personnes : son propriétaire et ses approbateurs par leur
+     * identifiant. Le propriétaire se lit comme le paquet le lit : son identifiant reste, présenté par sa note quand
+     * {@code presented} n'est pas nul ; le repère {@code workspace-owner} reste ; un courriel d'avant la 1.18 devient
+     * l'identifiant de son compte ; tout autre texte ne nomme personne.
+     */
+    private void pseudonymize(ObjectNode rule, Long workspaceId, List<User> named, Set<String> presented) {
         String owner = rule.path("owner").asText(null);
-        if (owner != null && owner.contains("@")) {
+        if (owner != null && owner.startsWith(MissionPerson.PREFIX)) {
+            if (presented != null && presented.add(owner)) {
+                people.findByWorkspaceIdAndPerson(workspaceId, owner)
+                    .flatMap(person -> users.findById(person.getUserId()))
+                    .ifPresent(user -> personIdOf(workspaceId, user, named));
+            }
+        } else if (owner != null && owner.contains("@")) {
             rule.put("owner", users.findByEmail(owner.strip()).map(user -> personIdOf(workspaceId, user, named)).orElse(UNKNOWN_PERSON));
+        } else if (!HarnessRulesService.OWNER_PLACEHOLDER.equals(owner)) {
+            rule.put("owner", UNKNOWN_PERSON);
         }
         JsonNode approvers = rule.path("require").path("approvers");
         if (approvers.isArray() && rule.get("require") instanceof ObjectNode require) {
@@ -697,8 +717,7 @@ public class MissionEvidenceService {
             return null;
         }
         return people.findByWorkspaceIdAndUserId(workspaceId, user.getId()).map(MissionPerson::getPerson)
-            .orElseGet(() -> people.saveAndFlush(MissionPerson.builder().workspaceId(workspaceId).userId(user.getId())
-                .person(MissionPerson.PREFIX + salt()).createdAt(LocalDateTime.now()).build()).getPerson());
+            .orElseGet(() -> people.saveAndFlush(MissionPerson.draw(workspaceId, user.getId())).getPerson());
     }
 
     /** L'espace d'un dossier : celui dont ses personnes portent l'identifiant. */
