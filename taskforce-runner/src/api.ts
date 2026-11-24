@@ -174,12 +174,22 @@ export interface RunnerEvent {
   /** `brief` : le texte entier remis à l'agent. */
   body?: string;
   /** `agent` : ce que l'agent dit de lui-même au démarrage. */
-  agent?: { version?: string; model?: string; session?: string; provider?: string };
+  /**
+   * `agent` : l'agent réellement lancé. `model` : le modèle servi quand les réponses l'ont dit, sinon celui de la
+   * configuration (`configured`) ; `served` : chaque modèle que les réponses ont nommé ; `provider` : lu dans
+   * l'environnement de l'agent (R159, L5).
+   */
+  agent?: { version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string };
   /** `test` : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière gardée sur ce poste. */
   test?: {
     command: string; ran: boolean; passed: boolean; passedCount?: number; total?: number; output?: string; outputBytes?: number;
     /** Faux : le projet n'a pas de commande de test, rien n'a tourné. */
     configured?: boolean;
+    /**
+     * Les fichiers de la branche qui disent comment les tests tournent (scripts, configuration), ou que la commande
+     * nomme : le résultat ne dit alors que ce que donne la version des tests de l'agent (R159, M5).
+     */
+    definitionChanged?: string[];
   };
 }
 

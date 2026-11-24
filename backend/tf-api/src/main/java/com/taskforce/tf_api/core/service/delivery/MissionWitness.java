@@ -1,18 +1,29 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.net.URI;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.taskforce.tf_api.core.model.DeliveryRun;
+import com.taskforce.tf_api.core.repository.DeliveryRunEvidenceRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
+import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.service.GitHubPullRequests;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.util.LogSafe;
@@ -23,31 +34,67 @@ import lombok.extern.slf4j.Slf4j;
  * Le témoin du dossier d'une mission (R198 amendée, précision 5 ; point 9 de la séance n°30, « oui pour le témoin, le
  * moins cher ») : à la fin de la mission, la tête de sa chaîne s'écrit là où l'exploitant de TaskForce n'est pas seul à
  * écrire, d'abord dans la pull request de la mission. GitHub date le commentaire et garde l'historique de ses
- * modifications : un dossier réécrit ensuite ne retrouve plus cette tête dans sa chaîne. Rien d'autre ne s'ajoute à la
- * pull request que cette empreinte et le lien de la page de vérification.
+ * modifications : un dossier réécrit ensuite ne retrouve plus cette tête dans sa chaîne.
  *
- * <p>Après le commit de la fin, hors de sa transaction : GitHub peut être lent ou injoignable, la mission est déjà
- * close. Ce qui s'est passé entre au dossier, à la suite : le commentaire écrit, ou pourquoi il ne l'est pas. Une mission
- * sans pull request n'a pas de témoin ; la page le dit.</p>
+ * <p>Le commentaire porte toujours l'empreinte de tête scellée, et rien qui dise qui ou où (R159, B2 et M1) : un lien vers
+ * la page de vérification seulement quand GitHub dit le dépôt privé, que l'instance n'est pas l'app de bureau et que son
+ * adresse n'est pas celle de la machine ; dans le doute, pas de lien. Jamais le nom d'un espace, d'une personne ou d'un
+ * hôte interne sur un dépôt public.</p>
+ *
+ * <p>Après le commit de la fin, hors de sa transaction : GitHub peut être lent ou injoignable, la mission est déjà close.
+ * Un échec se retente (R159, L7), et un passage régulier écrit le témoin d'une mission scellée qui n'en a pas encore, si le
+ * serveur a redémarré avant. Ce qui s'est passé entre au dossier, à la suite : le commentaire écrit, ou pourquoi il ne
+ * l'est pas, et pour une mission sans pull request, une note qui le dit.</p>
  */
 @Slf4j
 @Component
 public class MissionWitness {
 
+    /** Les attentes avant chaque nouvel essai, quand GitHub ne répond pas. */
+    static final List<Duration> RETRIES = List.of(Duration.ofSeconds(2), Duration.ofSeconds(10));
+    /** Le passage régulier ne revient pas plus loin : au-delà, la mission a son témoin, ou la note qui dit pourquoi. */
+    static final Duration SWEEP_WINDOW = Duration.ofDays(7);
+    /** Il laisse au témoin de la fin le temps de s'écrire avant de le remplacer. */
+    static final Duration SWEEP_GRACE = Duration.ofMinutes(5);
+
     private final DeliveryRunRepository runRepository;
+    private final DeliveryRunEvidenceRepository evidenceRepository;
+    private final MissionDossierSealRepository sealRepository;
     private final GitHubPullRequests pullRequests;
     private final MissionEvidenceService evidence;
     private final TransactionTemplate tx;
     private final String frontendUrl;
+    private final boolean linkAllowed;
+    private final List<Duration> retries;
 
+    /** Le témoin comme avant la relecture R159 : un lien permis là où le dépôt est privé, les attentes par défaut. */
     public MissionWitness(DeliveryRunRepository runRepository, GitHubPullRequests pullRequests, MissionEvidenceService evidence,
-                          PlatformTransactionManager transactionManager,
-                          @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl) {
+                          PlatformTransactionManager transactionManager, String frontendUrl) {
+        this(runRepository, null, null, pullRequests, evidence, transactionManager, frontendUrl, true, RETRIES);
+    }
+
+    @Autowired
+    public MissionWitness(DeliveryRunRepository runRepository, DeliveryRunEvidenceRepository evidenceRepository,
+                          MissionDossierSealRepository sealRepository, GitHubPullRequests pullRequests,
+                          MissionEvidenceService evidence, PlatformTransactionManager transactionManager,
+                          @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl,
+                          @Value("${delivery.evidence.witness-link:true}") boolean linkAllowed) {
+        this(runRepository, evidenceRepository, sealRepository, pullRequests, evidence, transactionManager, frontendUrl,
+            linkAllowed, RETRIES);
+    }
+
+    MissionWitness(DeliveryRunRepository runRepository, DeliveryRunEvidenceRepository evidenceRepository,
+                   MissionDossierSealRepository sealRepository, GitHubPullRequests pullRequests, MissionEvidenceService evidence,
+                   PlatformTransactionManager transactionManager, String frontendUrl, boolean linkAllowed, List<Duration> retries) {
         this.runRepository = runRepository;
+        this.evidenceRepository = evidenceRepository;
+        this.sealRepository = sealRepository;
         this.pullRequests = pullRequests;
         this.evidence = evidence;
         this.tx = new TransactionTemplate(transactionManager);
         this.frontendUrl = frontendUrl.endsWith("/") ? frontendUrl.substring(0, frontendUrl.length() - 1) : frontendUrl;
+        this.linkAllowed = linkAllowed;
+        this.retries = List.copyOf(retries);
     }
 
     /** Ce qu'il faut pour écrire le témoin d'une mission : sa pull request et l'adresse de sa page. */
@@ -60,45 +107,128 @@ public class MissionWitness {
         write(sealed);
     }
 
+    /**
+     * Le passage régulier (R159, L7) : les missions scellées des sept derniers jours dont le dossier n'a ni témoin ni note
+     * qui dise pourquoi, parce que le serveur a redémarré avant l'écriture.
+     */
+    @Scheduled(fixedDelayString = "${delivery.evidence.witness-sweep-ms:900000}",
+        initialDelayString = "${delivery.evidence.witness-sweep-initial-ms:120000}")
+    public void sweep() {
+        if (evidenceRepository == null || sealRepository == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        List<Long> runs = tx.execute(status -> evidenceRepository.findUnwitnessed(now.minus(SWEEP_WINDOW), now.minus(SWEEP_GRACE)));
+        for (Long runId : runs == null ? List.<Long>of() : runs) {
+            sealRepository.findTopByRunIdOrderBySeqDesc(runId)
+                .ifPresent(seal -> write(new MissionSealed(runId, seal.getRoot(), seal.getSeq())));
+        }
+    }
+
     /** Écrit la tête du dossier dans la pull request de la mission, puis le dit au dossier. */
     void write(MissionSealed sealed) {
-        Target target = tx.execute(status -> runRepository.findById(sealed.runId()).map(run -> {
-            Matcher pr = DeliveryRunner.PULL_REQUEST.matcher(run.getResultUrl() == null ? "" : run.getResultUrl());
-            if (!pr.matches()) return null;
-            var workspace = run.getIssue().getProject().getWorkspace();
-            return new Target(workspace.getId(), workspace.getSlug(), pr.group(1), Integer.parseInt(pr.group(2)),
-                "https://github.com/" + pr.group(1) + "/pull/" + pr.group(2));
-        }).orElse(null));
-        if (target == null) {
+        Optional<Optional<Target>> found = tx.execute(status -> runRepository.findById(sealed.runId()).map(MissionWitness::target));
+        if (found == null || found.isEmpty()) {
             return;
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("kind", "witness");
+        Target target = found.get().orElse(null);
+        if (target == null) {
+            // Sans pull request, la tête ne s'écrit nulle part : la note le dit, le vérificateur n'a rien à deviner (L7).
+            data.put("written", false);
+            data.put("reason", "This mission has no pull request.");
+            keep(sealed.runId(), data);
+            return;
+        }
         data.put("where", "github-pull-request");
         data.put("pullRequest", target.pullRequest());
         data.put("root", sealed.root());
         data.put("seq", sealed.seq());
-        try {
-            String url = pullRequests.comment(target.workspaceId(), target.repo(), target.number(), body(target, sealed)).orElse(null);
-            data.put("written", true);
-            data.put("comment", url);
-            log.info("Run {} : témoin écrit sur {}", sealed.runId(), target.pullRequest());
-        } catch (BusinessException | IllegalStateException e) {
-            data.put("written", false);
-            data.put("reason", e.getMessage());
-            log.warn("Run {} : témoin non écrit sur {} : {}", sealed.runId(), target.pullRequest(), LogSafe.of(e.getMessage()));
+        String leftOut = linkLeftOut(target);
+        data.put("pageLinked", leftOut == null);
+        if (leftOut != null) data.put("pageLeftOut", leftOut);
+        String body = body(target, sealed, leftOut == null);
+        String reason = null;
+        for (int attempt = 0; attempt <= retries.size(); attempt++) {
+            try {
+                String url = pullRequests.comment(target.workspaceId(), target.repo(), target.number(), body).orElse(null);
+                data.put("written", true);
+                data.put("comment", url);
+                reason = null;
+                log.info("Run {} : témoin écrit sur {}", sealed.runId(), target.pullRequest());
+                break;
+            } catch (BusinessException | IllegalStateException e) {
+                reason = e.getMessage();
+                if (attempt < retries.size() && !pause(retries.get(attempt))) break;
+            }
         }
+        if (reason != null) {
+            data.put("written", false);
+            data.put("reason", reason);
+            log.warn("Run {} : témoin non écrit sur {} : {}", sealed.runId(), target.pullRequest(), LogSafe.of(reason));
+        }
+        keep(sealed.runId(), data);
+    }
+
+    private void keep(Long runId, Map<String, Object> data) {
         try {
-            tx.executeWithoutResult(status -> evidence.appendToDossier(sealed.runId(), "note", MissionEvidenceService.Actor.SERVER, data));
+            tx.executeWithoutResult(status -> evidence.appendToDossier(runId, "note", MissionEvidenceService.Actor.SERVER, data));
         } catch (RuntimeException e) {
-            log.warn("Run {} : le témoin n'a pas pu entrer au dossier : {}", sealed.runId(), LogSafe.of(e.getMessage()));
+            log.warn("Run {} : le témoin n'a pas pu entrer au dossier : {}", runId, LogSafe.of(e.getMessage()));
         }
     }
 
-    /** Le commentaire : l'empreinte de tête et le lien de la page, rien d'autre (R212). */
-    String body(Target target, MissionSealed sealed) {
-        return "TaskForce evidence of this pull request: `" + sealed.root() + "` (event " + sealed.seq() + " of mission "
-            + sealed.runId() + ").\nVerification page: " + pageUrl(target.slug(), sealed.runId());
+    private static boolean pause(Duration wait) {
+        try {
+            Thread.sleep(wait.toMillis());
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /** La pull request de la mission, si elle en a une. */
+    private static Optional<Target> target(DeliveryRun run) {
+        Matcher pr = DeliveryRunner.PULL_REQUEST.matcher(run.getResultUrl() == null ? "" : run.getResultUrl());
+        if (!pr.matches()) return Optional.empty();
+        var workspace = run.getIssue().getProject().getWorkspace();
+        return Optional.of(new Target(workspace.getId(), workspace.getSlug(), pr.group(1), Integer.parseInt(pr.group(2)),
+            "https://github.com/" + pr.group(1) + "/pull/" + pr.group(2)));
+    }
+
+    /**
+     * Pourquoi le commentaire ne porte pas de lien, ou null s'il peut en porter un : l'app de bureau (sa page n'existe que
+     * sur la machine), une adresse de la machine elle-même, un dépôt que GitHub ne dit pas privé, ou dont on ne sait rien.
+     */
+    String linkLeftOut(Target target) {
+        if (!linkAllowed) return "desktop-app";
+        if (local(frontendUrl)) return "local-address";
+        String visibility = pullRequests.visibility(target.workspaceId(), target.repo()).orElse(null);
+        if (visibility == null) return "visibility-unknown";
+        return "private".equals(visibility) ? null : visibility + "-repository";
+    }
+
+    /** Une adresse qui ne mène qu'à la machine qui l'écrit. */
+    static boolean local(String url) {
+        String host;
+        try {
+            host = URI.create(url).getHost();
+        } catch (IllegalArgumentException e) {
+            return true;
+        }
+        if (host == null || host.isBlank()) return true;
+        host = host.toLowerCase(Locale.ROOT);
+        return host.equals("localhost") || host.endsWith(".localhost") || host.startsWith("127.") || host.equals("0.0.0.0")
+            || host.equals("[::1]") || host.equals("::1");
+    }
+
+    /** Le commentaire : l'empreinte de tête scellée, et le lien de la page quand il est permis ; rien d'autre (R212). */
+    String body(Target target, MissionSealed sealed, boolean link) {
+        String head = "TaskForce evidence of this pull request: `" + sealed.root() + "` (event " + sealed.seq() + " of mission "
+            + sealed.runId() + ").";
+        return link ? head + "\nVerification page: " + pageUrl(target.slug(), sealed.runId()) : head;
     }
 
     /** La page de vérification de la mission, dans l'app. */

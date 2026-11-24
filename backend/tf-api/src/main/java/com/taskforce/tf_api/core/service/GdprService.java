@@ -16,6 +16,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.IssueWorklogRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class GdprService {
     private final KeycloakService keycloakService;
     private final AuditService auditService;
     private final JdbcTemplate jdbcTemplate;
+    private final MissionEvidenceService missionEvidence;
 
     /** Délai de grâce (jours) avant la purge réelle d'un compte dont la suppression a été demandée. */
     @Value("${taskforce.account.deletion-grace-days:30}")
@@ -204,6 +206,10 @@ public class GdprService {
 
         final String keycloakId = u.getKeycloakId();
 
+        // Ce que les dossiers des missions gardent de la personne (son courriel, son nom) s'efface, et chaque dossier touché
+        // le dit et se scelle de nouveau ; son identifiant opaque reste dans les chaînes, relié à personne (R159, M6).
+        int dossiers = missionEvidence.forgetPerson(userId);
+
         int transferred = 0, deleted = 0;
         for (Long wsId : jdbcTemplate.queryForList(
                 "SELECT id FROM workspaces WHERE owner_id = ?", Long.class, userId)) {
@@ -242,7 +248,7 @@ public class GdprService {
         userRepository.save(u);
 
         auditService.record(null, userId, AuditService.GDPR_DELETE, "User", String.valueOf(userId),
-            Map.of("purged", true, "workspacesTransferred", transferred, "workspacesDeleted", deleted));
+            Map.of("purged", true, "workspacesTransferred", transferred, "workspacesDeleted", deleted, "missionDossiersErased", dossiers));
         log.info("Compte {} purgé : {} workspace(s) transféré(s), {} supprimé(s), row anonymisé",
             userId, transferred, deleted);
 

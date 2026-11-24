@@ -303,24 +303,41 @@ public class DeliveryController {
 
     /**
      * GET /api/workspaces/{slug}/delivery/evidence/key : la clé qui scelle les dossiers de ce serveur, à comparer à celle
-     * d'un sceau ({@code npm run verify -- --key}) : son identifiant, sa clé publique, et où vit la clé privée. Un membre
-     * de l'espace.
+     * d'un sceau ({@code npm run verify -- --key}) : son identifiant, sa clé publique, et où vit la clé privée ; puis les
+     * clés qui ont déjà scellé des dossiers de cet espace, avec leur premier et leur dernier usage (R159, M3). Un membre de
+     * l'espace.
      */
     @GetMapping("/evidence/key")
-    public ResponseEntity<ApiResponse<EvidenceKeyResponse>> evidenceKey(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug) {
-        var key = dossierAccess.key(slug, resolveUserId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Evidence signing key",
-            new EvidenceKeyResponse(key.id(), EvidenceSeal.ALGORITHM, key.publicKey(), key.custody(), key.kept())));
+    public ResponseEntity<ApiResponse<EvidenceKeysResponse>> evidenceKey(@AuthenticationPrincipal Jwt jwt, @PathVariable String slug) {
+        MissionDossierAccess.Keys keys = dossierAccess.keys(slug, resolveUserId(jwt));
+        EvidenceSeal.Key key = keys.current();
+        EvidenceKeyResponse current = new EvidenceKeyResponse(key.id(), EvidenceSeal.ALGORITHM, key.publicKey(), key.custody(),
+            key.kept(), null, null, null);
+        List<EvidenceKeyResponse> used = keys.used().stream()
+            .map(u -> new EvidenceKeyResponse(u.id(), EvidenceSeal.ALGORITHM, u.publicKey(), u.custody(), u.kept(), u.firstUsed(),
+                u.lastUsed(), u.seals()))
+            .toList();
+        return ResponseEntity.ok(ApiResponse.success("Evidence signing keys", new EvidenceKeysResponse(current, used)));
     }
 
     /**
-     * La clé publique qui scelle les dossiers.
+     * Une clé publique qui scelle, ou a scellé, les dossiers.
      *
      * @param publicKey SubjectPublicKeyInfo en DER, en base64
-     * @param custody   {@code same-machine} ou {@code separate-machine}, tel que l'exploitant le déclare
+     * @param custody   {@code same-machine} ou {@code separate-machine}, tel que l'exploitant le déclare (au moment du sceau
+     *                  pour une clé déjà utilisée)
      * @param kept      gardée d'un démarrage à l'autre
+     * @param firstUsed le premier sceau de cette clé dans l'espace (heure du dossier, UTC), nul pour la clé d'aujourd'hui
+     * @param lastUsed  son dernier sceau
+     * @param seals     combien de sceaux elle a faits dans l'espace
      */
-    public record EvidenceKeyResponse(String id, String algorithm, String publicKey, String custody, boolean kept) {}
+    public record EvidenceKeyResponse(String id, String algorithm, String publicKey, String custody, Boolean kept,
+                                      String firstUsed, String lastUsed, Long seals) {}
+
+    /**
+     * Les clés des dossiers de l'espace : celle qui scelle aujourd'hui, et celles qui ont déjà scellé, la plus récente d'abord.
+     */
+    public record EvidenceKeysResponse(EvidenceKeyResponse current, List<EvidenceKeyResponse> used) {}
 
     /**
      * POST /api/workspaces/{slug}/delivery/runs/{runId}/apply : « Apply » sur la carte de résultat (R78) : la pull

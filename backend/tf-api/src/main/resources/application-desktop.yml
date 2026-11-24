@@ -185,6 +185,8 @@ delivery:
     signing-key: ${DELIVERY_EVIDENCE_SIGNING_KEY:}
     signing-key-file: ${DELIVERY_EVIDENCE_SIGNING_KEY_FILE:${desktop.data-dir}/evidence/signing-key.pem}
     key-custody: same-machine
+    # Le témoin n'écrit pas de lien dans la pull request : la page de l'app n'existe que sur cette machine (R159, M1).
+    witness-link: false
 
 # Une personne sur sa machine : la fenêtre, le runner et Claude Code partagent 127.0.0.1, un quota par adresse les
 # bloquerait ensemble. L'API n'admet de toute façon que les jetons de la coque.

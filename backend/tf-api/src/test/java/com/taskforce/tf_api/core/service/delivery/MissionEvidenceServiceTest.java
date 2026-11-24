@@ -46,6 +46,7 @@ import com.taskforce.tf_api.core.model.IssueChecklistItem;
 import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.MissionDossierSeal;
 import com.taskforce.tf_api.core.model.MissionDossierText;
+import com.taskforce.tf_api.core.model.MissionPerson;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -56,6 +57,7 @@ import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
+import com.taskforce.tf_api.core.repository.MissionPersonRepository;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 /**
@@ -77,6 +79,7 @@ class MissionEvidenceServiceTest {
     @Mock private MissionDossierTextRepository textRepository;
     @Mock private HarnessRuleSetRepository ruleSets;
     @Mock private IssueChecklistItemRepository checklist;
+    @Mock private MissionPersonRepository people;
     @Mock private ApplicationEventPublisher publisher;
 
     /** Ce que la base garde, dans l'ordre. */
@@ -84,6 +87,7 @@ class MissionEvidenceServiceTest {
     private final Map<Long, MissionDossier> rows = new HashMap<>();
     private final List<MissionDossierSeal> seals = new ArrayList<>();
     private final List<MissionDossierText> texts = new ArrayList<>();
+    private final Map<Long, MissionPerson> persons = new HashMap<>();
     private MissionEvidenceService service;
     private DeliveryRun run;
     private Issue issue;
@@ -92,8 +96,8 @@ class MissionEvidenceServiceTest {
     @BeforeEach
     void setUp() {
         service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository, textRepository, ruleSets,
-            checklist, new EvidenceSigner("", "", ""), publisher);
-        ada = User.builder().id(7L).email("ada@taskforce.dev").build();
+            checklist, people, new EvidenceSigner("", "", ""), publisher);
+        ada = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada Lovelace").build();
         User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
         Workspace workspace = Workspace.builder().id(3L).slug("acme").owner(ada).build();
         Project project = Project.builder().id(12L).identifier("WEB").workspace(workspace).build();
@@ -137,7 +141,31 @@ class MissionEvidenceServiceTest {
         lenient().when(textRepository.findByRunIdOrderByIdAsc(100L)).thenAnswer(inv -> List.copyOf(texts));
         lenient().when(textRepository.findByRunIdAndHash(anyLong(), anyString()))
             .thenAnswer(inv -> texts.stream().filter(t -> t.getHash().equals(inv.getArgument(1))).findFirst());
+        lenient().when(textRepository.findFirstByRunIdAndKindAndBody(anyLong(), anyString(), anyString()))
+            .thenAnswer(inv -> texts.stream().filter(t -> t.getRunId().equals(inv.getArgument(0)) && t.getKind().equals(inv.getArgument(1))
+                && inv.getArgument(2).equals(t.getBody())).findFirst());
+        lenient().when(textRepository.existsByRunIdAndPersonAndKind(anyLong(), anyString(), anyString()))
+            .thenAnswer(inv -> texts.stream().anyMatch(t -> t.getRunId().equals(inv.getArgument(0))
+                && inv.getArgument(1).equals(t.getPerson()) && t.getKind().equals(inv.getArgument(2))));
+        lenient().when(textRepository.findByPersonAndBodyIsNotNull(anyString()))
+            .thenAnswer(inv -> texts.stream().filter(t -> inv.getArgument(0).equals(t.getPerson()) && t.getBody() != null).toList());
+        lenient().when(repository.existsByRunIdAndType(anyLong(), anyString()))
+            .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))));
+        lenient().when(people.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))));
+        lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
+            MissionPerson person = inv.getArgument(0);
+            persons.put(person.getUserId(), person);
+            return person;
+        });
+        lenient().doAnswer(inv -> persons.remove(inv.<MissionPerson>getArgument(0).getUserId())).when(people).delete(any());
     }
+
+    /** Le texte gardé à côté de la chaîne, de cette sorte, et l'empreinte salée que la chaîne en porte. */
+    private MissionDossierText text(String kind) {
+        return texts.stream().filter(t -> t.getKind().equals(kind)).findFirst().orElseThrow();
+    }
+
+    private static final String PERSON = "person:[0-9a-f]{32}";
 
     private static RulesBundle rules() {
         return new RulesBundle("taskforce-rules/1", "acme", 12L, 3, DIGEST, null, List.of(), null,
@@ -179,26 +207,54 @@ class MissionEvidenceServiceTest {
             assertThat(started.get("workspace").asText()).isEqualTo("acme");
             assertThat(started.get("project").asLong()).isEqualTo(12L);
             assertThat(started.get("issue").asText()).isEqualTo("WEB-12");
-            assertThat(started.get("requestedBy").asText()).isEqualTo("ada@taskforce.dev");
-            assertThat(started.get("accountable").asText()).isEqualTo("ada@taskforce.dev");
+            // R159, M6 : chaque personne entre par son identifiant opaque, le même partout où elle apparaît.
+            String adaId = persons.get(7L).getPerson();
+            assertThat(adaId).matches(PERSON);
+            assertThat(started.get("requestedBy").asText()).isEqualTo(adaId);
+            assertThat(started.get("accountable").asText()).isEqualTo(adaId);
             assertThat(started.get("delegatedAt").asText()).isEqualTo("2026-11-22T08:00:00.000Z");
             assertThat(started.get("origin").get("channel").asText()).isEqualTo("mcp");
             assertThat(started.get("agent").get("model").asText()).isEqualTo("claude-sonnet-5");
-            assertThat(started.get("rules").get("layers").get(0).get("author").asText()).isEqualTo("carol@taskforce.dev");
+            assertThat(started.get("rules").get("layers").get(0).get("author").asText()).isEqualTo(persons.get(9L).getPerson());
+            // Les faits que le runner rapportera viennent du poste de l'agent (R159, M5).
+            assertThat(started.get("runnerFacts").asText()).isEqualTo("agent-machine");
             JsonNode request = started.get("request");
-            assertThat(request.get("reporter").asText()).isEqualTo("bob@taskforce.dev");
+            assertThat(request.get("reporter").asText()).isEqualTo(persons.get(8L).getPerson());
             assertThat(request.get("createdAt").asText()).isEqualTo("2026-11-20T09:30:00.000Z");
-            // Le texte n'entre pas dans la chaîne : son empreinte, sa longueur ; il vit à côté.
-            assertThat(request.get("title").get("sha256").asText()).isEqualTo(EvidenceChain.sha256("Fix the footer"));
+            // Le texte n'entre pas dans la chaîne : son empreinte salée, sa longueur ; il vit à côté, avec son sel.
+            MissionDossierText title = text("title");
+            assertThat(title.getSalt()).matches("[0-9a-f]{32}");
+            assertThat(request.get("title").get("sha256").asText()).isEqualTo(EvidenceChain.sha256(title.getSalt() + "Fix the footer"))
+                .isNotEqualTo(EvidenceChain.sha256("Fix the footer"));
             assertThat(request.get("title").get("chars").asInt()).isEqualTo(14);
-            assertThat(stored.getFirst().getData()).doesNotContain("Fix the footer").doesNotContain("old site");
-            assertThat(texts).extracting(MissionDossierText::getKind).containsExactly("title", "description");
+            assertThat(stored.getFirst().getData()).doesNotContain("Fix the footer").doesNotContain("old site")
+                .doesNotContain("@taskforce.dev");
+            // Puis une note par personne : son identifiant, son courriel et son nom par leur empreinte, effaçables avec elle.
+            assertThat(stored).extracting(DeliveryRunEvidence::getType).containsExactly("mission.started", "note", "note", "note");
+            assertThat(data(1).get("kind").asText()).isEqualTo("person");
+            assertThat(data(1).get("person").asText()).isEqualTo(adaId);
+            assertThat(data(1).get("email").get("sha256").asText()).isEqualTo(EvidenceChain.sha256(text("email").getSalt() + "ada@taskforce.dev"));
+            assertThat(data(1).get("name").get("sha256").asText()).isEqualTo(EvidenceChain.sha256(text("name").getSalt() + "Ada Lovelace"));
+            assertThat(data(2).get("person").asText()).isEqualTo(persons.get(8L).getPerson());
+            assertThat(data(3).get("person").asText()).isEqualTo(persons.get(9L).getPerson());
+            assertThat(stored.stream().map(DeliveryRunEvidence::getData).toList()).noneMatch(d -> d.contains("@taskforce.dev"));
+            assertThat(texts).extracting(MissionDossierText::getKind).containsExactly("title", "description", "email", "name", "email", "email");
+            assertThat(texts).filteredOn(t -> "email".equals(t.getKind())).extracting(MissionDossierText::getPerson)
+                .containsExactly(adaId, persons.get(8L).getPerson(), persons.get(9L).getPerson());
             assertThat(rows.get(100L).getRulesBundle()).contains("\"digest\":\"" + DIGEST + "\"");
         }
 
         private void when_layer_author(String email) {
             lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3))
-                .thenReturn(Optional.of(HarnessRuleSet.builder().version(3).createdBy(User.builder().email(email).build()).build()));
+                .thenReturn(Optional.of(HarnessRuleSet.builder().version(3).createdBy(User.builder().id(9L).email(email).build()).build()));
+        }
+
+        @Test
+        @DisplayName("sans runner, rien ne dit d'où viennent ses faits : il n'en rapporte pas")
+        void without_a_runner_there_are_no_runner_facts() throws Exception {
+            service.open(run, rules(), null, Map.of());
+
+            assertThat(data(0).has("runnerFacts")).isFalse();
         }
 
         @Test
@@ -275,10 +331,49 @@ class MissionEvidenceServiceTest {
                 null, null, null, "You are working on a task delegated from TaskForce: WEB-12", null, null));
 
             assertThat(stored.get(0).getData()).doesNotContain("footer");
-            assertThat(data(0).get("text").get("sha256").asText()).isEqualTo(EvidenceChain.sha256("I will read the footer first."));
+            assertThat(data(0).get("text").get("sha256").asText())
+                .isEqualTo(EvidenceChain.sha256(text("text").getSalt() + "I will read the footer first."));
             assertThat(data(1).get("brief").get("sha256").asText())
-                .isEqualTo(EvidenceChain.sha256("You are working on a task delegated from TaskForce: WEB-12"));
+                .isEqualTo(EvidenceChain.sha256(text("brief").getSalt() + "You are working on a task delegated from TaskForce: WEB-12"));
             assertThat(texts).extracting(MissionDossierText::getKind).containsExactly("text", "brief");
+        }
+
+        @Test
+        @DisplayName("R159, M6 : le même texte dans un dossier garde son sel ; dans un autre dossier, il en tire un autre")
+        void a_salt_is_drawn_once_per_text_and_dossier() throws Exception {
+            service.runnerEvent(run, numbered(1, "text", "Done."));
+            service.runnerEvent(run, numbered(2, "text", "Done."));
+            rows.put(101L, MissionDossier.builder().runId(101L).build());
+
+            Map<String, Object> other = service.ref(101L, "text", "Done.");
+
+            assertThat(data(1).get("text")).isEqualTo(data(0).get("text"));
+            assertThat(texts).hasSize(2);
+            assertThat(other.get("sha256")).isNotEqualTo(data(0).get("text").get("sha256").asText());
+        }
+
+        @Test
+        @DisplayName("R159, L5 : le modèle configuré et ceux que les réponses ont nommés, à côté du modèle retenu")
+        void the_agent_keeps_the_configured_and_the_served_models() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "amazon-bedrock",
+                    "sonnet", List.of("claude-sonnet-5-20261001", " ", "claude-haiku-5-20261001")), null));
+
+            JsonNode agent = data(0);
+            assertThat(agent.get("provider").asText()).isEqualTo("amazon-bedrock");
+            assertThat(agent.get("configured").asText()).isEqualTo("sonnet");
+            assertThat(agent.get("served")).extracting(JsonNode::asText)
+                .containsExactly("claude-sonnet-5-20261001", "claude-haiku-5-20261001");
+        }
+
+        @Test
+        @DisplayName("R159, M5 : des tests dont la branche a changé la définition le disent")
+        void the_tests_say_when_the_branch_changed_their_definition() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("test", "npm test", "Tests passed: `npm test` (4 s).", null, null, 1,
+                null, null, null, null, null, new RunnerEventsRequest.Test("npm test", true, true, 42, 42,
+                    "sha256:" + "1".repeat(64), 5000L, true, List.of("package.json", " ", "vitest.config.ts"))));
+
+            assertThat(data(0).get("definitionChanged")).extracting(JsonNode::asText).containsExactly("package.json", "vitest.config.ts");
         }
 
         @Test
@@ -355,7 +450,8 @@ class MissionEvidenceServiceTest {
             assertThat(data(2).get("kind").asText()).isEqualTo("checklist");
             assertThat(data(2).get("items").get(0).get("done").asBoolean()).isTrue();
             assertThat(stored.getLast().getType()).isEqualTo("mission.ended");
-            assertThat(data(3).get("summary").get("sha256").asText()).isEqualTo(EvidenceChain.sha256("## What I did\nThe footer links."));
+            assertThat(data(3).get("summary").get("sha256").asText())
+                .isEqualTo(EvidenceChain.sha256(text("summary").getSalt() + "## What I did\nThe footer links."));
             assertThat(run.getEvidenceRoot()).isEqualTo(stored.getLast().getHash());
             assertThat(seals).hasSize(1);
             assertThat(seals.getFirst().getSeq()).isEqualTo(4);
@@ -417,7 +513,13 @@ class MissionEvidenceServiceTest {
             assertThat(file.get("mission").get("agent").get("model").asText()).isEqualTo("claude-sonnet-5-20261001");
             assertThat(file.get("mission").get("agent").get("version").asText()).isEqualTo("2.1.300");
             assertThat(file.get("rules").get("digest").asText()).isEqualTo(DIGEST);
-            assertThat(file.get("texts").get(EvidenceChain.sha256("Fix the footer")).asText()).isEqualTo("Fix the footer");
+            assertThat(file.get("mission").get("requestedBy").asText()).matches(PERSON);
+            assertThat(file.get("mission").get("runnerFacts").asText()).isEqualTo("agent-machine");
+            // Chaque texte part avec son sel : l'empreinte que la chaîne porte est le SHA-256 du sel suivi du texte (R159, M6).
+            String title = file.get("events").get(0).get("data").get("request").get("title").get("sha256").asText();
+            JsonNode kept = file.get("texts").get(title);
+            assertThat(kept.get("text").asText()).isEqualTo("Fix the footer");
+            assertThat(EvidenceChain.sha256(kept.get("salt").asText() + kept.get("text").asText())).isEqualTo(title);
             List<ObjectNode> events = new ArrayList<>();
             file.get("events").forEach(e -> events.add((ObjectNode) e));
             assertThat(EvidenceChain.firstBrokenLink(events)).isEqualTo(-1);
@@ -440,12 +542,13 @@ class MissionEvidenceServiceTest {
 
             assertThat(file.get("mission").get("issue").asText()).isEqualTo("WEB-12");
             assertThat(EvidenceSeal.open(file.get("seal")).valid()).isTrue();
+            // Le départ, une note par personne (Ada qui délègue, Bob qui a écrit l'issue), la fin.
             assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("# Evidence of mission 100: WEB-12")
-                .contains("- Seal: event 2, signed by key `sha256:");
+                .contains("- Seal: event 4, signed by key `sha256:");
         }
 
         @Test
-        @DisplayName("un dossier d'avant la 1.18 : ce que la chaîne ne couvre pas vient de sa ligne")
+        @DisplayName("un dossier d'avant la 1.18 : ce que la chaîne ne couvre pas vient de sa ligne, sauf qui a délégué")
         void an_older_dossier_takes_the_rest_from_its_row() throws Exception {
             startAndAct();
 
@@ -454,21 +557,39 @@ class MissionEvidenceServiceTest {
             assertThat(mission.get("id").asLong()).isEqualTo(100L);
             assertThat(mission.get("workspace").asText()).isEqualTo("acme");
             assertThat(mission.get("issue").asText()).isEqualTo("WEB-12");
-            assertThat(mission.get("requestedBy").asText()).isEqualTo("ada@taskforce.dev");
+            // R159, M6 : pas de courriel lu dans la ligne de la personne, qui changerait avec elle et casserait le sceau.
+            assertThat(mission.get("requestedBy").isNull()).isTrue();
+            assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("- Requested by: not in the chain");
         }
 
         @Test
-        @DisplayName("un texte s'efface : son empreinte reste, la chaîne tient, l'effacement entre au dossier, qui se scelle de nouveau")
+        @DisplayName("R159, M6 : un dossier d'avant la 1.18, scellé, se vérifie encore après la purge de la personne qui a délégué")
+        void an_older_sealed_dossier_still_checks_after_the_delegator_is_purged() throws Exception {
+            startAndAct();
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            rows.get(100L).setDelegatedBy(null);
+
+            JsonNode file = file();
+
+            EvidenceSeal.Opened seal = EvidenceSeal.open(file.get("seal"));
+            assertThat(CanonicalJson.of(seal.statement().get("predicate").get("mission"))).isEqualTo(CanonicalJson.of(file.get("mission")));
+        }
+
+        @Test
+        @DisplayName("un texte s'efface avec son sel : son empreinte reste, la chaîne tient, l'effacement entre au dossier, qui se scelle de nouveau")
         void a_text_is_erased_without_breaking_the_chain() throws Exception {
             service.open(run, rules(), "tf-runner-ada", Map.of());
             service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
-            String title = EvidenceChain.sha256("Fix the footer");
+            String title = text("title").getHash();
 
             service.eraseText(100L, title, ada);
 
             JsonNode file = file();
             assertThat(file.get("texts").has(title)).isFalse();
+            assertThat(text("title").getBody()).isNull();
+            assertThat(text("title").getSalt()).isNull();
             assertThat(stored.getLast().getType()).isEqualTo("human.decision");
+            assertThat(stored.getLast().getActorId()).isEqualTo(persons.get(7L).getPerson());
             assertThat(data(stored.size() - 1).get("kind").asText()).isEqualTo("erased");
             assertThat(data(stored.size() - 1).get("text").asText()).isEqualTo(title);
             List<ObjectNode> events = new ArrayList<>();
@@ -503,6 +624,73 @@ class MissionEvidenceServiceTest {
             assertThat(service.dossierJson(100L)).isEmpty();
             assertThat(service.dossierMarkdown(100L)).isEmpty();
             assertThat(service.envelope(100L)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("les personnes, par un identifiant opaque (R159, M6)")
+    class People {
+
+        @Test
+        @DisplayName("une personne qui agit entre par son identifiant ; la première fois dans un dossier, une note la présente")
+        void a_person_who_acts_is_introduced_once() throws Exception {
+            startAndAct();
+            User linus = User.builder().id(8L).email("linus@taskforce.dev").displayName("Linus").build();
+
+            MissionEvidenceService.Actor first = service.person(run, linus);
+            MissionEvidenceService.Actor again = service.person(run, linus);
+
+            assertThat(first.kind()).isEqualTo("person");
+            assertThat(first.id()).matches(PERSON).isEqualTo(again.id());
+            assertThat(stored).hasSize(3);
+            assertThat(data(2).get("kind").asText()).isEqualTo("person");
+            assertThat(data(2).get("person").asText()).isEqualTo(first.id());
+            assertThat(stored.get(2).getData()).doesNotContain("linus").doesNotContain("Linus");
+            assertThat(texts).extracting(MissionDossierText::getPerson).containsOnly(first.id());
+            assertThat(service.person(run, null)).isEqualTo(new MissionEvidenceService.Actor("person", "unknown"));
+        }
+
+        @Test
+        @DisplayName("deux personnes de même nom ne partagent pas leur texte : chacune s'efface seule")
+        void two_people_with_the_same_name_keep_their_own_text() {
+            startAndAct();
+
+            service.person(run, User.builder().id(8L).email("linus@taskforce.dev").displayName("Linus").build());
+            service.person(run, User.builder().id(9L).email("linus@example.com").displayName("Linus").build());
+
+            assertThat(texts).filteredOn(t -> "name".equals(t.getKind())).extracting(MissionDossierText::getPerson)
+                .containsExactly(persons.get(8L).getPerson(), persons.get(9L).getPerson());
+        }
+
+        @Test
+        @DisplayName("le compte purgé : son courriel et son nom s'effacent de chaque dossier, la chaîne tient, le dossier se scelle de nouveau")
+        void a_purged_account_is_forgotten() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            String adaId = persons.get(7L).getPerson();
+            int sealsBefore = seals.size();
+            assertThat(file().toString()).contains("ada@taskforce.dev");
+
+            assertThat(service.forgetPerson(7L)).isEqualTo(1);
+
+            JsonNode file = file();
+            assertThat(file.toString()).doesNotContain("ada@taskforce.dev").doesNotContain("Ada Lovelace").contains("bob@taskforce.dev");
+            assertThat(texts).filteredOn(t -> adaId.equals(t.getPerson())).hasSize(2)
+                .allMatch(t -> t.getBody() == null && t.getSalt() == null && t.getErasedAt() != null);
+            JsonNode erased = data(stored.size() - 1);
+            assertThat(erased.get("kind").asText()).isEqualTo("erased");
+            assertThat(erased.get("person").asText()).isEqualTo(adaId);
+            assertThat(erased.get("reason").asText()).isEqualTo("account-deleted");
+            assertThat(erased.get("texts")).hasSize(2);
+            List<ObjectNode> events = new ArrayList<>();
+            file.get("events").forEach(e -> events.add((ObjectNode) e));
+            assertThat(EvidenceChain.firstBrokenLink(events)).isEqualTo(-1);
+            assertThat(seals).hasSize(sealsBefore + 1);
+            assertThat(EvidenceSeal.open(file.get("seal")).valid()).isTrue();
+            // Plus rien ne relie la personne à son identifiant ; qui n'est pas connu n'a rien à oublier.
+            assertThat(persons).doesNotContainKey(7L);
+            assertThat(service.forgetPerson(7L)).isZero();
+            assertThat(service.forgetPerson(null)).isZero();
         }
     }
 

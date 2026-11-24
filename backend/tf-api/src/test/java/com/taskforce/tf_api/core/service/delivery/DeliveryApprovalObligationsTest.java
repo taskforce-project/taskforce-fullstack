@@ -128,6 +128,11 @@ class DeliveryApprovalObligationsTest {
         lenient().when(signatures.findByApprovalIdOrderBySignedAtAsc(anyLong())).thenAnswer(inv -> List.copyOf(signed));
         lenient().when(signatures.existsByApprovalIdAndUserId(anyLong(), anyLong())).thenAnswer(inv ->
             signed.stream().anyMatch(s -> s.getUser().getId().equals(inv.getArgument(1))));
+        // Le dossier nomme une personne par son identifiant opaque (R159, M6 ; le détail, MissionEvidenceServiceTest).
+        lenient().when(evidenceService.person(any(), any())).thenAnswer(inv -> {
+            User user = inv.getArgument(1);
+            return new MissionEvidenceService.Actor("person", user == null ? "unknown" : "person:" + user.getId());
+        });
     }
 
     /** La couche de l'organisation, avec une règle de l'entreprise. */

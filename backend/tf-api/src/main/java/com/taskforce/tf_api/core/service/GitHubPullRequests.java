@@ -1,5 +1,6 @@
 package com.taskforce.tf_api.core.service;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -15,6 +16,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
@@ -77,6 +79,24 @@ public class GitHubPullRequests {
             String url = JSON.readTree(answer).path("html_url").asText("");
             return url.startsWith("https://") ? Optional.of(url) : Optional.empty();
         } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * La visibilité du dépôt telle que GitHub la donne : {@code public}, {@code private} ou {@code internal} ; vide quand
+     * elle ne se lit pas (pas de jeton, GitHub injoignable, une réponse sans visibilité). Le témoin n'écrit un lien vers
+     * l'instance que pour un dépôt dont on sait qu'il est privé (R159, B2).
+     */
+    public Optional<String> visibility(Long workspaceId, String repo) {
+        try {
+            String answer = send(workspaceId, repo, "", HttpMethod.GET, null, "read the repository");
+            JsonNode node = answer == null || answer.isBlank() ? null : JSON.readTree(answer);
+            if (node == null) return Optional.empty();
+            String visibility = node.path("visibility").asText("").strip().toLowerCase(Locale.ROOT);
+            if (!visibility.isEmpty()) return Optional.of(visibility);
+            return node.path("private").isBoolean() ? Optional.of(node.get("private").asBoolean() ? "private" : "public") : Optional.empty();
+        } catch (BusinessException | JsonProcessingException e) {
             return Optional.empty();
         }
     }

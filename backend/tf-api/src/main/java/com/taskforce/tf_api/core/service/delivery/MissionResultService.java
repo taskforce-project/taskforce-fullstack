@@ -190,7 +190,7 @@ public class MissionResultService {
         decision.put("where", WHERE_TASKFORCE);
         decision.put("followUpRun", next.id());
         decision.put("comments", asked);
-        evidenceService.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), decision);
+        evidenceService.appendAfterEnd(run, "human.decision", evidenceService.person(run, run.getStartedBy()), decision);
         log.info("Run {} : {} commentaires, reprise {} par {}", runId, comments.size(), next.id(), userId);
         return next;
     }
@@ -236,7 +236,7 @@ public class MissionResultService {
         User person = run.getStartedBy();
         // Une mission encore en file n'a pas de dossier : il s'ouvre quand un runner la prend.
         if (working) {
-            evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", person.getEmail()),
+            evidenceService.append(run, "human.decision", evidenceService.person(run, person),
                 Map.of("decision", "STOP", "where", WHERE_TASKFORCE));
         }
         LocalDateTime now = LocalDateTime.now();
@@ -244,8 +244,9 @@ public class MissionResultService {
         run.setOutcomeBy(person);
         run.setOutcomeAt(now);
         run.setEndedAt(now);
-        String who = person.getDisplayName() == null || person.getDisplayName().isBlank() ? person.getEmail() : person.getDisplayName();
-        deliveryRunner.complete(runId, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by " + who + "."));
+        // Sans nom : cette erreur entre en clair au dossier, qui nomme déjà la personne par son identifiant au geste STOP, et
+        // seule la personne qui a délégué arrête sa mission (R159, M6).
+        deliveryRunner.complete(runId, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, STOPPED));
         log.info("Run {} : arrêté par {}", runId, userId);
     }
 
@@ -311,6 +312,8 @@ public class MissionResultService {
 
     /** Où la décision de fin se prend quand la personne tranche dans l'app. */
     static final String WHERE_TASKFORCE = "taskforce";
+    /** L'erreur d'une mission arrêtée, telle que la carte et le dossier la gardent : sans nom ni courriel (R159, M6). */
+    static final String STOPPED = "Stopped by the person who delegated it.";
 
     /**
      * Le geste entre au dossier de la mission (R198 : les gestes de la personne sur le résultat, avec leur raison ; R212,
@@ -323,7 +326,7 @@ public class MissionResultService {
         if (reason != null && !reason.isBlank()) data.put("reason", reason.strip());
         data.putAll(facts);
         evidenceService.appendAfterEnd(run, "human.decision",
-            new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), data);
+            evidenceService.person(run, run.getStartedBy()), data);
     }
 
     /** Ce que l'activité de l'issue garde de chaque geste. */

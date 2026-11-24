@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 
-import { canonicalJson, type Json } from "./engine/rules-engine.js";
 
 /**
  * L'action exacte d'une écriture (R198 : « au moins l'empreinte du contenu écrit, que le relevé des fichiers permet de
@@ -16,16 +15,42 @@ export function sha256(data: string | Buffer): string {
   return `sha256:${createHash("sha256").update(data).digest("hex")}`;
 }
 
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
 /**
- * L'empreinte de l'entrée d'un outil, l'action exacte qu'il fera : le SHA-256 de son JSON canonique (celui du dossier,
- * RFC 8785 sur ces valeurs). La session brute de l'agent porte cette entrée : un tiers la retrouve.
+ * Le JSON canonique de la RFC 8785 (JCS) : les clés triées par unités UTF-16, les nombres et les chaînes comme ECMAScript
+ * les écrit (`JSON.stringify`). Sans nombre décimal, c'est celui du dossier (CanonicalJson). Une valeur qui n'est pas du
+ * I-JSON (une demi-paire de substitution, un nombre infini) n'en a pas : une exception.
+ */
+export function jcs(value: unknown): string {
+  if (value === null || typeof value === "boolean") return JSON.stringify(value);
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("Not I-JSON: a number that is not finite");
+    return JSON.stringify(value);
+  }
+  if (typeof value === "string") {
+    if (LONE_SURROGATE.test(value)) throw new Error("Not I-JSON: a lone surrogate");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map((item) => jcs(item === undefined ? null : item)).join(",")}]`;
+  if (typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    const keys = Object.keys(object).filter((key) => object[key] !== undefined).sort();
+    return `{${keys.map((key) => `${jcs(key)}:${jcs(object[key])}`).join(",")}}`;
+  }
+  throw new Error(`Not JSON: a ${typeof value}`);
+}
+
+/**
+ * L'empreinte de l'entrée d'un outil, l'action exacte qu'il fera : le SHA-256 de son JSON canonique (RFC 8785, R159 L3).
+ * La session brute de l'agent porte cette entrée : un tiers la retrouve. Null pour une entrée qui n'est pas du I-JSON :
+ * pas d'empreinte, plutôt qu'une empreinte que personne ne refait.
  */
 export function inputHash(input: unknown): string | null {
   try {
-    return sha256(canonicalJson((input ?? {}) as Json));
+    return sha256(jcs(input ?? {}));
   } catch {
-    // Un nombre décimal dans l'entrée : le JSON canonique du dossier les refuse.
-    return sha256(JSON.stringify(input ?? {}));
+    return null;
   }
 }
 

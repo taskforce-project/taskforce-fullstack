@@ -11222,7 +11222,7 @@
             "content": {
               "*/*": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseEvidenceKeyResponse"
+                  "$ref": "#/components/schemas/ApiResponseEvidenceKeysResponse"
                 }
               }
             }
@@ -20795,6 +20795,21 @@
             "type": "string",
             "maxLength": 80,
             "minLength": 0
+          },
+          "configured": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "served": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 0
+            },
+            "maxItems": 10,
+            "minItems": 0
           }
         }
       },
@@ -20900,6 +20915,16 @@
           },
           "configured": {
             "type": "boolean"
+          },
+          "definitionChanged": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 0
+            },
+            "maxItems": 20,
+            "minItems": 0
           }
         },
         "required": [
@@ -24488,7 +24513,7 @@
           }
         }
       },
-      "ApiResponseEvidenceKeyResponse": {
+      "ApiResponseEvidenceKeysResponse": {
         "type": "object",
         "properties": {
           "success": {
@@ -24498,7 +24523,7 @@
             "type": "string"
           },
           "data": {
-            "$ref": "#/components/schemas/EvidenceKeyResponse"
+            "$ref": "#/components/schemas/EvidenceKeysResponse"
           },
           "timestamp": {
             "type": "string",
@@ -24523,6 +24548,30 @@
           },
           "kept": {
             "type": "boolean"
+          },
+          "firstUsed": {
+            "type": "string"
+          },
+          "lastUsed": {
+            "type": "string"
+          },
+          "seals": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "EvidenceKeysResponse": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/EvidenceKeyResponse"
+          },
+          "used": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceKeyResponse"
+            }
           }
         }
       },

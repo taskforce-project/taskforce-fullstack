@@ -255,9 +255,14 @@ final class JsValues {
     @JSBody(params = "v", script = "return v !== null && typeof v === 'object';")
     private static native boolean isObject(JSObject v);
 
+    /**
+     * La sorte d'une valeur JavaScript. Un entier n'en est un que dans ±(2^53−1) : au-delà, un nombre de JavaScript n'est
+     * plus l'entier qu'il paraît (1e21 s'écrivait 3875820019684212736), et il reste un nombre, que CanonicalJson refuse :
+     * la chaîne ne porte que des entiers que tout outil de la RFC 8785 écrit à l'identique (R159, L3).
+     */
     @JSBody(params = "v", script = "if (v === null || v === undefined) return 'null';"
         + " if (Array.isArray(v)) return 'array';"
-        + " if (typeof v === 'number') return Number.isInteger(v) ? 'integer' : 'number';"
+        + " if (typeof v === 'number') return Number.isSafeInteger(v) ? 'integer' : 'number';"
         + " return typeof v;")
     private static native String kind(JSObject v);
 

@@ -197,12 +197,14 @@ delivery:
     session-ttl-minutes: ${DELIVERY_RUNNER_SESSION_TTL_MINUTES:120}
     heartbeat-timeout-minutes: ${DELIVERY_RUNNER_HEARTBEAT_TIMEOUT_MINUTES:10}
   # La clé qui scelle les dossiers des missions (TF-J2-7, SELF_HOSTING.md) : une clé Ed25519 en PKCS#8 (PEM), par la
-  # variable ou par un fichier. Sans l'une ni l'autre, une clé tirée au démarrage, perdue à l'arrêt, et le journal le dit.
+  # variable ou par un fichier. Sans l'une ni l'autre, celle du fichier par défaut, dans le volume de données du serveur,
+  # créée au premier démarrage et gardée ensuite (R159, M3) ; sans volume, une clé tirée au démarrage, et le journal le dit.
   # La garde : same-machine (défaut) tant que l'exploitant ne déclare pas separate-machine, c'est-à-dire qu'aucun agent
   # ne tourne sur la machine du serveur ; chaque sceau la porte, la page de vérification la dit.
   evidence:
     signing-key: ${DELIVERY_EVIDENCE_SIGNING_KEY:}
     signing-key-file: ${DELIVERY_EVIDENCE_SIGNING_KEY_FILE:}
+    default-key-file: ${DELIVERY_EVIDENCE_DEFAULT_KEY_FILE:/var/lib/taskforce/evidence/signing-key.pem}
     key-custody: ${DELIVERY_EVIDENCE_KEY_CUSTODY:same-machine}
 
 # Logging Configuration

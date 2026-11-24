@@ -38,20 +38,24 @@ class MissionMergesTest {
     }
 
     @Test
-    @DisplayName("la mission qui a ouvert la pull request garde qui l'a fusionnée, quand, et où")
+    @DisplayName("la mission qui a ouvert la pull request garde qui l'a fusionnée, quand, et où ; le compte, à côté de la chaîne")
     @SuppressWarnings({"unchecked", "rawtypes"})
     void the_mission_that_opened_it_keeps_the_merge() {
         DeliveryRun mission = run(100L, "https://github.com/acme/website/pull/212", DeliveryRunStatus.DONE, null);
         when(runs.findByIssueIdOrderByCreatedAtDesc(55L)).thenReturn(List.of(
             run(101L, "https://github.com/acme/website/pull/213", DeliveryRunStatus.DONE, null), mission));
+        Map<String, Object> login = Map.of("sha256", "sha256:" + "a".repeat(64), "chars", 7);
+        when(evidence.text(mission, "login", "octocat")).thenReturn(login);
 
-        merges.onMerged(new MergedPullRequests.PullRequestMerged(55L, "acme/website", 212, "octocat", "2026-11-22T10:00:00Z"));
+        merges.onMerged(new MergedPullRequests.PullRequestMerged(55L, "acme/website", 212, " octocat ", "2026-11-22T10:00:00Z"));
 
+        // R159, M6 : le compte GitHub est une personne ; la chaîne n'en garde que l'empreinte salée, effaçable.
         ArgumentCaptor<Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
-        verify(evidence).appendAfterEnd(eq(mission), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "github:octocat")),
+        verify(evidence).appendAfterEnd(eq(mission), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "github")),
             data.capture());
         assertThat(data.getValue()).containsEntry("decision", "MERGE").containsEntry("where", "github")
-            .containsEntry("by", "octocat").containsEntry("mergedAt", "2026-11-22T10:00:00Z");
+            .containsEntry("by", login).containsEntry("mergedAt", "2026-11-22T10:00:00Z");
+        assertThat(data.getValue().toString()).doesNotContain("octocat");
     }
 
     @Test

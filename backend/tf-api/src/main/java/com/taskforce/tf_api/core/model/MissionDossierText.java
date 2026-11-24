@@ -38,17 +38,28 @@ public class MissionDossierText {
     @Column(name = "run_id", nullable = false, updatable = false)
     private Long runId;
 
-    /** {@code sha256:} et l'empreinte du texte en UTF-8. */
+    /** {@code sha256:} et l'empreinte, en UTF-8, du sel suivi du texte (R159, M6). */
     @Column(nullable = false, updatable = false, length = 71)
     private String hash;
 
-    /** {@code title}, {@code description}, {@code brief}, {@code text}, {@code summary} ou {@code checklist}. */
+    /**
+     * {@code title}, {@code description}, {@code brief}, {@code text}, {@code summary}, {@code checklist}, ou ce qu'on
+     * sait d'une personne : {@code email}, {@code name}, {@code login} (un compte GitHub).
+     */
     @Column(nullable = false, updatable = false, length = 16)
     private String kind;
+
+    /** Le sel du texte, 32 chiffres hexadécimaux ; nul une fois effacé, avec le texte. */
+    @Column(length = 32)
+    private String salt;
 
     /** Le texte ; nul une fois effacé. */
     @Column(columnDefinition = "TEXT")
     private String body;
+
+    /** La personne que ce texte décrit (son identifiant opaque), pour l'effacer avec son compte ; nul pour les autres. */
+    @Column(length = 48, updatable = false)
+    private String person;
 
     @Column(name = "erased_at")
     private LocalDateTime erasedAt;

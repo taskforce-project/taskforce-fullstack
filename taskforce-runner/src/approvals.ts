@@ -7,7 +7,7 @@ import type { Approval, AskedBy, Ruling } from "./api.js";
 import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/engine/rules-engine.js";
 import type { Exposure } from "./harness/exposure.js";
 import { changesTaskForce, toolFacts } from "./harness/facts.js";
-import { inputHash, written, type Written } from "./harness/written.js";
+import { inputHash, sensitivePath, written, type Written } from "./harness/written.js";
 import { log } from "./log.js";
 import { describeToolInput, toolLabel } from "./stream.js";
 
@@ -187,8 +187,10 @@ export function missionScopes(rules: RulesBundle | undefined, factsList: Facts[]
  * fichier contiendra. La décision et la demande la portent : on accorde cette action-là, pas une autre.
  */
 export function exactAction(tool: string, toolInput: unknown, workDir: string): { input?: string; written?: Written } {
-  const input = inputHash(toolInput);
   const file = written(tool, toolInput, workDir);
+  // L'entrée d'une écriture porte le contenu : vers un fichier qui peut tenir un secret, ni l'un ni l'autre n'a
+  // d'empreinte, qui confirmerait un secret court (R159, L3). Le chemin reste.
+  const input = file && sensitivePath(file.path) ? null : inputHash(toolInput);
   return { ...(input ? { input } : {}), ...(file ? { written: file } : {}) };
 }
 

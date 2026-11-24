@@ -66,15 +66,30 @@ CREATE TABLE mission_dossier_seals (
 -- 6. Les textes à côté de la chaîne (R198 amendée, précision 4) : le titre, la description et le brief de la demande, ce
 --    que l'agent raconte, son résumé. La chaîne n'en garde que l'empreinte ; le texte s'efface sans casser la chaîne, et
 --    l'effacement garde qui et quand.
+--    L'empreinte est salée (R159, M6) : le SHA-256 d'un sel tiré pour ce texte, suivi du texte ; le sel s'efface avec
+--    lui, et l'empreinte restée ne confirme plus une supposition. Le courriel et le nom d'une personne que la chaîne
+--    nomme y vivent aussi (`person`), effacés quand son compte est purgé.
 CREATE TABLE mission_dossier_texts (
     id          BIGSERIAL    PRIMARY KEY,
     run_id      BIGINT       NOT NULL REFERENCES mission_dossiers (run_id) ON DELETE CASCADE,
     hash        VARCHAR(71)  NOT NULL,
     kind        VARCHAR(16)  NOT NULL,
+    salt        VARCHAR(32),
     body        TEXT,
+    person      VARCHAR(48),
     erased_at   TIMESTAMP,
     erased_by   BIGINT       REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT uq_mission_dossier_text UNIQUE (run_id, hash)
+);
+CREATE INDEX idx_mission_dossier_texts_person ON mission_dossier_texts (person) WHERE person IS NOT NULL;
+
+-- 6 bis. Une personne entre dans la chaîne par un identifiant opaque et stable (R159, M6), jamais par son courriel :
+--    tiré au hasard la première fois, gardé ici, et retiré quand son compte est purgé. L'identifiant reste dans les
+--    chaînes ; plus rien ne le relie à la personne.
+CREATE TABLE mission_people (
+    user_id     BIGINT       PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    person      VARCHAR(48)  NOT NULL UNIQUE,
+    created_at  TIMESTAMP    NOT NULL DEFAULT now()
 );
 
 -- 7. Rien ne se modifie, comme les versions des règles (V125). Un événement ou un sceau ne s'efface qu'avec tout son
@@ -135,7 +150,9 @@ BEGIN
         RETURN OLD;
     END IF;
     IF NEW.run_id IS DISTINCT FROM OLD.run_id OR NEW.hash IS DISTINCT FROM OLD.hash OR NEW.kind IS DISTINCT FROM OLD.kind
+       OR NEW.person IS DISTINCT FROM OLD.person
        OR (NEW.body IS DISTINCT FROM OLD.body AND NEW.body IS NOT NULL)
+       OR (NEW.salt IS DISTINCT FROM OLD.salt AND (NEW.salt IS NOT NULL OR NEW.body IS NOT NULL))
        OR (OLD.erased_at IS NOT NULL AND NEW.erased_at IS DISTINCT FROM OLD.erased_at)
        OR (NEW.body IS NOT NULL AND (NEW.erased_at IS NOT NULL OR NEW.erased_by IS NOT NULL))
        OR (OLD.erased_by IS NOT NULL AND NEW.erased_by IS DISTINCT FROM OLD.erased_by AND NEW.erased_by IS NOT NULL) THEN

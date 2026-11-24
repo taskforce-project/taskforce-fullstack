@@ -1,11 +1,16 @@
 package com.taskforce.tf_api.core.service.delivery;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taskforce.tf_api.core.enums.WorkspaceRole;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
@@ -13,6 +18,7 @@ import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
@@ -42,7 +48,10 @@ public class MissionDossierAccess {
     private final WorkspaceMemberRepository members;
     private final UserRepository users;
     private final WorkspaceRepository workspaces;
+    private final MissionDossierSealRepository seals;
     private final EvidenceSigner signer;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     /** Le dossier en JSON ({@code taskforce-evidence/1}), en Markdown, ou son dernier sceau seul (l'enveloppe DSSE). */
     public enum Format { JSON, MARKDOWN, DSSE }
@@ -68,24 +77,62 @@ public class MissionDossierAccess {
         evidence.eraseText(runId, hash, person);
     }
 
+    /** Une clé qui a scellé des dossiers de l'espace : sa clé publique et sa garde telles que son dernier sceau les dit. */
+    public record UsedKey(String id, String publicKey, String custody, Boolean kept, String firstUsed, String lastUsed, long seals) {
+    }
+
+    /** La clé d'aujourd'hui, et celles qui ont scellé les dossiers de l'espace, la plus récente d'abord. */
+    public record Keys(EvidenceSeal.Key current, List<UsedKey> used) {
+    }
+
     /**
-     * La clé qui scelle les dossiers de ce serveur : son identifiant, sa clé publique, sa garde. Elle n'a rien de secret
-     * (chaque sceau la porte), mais la route vit sous l'espace : un membre de l'espace la lit.
+     * La clé qui scelle aujourd'hui (son identifiant, sa clé publique, sa garde), et les clés publiques qui ont déjà scellé
+     * des dossiers de cet espace (R159, M3), tirées des sceaux en place avec leur premier et leur dernier usage : un sceau
+     * d'avant un changement de clé se compare encore à la clé qui l'a fait. Rien de secret (chaque sceau porte sa clé),
+     * mais la route vit sous l'espace : un membre de l'espace la lit.
      */
     @Transactional(readOnly = true)
-    public EvidenceSeal.Key key(String slug, Long userId) {
+    public Keys keys(String slug, Long userId) {
+        Workspace workspace = member(slug, userId);
+        List<UsedKey> used = new ArrayList<>();
+        for (MissionDossierSealRepository.KeyUse use : seals.keysUsedIn(workspace.getId())) {
+            JsonNode key = seals.lastEnvelopeOf(workspace.getId(), use.getKeyId())
+                .map(envelope -> EvidenceSeal.open(parse(envelope)).statement())
+                .map(statement -> statement.path("predicate").path("key")).orElse(null);
+            used.add(new UsedKey(use.getKeyId(), key == null ? null : key.path("publicKey").asText(null),
+                key == null ? null : key.path("custody").asText(null), key == null || !key.has("kept") ? null : key.get("kept").asBoolean(),
+                use.getFirstUsed(), use.getLastUsed(), use.getSeals() == null ? 0 : use.getSeals()));
+        }
+        return new Keys(signer.key(), used);
+    }
+
+    private Workspace member(String slug, Long userId) {
         Workspace workspace = workspaces.findBySlug(slug).orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
         if (members.findByWorkspaceIdAndUserId(workspace.getId(), userId).isEmpty()) {
             throw new ForbiddenException("Access denied: you're not a member of this workspace");
         }
-        return signer.key();
+        return workspace;
     }
 
-    /** Le dossier, si cette personne peut le lire. */
+    private static JsonNode parse(String json) {
+        try {
+            return JSON.readTree(json);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Le dossier, si cette personne peut le lire. Elle doit être membre de son espace, vérifié ici et pas seulement par
+     * l'intercepteur des routes (R159, L8) : la personne qui a délégué et qui a quitté l'espace ne le lit plus.
+     */
     MissionDossier readable(String slug, Long runId, Long userId) {
         MissionDossier dossier = evidence.dossier(runId).orElseThrow(() -> new ResourceNotFoundException(NOT_FOUND));
         if (dossier.getWorkspace() == null || !slug.equals(dossier.getWorkspace().getSlug())) {
             throw new ResourceNotFoundException(NOT_FOUND);
+        }
+        if (members.findByWorkspaceIdAndUserId(dossier.getWorkspace().getId(), userId).isEmpty()) {
+            throw new ForbiddenException("Access denied: you're not a member of this workspace");
         }
         Project project = dossier.getProjectId() == null ? null : projects.findById(dossier.getProjectId()).orElse(null);
         if (project != null) {

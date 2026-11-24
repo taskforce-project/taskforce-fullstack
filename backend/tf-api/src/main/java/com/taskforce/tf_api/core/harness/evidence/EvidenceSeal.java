@@ -155,6 +155,12 @@ public final class EvidenceSeal {
                 verifier.initVerify(publicKey);
                 verifier.update(pae(PAYLOAD_TYPE, payload));
                 if (verifier.verify(Base64.getDecoder().decode(sig.path("sig").asText("")))) {
+                    // Le sujet est la racine que le prédicat nomme : un outil in-toto et ce contrôle concluent pareil (R159, L1).
+                    String root = statement.path("predicate").path("root").asText("");
+                    String subject = statement.path("subject").path(0).path("digest").path("sha256").asText("");
+                    if (root.isEmpty() || !subject.equals(root.startsWith("sha256:") ? root.substring("sha256:".length()) : root)) {
+                        return new Opened(false, "The seal's subject is not the root it names.", statement, id);
+                    }
                     return new Opened(true, null, statement, id);
                 }
                 return new Opened(false, "The signature does not hold: the statement was changed after it was sealed.", statement, id);

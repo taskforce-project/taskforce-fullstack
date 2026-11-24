@@ -40,10 +40,12 @@ public class MissionMerges {
             data.put("decision", "MERGE");
             data.put("where", WHERE_GITHUB);
             data.put("pullRequest", "https://github.com/" + merged.repo() + "/pull/" + merged.number());
-            data.put("by", merged.mergedBy());
+            // Le compte GitHub qui a fusionné est une personne : il n'entre que par son empreinte, son nom à côté de la chaîne,
+            // effaçable (R159, M6).
+            String login = merged.mergedBy() == null || merged.mergedBy().isBlank() ? null : merged.mergedBy().strip();
+            data.put("by", evidence.text(run, "login", login));
             data.put("mergedAt", merged.mergedAt());
-            String who = merged.mergedBy() == null || merged.mergedBy().isBlank() ? "github" : "github:" + merged.mergedBy();
-            evidence.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", who), data);
+            evidence.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "github"), data);
             return;
         }
     }

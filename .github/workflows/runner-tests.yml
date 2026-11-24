@@ -10,6 +10,7 @@ on:
     paths:
       - 'taskforce-runner/**'
       - 'contracts/**'
+      - 'frontend/lib/evidence/**'
       - '.github/workflows/runner-tests.yml'
   pull_request:
     branches:
@@ -18,6 +19,8 @@ on:
     paths:
       - 'taskforce-runner/**'
       - 'contracts/**'
+      - 'frontend/lib/evidence/**'
+      - '.github/workflows/runner-tests.yml'
 
 permissions:
   contents: read
@@ -56,3 +59,17 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      # L'app vérifie un dossier avec le vérificateur du runner (R159, #551), copié sous frontend/lib/evidence par
+      # `npm run share:app` : la copie doit être celle de la source, octet pour octet.
+      - name: The app's copy of the evidence verifier
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          npm run share:app
+          added=$(git ls-files --others --exclude-standard -- ../frontend/lib/evidence)
+          if ! git diff --quiet -- ../frontend/lib/evidence || [ -n "$added" ]; then
+            git status --short -- ../frontend/lib/evidence
+            echo "::error::frontend/lib/evidence is not the copy of taskforce-runner/src/harness/{verifier,engine}: run npm run share:app in taskforce-runner and commit the result."
+            exit 1
+          fi

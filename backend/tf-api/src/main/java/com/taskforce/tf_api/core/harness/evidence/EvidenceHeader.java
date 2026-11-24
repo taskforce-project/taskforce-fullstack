@@ -20,7 +20,7 @@ public final class EvidenceHeader {
 
     /** Les champs de l'en-tête, dans l'ordre du schéma. */
     public static final List<String> FIELDS = List.of("id", "workspace", "project", "issue", "requestedBy", "agent", "rules",
-        "runner", "taskforce");
+        "runner", "runnerFacts", "taskforce");
 
     private EvidenceHeader() {
     }
@@ -69,6 +69,8 @@ public final class EvidenceHeader {
             covered.add("rules");
         }
         copy(started, "runner", header, "runner", covered);
+        // D'où viennent les faits du runner (R159, M5) : du poste de l'agent. Absent d'une mission sans runner.
+        copy(started, "runnerFacts", header, "runnerFacts", covered);
         copy(started, "taskforce", header, "taskforce", covered);
         return new Projection(header, covered);
     }
