@@ -98,6 +98,15 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     // Le témoin nomme la clé qui a scellé sa tête (second tour de #551, N6) : la page la donne entière, à comparer.
     expect(page.record.witness?.key).toBe(exampleKey())
     expect(lines).toContain(t.record.witnessKey.replace("{key}", exampleKey()))
+    // R161 B4 : ce que le commentaire lie, ou pourquoi il ne lie pas la page (B2 et M1 de #551).
+    expect(lines).toContain(t.record.pageLinked)
+    const leftOut = (why: string) => {
+      const witness = page.record.witness ? { ...page.record.witness, pageLinked: false, pageLeftOut: why } : null
+      return texts(verificationSections({ ...page, record: { ...page.record, witness } }, t, context), "record")
+    }
+    expect(leftOut("desktop-app")).toContain(t.record.pageLeftOut["desktop-app"])
+    expect(leftOut("public-repository")).toContain(t.record.pageLeftOut.repository)
+    expect(leftOut("something-new")).toContain(t.record.pageLeftOut.other)
   })
 
   it("R161 M6 : la consigne nomme le bon fichier, et ne demande pas une clé que l'instance ne garde pas", () => {

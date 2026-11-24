@@ -232,6 +232,11 @@ export interface PageRecord {
   readonly witness: {
     readonly written: boolean; readonly root: string | null; readonly seq: number | null; readonly url: string | null
     readonly reason: string | null; readonly key: string | null
+    /**
+     * Le commentaire lie cette page (par un identifiant opaque du dossier), ou pourquoi il ne la lie pas : l'app de bureau,
+     * une adresse locale, un lien coupé par l'exploitant, un dépôt qui n'est pas privé (R159 B2 et M1 de #551, R161 B4).
+     */
+    readonly pageLinked: boolean | null; readonly pageLeftOut: string | null
   } | null
   readonly pullRequest: boolean
   readonly gaps: readonly PageGap[]
@@ -653,7 +658,8 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       late: predicate.late === true,
     } : null,
     witness: w ? { written: w.written === true, root: str(w.root), seq: num(w.seq), url: str(w.comment) ?? str(w.pullRequest),
-      reason: str(w.reason), key: str(w.key) } : null,
+      reason: str(w.reason), key: str(w.key), pageLinked: typeof w.pageLinked === "boolean" ? w.pageLinked : null,
+      pageLeftOut: str(w.pageLeftOut) } : null,
     pullRequest: pullRequest !== null,
     gaps: notes("gap").map((e) => ({ from: num(data(e).from) ?? 0, to: num(data(e).to), noted: e.seq })),
     runnerFacts: s.runnerFacts === "agent-machine",

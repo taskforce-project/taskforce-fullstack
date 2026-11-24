@@ -516,6 +516,13 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     // La clé du commentaire, datée par GitHub : c'est elle qu'on compare à la clé qu'on vous donne, pas une liste de
     // l'exploitant (N6). Entière : on la compare caractère par caractère.
     if (r.witness.key) lines.push({ text: fillText(rec.witnessKey, { key: r.witness.key }), tone: "muted" })
+    // Ce que le commentaire lie, et pourquoi il ne lie pas cette page (R159 B2 et M1 de #551, R161 B4).
+    const leftOut = rec.pageLeftOut as Record<string, string>
+    if (r.witness.pageLinked === true) lines.push({ text: rec.pageLinked, tone: "muted" })
+    else if (r.witness.pageLinked === false) {
+      const why = r.witness.pageLeftOut ?? ""
+      lines.push({ text: leftOut[why] ?? (why.endsWith("-repository") ? leftOut.repository : leftOut.other), tone: "muted" })
+    }
     if (r.witness.seq !== null && r.witness.seq < r.events) lines.push({ text: fillText(rec.witnessLater, { seq: r.witness.seq }), tone: "muted" })
   } else if (r.witness) {
     lines.push({ text: fillText(rec.noWitness, { reason: r.witness.reason ?? "" }), tone: "warn" })
