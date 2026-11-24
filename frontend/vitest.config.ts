@@ -42,6 +42,8 @@ const VERIFICATION = [
   "lib/delivery/verification-words.ts",
   "lib/delivery/verification-html.ts",
   "components/delivery/verification-view.tsx",
+  // Le lien du témoin, `/verify/<id>` (R159, second tour de #551, M-b).
+  "components/delivery/verification-link.tsx",
 ];
 
 export default defineConfig({
@@ -92,6 +94,8 @@ export default defineConfig({
         "components/agent/node-in-chat.tsx",
         // La page de vérification d'une mission (TF-J2-7) : elle se remplit depuis le dossier, par du code.
         "components/delivery/verification-view.tsx",
+        // Le lien du témoin qui l'ouvre (R159, second tour de #551, M-b).
+        "components/delivery/verification-link.tsx",
       ],
       // Objectifs de couverture.
       // Vitest 4 (18/10/2026) compte les branches et les instructions sur l'AST (`??`, `?.`,

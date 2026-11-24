@@ -16,6 +16,7 @@ import {
   downloadEvidence as downloadEvidenceApi,
   getEvidence,
   getEvidenceKeys,
+  getEvidenceLink,
   provisionRunner as provisionRunnerApi,
   getMissionChanges,
   getMissionFileDiff,
@@ -30,6 +31,7 @@ import {
   type DeliveryRunActivity,
   type MissionChanges,
   type MissionEvidence,
+  type EvidenceLink,
   type MissionFileDiff,
   type OpenApproval,
   type ProjectRun,
@@ -88,6 +90,11 @@ interface DeliveryState {
    * déjà scellé) ; `null` : la route ne s'est pas lue, et la page ne compare un sceau à aucune clé.
    */
   evidenceKeys: Record<string, string[] | null>;
+  /**
+   * Par identifiant de lien du témoin (`/verify/<id>`) : où il mène ; `null` : à rien que la personne puisse lire (le
+   * serveur ne dit pas lequel). Absent : pas encore lu, ou la lecture a échoué (R159, second tour de #551, M-b).
+   */
+  evidenceLinks: Record<string, EvidenceLink | null>;
   /** Par runId : les fichiers changés et ce que la personne peut en faire (R139). */
   missionChanges: Record<number, MissionChanges>;
   /** Par runId puis par fichier : le diff lu ; `null` : il n'a pas pu se lire. */
@@ -148,6 +155,8 @@ interface DeliveryState {
   fetchEvidence: (slug: string, runId: number) => Promise<MissionEvidence | null>;
   /** Lit les clés de l'instance pour cet espace ; `null` en cas d'échec, gardé tel quel. */
   fetchEvidenceKeys: (slug: string) => Promise<string[] | null>;
+  /** Où mène le lien du témoin d'un dossier ; null quand il ne mène à rien de lisible, ou que la lecture échoue. */
+  fetchEvidenceLink: (id: string) => Promise<EvidenceLink | null>;
   /**
    * Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. `reason` :
    * pourquoi, si la personne le dit ; elle entre au dossier de la mission avec le geste (TF-J2-7).
@@ -289,6 +298,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   evidence: {},
   evidenceLegacy: {},
   evidenceKeys: {},
+  evidenceLinks: {},
   missionChanges: {},
   fileDiffs: {},
   changeComments: {},
@@ -609,6 +619,20 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       if (status === 404 || status === 403) {
         set((state) => ({ evidence: { ...state.evidence, [runId]: null }, evidenceLegacy: { ...state.evidenceLegacy, [runId]: legacy } }));
       }
+      return null;
+    }
+  },
+
+  fetchEvidenceLink: async (id) => {
+    try {
+      const link = await getEvidenceLink(id);
+      set((state) => ({ evidenceLinks: { ...state.evidenceLinks, [id]: link } }));
+      return link;
+    } catch (e) {
+      // 404 : un lien qui ne mène à rien, ou à un dossier que la personne ne peut pas lire ; une autre erreur ne dit rien
+      // du lien, et la page propose de réessayer.
+      const status = getErrorStatus(e);
+      if (status === 404 || status === 403 || status === 400) set((state) => ({ evidenceLinks: { ...state.evidenceLinks, [id]: null } }));
       return null;
     }
   },

@@ -483,6 +483,21 @@ export async function getEvidenceKeys(slug: string): Promise<EvidenceKeys> {
   return res.data.data;
 }
 
+/** Où mène le lien du témoin d'un dossier : l'adresse de son espace et sa mission (R159, second tour de #551, M-b). */
+export interface EvidenceLink {
+  workspace: string;
+  runId: number;
+}
+
+/**
+ * Le lien du témoin, `/verify/<id>` : un identifiant opaque du dossier, qui ne nomme ni l'espace ni la mission. Un lien
+ * qui ne mène à rien, ou à un dossier que la personne ne peut pas lire, répond 404 ; l'erreur remonte à l'appelant.
+ */
+export async function getEvidenceLink(id: string): Promise<EvidenceLink> {
+  const res = await apiClient.get<{ data: EvidenceLink }>(DELIVERY_ROUTES.EVIDENCE_LINK(id), { silentError: true });
+  return res.data.data;
+}
+
 /**
  * Le dossier de preuve d'un run, en JSON, lu pour la vue du travail (R95, point 3) ; la même route que le
  * téléchargement. Une erreur (un run sans dossier : 404) remonte à l'appelant.

@@ -18,6 +18,7 @@ vi.mock('../api/delivery-service', () => ({
   downloadEvidence: vi.fn(),
   getEvidence: vi.fn(),
   getEvidenceKeys: vi.fn(),
+  getEvidenceLink: vi.fn(),
   applyRun: vi.fn(),
   discardRun: vi.fn(),
   markRunDone: vi.fn(),
@@ -417,6 +418,25 @@ describe('delivery-store', () => {
 
     expect(useDeliveryStore.getState().evidence[102]).toBeNull();
     expect(useDeliveryStore.getState().evidenceLegacy[102]).toBe(true);
+  });
+
+  // Le lien du témoin, `/verify/<id>` (R159, second tour de #551, M-b) : où il mène, ou à rien que la personne puisse lire.
+  it('fetchEvidenceLink keeps where a link leads, null for a link to nothing readable, nothing on another error', async () => {
+    const missing = new AxiosError('Not found', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 404, data: {}, headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidenceLink)
+      .mockResolvedValueOnce({ workspace: 'acme', runId: 42 })
+      .mockRejectedValueOnce(missing)
+      .mockRejectedValueOnce(new Error('offline'));
+    act(() => useDeliveryStore.setState({ evidenceLinks: {} }));
+
+    await expect(useDeliveryStore.getState().fetchEvidenceLink('a'.repeat(32))).resolves.toEqual({ workspace: 'acme', runId: 42 });
+    expect(useDeliveryStore.getState().evidenceLinks['a'.repeat(32)]).toEqual({ workspace: 'acme', runId: 42 });
+    await expect(useDeliveryStore.getState().fetchEvidenceLink('b'.repeat(32))).resolves.toBeNull();
+    expect(useDeliveryStore.getState().evidenceLinks['b'.repeat(32)]).toBeNull();
+    await expect(useDeliveryStore.getState().fetchEvidenceLink('c'.repeat(32))).resolves.toBeNull();
+    expect(useDeliveryStore.getState().evidenceLinks).not.toHaveProperty('c'.repeat(32));
+    expect(svc.getEvidenceLink).toHaveBeenCalledWith('a'.repeat(32));
   });
 
   // La page vérifie le sceau face aux clés de l'instance (R161 B1) : la clé du moment et celles qui ont servi.

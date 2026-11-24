@@ -52,6 +52,8 @@ describe("les adresses de la fenêtre", () => {
   it("R161 M7 : la page de vérification a le nom de la page, pas « Work view »", () => {
     const screens = { ...CONSTANTS_EN.window.screens }
     expect(paneOf("/acme/missions/42/verification")).toEqual({ section: VERIFICATION, projectId: null })
+    // Le lien du témoin (second tour de #551, M-b) s'ouvre sous le même nom, le temps de savoir où il mène.
+    expect(paneOf(`/verify/${"a".repeat(32)}`)).toEqual({ section: VERIFICATION, projectId: null })
     expect(paneTitle({ section: VERIFICATION, projectId: null }, PROJECTS, screens)).toBe("Verification")
     expect(paneTitle(paneOf("/acme/missions/42") ?? { section: "", projectId: null }, PROJECTS, screens)).toBe("Work view")
   })

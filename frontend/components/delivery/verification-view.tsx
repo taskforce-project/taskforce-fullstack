@@ -141,7 +141,7 @@ function SectionBlock({ section, t }: Readonly<{ section: Section; t: Texts }>) 
 }
 
 /** Un état sans dossier à montrer : un titre, ce qui s'est passé, quoi faire, et le retour à la mission (R161 M3). */
-function Unavailable({ title, message, hint, action, back }: Readonly<{
+export function Unavailable({ title, message, hint, action, back }: Readonly<{
   title: string; message: string; hint: string; action?: React.ReactNode; back: React.ReactNode
 }>) {
   return (
