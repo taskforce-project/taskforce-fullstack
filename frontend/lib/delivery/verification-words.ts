@@ -495,6 +495,9 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   if (r.witness?.written) {
     const url = r.witness.url ?? ""
     lines.push({ text: fillText(rec.witness, { seq: r.witness.seq ?? "?", root: short(r.witness.root), url }), ...(linkable(url) ? { link: url } : {}) })
+    // La clé du commentaire, datée par GitHub : c'est elle qu'on compare à la clé qu'on vous donne, pas une liste de
+    // l'exploitant (N6). Entière : on la compare caractère par caractère.
+    if (r.witness.key) lines.push({ text: fillText(rec.witnessKey, { key: r.witness.key }), tone: "muted" })
     if (r.witness.seq !== null && r.witness.seq < r.events) lines.push({ text: fillText(rec.witnessLater, { seq: r.witness.seq }), tone: "muted" })
   } else if (r.witness) {
     lines.push({ text: fillText(rec.noWitness, { reason: r.witness.reason ?? "" }), tone: "warn" })

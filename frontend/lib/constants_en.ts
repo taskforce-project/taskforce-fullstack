@@ -2528,6 +2528,7 @@ export const CONSTANTS_EN = {
       },
       notKept: "The key was drawn when the server started and is not kept: the operator cannot publish it.",
       witness: "Witness: the head of the record at event {seq} ({root}), when it was sealed, was written in the pull request on GitHub, where others can see it: {url}",
+      witnessKey: "The comment also names the key that sealed that head, {key}: check that it is the key you were given for this TaskForce. GitHub dates the comment; a list of keys from this TaskForce proves nothing by itself.",
       witnessLater: "Events after {seq}, such as the final decision, came after the witness.",
       noWitness: "No witness: {reason}",
       noWitnessYet: "No witness yet: the mission is still running.",

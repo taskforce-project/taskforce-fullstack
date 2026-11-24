@@ -95,6 +95,9 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(lines).toContain("The runner's event 9 never arrived (noted at event 15 of the record).")
     expect(lines.some((l) => /^Witness: the head of the record at event 23 \(sha256:[0-9a-f]{12}\), when it was sealed,/.test(l))).toBe(true)
     expect(lines).toContain("Events after 23, such as the final decision, came after the witness.")
+    // Le témoin nomme la clé qui a scellé sa tête (second tour de #551, N6) : la page la donne entière, à comparer.
+    expect(page.record.witness?.key).toBe(exampleKey())
+    expect(lines).toContain(t.record.witnessKey.replace("{key}", exampleKey()))
   })
 
   it("R161 M6 : la consigne nomme le bon fichier, et ne demande pas une clé que l'instance ne garde pas", () => {

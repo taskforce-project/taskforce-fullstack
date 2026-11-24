@@ -221,7 +221,11 @@ export interface PageRecord {
     /** Posé tard, sur un dossier fini avant que TaskForce ne scelle : il ne prouve rien de ce qui précède (second tour, N5). */
     readonly late: boolean
   } | null
-  readonly witness: { readonly written: boolean; readonly root: string | null; readonly seq: number | null; readonly url: string | null; readonly reason: string | null } | null
+  /** Le témoin, et la clé qui a scellé sa tête, que son commentaire porte aussi (R159, second tour de #551, N6). */
+  readonly witness: {
+    readonly written: boolean; readonly root: string | null; readonly seq: number | null; readonly url: string | null
+    readonly reason: string | null; readonly key: string | null
+  } | null
   readonly pullRequest: boolean
   readonly gaps: readonly PageGap[]
   /** Le runner a pris la mission : ce qu'il rapporte vient du poste de l'agent (R159 M5 de #551). */
@@ -639,7 +643,7 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       late: predicate.late === true,
     } : null,
     witness: w ? { written: w.written === true, root: str(w.root), seq: num(w.seq), url: str(w.comment) ?? str(w.pullRequest),
-      reason: str(w.reason) } : null,
+      reason: str(w.reason), key: str(w.key) } : null,
     pullRequest: pullRequest !== null,
     gaps: notes("gap").map((e) => ({ from: num(data(e).from) ?? 0, to: num(data(e).to), noted: e.seq })),
     runnerFacts: s.runnerFacts === "agent-machine",
