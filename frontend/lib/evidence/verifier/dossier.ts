@@ -2,7 +2,7 @@
 import {
   bundleDigest, canonicalJson, decideAll, firstBrokenLink, type ChainedEvent, type Facts, type Json, type RulesBundle,
 } from "../engine/rules-engine.js";
-import { concat, ed25519Key, ed25519Supported, fromBase64, sha256, text, utf8, verifyEd25519, type Bytes } from "./crypto.js";
+import { concat, ed25519Key, ed25519Supported, fromBase64, sha256, text, utf8, verifyEd25519, type Bytes } from "./crypto";
 
 /**
  * Ce que le vérificateur lit d'un dossier exporté (`taskforce-evidence/1`, contracts/README.md), sans TaskForce ni réseau :
