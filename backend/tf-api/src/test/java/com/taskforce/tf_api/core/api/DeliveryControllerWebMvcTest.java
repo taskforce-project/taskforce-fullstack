@@ -329,17 +329,28 @@ class DeliveryControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("GET /evidence/key : la clé publique qui scelle les dossiers, et sa garde")
+    @DisplayName("GET /evidence/key : la clé qui scelle aujourd'hui et sa garde, puis celles qui ont déjà scellé (R159, M3)")
     void evidence_key_200() throws Exception {
-        when(dossierAccess.key("acme", 7L)).thenReturn(new com.taskforce.tf_api.core.harness.evidence.EvidenceSeal.Key(
-            "sha256:" + "b".repeat(64), "MCowBQYDK2VwAyEA", "same-machine", true));
+        when(dossierAccess.keys("acme", 7L)).thenReturn(new com.taskforce.tf_api.core.service.delivery.MissionDossierAccess.Keys(
+            new com.taskforce.tf_api.core.harness.evidence.EvidenceSeal.Key("sha256:" + "b".repeat(64), "MCowBQYDK2VwAyEA",
+                "separate-machine", true),
+            java.util.List.of(new com.taskforce.tf_api.core.service.delivery.MissionDossierAccess.UsedKey("sha256:" + "c".repeat(64),
+                "MCowBQYDK2VwAyEB", "same-machine", false, "2026-11-01T08:00:00.000Z", "2026-11-20T17:00:00.000Z", 12))));
 
         mockMvc.perform(get("/api/workspaces/acme/delivery/evidence/key").with(auth()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data.id").value("sha256:" + "b".repeat(64)))
-            .andExpect(jsonPath("$.data.algorithm").value("ed25519"))
-            .andExpect(jsonPath("$.data.custody").value("same-machine"))
-            .andExpect(jsonPath("$.data.kept").value(true));
+            .andExpect(jsonPath("$.data.current.id").value("sha256:" + "b".repeat(64)))
+            .andExpect(jsonPath("$.data.current.algorithm").value("ed25519"))
+            .andExpect(jsonPath("$.data.current.custody").value("separate-machine"))
+            .andExpect(jsonPath("$.data.current.kept").value(true))
+            .andExpect(jsonPath("$.data.current.firstUsed").doesNotExist())
+            .andExpect(jsonPath("$.data.used[0].id").value("sha256:" + "c".repeat(64)))
+            .andExpect(jsonPath("$.data.used[0].publicKey").value("MCowBQYDK2VwAyEB"))
+            .andExpect(jsonPath("$.data.used[0].custody").value("same-machine"))
+            .andExpect(jsonPath("$.data.used[0].kept").value(false))
+            .andExpect(jsonPath("$.data.used[0].firstUsed").value("2026-11-01T08:00:00.000Z"))
+            .andExpect(jsonPath("$.data.used[0].lastUsed").value("2026-11-20T17:00:00.000Z"))
+            .andExpect(jsonPath("$.data.used[0].seals").value(12));
     }
 
     @ParameterizedTest(name = "POST approval : {0} {1} -> autorisé={2}, pour la mission={3}, enregistré {4}")

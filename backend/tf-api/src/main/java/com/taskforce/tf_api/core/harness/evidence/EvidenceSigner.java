@@ -22,6 +22,7 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -50,9 +51,23 @@ public class EvidenceSigner {
     private final EvidenceSeal.Key key;
     private final boolean kept;
 
+    /** La clé comme avant la relecture R159 : sans fichier par défaut. */
+    public EvidenceSigner(String inline, String file, String custody) {
+        this(inline, file, "", custody);
+    }
+
+    /**
+     * @param inline      la clé donnée par l'environnement, en PEM ou en base64
+     * @param file        un fichier que l'exploitant désigne : illisible, le démarrage s'arrête
+     * @param defaultFile le fichier par défaut, dans le volume de données persistant du serveur (R159, M3) : créé au
+     *                    premier démarrage et relu ensuite ; s'il ne peut pas l'être, une clé tirée pour ce démarrage, et le
+     *                    journal le dit
+     */
+    @Autowired
     public EvidenceSigner(
         @Value("${delivery.evidence.signing-key:}") String inline,
         @Value("${delivery.evidence.signing-key-file:}") String file,
+        @Value("${delivery.evidence.default-key-file:}") String defaultFile,
         @Value("${delivery.evidence.key-custody:" + EvidenceSeal.SAME_MACHINE + "}") String custody
     ) {
         try {
@@ -63,10 +78,13 @@ public class EvidenceSigner {
                 this.keys = fromFile(Path.of(file.strip()));
                 this.kept = true;
             } else {
-                this.keys = generate();
-                this.kept = false;
-                log.warn("Evidence signing key not configured (DELIVERY_EVIDENCE_SIGNING_KEY or DELIVERY_EVIDENCE_SIGNING_KEY_FILE): "
-                    + "a key was drawn for this run and is lost when it stops.");
+                KeyPair fromVolume = defaultFile == null || defaultFile.isBlank() ? null : fromDefaultFile(Path.of(defaultFile.strip()));
+                this.keys = fromVolume != null ? fromVolume : generate();
+                this.kept = fromVolume != null;
+                if (fromVolume == null) {
+                    log.warn("Evidence signing key not configured (DELIVERY_EVIDENCE_SIGNING_KEY or DELIVERY_EVIDENCE_SIGNING_KEY_FILE): "
+                        + "a key was drawn for this run and is lost when it stops.");
+                }
             }
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("The evidence signing key cannot be read: " + e.getMessage(), e);
@@ -110,6 +128,21 @@ public class EvidenceSigner {
             log.warn("Unknown DELIVERY_EVIDENCE_KEY_CUSTODY \"{}\": the seals say the key is on the agent's machine", value);
         }
         return EvidenceSeal.SAME_MACHINE;
+    }
+
+    /**
+     * Le fichier par défaut, dans le volume de données du serveur : relu, ou créé au premier démarrage. Un fichier qu'on
+     * ne peut ni lire ni créer (pas de volume, un dossier en lecture seule) n'arrête pas le serveur : null, et une clé
+     * tirée pour ce démarrage. Un fichier qui existe mais ne porte pas une clé arrête le démarrage, comme une clé donnée.
+     */
+    static KeyPair fromDefaultFile(Path path) throws GeneralSecurityException {
+        try {
+            return fromFile(path);
+        } catch (UncheckedIOException e) {
+            log.error("The default evidence signing key file {} cannot be used ({}): set DELIVERY_EVIDENCE_SIGNING_KEY or a volume "
+                + "for it; a key was drawn for this run.", path, e.getCause() == null ? e.getMessage() : e.getCause().getMessage());
+            return null;
+        }
     }
 
     /** Le fichier de la clé, créé avec une clé neuve s'il n'existe pas, lisible par son seul propriétaire quand le système le permet. */

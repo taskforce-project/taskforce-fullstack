@@ -85,6 +85,53 @@ class EvidenceSignerTest {
     }
 
     @Test
+    @DisplayName("R159, M3 : sans clé donnée, le serveur garde la sienne dans le fichier par défaut de son volume, et la relit")
+    void the_default_file_keeps_the_key_from_one_start_to_the_next() throws Exception {
+        Path file = dir.resolve("var/lib/taskforce/evidence/signing-key.pem");
+
+        EvidenceSigner first = new EvidenceSigner("", "", file.toString(), "");
+        EvidenceSigner again = new EvidenceSigner("", "", file.toString(), "");
+
+        assertThat(Files.readString(file)).startsWith("-----BEGIN PRIVATE KEY-----");
+        assertThat(first.kept()).isTrue();
+        assertThat(first.key().kept()).isTrue();
+        assertThat(again.key().id()).isEqualTo(first.key().id());
+    }
+
+    @Test
+    @DisplayName("R159, M3 : la clé donnée, ou son fichier, passe avant le fichier par défaut, qui n'est pas créé")
+    void a_given_key_comes_before_the_default_file() throws Exception {
+        Path given = dir.resolve("given.pem");
+        Path fallback = dir.resolve("default.pem");
+        EvidenceSigner fromGiven = new EvidenceSigner("", given.toString(), "");
+
+        assertThat(new EvidenceSigner("", given.toString(), fallback.toString(), "").key().id()).isEqualTo(fromGiven.key().id());
+        assertThat(new EvidenceSigner(Files.readString(given), "", fallback.toString(), "").key().id()).isEqualTo(fromGiven.key().id());
+        assertThat(fallback).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("R159, M3 : un fichier par défaut qu'on ne peut pas créer n'arrête pas le serveur : une clé pour ce démarrage")
+    void a_default_file_that_cannot_be_written_falls_back_to_a_drawn_key() throws Exception {
+        // Son dossier est un fichier : rien ne s'y crée, même pour root.
+        Path blocker = Files.writeString(dir.resolve("blocker"), "not a directory");
+
+        EvidenceSigner signer = new EvidenceSigner("", "", blocker.resolve("signing-key.pem").toString(), "");
+
+        assertThat(signer.kept()).isFalse();
+        assertThat(signer.key().kept()).isFalse();
+    }
+
+    @Test
+    @DisplayName("R159, M3 : un fichier par défaut qui ne porte pas une clé arrête le démarrage, comme une clé donnée")
+    void a_default_file_that_is_not_a_key_stops_the_start() throws Exception {
+        Path file = Files.writeString(dir.resolve("broken.pem"), "not a key");
+
+        assertThatThrownBy(() -> new EvidenceSigner("", "", file.toString(), ""))
+            .isInstanceOf(IllegalStateException.class).hasMessageContaining("cannot be read");
+    }
+
+    @Test
     @DisplayName("la garde : separate-machine seulement quand l'exploitant le déclare ; tout le reste vaut same-machine")
     void custody_is_same_machine_unless_declared() {
         assertThat(EvidenceSigner.custodyOf("separate-machine")).isEqualTo(EvidenceSeal.SEPARATE_MACHINE);

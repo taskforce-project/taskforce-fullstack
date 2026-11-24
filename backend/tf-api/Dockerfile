@@ -53,6 +53,9 @@ RUN chown spring:spring app.jar && chown -R spring:spring /otel
 
 # Dossier de logs (logback y écrit application.log) — créé + possédé par spring, sinon FileNotFoundException au boot.
 RUN mkdir -p /var/log/taskforce-api && chown spring:spring /var/log/taskforce-api
+# Ce que l'API garde d'un démarrage à l'autre (la clé qui scelle les dossiers des missions) : un volume s'y monte, et un
+# volume neuf prend le propriétaire de ce dossier.
+RUN mkdir -p /var/lib/taskforce && chown spring:spring /var/lib/taskforce
 
 # Utiliser l'utilisateur non-root
 USER spring:spring

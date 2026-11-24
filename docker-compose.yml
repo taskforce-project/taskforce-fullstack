@@ -164,8 +164,9 @@ services:
       SIGNUP_EMAIL_VERIFICATION: ${SIGNUP_EMAIL_VERIFICATION:-false}
       # Coding agents run by each person on their own machine (Settings > Agents).
       DELIVERY_LOCAL_RUNNER_ENABLED: ${DELIVERY_LOCAL_RUNNER_ENABLED:-true}
-      # The key that seals each mission's evidence (Ed25519, PKCS#8 PEM; SELF_HOSTING.md). Empty: a key drawn at each
-      # start. Set the custody to separate-machine only if no coding agent runs on this server.
+      # The key that seals each mission's evidence (Ed25519, PKCS#8 PEM; SELF_HOSTING.md). Empty: the key the server
+      # creates on its first start in the backend_data volume, and keeps. Set the custody to separate-machine only if no
+      # coding agent runs on this server.
       DELIVERY_EVIDENCE_SIGNING_KEY: ${DELIVERY_EVIDENCE_SIGNING_KEY:-}
       DELIVERY_EVIDENCE_KEY_CUSTODY: ${DELIVERY_EVIDENCE_KEY_CUSTODY:-same-machine}
       AI_MONTHLY_TOKENS_PER_ACCOUNT: ${AI_MONTHLY_TOKENS_PER_ACCOUNT:-0}
@@ -197,6 +198,9 @@ services:
       TF_MICROSOFT_TENANT: ${TF_MICROSOFT_TENANT:-common}
     ports:
       - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8080}:8080"
+    # What the API keeps between restarts: the key that seals the missions' evidence (evidence/signing-key.pem).
+    volumes:
+      - backend_data:/var/lib/taskforce
     depends_on:
       postgres:
         condition: service_healthy
@@ -253,3 +257,4 @@ volumes:
   postgres_data:
   minio_data:
   ollama_data:
+  backend_data:

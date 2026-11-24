@@ -214,9 +214,9 @@ services:
       # Runner local « Claude Code » (ADR-013), coupé par défaut. L'accès anticipé se règle dans .env.prod
       # (DELIVERY_LOCAL_RUNNER_ENABLED=true) : valeur durable, reprise à chaque rebuild, sans override hors dépôt.
       DELIVERY_LOCAL_RUNNER_ENABLED: ${DELIVERY_LOCAL_RUNNER_ENABLED:-false}
-      # La clé qui scelle les dossiers des missions (TF-J2-7) : Ed25519 en PKCS#8 (PEM), à garder dans .env.prod. Vide :
-      # une clé tirée à chaque démarrage. La garde (separate-machine si aucun agent ne tourne sur ce serveur) va dans
-      # chaque sceau.
+      # La clé qui scelle les dossiers des missions (TF-J2-7) : Ed25519 en PKCS#8 (PEM), dans .env.prod. Vide : celle que
+      # le serveur crée à son premier démarrage dans le volume backend_prod_data, et garde (R159, M3). La garde
+      # (separate-machine si aucun agent ne tourne sur ce serveur) va dans chaque sceau.
       DELIVERY_EVIDENCE_SIGNING_KEY: ${DELIVERY_EVIDENCE_SIGNING_KEY:-}
       DELIVERY_EVIDENCE_KEY_CUSTODY: ${DELIVERY_EVIDENCE_KEY_CUSTODY:-same-machine}
 
@@ -280,6 +280,9 @@ services:
 
       # JVM — aligné sur la limite conteneur ci-dessous (1024 Mio de heap dans 1536 Mio)
       JAVA_OPTS: "-Xmx1024m -Xms512m -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Duser.timezone=UTC"
+    # Ce que l'API garde d'un démarrage à l'autre : la clé qui scelle les dossiers (evidence/signing-key.pem).
+    volumes:
+      - backend_prod_data:/var/lib/taskforce
     depends_on:
       postgres:
         condition: service_healthy
@@ -463,6 +466,8 @@ volumes:
   postgres_prod_data:
     driver: local
   minio_prod_data:
+    driver: local
+  backend_prod_data:
     driver: local
   nginx_cache:
     driver: local
