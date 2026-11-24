@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { MissionResultCard } from "./mission-result-card";
 import type { DeliveryRun } from "@/lib/api/delivery-service";
+import { CONSTANTS_EN } from "@/lib/constants_en";
 import { useDeliveryStore } from "@/lib/store/delivery-store";
 import { useUserStore } from "@/lib/store/user-store";
 
@@ -78,7 +79,9 @@ describe("MissionResultCard : la carte de résultat d'une mission (R78, Relire)"
     const at = order.map((text) => document.body.textContent?.indexOf(text) ?? -1);
     expect(at.every((position) => position >= 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
-    expect(screen.getByText("What it says it did")).toBeInTheDocument();
+    // R161 F6 : le résumé porte le même nom ici, dans la vue du travail et sur la page de vérification.
+    expect(screen.getByText("What the agent says it did")).toBeInTheDocument();
+    expect(CONSTANTS_EN.verification.changed.summary.startsWith(CONSTANTS_EN.missions.result.inItsWords)).toBe(true);
   });
 
   it("embedded in the work view, it doesn't repeat the title of the mission", () => {

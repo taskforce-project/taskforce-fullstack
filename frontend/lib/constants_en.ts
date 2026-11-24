@@ -2726,7 +2726,7 @@ export const CONSTANTS_EN = {
       moveChange: "Move {key} to Done",
       final: "final",
       canBeUndone: "can be undone",
-      inItsWords: "What it says it did",
+      inItsWords: "What the agent says it did",
       discard: "Discard",
       tryAgain: "Try again",
       retryNote: "What should it do differently? Your note goes on the issue, where the agent reads it.",
