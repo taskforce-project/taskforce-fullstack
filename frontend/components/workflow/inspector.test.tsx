@@ -163,7 +163,9 @@ describe("Inspector", () => {
 
   it("Evidence: the rule and its version, the requests, the files, the tests and the proof", async () => {
     useDeliveryStore.setState({
-      evidence: { 1: { format: "taskforce-evidence/1", events: [{ seq: 1 }, { seq: 2 }] as never, root: "x" } },
+      // Un dossier fini et scellé par une clé sur le poste de l'agent : la ligne de la preuve le dit, comme la page (R161 M5).
+      evidence: { 1: { format: "taskforce-evidence/1", events: [{ seq: 1, type: "mission.started" }, { seq: 2, type: "mission.ended" }] as never, root: "x",
+        seal: { payload: btoa(JSON.stringify({ predicate: { key: { custody: "same-machine" } } })) } } },
       missionChanges: { 1: { mode: "repo", live: false, added: 12, removed: 1, more: 0, canRevert: false, canComment: false, canCorrect: false, blockedReason: null, correction: null,
         files: [{ path: "src/export.ts", status: "modified", added: 12, removed: 1, binary: false, truncated: false, withheld: false, revision: "r", reverting: false, error: null, updatedAt: null }] } },
     })
@@ -183,7 +185,7 @@ describe("Inspector", () => {
     expect(screen.getByText("Rules version 12")).toBeInTheDocument()
     expect(screen.getByText("Tests passed: 12 of 12")).toBeInTheDocument()
     // Le libellé de la ligne dit « Proof » : la valeur ne le répète pas (R161, L5).
-    expect(screen.getByText("2 events, sealed")).toBeInTheDocument()
+    expect(screen.getByText("2 events, signed with a key the agent could read")).toBeInTheDocument()
     expect(screen.queryByText(/^Proof: /)).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /export\.ts/ }))
     expect(onOpenMission).toHaveBeenCalledWith(1)

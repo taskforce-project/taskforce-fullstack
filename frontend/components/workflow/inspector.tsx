@@ -21,6 +21,7 @@ import { useIssueStore } from "@/lib/store/issue-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
 import { isMine } from "@/lib/window/missions"
+import { proofLine, proofOf } from "@/lib/window/work-view"
 import { issueKey, nextStage, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
 import { markStill, pendingOf } from "@/lib/workflow/node-state"
 import { countWords, momentWords, nodeSentence } from "@/lib/workflow/sentence"
@@ -465,8 +466,8 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
   const rules = [...new Set(approvals.map((approval) => approval.reason?.trim()).filter((reason): reason is string => Boolean(reason)))]
   const pr = node.run?.links.pullRequestUrl ?? null
   const tests = run.tests
-  const events = evidence?.events.length ?? 0
-  const sealed = run.status === "DONE" || run.status === "FAILED"
+  // La ligne de la preuve de la vue du travail : finir ne scelle pas, et une clé que l'agent lisait se dit (R161 M5).
+  const proof = proofLine(proofOf(evidence), sequenceTexts.proof)
 
   async function download() {
     if (runId === null) return
@@ -550,7 +551,7 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
       <Row label={sequenceTexts.proof.name}>
         {evidence ? (
           <div className="flex flex-col gap-1.5">
-            <p>{sealed ? fillText(t.proofSealed, { count: events }) : fillText(sequenceTexts.proof.building, { count: events })}</p>
+            <p>{proof}</p>
             <Button variant="outline" size="sm" className="h-7 w-fit text-xs" onClick={() => void download()}>{t.download}</Button>
           </div>
         ) : <p className="text-muted-foreground">{t.noEvidence}</p>}

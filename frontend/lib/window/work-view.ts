@@ -85,14 +85,62 @@ export async function diffAnchor(path: string): Promise<string | null> {
   return `diff-${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`
 }
 
-/** La preuve telle qu'elle se construit : combien d'événements le dossier garde, et s'il est scellé. */
+/**
+ * La preuve telle qu'elle se construit : combien d'événements le dossier garde, si la mission a fini, et le sceau quand il
+ * y en a un, avec ce que son énoncé dit de la clé. Finir ne scelle pas : seul un sceau signe (R161 M5 de #552).
+ */
 export interface Proof {
   readonly count: number
-  /** La mission est finie : l'empreinte du dernier événement scelle le dossier. */
-  readonly sealed: boolean
+  readonly ended: boolean
+  /** La clé du sceau sur le poste de l'agent (elle pouvait la lire), et un sceau posé tard ; null sans sceau. */
+  readonly seal: { readonly sameMachine: boolean; readonly late: boolean } | null
+}
+
+/** Ce que l'énoncé d'un sceau (une enveloppe DSSE) dit de lui ; la page de vérification en vérifie la signature. */
+function predicateOf(seal: Record<string, unknown> | undefined): Record<string, unknown> | null {
+  if (!seal || typeof seal.payload !== "string") return null
+  try {
+    const decoded = atob(seal.payload)
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(Uint8Array.from(decoded, (c) => c.charCodeAt(0))))
+    const predicate = parsed !== null && typeof parsed === "object" ? (parsed as { predicate?: unknown }).predicate : null
+    return predicate !== null && typeof predicate === "object" ? predicate as Record<string, unknown> : null
+  } catch {
+    return null
+  }
 }
 
 export function proofOf(evidence: MissionEvidence | null | undefined): Proof {
   const events = evidence?.events ?? []
-  return { count: events.length, sealed: events.some((event) => event.type === "mission.ended") }
+  const predicate = predicateOf(evidence?.seal)
+  const key = predicate?.key !== null && typeof predicate?.key === "object" ? predicate.key as Record<string, unknown> : {}
+  return {
+    count: events.length,
+    ended: events.some((event) => event.type === "mission.ended"),
+    // Sans garde lisible, la clé est dite sur le poste de l'agent : la réserve d'abord (R198, R161 M5).
+    seal: predicate ? { sameMachine: key.custody !== "separate-machine", late: predicate.late === true } : null,
+  }
+}
+
+/** Les mots de la ligne de la preuve, les mêmes dans la vue du travail et l'inspecteur du workflow que sur la page. */
+export interface ProofTexts {
+  readonly none: string
+  readonly events: string
+  readonly eventsOne: string
+  readonly soFar: string
+  readonly ended: string
+  readonly signed: string
+  readonly signedSameMachine: string
+  readonly signedLate: string
+}
+
+/** La ligne de la preuve : jamais « sealed » pour une mission finie sans sceau, ni comme garantie quand l'agent lisait la clé. */
+export function proofLine(proof: Proof, t: ProofTexts): string {
+  if (proof.count === 0) return t.none
+  const events = proof.count === 1 ? t.eventsOne : t.events.replace("{count}", String(proof.count))
+  const state = !proof.ended && !proof.seal ? t.soFar
+    : !proof.seal ? t.ended
+    : proof.seal.late ? t.signedLate
+    : proof.seal.sameMachine ? t.signedSameMachine
+    : t.signed
+  return state.replace("{events}", events)
 }

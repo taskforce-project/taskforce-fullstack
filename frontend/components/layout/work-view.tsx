@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils"
 import { elapsedMinutes, isActiveRun, isMine, runState } from "@/lib/window/missions"
 import { verificationPath } from "@/lib/window/address"
 import { issuePath } from "@/lib/window/pane"
-import { proofOf } from "@/lib/window/work-view"
+import { proofLine, proofOf, type Proof } from "@/lib/window/work-view"
 
 /** Le rythme des relectures pendant que la mission tourne : son état et sa chronologie, puis son dossier. */
 const RUN_MS = 2_000
@@ -125,14 +125,14 @@ function ApprovalsRow({ run, approvals, you, showCommands }: Readonly<{
  * La preuve, repliée en une ligne (R138) : le nombre d'événements, scellés, la page de vérification de la mission (R212),
  * et le téléchargement du dossier.
  */
-function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId: number; count: number; sealed: boolean }>) {
+function ProofRow({ slug, runId, proof }: Readonly<{ slug: string; runId: number; proof: Proof }>) {
   const t = usePreferencesStore((s) => s.t.missionSequence.proof)
   const page = usePreferencesStore((s) => s.t.verification)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
   const { openVerification } = usePaneNavigation()
-  const said = count === 0 ? t.none
-    : sealed ? (count === 1 ? t.sealedOne : fillText(t.sealed, { count }))
-    : (count === 1 ? t.buildingOne : fillText(t.building, { count }))
+  const count = proof.count
+  // Les mots de la page : finir ne scelle pas, et une clé que l'agent pouvait lire se dit avant tout (R161 M5).
+  const said = proofLine(proof, t)
 
   async function download(format: "json" | "md") {
     if (!(await downloadEvidence(slug, runId, format))) toast.error(t.failed)
@@ -335,7 +335,7 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
 
       <div className="flex flex-col divide-y divide-border border-y border-border">
         {answered.length > 0 && <ApprovalsRow run={run} approvals={answered} you={you} showCommands={showCommands} />}
-        <ProofRow slug={slug} runId={runId} count={proof.count} sealed={proof.sealed} />
+        <ProofRow slug={slug} runId={runId} proof={proof} />
       </div>
     </div>
   )

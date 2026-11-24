@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { DeliveryRunEvent, MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
-import { diffAnchor, documentChanges, fileChanges, proofOf } from "./work-view"
+import { CONSTANTS_EN } from "@/lib/constants_en"
+import { diffAnchor, documentChanges, fileChanges, proofLine, proofOf } from "./work-view"
 
 let seq = 0
 const event = (kind: DeliveryRunEvent["kind"], tool: string | null, text: string): DeliveryRunEvent =>
@@ -73,16 +74,43 @@ describe("diffAnchor : un fichier dans l'onglet Files changed de la pull request
 })
 
 describe("proofOf : la preuve telle qu'elle se construit", () => {
+  const seal = (predicate: unknown) => ({ payload: btoa(JSON.stringify({ predicate })) })
+
   it("counts the record's events, and says when the mission ended", () => {
     const building: MissionEvidence = { format: "taskforce-evidence/1", events: [1, 2, 3].map((n) => proofEvent(n, "action.requested")), root: "h3" }
-    expect(proofOf(building)).toEqual({ count: 3, sealed: false })
+    expect(proofOf(building)).toEqual({ count: 3, ended: false, seal: null })
 
-    const sealed: MissionEvidence = { ...building, events: [...building.events, proofEvent(4, "mission.ended")], root: "h4" }
-    expect(proofOf(sealed)).toEqual({ count: 4, sealed: true })
+    const ended: MissionEvidence = { ...building, events: [...building.events, proofEvent(4, "mission.ended")], root: "h4" }
+    expect(proofOf(ended)).toEqual({ count: 4, ended: true, seal: null })
   })
 
   it("is empty before the first event, or for a run without a record", () => {
-    expect(proofOf(null)).toEqual({ count: 0, sealed: false })
-    expect(proofOf(undefined)).toEqual({ count: 0, sealed: false })
+    expect(proofOf(null)).toEqual({ count: 0, ended: false, seal: null })
+    expect(proofOf(undefined)).toEqual({ count: 0, ended: false, seal: null })
+  })
+
+  // R161 M5 : finir ne scelle pas ; un sceau se lit dans le dossier, avec la garde de sa clé.
+  it("reads the seal's key custody, and a late seal; an unreadable seal keeps the reserve", () => {
+    const ended: MissionEvidence = { format: "taskforce-evidence/1", events: [proofEvent(1, "mission.ended")], root: "h1" }
+    expect(proofOf({ ...ended, seal: seal({ key: { custody: "separate-machine" } }) }).seal).toEqual({ sameMachine: false, late: false })
+    expect(proofOf({ ...ended, seal: seal({ key: { custody: "same-machine" }, late: true }) }).seal).toEqual({ sameMachine: true, late: true })
+    expect(proofOf({ ...ended, seal: seal({}) }).seal).toEqual({ sameMachine: true, late: false })
+    expect(proofOf({ ...ended, seal: { payload: "%%%" } }).seal).toBeNull()
+    expect(proofOf({ ...ended, seal: { payload: btoa("[]") } }).seal).toBeNull()
+  })
+})
+
+describe("proofLine : la ligne de la preuve, les mots de la page", () => {
+  const t = CONSTANTS_EN.missionSequence.proof
+  const line = (proof: Parameters<typeof proofLine>[0]) => proofLine(proof, t)
+
+  it("never says sealed for a mission that ended without a seal, nor as a guarantee when the agent could read the key", () => {
+    expect(line({ count: 0, ended: false, seal: null })).toBe("No record yet")
+    expect(line({ count: 1, ended: false, seal: null })).toBe("1 event so far")
+    expect(line({ count: 3, ended: true, seal: null })).toBe("3 events, ended")
+    expect(line({ count: 3, ended: true, seal: { sameMachine: true, late: false } })).toBe("3 events, signed with a key the agent could read")
+    expect(line({ count: 3, ended: true, seal: { sameMachine: false, late: false } })).toBe("3 events, signed: the verification page checks it")
+    expect(line({ count: 3, ended: true, seal: { sameMachine: false, late: true } })).toBe("3 events, signed late, after the mission had ended")
+    expect(Object.values(t).join(" ")).not.toMatch(/sealed/)
   })
 })

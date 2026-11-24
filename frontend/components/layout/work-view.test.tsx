@@ -61,6 +61,8 @@ const EVIDENCE: MissionEvidence = {
 const SEALED: MissionEvidence = {
   ...EVIDENCE, events: [...EVIDENCE.events, { ...EVIDENCE.events[1], seq: 3, type: "mission.ended", hash: "cccccccccccc3333" }], root: "cccccccccccc3333",
 }
+/** Le sceau d'un dossier, tel que la ligne de la preuve en lit l'énoncé : la garde de sa clé ; sa signature, la page la vérifie. */
+const seal = (custody: string) => ({ payload: btoa(JSON.stringify({ predicate: { key: { custody } } })) })
 
 const DONE: DeliveryRun = { ...RUN, status: "DONE", endedAt: "2026-11-07T10:04:00", summary: "## What I did\nFixed **three** links." }
 
@@ -305,9 +307,13 @@ describe("WorkView", () => {
   describe("the proof", () => {
     it.each([
       ["while it builds", EVIDENCE, "2 events so far"],
-      ["sealed", SEALED, "3 events, sealed"],
+      // Finir ne scelle pas : sans sceau, la mission a fini, sans plus (R161 M5).
+      ["ended", SEALED, "3 events, ended"],
       ["one event", { ...EVIDENCE, events: EVIDENCE.events.slice(0, 1) }, "1 event so far"],
-      ["one event, sealed", { ...EVIDENCE, events: [SEALED.events[2]] }, "1 event, sealed"],
+      ["one event, ended", { ...EVIDENCE, events: [SEALED.events[2]] }, "1 event, ended"],
+      // Un sceau dont la clé est sur le poste de l'agent : la réserve d'abord, comme sur la page.
+      ["signed on the agent's computer", { ...SEALED, seal: seal("same-machine") }, "3 events, signed with a key the agent could read"],
+      ["signed away from it", { ...SEALED, seal: seal("separate-machine") }, "3 events, signed: the verification page checks it"],
     ])("folds into one line: %s", (_label, evidence, line) => {
       useDeliveryStore.setState({ evidence: { 100: evidence } })
       render(<WorkView runId={100} />)
