@@ -19,6 +19,8 @@ export type Who =
   | { readonly kind: "named"; readonly name: string }
   | { readonly kind: "erased"; readonly on?: string }
   | { readonly kind: "unnamed" }
+  /** Une chaîne d'avant la 1.18 la nomme par son courriel, que la page ne montre pas (R159, second tour, N4). */
+  | { readonly kind: "hidden" }
 
 /** Qui a effacé un texte, quand, et lequel (le titre de la demande, le brief...). */
 export interface Erasure {
@@ -222,6 +224,11 @@ export interface PageRecord {
   readonly gaps: readonly PageGap[]
   /** Le runner a pris la mission : ce qu'il rapporte vient du poste de l'agent (R159 M5 de #551). */
   readonly runnerFacts: boolean
+  /**
+   * La purge d'un compte nommé par une chaîne d'avant la 1.18 : sa date, et les événements qui gardent son courriel, qui ne
+   * changent pas sans casser la chaîne (R159, second tour, N4).
+   */
+  readonly legacyErasures: ReadonlyArray<{ readonly at: string; readonly events: readonly number[] }>
 }
 
 export interface VerificationPage {
@@ -230,6 +237,11 @@ export interface VerificationPage {
   readonly running: boolean
   /** Le dossier est d'avant la 1.18 : la chaîne ne couvre pas son en-tête, et bien des faits n'y sont pas. */
   readonly older: boolean
+  /**
+   * La chaîne nomme les personnes par leur courriel, comme avant la 1.18 : son `mission.started` n'a pas de `accountable`,
+   * le signe que le serveur lit aussi. La page masque alors chaque courriel, comme l'export Markdown (R159, second tour, N4).
+   */
+  readonly legacy: boolean
   readonly request: PageRequest
   readonly changes: PageChanges
   readonly classOf: PageClass
@@ -252,6 +264,9 @@ const data = (e: MissionEvidenceEvent): Obj => (isObj(e.data) ? e.data : {})
 
 /** L'identifiant opaque d'une personne dans le dossier : `who:` depuis le second tour de R159, `person:` au premier. */
 const OPAQUE_PERSON = /^(who|person):[0-9a-f]{32}$/
+
+/** Un courriel, où qu'il soit dans un texte : le motif du serveur (`MissionEvidenceService.EMAIL`). */
+export const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+/
 
 /** Les gestes de la personne sur le résultat : la décision de fin est le dernier d'entre eux. */
 const END_GESTURES = new Set(["APPLY", "DISCARD", "RETRY", "MARK_DONE", "MERGE", "STOP"])
@@ -302,6 +317,9 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
   const ended = [...events].reverse().find((e) => e.type === "mission.ended")
   const end = ended ? data(ended) : {}
   const header = isObj(file.mission) ? file.mission : {}
+  // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : le serveur la reconnaît à son `mission.started` sans
+  // `accountable`, et la page aussi (R159, second tour, N4).
+  const legacy = started === undefined || !("accountable" in s)
 
   // Les personnes : l'identifiant opaque de la chaîne, un par personne et par espace (`who:`, R159, second tour, L-a et L-e ;
   // `person:` au premier tour), et ce que leur note dit d'elles ; un dossier d'avant la 1.18 les nomme par leur courriel.
@@ -321,6 +339,7 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
     ? keptText(texts[ref.sha256]) : null)
   const who = (id: unknown): Who | null => {
     if (typeof id !== "string" || id.length === 0) return null
+    if (legacy && EMAIL.test(id)) return { kind: "hidden" }
     if (!OPAQUE_PERSON.test(id)) return id === "unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
     const person = persons.get(id)
     if (!person) return { kind: "unnamed" }
@@ -614,12 +633,17 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
     pullRequest: pullRequest !== null,
     gaps: notes("gap").map((e) => ({ from: num(data(e).from) ?? 0, to: num(data(e).to), noted: e.seq })),
     runnerFacts: s.runnerFacts === "agent-machine",
+    legacyErasures: notes("erased").filter((e) => data(e).legacy === true).map((e) => {
+      const seqs = data(e).events
+      return { at: e.at, events: Array.isArray(seqs) ? seqs.filter((n): n is number => typeof n === "number") : [] }
+    }),
   }
 
   return {
     mission: { id: num(s.mission) ?? num(header.id), workspace: str(s.workspace) ?? str(header.workspace), issue: pageRequest.issue },
     running,
     older: started !== undefined && !headerFromChain,
+    legacy,
     request: pageRequest,
     changes,
     classOf: pageClass,

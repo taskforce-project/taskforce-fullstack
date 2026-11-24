@@ -84,6 +84,13 @@ describe("la page exportée avec son dossier", () => {
     expect((await checkRecord(JSON.parse(embedded), [exampleKey()], at)).chain).toBe("holds")
   })
 
+  it("N4 du second tour de #551 : la page exportée d'un dossier d'avant la 1.18 ne porte pas ce dossier, ni ses courriels", () => {
+    const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [],
+      howTo: t.export.howToLegacy.replace("{id}", "3"), moreFiles: t.showAllFiles }, [], null)
+    expect(html).not.toContain("<script")
+    expect(html).toContain(escapeHtml("this file does not carry it. An owner or admin of the workspace can download it as JSON"))
+  })
+
   it("R161 M1 : une longue liste se replie avec son nombre", () => {
     const files = Array.from({ length: FOLD + 2 }, (_, i) => line(`file-${i}.ts`))
     const sections: Section[] = [{ id: "changed", title: "2. What changed", lines: [{ text: "12 files changed", list: { lines: files, fold: FOLD } }] }]

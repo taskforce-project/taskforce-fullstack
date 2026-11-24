@@ -27,7 +27,7 @@ const t = CONSTANTS_EN.verification
 describe("VerificationView", () => {
   const fetchEvidence = vi.fn<(slug: string, runId: number) => Promise<MissionEvidence | null>>()
   const fetchEvidenceKeys = vi.fn<(slug: string) => Promise<string[] | null>>()
-  const downloadEvidence = vi.fn<(slug: string, runId: number, format: "json") => Promise<boolean>>()
+  const downloadEvidence = vi.fn<(slug: string, runId: number, format: "json" | "md") => Promise<boolean>>()
 
   function show(file: MissionEvidence | null | undefined, keys: string[] | null = [exampleKey()]) {
     fetchEvidence.mockResolvedValue(file ?? null)
@@ -41,6 +41,7 @@ describe("VerificationView", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     downloadEvidence.mockResolvedValue(true)
+    useDeliveryStore.setState({ evidenceLegacy: {} })
   })
 
   it("R161 B1 : lit le dossier et les clés de l'instance, dit qu'elle vérifie, puis ce qu'elle a vérifié, où et quand", async () => {
@@ -139,6 +140,20 @@ describe("VerificationView", () => {
     expect(screen.getByText(t.deniedHint)).toBeInTheDocument()
     fireEvent.click(screen.getByRole("link", { name: t.back }))
     expect(nav.push).toHaveBeenCalledWith("/acme/missions/42", { scroll: false })
+  })
+
+  it("N4 du second tour de #551 : un dossier d'avant la 1.18 qu'on ne peut pas ouvrir en JSON le dit, et offre son export Markdown", async () => {
+    useDeliveryStore.setState({ evidenceLegacy: { 42: true } })
+    show(null)
+
+    expect(screen.getByRole("heading", { name: t.title })).toBeInTheDocument()
+    expect(screen.getByRole("status")).toHaveTextContent(t.legacyDenied)
+    expect(screen.queryByText(t.denied)).not.toBeInTheDocument()
+    expect(screen.getByText(t.legacyDeniedHint)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: t.downloadMarkdown }))
+    expect(downloadEvidence).toHaveBeenCalledWith("acme", 42, "md")
+    await vi.waitFor(() => expect(toasts.success).toHaveBeenCalledWith(t.markdownDownloaded))
+    expect(screen.getByRole("link", { name: t.back })).toBeInTheDocument()
   })
 
   it("R161 M3 : une lecture qui échoue le dit, avec un titre, et propose de réessayer", async () => {

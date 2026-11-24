@@ -15,7 +15,7 @@ import { verificationPage, type DossierFile } from "@/lib/delivery/verification"
 import { checkRecord, type RecordCheck } from "@/lib/delivery/verification-check"
 import { verificationHtml } from "@/lib/delivery/verification-html"
 import {
-  linkable, pageTitle, summarySentence, verdictLines, verificationSections, when, type Block, type Line, type Section,
+  exportHowTo, linkable, pageTitle, summarySentence, verdictLines, verificationSections, when, type Block, type Line, type Section,
 } from "@/lib/delivery/verification-words"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
@@ -166,6 +166,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
   const slug = typeof params?.workspace === "string" ? params.workspace : ""
   const t = usePreferencesStore((s) => s.t.verification)
   const evidence = useDeliveryStore((s) => s.evidence[runId])
+  const legacyRefused = useDeliveryStore((s) => s.evidenceLegacy[runId] === true)
   const keys = useDeliveryStore((s) => s.evidenceKeys[slug])
   const fetchEvidence = useDeliveryStore((s) => s.fetchEvidence)
   const fetchEvidenceKeys = useDeliveryStore((s) => s.fetchEvidenceKeys)
@@ -232,6 +233,24 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
       </p>
     )
   }
+  // Un dossier d'avant la 1.18 que la personne peut lire, mais pas en JSON : la page le dit, et offre l'export Markdown, qui
+  // masque les courriels (R159, second tour, N4).
+  if (evidence === null && legacyRefused) {
+    const downloadMarkdown = async () => {
+      const ok = await downloadEvidence(slug, runId, "md")
+      if (ok) toast.success(t.markdownDownloaded)
+      else toast.error(t.markdownDownloadFailed)
+    }
+    return (
+      <Unavailable title={t.title} message={t.legacyDenied} hint={t.legacyDeniedHint} back={back}
+        action={(
+          <button type="button" onClick={() => void downloadMarkdown()}
+            className="inline-flex w-fit items-center gap-1.5 border border-border px-2 py-1 text-xs text-foreground hover:bg-muted">
+            <Download className="size-3.5" aria-hidden="true" /> {t.downloadMarkdown}
+          </button>
+        )} />
+    )
+  }
   // 403 et 404 : un seul message, qui ne dit pas lequel (R159 P2).
   if (evidence === null || !page || !sections) return <Unavailable title={t.title} message={t.denied} hint={t.deniedHint} back={back} />
 
@@ -243,8 +262,6 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
     if (!page || !sections) return
     try {
       const id = page.mission.id ?? runId
-      const seal = page.record.seal
-      const key = seal && seal.kept && !IS_DESKTOP && seal.keyId ? fillText(t.export.key, { key: seal.keyId }) : ""
       const html = verificationHtml({
         title: heading,
         assembled: fillText(t.export.assembled, {
@@ -258,9 +275,10 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
         proves: t.export.proves,
         sentence,
         notes: [t.audience, t.assembled, t.scope],
-        howTo: fillText(t.export.howTo, { id, key }),
+        howTo: exportHowTo(page, t, context),
         moreFiles: t.showAllFiles,
-      }, sections, JSON.stringify(evidence, null, 2))
+        // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : la page exportée ne la porte pas (N4).
+      }, sections, page.legacy ? null : JSON.stringify(evidence, null, 2))
       saveBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `verification-run-${id}.html`)
       toast.success(t.record.downloaded)
     } catch {

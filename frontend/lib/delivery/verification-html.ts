@@ -92,8 +92,11 @@ function lineHtml(line: Line, moreFiles: string): string {
   return parts.join("")
 }
 
-/** Le fichier HTML de la page, son dossier à l'intérieur. */
-export function verificationHtml(head: ExportHead, sections: readonly Section[], dossierJson: string): string {
+/**
+ * Le fichier HTML de la page, son dossier à l'intérieur ; sans lui (`null`) pour une chaîne d'avant la 1.18, qui nomme les
+ * personnes par leur courriel : seul un responsable de l'espace l'exporte (R159, second tour, N4).
+ */
+export function verificationHtml(head: ExportHead, sections: readonly Section[], dossierJson: string | null): string {
   const body = sections.map((section) => [
     `<details class="section" id="${section.id}" open><summary><h2>${escapeHtml(section.title)}</h2></summary>`,
     section.lines.map((line) => lineHtml(line, head.moreFiles)).join("\n"),
@@ -113,7 +116,7 @@ export function verificationHtml(head: ExportHead, sections: readonly Section[],
     body,
     `<section id="verify"><p class="muted">${escapeHtml(head.howTo)}</p></section>`,
     "</main>",
-    `<script type="application/json" id="taskforce-evidence">${embedJson(dossierJson)}</script>`,
+    ...(dossierJson === null ? [] : [`<script type="application/json" id="taskforce-evidence">${embedJson(dossierJson)}</script>`]),
     "</body></html>",
   ].join("\n")
 }

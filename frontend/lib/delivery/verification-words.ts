@@ -2,7 +2,7 @@ import type { CONSTANTS_EN } from "@/lib/constants_en"
 import { fillText } from "@/lib/delivery/result-card"
 import { parseServerDate } from "@/lib/utils/server-date"
 
-import type { DossierText, NotChecked, PageDecision, PageRule, VerificationPage, Who } from "./verification"
+import { EMAIL, type DossierText, type NotChecked, type PageDecision, type PageRule, type VerificationPage, type Who } from "./verification"
 
 /**
  * Les mots de la page de vérification (R212), tirés de son modèle ({@link VerificationPage}) : d'abord ce que la page a
@@ -80,8 +80,25 @@ export function linkable(url: string | null | undefined): url is string {
 /** Une personne telle que le dossier la nomme ; effacée, le dossier dit quand quand il le sait (R210). */
 export function whoWords(who: Who | null | undefined, t: Texts): string {
   if (!who || who.kind === "unnamed") return t.people.unnamed
+  if (who.kind === "hidden") return t.people.hidden
   if (who.kind === "erased") return who.on ? fillText(t.people.erasedOn, { date: when(who.on) }) : t.people.erased
   return who.name
+}
+
+/** Chaque courriel d'un texte, masqué comme l'export Markdown le masque (R159, second tour, N4). */
+export function hideEmails(text: string, t: Texts): string {
+  return text.replace(new RegExp(EMAIL.source, "g"), t.emailHidden)
+}
+
+/** Les lignes d'un dossier d'avant la 1.18 : aucun courriel, où qu'il soit, le résumé de l'agent et les listes compris. */
+function hiddenLines(lines: readonly Line[], t: Texts): Line[] {
+  return lines.map((line) => ({
+    ...line,
+    text: hideEmails(line.text, t),
+    ...(line.body !== undefined ? { body: hideEmails(line.body, t) } : {}),
+    ...(line.blocks ? { blocks: line.blocks.map((block) => ({ ...block, parts: block.parts.map((part) => ({ ...part, text: hideEmails(part.text, t) })) })) } : {}),
+    ...(line.list ? { list: { ...line.list, lines: hiddenLines(line.list.lines, t) } } : {}),
+  }))
 }
 
 /** Le résumé de l'agent, en blocs simples : les titres, les listes et le code cité de son Markdown, sans ses signes. */
@@ -161,6 +178,11 @@ function textLine(text: DossierText, kind: string, t: Texts): Line | null {
 
 /** Les premières lignes : ce que la page a vérifié du dossier, dans cette app, et quand (R161 B1, R159 P5). */
 export function verdictLines(page: VerificationPage, t: Texts): Line[] {
+  const lines = verdictOf(page, t)
+  return page.legacy ? hiddenLines(lines, t) : lines
+}
+
+function verdictOf(page: VerificationPage, t: Texts): Line[] {
   const c = page.check
   if (!c) return [{ text: t.checking, tone: "muted" }]
   const v = t.verdict
@@ -176,6 +198,8 @@ export function verdictLines(page: VerificationPage, t: Texts): Line[] {
   else lines.push({ text: d.texts.referenced > 0 && changed === 0
     ? fillText(v.holds, { date, events: page.record.events, texts: d.texts.matches.length })
     : fillText(v.holdsNoTexts, { date, events: page.record.events }), tone: clean ? "ok" : undefined })
+  // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : la page le dit avant d'en masquer un (N4).
+  if (page.legacy) lines.push({ text: v.legacy, tone: "muted" })
   if (d.header.differs.length > 0 || d.header.missing.length > 0) {
     lines.push({ text: fillText(v.header, { fields: [...d.header.differs, ...d.header.missing].join(", ") }), tone: "warn" })
   }
@@ -224,7 +248,8 @@ export function summarySentence(page: VerificationPage, t: Texts): string {
   else if (!page.running && page.notChecked.some((n) => n.kind === "noTestRecord")) parts.push(s.testsUnknown)
   if (page.end) parts.push(fillText(s.decided, { decision: decisionWords(page.end, t), date: when(page.end.at) }))
   else if (!page.running) parts.push(s.undecided)
-  return parts.join(" ")
+  const sentence = parts.join(" ")
+  return page.legacy ? hideEmails(sentence, t) : sentence
 }
 
 function request(page: VerificationPage, t: Texts): Line[] {
@@ -446,6 +471,10 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     lines.push({ text: gap.to === null ? fillText(rec.gapLost, { from: gap.from, noted: gap.noted })
       : fillText(gap.from === gap.to ? rec.gapOne : rec.gap, { from: gap.from, to: gap.to, noted: gap.noted }), tone: "warn" })
   }
+  // La purge d'un compte qu'une chaîne d'avant la 1.18 nomme par son courriel : ce qui reste, et pourquoi (N4).
+  for (const erasure of r.legacyErasures) {
+    lines.push({ text: fillText(rec.legacyErased, { date: when(erasure.at), events: erasure.events.join(", ") || "?" }), tone: "muted" })
+  }
   if (r.seal) {
     // La garde de la clé d'abord : « scellé » n'est pas une garantie quand l'agent pouvait lire la clé (R161 M5).
     lines.push({ text: rec.custody[r.seal.custody], tone: r.seal.custody === "same-machine" ? "warn" : "muted" })
@@ -476,7 +505,7 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
 export function verificationSections(page: VerificationPage, t: Texts, context: WordsContext): Section[] {
   const notChecked: Line[] = page.notChecked.length === 0 ? [{ text: t.notChecked.none, tone: "muted" }]
     : page.notChecked.map((item) => notCheckedLine(item, t))
-  return [
+  const sections: Section[] = [
     { id: "request", title: t.sections.request, lines: request(page, t) },
     { id: "changed", title: t.sections.changed, lines: changed(page, t) },
     { id: "classification", title: t.sections.classification, lines: classification(page, t) },
@@ -486,11 +515,26 @@ export function verificationSections(page: VerificationPage, t: Texts, context: 
     { id: "model", title: t.sections.model, lines: model(page, t) },
     { id: "record", title: t.sections.record, lines: record(page, t, context) },
   ]
+  // Une chaîne d'avant la 1.18 : aucun de ses courriels à l'écran ni dans la page exportée (R159, second tour, N4).
+  return page.legacy ? sections.map((section) => ({ ...section, lines: hiddenLines(section.lines, t) })) : sections
 }
 
 /** Le titre de la page : l'issue et le titre de la demande (R161 F4). */
 export function pageTitle(page: VerificationPage, t: Texts): string {
   const issue = page.mission.issue
   if (!issue) return t.title
-  return page.request.title.state === "text" ? fillText(t.titleOfRequest, { issue, title: page.request.title.text }) : fillText(t.titleOf, { issue })
+  const title = page.request.title.state === "text" ? fillText(t.titleOfRequest, { issue, title: page.request.title.text }) : fillText(t.titleOf, { issue })
+  return page.legacy ? hideEmails(title, t) : title
+}
+
+/**
+ * Comment vérifier la page exportée : le dossier qu'elle porte, et la commande. Une chaîne d'avant la 1.18 n'y entre pas,
+ * ses courriels avec elle : seul un responsable de l'espace l'exporte en JSON (R159, second tour, N4).
+ */
+export function exportHowTo(page: VerificationPage, t: Texts, context: WordsContext): string {
+  const id = page.mission.id ?? context.runId
+  if (page.legacy) return fillText(t.export.howToLegacy, { id })
+  const seal = page.record.seal
+  const key = seal && seal.kept && !context.desktop && seal.keyId ? fillText(t.export.key, { key: seal.keyId }) : ""
+  return fillText(t.export.howTo, { id, key })
 }

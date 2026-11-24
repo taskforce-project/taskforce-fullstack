@@ -78,6 +78,12 @@ interface DeliveryState {
    */
   evidence: Record<number, MissionEvidence | null>;
   /**
+   * Par runId : le dossier est d'avant la 1.18 et la personne, qui peut le lire, n'est pas responsable de l'espace : le
+   * serveur ne lui en donne pas le JSON, qui nomme les personnes par leur courriel (R159, second tour, N4). La page le dit,
+   * au lieu du message neutre d'un dossier qu'on ne peut pas lire.
+   */
+  evidenceLegacy: Record<number, boolean>;
+  /**
    * Par espace : les identifiants des clés qui scellent les dossiers de l'instance (celle d'aujourd'hui, puis celles qui ont
    * déjà scellé) ; `null` : la route ne s'est pas lue, et la page ne compare un sceau à aucune clé.
    */
@@ -187,6 +193,13 @@ export const PROJECT_RUN_PAGES_MAX = 40;
 /** Les pages lues en même temps, au plus. */
 const PROJECT_RUN_CONCURRENCY = 3;
 
+/**
+ * Le début du refus que le serveur oppose au JSON d'un dossier d'avant la 1.18, pour une personne qui peut lire le dossier
+ * sans être responsable de l'espace (`MissionDossierAccess.LEGACY`, R159, second tour, N4) : sa chaîne nomme les
+ * personnes par leur courriel, et seul l'export Markdown les masque.
+ */
+export const LEGACY_REFUSAL = "This record was written before TaskForce 1.18";
+
 /** Les lignes d'une page ajoutées à celles déjà lues, une fois chacune (une mission a pu glisser d'une page à l'autre). */
 /**
  * Une horloge qui ne fait qu'avancer : quand chaque mission a été relue seule (un événement l'a demandé), et quand chaque
@@ -274,6 +287,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   activity: {},
   resultErrors: {},
   evidence: {},
+  evidenceLegacy: {},
   evidenceKeys: {},
   missionChanges: {},
   fileDiffs: {},
@@ -589,7 +603,12 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1) ; 403 : la personne ne peut pas le lire.
       // Les deux se disent d'un seul message, qui ne dit pas lequel (R159 P2). Une autre erreur garde la lecture d'avant.
       const status = getErrorStatus(e);
-      if (status === 404 || status === 403) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
+      // Le JSON d'un dossier d'avant la 1.18, refusé à qui peut le lire sans être responsable de l'espace (N4) : la page le
+      // dit, cette personne sachant déjà que le dossier existe.
+      const legacy = status === 403 && getErrorMessage(e).startsWith(LEGACY_REFUSAL);
+      if (status === 404 || status === 403) {
+        set((state) => ({ evidence: { ...state.evidence, [runId]: null }, evidenceLegacy: { ...state.evidenceLegacy, [runId]: legacy } }));
+      }
       return null;
     }
   },

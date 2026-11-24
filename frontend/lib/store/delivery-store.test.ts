@@ -402,6 +402,21 @@ describe('delivery-store', () => {
     await act(async () => { await useDeliveryStore.getState().fetchEvidence('acme', 101); });
 
     expect(useDeliveryStore.getState().evidence[101]).toBeNull();
+    expect(useDeliveryStore.getState().evidenceLegacy[101]).toBe(false);
+  });
+
+  // Un dossier d'avant la 1.18 (R159, second tour de #551, N4) : la personne peut le lire, pas en JSON ; la page le dit.
+  it('fetchEvidence marks the refusal of the JSON of a record from before 1.18, which the person can read', async () => {
+    const legacy = new AxiosError('Forbidden', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 403, data: { message: 'This record was written before TaskForce 1.18 and names people by their email: only an owner or admin of the workspace can export it as JSON.' },
+        headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidence).mockRejectedValueOnce(legacy);
+    act(() => useDeliveryStore.setState({ evidence: {}, evidenceLegacy: {} }));
+
+    await act(async () => { await useDeliveryStore.getState().fetchEvidence('acme', 102); });
+
+    expect(useDeliveryStore.getState().evidence[102]).toBeNull();
+    expect(useDeliveryStore.getState().evidenceLegacy[102]).toBe(true);
   });
 
   // La page vérifie le sceau face aux clés de l'instance (R161 B1) : la clé du moment et celles qui ont servi.

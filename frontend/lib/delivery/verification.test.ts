@@ -6,7 +6,7 @@ import { brokenChain, chained, example, exampleKey, inheritedTicks, olderFailed,
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
 import {
-  inlineParts, linkable, pageTitle, short, summaryBlocks, summarySentence, verdictLines, verificationSections, when, whoWords,
+  exportHowTo, inlineParts, linkable, pageTitle, short, summaryBlocks, summarySentence, verdictLines, verificationSections, when, whoWords,
   type Section,
 } from "./verification-words"
 
@@ -192,6 +192,33 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
     expect(all(sections).join(" ")).not.toMatch(/the agent did not report it|has not ended/)
   })
 
+  it("N4 du second tour de #551 : un dossier d'avant la 1.18 ne montre aucun courriel, ni à l'écran ni dans la page exportée", async () => {
+    const file = chained([
+      { type: "mission.started", data: { issue: "WEB-12", requestedBy: "ada@example.com", agent: { kind: "claude-code", model: null } } },
+      { type: "human.decision", actor: { kind: "person", id: "grace@example.com" }, data: { decision: "STOP", reason: "Asked by ada@example.com." } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Stopped by grace@example.com." } },
+      { type: "note", at: "2026-11-24T08:00:00.000Z", data: { kind: "erased", legacy: true, events: [1, 2], reason: "account-deleted",
+        text: "A person's account was deleted on 2026-11-24T08:00:00.000Z." } },
+    ], { mission: { id: 3, workspace: "acme", issue: "WEB-12", requestedBy: "ada@example.com" } })
+    const page = verificationPage(file, await checkRecord(file, [], at))
+    expect(page.legacy).toBe(true)
+    expect(page.request.delegatedBy).toEqual({ kind: "hidden" })
+    const sections = verificationSections(page, t, context)
+    const shown = JSON.stringify(sections) + summarySentence(page, t) + JSON.stringify(verdictLines(page, t)) + pageTitle(page, t)
+    expect(shown).not.toMatch(/@example\.com/)
+    expect(texts(sections, "request")).toContain(`Given to the agent by a person (email hidden) on ${when(file.events[0]?.at ?? null)}.`)
+    expect(texts(sections, "changed")).toContain("The mission did not finish. Its error, as it was reported: “Stopped by (email hidden).”")
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.legacy)
+    expect(texts(sections, "record")).toContain("A person's account was deleted on 2026-11-24 08:00 UTC. Their email stays in events 1, 2, "
+      + "written before TaskForce 1.18, which cannot change without breaking the chain: this page hides it.")
+    // La page exportée ne porte pas ce dossier : seul un responsable de l'espace l'exporte en JSON.
+    expect(exportHowTo(page, t, context)).toBe(t.export.howToLegacy.replace("{id}", "3"))
+    // Le dossier d'aujourd'hui nomme ses personnes par un identifiant : rien n'y est masqué, et la page exportée le porte.
+    const today = verificationPage(example())
+    expect(today.legacy).toBe(false)
+    expect(exportHowTo(today, t, context)).toBe(t.export.howTo.replaceAll("{id}", "42").replace("{key}", ""))
+  })
+
   it("R159 P3 : des coches héritées, que l'agent de cette mission n'a pas cochées, ne comptent pas pour elle", () => {
     const page = verificationPage(inheritedTicks())
     expect(page.checks.some((c) => c.what === "tests")).toBe(false)
@@ -269,7 +296,8 @@ describe("le reste du dossier, dit en clair", () => {
     ], { texts: { [login]: { salt: "0".repeat(32), text: "octocat" } } }))
     const lines = texts(verificationSections(page, t, context), "decisions")
     expect(lines[0]).toBe("Final decision: Merged on GitHub by octocat.")
-    expect(lines.some((l) => l.startsWith("ada@example.com allowed the command “echo \"approved by security\"”, as the agent wrote it,"))).toBe(true)
+    // Une chaîne d'avant la 1.18 (pas de `accountable`) nomme la personne par son courriel : la page le masque (N4).
+    expect(lines.some((l) => l.startsWith("a person (email hidden) allowed the command “echo \"approved by security\"”, as the agent wrote it,"))).toBe(true)
   })
 
   it("une demande échue, un fournisseur autre, une session gardée à part", () => {
