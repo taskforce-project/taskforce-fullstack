@@ -101,8 +101,13 @@ public class MissionEvidenceService {
     /** Les faits que le runner rapporte viennent du poste de l'agent, quelle que soit la garde de la clé (R159, M5). */
     static final String AGENT_MACHINE = "agent-machine";
     static final String LIMIT_REACHED = "limit.reached";
-    /** Ce qu'un événement garde d'un texte en clair (une commande, une erreur), et d'un fait jugé. */
+    /** Ce qu'un événement garde d'un texte en clair (une commande, une erreur). */
     static final int MAX_TEXT = 2_000;
+    /**
+     * Ce qu'il garde d'un fait jugé : ce que l'entrée admet. Au-delà, le runner le coupe d'une coupe marquée, et le
+     * vérificateur ne rejuge pas une décision prise sur un fait coupé (R159, second tour, N2).
+     */
+    static final int MAX_FACT = 4_000;
     /** Ce que le dossier garde du résumé de l'agent, à côté de la chaîne. */
     static final int MAX_SUMMARY = 8_000;
 
@@ -470,7 +475,7 @@ public class MissionEvidenceService {
             Map<String, String> clean = new LinkedHashMap<>();
             if (part != null) {
                 part.forEach((k, v) -> {
-                    if (k != null && v != null) clean.put(k, EvidenceIntake.clip(v, MAX_TEXT));
+                    if (k != null && v != null) clean.put(k, EvidenceIntake.clip(v, MAX_FACT));
                 });
             }
             out.add(clean);

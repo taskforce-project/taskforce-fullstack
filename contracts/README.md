@@ -135,6 +135,10 @@ goes on without being written. A reserve of 1,000 more keeps only what the serve
 `checklist`, `witness`, `erased` and `late-seal`, and the `gap` of a lost runner. A text is kept beside the chain only
 with the event that names it: an event the cap drops leaves none.
 
+A fact longer than 4,000 characters (a long command) arrives cut, its end replaced by `[TaskForce cut this text here:
+N characters in all]`. The rules judged the whole fact: a decision whose facts were cut is not judged again, and the
+verifier says how many.
+
 ### Seal
 
 No format of TaskForce's own (E34): the seal is an in-toto Statement v1 whose subject is the head of the chain

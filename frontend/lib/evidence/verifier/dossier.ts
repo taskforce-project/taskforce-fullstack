@@ -175,6 +175,14 @@ export async function openSeal(envelope: unknown): Promise<SealReading> {
 /** Les règles que le runner applique lui-même, et qu'un paquet ne rejuge pas : le plafond, un accord pour la mission. */
 const RUNNER_GATES = /^(cap:|allowed for this mission)/;
 
+/** Ce que le dossier garde d'un fait jugé ; au-delà, le runner le coupe et le dit (R159, L4 ; second tour, N2). */
+export const MAX_FACT = 4000;
+const CUT_MARK = /\n\[TaskForce cut this text here: \d+ characters in all\]$/;
+
+/** Des faits dont l'un a été coupé pour tenir au dossier : les règles ont jugé le fait entier, qu'on n'a plus. */
+const cutFacts = (facts: readonly Facts[]): boolean =>
+  facts.some((part) => isObj(part) && Object.values(part).some((value) => typeof value === "string" && CUT_MARK.test(value)));
+
 const shortHash = (hash: unknown): string => (typeof hash === "string" ? `${hash.slice(0, 19)}...` : String(hash));
 
 const CUSTODY: Record<string, string> = {
@@ -274,11 +282,17 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     } else {
       let judged = 0;
       let differ = 0;
+      let cutShort = 0;
       for (const event of events) {
         const data = isObj(event.data) ? (event.data as Obj) : null;
         if (event.type !== "action.decided" || data?.kind !== "decision" || !Array.isArray(data.facts) || data.facts.length === 0) continue;
         const ruleId = event.actor?.id ?? "none";
         if (RUNNER_GATES.test(ruleId)) continue;
+        // Les règles ont jugé le fait entier ; le dossier n'en garde que le début (R159, second tour, N2).
+        if (cutFacts(data.facts as Facts[])) {
+          cutShort++;
+          continue;
+        }
         const decision = decideAll(rules, data.facts as Facts[]);
         judged++;
         if (decision.effect !== data.effect || (decision.rule?.id ?? "none") !== ruleId) {
@@ -290,6 +304,9 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         lines.push({ level: "ok", text: judged > 0
           ? `The rules bundle matches its digest, and judging the ${judged} recorded actions again gives the same decisions.`
           : "The rules bundle matches its digest." });
+      }
+      if (cutShort > 0) {
+        lines.push({ level: "info", text: `${cutShort === 1 ? "1 recorded action was" : `${cutShort} recorded actions were`} judged on facts longer than the record keeps (cut at ${MAX_FACT} characters): ${cutShort === 1 ? "it is" : "they are"} not judged again.` });
       }
     }
   }

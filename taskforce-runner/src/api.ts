@@ -1,5 +1,20 @@
 import type { RunnerConfig } from "./config.js";
 import type { Facts } from "./harness/engine/rules-engine.js";
+import { cut } from "./text.js";
+
+/**
+ * Ce que TaskForce garde d'un fait jugé : 4 000 unités (`RunnerEventsRequest`, `RunnerApprovalRequest`). Au-delà, le fait
+ * part coupé, d'une coupe marquée (R159, L4), plutôt que de faire refuser tout le lot : un lot refusé laisse un trou, et
+ * un agent qui le voudrait en ferait autant de trous que de commandes trop longues (R159, second tour, N2). Les règles,
+ * elles, ont jugé le fait entier : un fait coupé ne se rejuge pas, et le vérificateur le dit.
+ */
+export const MAX_FACT = 4000;
+
+/** Les faits tels qu'ils partent à TaskForce : chaque valeur au plus {@link MAX_FACT} unités. */
+export function reportedFacts(facts: readonly Facts[]): Facts[] {
+  return facts.map((part) => Object.fromEntries(Object.entries(part)
+    .map(([key, value]) => [key, typeof value === "string" ? cut(value, MAX_FACT) : value])) as Facts);
+}
 
 /** Tâche remise par `POST /delivery/runner/claim` (miroir de `RunnerClaimResponse` côté backend). */
 export interface Claim {
@@ -273,7 +288,8 @@ export class TaskforceApi {
 
   /** Ajoute des événements à la chronologie du run (suivi en direct dans l'app). */
   async events(runId: number, events: RunnerEvent[]): Promise<void> {
-    await this.send("POST", `/delivery/runner/runs/${runId}/events`, { events });
+    await this.send("POST", `/delivery/runner/runs/${runId}/events`,
+      { events: events.map((event) => (event.facts ? { ...event, facts: reportedFacts(event.facts) } : event)) });
   }
 
   /**
@@ -281,7 +297,8 @@ export class TaskforceApi {
    * demande, l'agent ou le runner lui-même (décision J4).
    */
   requestApproval(runId: number, tool: string, summary: string, askedBy: AskedBy = "agent", ruling: Ruling = {}): Promise<Approval> {
-    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary, askedBy, ...ruling });
+    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`,
+      { tool, summary, askedBy, ...ruling, ...(ruling.facts ? { facts: reportedFacts(ruling.facts) } : {}) });
   }
 
   approvalStatus(runId: number, approvalId: number): Promise<Approval> {
