@@ -149,8 +149,9 @@ class MissionEvidenceServiceTest {
                 && inv.getArgument(1).equals(t.getPerson()) && t.getKind().equals(inv.getArgument(2))));
         lenient().when(textRepository.findByPersonAndBodyIsNotNull(anyString()))
             .thenAnswer(inv -> texts.stream().filter(t -> inv.getArgument(0).equals(t.getPerson()) && t.getBody() != null).toList());
-        lenient().when(repository.existsByRunIdAndType(anyLong(), anyString()))
-            .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))));
+        lenient().when(repository.existsByRunIdAndTypeAndActorKind(anyLong(), anyString(), anyString()))
+            .thenAnswer(inv -> stored.stream().anyMatch(e -> e.getType().equals(inv.getArgument(1))
+                && e.getActorKind().equals(inv.getArgument(2))));
         // Un seul espace ici : l'identifiant d'une personne se range par son compte.
         lenient().when(people.findByWorkspaceIdAndUserId(anyLong(), anyLong()))
             .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));

@@ -127,9 +127,13 @@ last number it received: a number already received is dropped, a number that ski
 `gap` (`from`, `to`). At the end, the runner says how many events it numbered; the ones that never came are marked too.
 A runner that stops answering leaves a `gap` with `to: null`: any event after `from - 1` may be missing.
 
-A dossier keeps 10,000 events from the agent's computer (actors `agent`, `rule`, `runner`); the next one becomes a
-`limit.reached`, and the rest is not kept. What the server and people write (the end, gestures and their reason, the
-witness, an erasure) still is, in a reserve of 1,000 more.
+A dossier keeps 10,000 events of what the mission gives rise to: what comes from the agent's computer (actors `agent`,
+`rule`, `runner`) and what the server writes because of it (a `gap`, a request for approval, its expiry). The next one
+becomes a `limit.reached` written by the server (`max`, `stopped`), and TaskForce stops the mission, so that nothing
+goes on without being written. A reserve of 1,000 more keeps only what the server and people write, and nothing else:
+`mission.ended`, the people's gestures (`human.decision`), the `limit.reached` itself, the notes of kind `person`,
+`checklist`, `witness`, `erased` and `late-seal`, and the `gap` of a lost runner. A text is kept beside the chain only
+with the event that names it: an event the cap drops leaves none.
 
 ### Seal
 

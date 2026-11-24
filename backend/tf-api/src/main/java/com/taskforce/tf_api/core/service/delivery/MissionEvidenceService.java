@@ -82,17 +82,22 @@ public class MissionEvidenceService {
 
     public static final String FORMAT = EvidenceSeal.FORMAT;
     /**
-     * Plafond des événements du runner, de l'agent et des règles, bien au-delà de la chronologie affichée : atteint, un
-     * événement le dit, et ce qu'ils envoient ensuite n'est plus gardé.
+     * Plafond de ce que la mission fait naître, bien au-delà de la chronologie affichée et loin d'une mission ordinaire (25
+     * événements pour l'exemple de contracts/evidence ; 60 tours de l'agent par défaut) : ce qui vient du poste de l'agent,
+     * et ce que le serveur écrit à cause de lui (un trou, une demande d'accord, son expiration). Atteint, la mission
+     * s'arrête : un événement le dit, et rien de ce qu'elle envoie ensuite n'est gardé.
      */
     static final int MAX_EVENTS = 10_000;
     /**
-     * Au-delà du plafond, une réserve pour ce que le serveur et les personnes écrivent : la fin, les gestes et leur
-     * raison, le témoin, un effacement (R159, M4). Un agent qui épuise le plafond n'efface pas la décision de fin.
+     * Au-delà du plafond, une réserve pour ce que seuls le serveur et les personnes écrivent, et rien d'autre (R159, M4 ;
+     * second tour, N2) : la fin, les gestes des personnes, le témoin, la purge, le sceau tardif et le plafond lui-même.
+     * Rien de ce que l'agent fait ne la remplit : la décision de fin et le témoin y ont toujours leur place.
      */
     static final int RESERVE = 1_000;
-    /** Les acteurs que le plafond borne : ce qui vient du poste de l'agent. */
-    private static final Set<String> CAPPED = Set.of("agent", "rule", "runner");
+    /** Ce que la réserve garde, quand le serveur ou une personne l'écrit : la fin, les gestes, le plafond. */
+    private static final Set<String> RESERVED_TYPES = Set.of("mission.ended", "human.decision", "limit.reached");
+    /** Les notes du serveur que la réserve garde : les personnes, la liste de la fin, le témoin, la purge, le sceau tardif. */
+    private static final Set<String> RESERVED_NOTES = Set.of("person", "checklist", "witness", "erased", "late-seal");
     /** Les faits que le runner rapporte viennent du poste de l'agent, quelle que soit la garde de la clé (R159, M5). */
     static final String AGENT_MACHINE = "agent-machine";
     static final String LIMIT_REACHED = "limit.reached";
@@ -229,8 +234,9 @@ public class MissionEvidenceService {
     // --------------------------------------------------------------------- ajouter
 
     /**
-     * Ajoute un événement à la suite du dossier et rend son empreinte. Le dossier plein, l'avant-dernière place reste
-     * au constat {@code limit.reached} et rien d'autre n'est gardé : la troncature se lit dans le dossier.
+     * Ajoute un événement à la suite du dossier et rend son empreinte, ou rien quand il n'est pas gardé. Le plafond
+     * atteint, le constat {@code limit.reached} prend la place de l'événement, la mission s'arrête, et seule la réserve
+     * garde encore ce qu'elle garde : l'arrêt se lit dans le dossier.
      */
     @Transactional
     public Optional<String> append(DeliveryRun run, String type, Actor actor, Map<String, ?> data) {
@@ -248,16 +254,22 @@ public class MissionEvidenceService {
             log.warn("Run {} : réserve du dossier de preuve épuisée, {} non gardé", runId, type);
             return Optional.empty();
         }
-        // Le plafond borne ce qui vient du poste de l'agent ; la réserve garde la fin, les gestes, le témoin (R159, M4).
-        if (CAPPED.contains(actor.kind()) && seq >= MAX_EVENTS) {
-            if (seq > MAX_EVENTS && repository.existsByRunIdAndType(runId, LIMIT_REACHED)) {
+        // Le plafond borne tout ce que la mission fait naître, ce que l'agent envoie comme ce que le serveur écrit à cause de
+        // lui ; la réserve ne garde que ce qu'elle garde (R159, M4 ; second tour, N2).
+        if (seq >= MAX_EVENTS && !reserved(type, actor, data)) {
+            if (repository.existsByRunIdAndTypeAndActorKind(runId, LIMIT_REACHED, Actor.SERVER.kind())) {
                 return Optional.empty();
             }
-            log.warn("Run {} : dossier de preuve plein ({} événements du poste de l'agent)", runId, MAX_EVENTS);
+            boolean working = runRepository.findById(runId)
+                .map(r -> r.getStatus() == DeliveryRunStatus.RUNNING || r.getStatus() == DeliveryRunStatus.QUEUED).orElse(false);
+            log.warn("Run {} : dossier de preuve plein ({} événements){}", runId, MAX_EVENTS, working ? " : la mission s'arrête" : "");
             type = LIMIT_REACHED;
             actor = Actor.SERVER;
-            data = Map.of("max", MAX_EVENTS, "text", "The evidence of this mission reached its cap: later events from the "
-                + "agent's computer are not kept. What the server and the people write still is.");
+            data = Map.of("max", MAX_EVENTS, "stopped", working, "text", "The evidence of this mission reached its cap of "
+                + MAX_EVENTS + " events" + (working ? ": TaskForce stopped the mission, so that nothing goes on without being "
+                + "written" : "") + ". Later events are not kept, except the end, the people's gestures and the witness.");
+            // Rien ne continue sans être écrit : la mission s'arrête par le chemin de toujours, une fois ce constat validé.
+            if (working) publisher.publishEvent(new EvidenceCapped(runId));
         }
         // Les textes que l'événement nomme pour la première fois se gardent avec lui, jamais sans lui (R159, second tour, N1).
         keepTexts(data);
@@ -272,6 +284,29 @@ public class MissionEvidenceService {
             .data(CanonicalJson.of(content)).prev(prev).hash(hash)
             .build());
         return Optional.of(hash);
+    }
+
+    /**
+     * Ce que la réserve garde au-delà du plafond, et rien d'autre (R159, second tour, N2) : ce que le serveur ou une personne
+     * écrit pour la fin de la mission, un geste d'une personne, le plafond lui-même, et les notes des personnes, de la liste
+     * de la fin, du témoin, de la purge et du sceau tardif. Le trou d'un runner perdu, dit à la fin ({@link #lost}), sans
+     * fin connue. Rien de ce que l'agent ou le runner envoie, quel que soit le nom qu'ils lui donnent.
+     */
+    static boolean reserved(String type, Actor actor, Map<String, ?> data) {
+        if (!Actor.SERVER.kind().equals(actor.kind()) && !"person".equals(actor.kind())) {
+            return false;
+        }
+        if (RESERVED_TYPES.contains(type)) {
+            return true;
+        }
+        if (!"note".equals(type) || data == null) {
+            return false;
+        }
+        Object kind = data.get("kind");
+        if ("gap".equals(kind)) {
+            return data.containsKey("to") && data.get("to") == null;
+        }
+        return kind instanceof String name && RESERVED_NOTES.contains(name);
     }
 
     /**

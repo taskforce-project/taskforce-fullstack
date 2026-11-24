@@ -24,6 +24,12 @@ public interface DeliveryRunEvidenceRepository extends JpaRepository<DeliveryRun
     boolean existsByRunIdAndType(Long runId, String type);
 
     /**
+     * Le dossier a-t-il déjà un événement de ce type écrit par cet acteur ? Le constat du plafond est celui du serveur : le
+     * runner écrit le sien sous le même type, quand il cesse d'envoyer (R159, second tour, N2).
+     */
+    boolean existsByRunIdAndTypeAndActorKind(Long runId, String type, String actorKind);
+
+    /**
      * Les missions finies et scellées entre ces deux instants dont le dossier n'a pas encore de témoin (R159, L7) : le
      * témoin s'écrit après la fin, hors de sa transaction, et un redémarrage du serveur peut le perdre.
      */
