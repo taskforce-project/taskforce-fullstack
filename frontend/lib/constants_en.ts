@@ -1890,6 +1890,7 @@ export const CONSTANTS_EN = {
       cycles: "Cycles",
       settings: "Settings",
       missions: "Work view",
+      verification: "Verification",
       progress: "Progress",
       notes: "Note",
     },
