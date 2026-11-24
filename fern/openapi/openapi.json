@@ -12170,6 +12170,37 @@
         }
       }
     },
+    "/api/evidence/links/{id}": {
+      "get": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "link",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[0-9a-f]{32}"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEvidenceLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/oauth/{provider}/authorize": {
       "get": {
         "tags": [
@@ -20810,6 +20841,11 @@
             },
             "maxItems": 10,
             "minItems": 0
+          },
+          "providerFrom": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
           }
         }
       },
@@ -20917,6 +20953,16 @@
             "type": "boolean"
           },
           "definitionChanged": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 0
+            },
+            "maxItems": 20,
+            "minItems": 0
+          },
+          "definitions": {
             "type": "array",
             "items": {
               "type": "string",
@@ -25726,6 +25772,36 @@
           },
           "projectName": {
             "type": "string"
+          }
+        }
+      },
+      "ApiResponseEvidenceLinkResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EvidenceLinkResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EvidenceLinkResponse": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
