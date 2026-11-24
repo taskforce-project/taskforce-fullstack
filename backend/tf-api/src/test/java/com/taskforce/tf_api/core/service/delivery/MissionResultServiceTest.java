@@ -93,6 +93,11 @@ class MissionResultServiceTest {
         lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(run));
         lenient().when(userRepository.getReferenceById(7L)).thenReturn(delegator);
         lenient().when(linkRepository.findByIssueIdOrderByLinkedAtDesc(55L)).thenReturn(List.of(link));
+        // Le dossier nomme une personne par son identifiant opaque (R159, M6 ; le détail, MissionEvidenceServiceTest).
+        lenient().when(evidenceService.person(any(), any())).thenAnswer(inv -> {
+            User user = inv.getArgument(1);
+            return new MissionEvidenceService.Actor("person", user == null ? "unknown" : "person:" + user.getId());
+        });
     }
 
     private static final List<MissionFollowUpRequest.Comment> COMMENTS = List.of(
@@ -115,7 +120,7 @@ class MissionResultServiceTest {
     private Map<String, Object> gesture() {
         ArgumentCaptor<Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
         verify(evidenceService, org.mockito.Mockito.atLeastOnce()).appendAfterEnd(eq(run), eq("human.decision"),
-            eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+            eq(new MissionEvidenceService.Actor("person", "person:7")), data.capture());
         return data.getValue();
     }
 
@@ -149,7 +154,7 @@ class MissionResultServiceTest {
         verify(issueService).addComment(eq("acme"), eq(12L), eq(55L), comment.capture(), eq(7L));
         assertThat(comment.getValue().getContent()).contains("`src/a.ts`, line 12: Use the helper", "`src/b.ts`, line 4");
         verify(missionChanges).assertCanAskForChanges(run, 7L, java.util.Set.of("src/a.ts", "src/b.ts"));
-        verify(evidenceService).appendAfterEnd(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), any());
+        verify(evidenceService).appendAfterEnd(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), any());
     }
 
     @Test
@@ -248,12 +253,14 @@ class MissionResultServiceTest {
         assertThat(run.getOutcomeBy()).isEqualTo(delegator);
         assertThat(run.getOutcomeAt()).isNotNull();
         assertThat(run.getEndedAt()).isNotNull();
-        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), any());
-        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by Ada."));
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), any());
+        // R159, M6 : l'erreur entre en clair au dossier ; elle ne nomme pas la personne, que le geste STOP nomme par son identifiant.
+        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
+            "Stopped by the person who delegated it."));
     }
 
     @Test
-    @DisplayName("Stop : une mission encore en file se clôt sans dossier, et sans nom elle dit l'e-mail")
+    @DisplayName("Stop : une mission encore en file se clôt sans dossier, et sans nom ni courriel")
     void stop_closes_a_queued_mission() {
         run.setStatus(DeliveryRunStatus.QUEUED);
         delegator.setDisplayName(" ");
@@ -261,7 +268,8 @@ class MissionResultServiceTest {
         service.stop("acme", 100L, 7L);
 
         verify(evidenceService, never()).append(any(), any(), any(), any());
-        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null, "Stopped by ada@taskforce.dev."));
+        verify(deliveryRunner).complete(100L, new DeliveryPoll(DeliveryRunStatus.FAILED, null, null,
+            "Stopped by the person who delegated it."));
     }
 
     @Test

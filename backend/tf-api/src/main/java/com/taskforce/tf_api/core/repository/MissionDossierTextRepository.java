@@ -17,4 +17,13 @@ public interface MissionDossierTextRepository extends JpaRepository<MissionDossi
     Optional<MissionDossierText> findByRunIdAndHash(Long runId, String hash);
 
     boolean existsByRunIdAndHash(Long runId, String hash);
+
+    /** Le même texte, déjà gardé dans ce dossier et pas effacé : il garde son sel, et donc son empreinte. */
+    Optional<MissionDossierText> findFirstByRunIdAndKindAndBody(Long runId, String kind, String body);
+
+    /** Ce que le dossier sait déjà de cette personne, de cette sorte (son courriel, son nom). */
+    boolean existsByRunIdAndPersonAndKind(Long runId, String person, String kind);
+
+    /** Ce que les dossiers gardent encore d'une personne : son courriel, son nom, à effacer avec son compte. */
+    List<MissionDossierText> findByPersonAndBodyIsNotNull(String person);
 }

@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
@@ -43,6 +44,8 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoBean private KeycloakService keycloakService;
     @MockitoBean private AuditService auditService;
+    /** Ce que la purge efface des dossiers des missions : MissionDossierIntegrationTest, contre la même base. */
+    @MockitoBean private MissionEvidenceService missionEvidence;
 
     private User user;
 
@@ -123,5 +126,7 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
         // Workspace solo (aucun autre membre) → supprimé ; appartenances nettoyées.
         assertThat(workspaceRepository.findBySlug("ws-gdpr")).isEmpty();
         assertThat(workspaceMemberRepository.findByUserId(user.getId())).isEmpty();
+        // R159, M6 : la purge efface aussi ce que les dossiers des missions gardent de la personne.
+        verify(missionEvidence).forgetPerson(user.getId());
     }
 }

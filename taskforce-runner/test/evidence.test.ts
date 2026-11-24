@@ -262,6 +262,18 @@ describe("le vérificateur du runner, sans TaskForce ni réseau", () => {
       /does not match its digest/);
   });
 
+  it("R159 M6 : un texte gardé sans son sel, comme avant le sel, ne se vérifie pas", async () => {
+    const title = "Fix the footer links";
+    const unsalted = sha256(title);
+    const { text } = dossier({ seal: false,
+      edit: (events) => {
+        const started = events[0]?.data as Record<string, Json>;
+        (started.request as Record<string, Json>).title = { sha256: unsalted, chars: title.length };
+      },
+      tamper: (f) => { f.texts = { [unsalted]: title }; } });
+    await fails(text, /A text kept beside the chain does not match its digest/);
+  });
+
   it("R159 M5 : les faits du runner viennent du poste de l'agent, et des tests dont la branche change la définition se notent", async () => {
     const edit = (events: EventInput[]): void => {
       (events[0]?.data as Record<string, Json>).runnerFacts = "agent-machine";

@@ -17,7 +17,10 @@
         "workspace": { "type": "string" },
         "project": { "type": ["integer", "null"] },
         "issue": { "type": ["string", "null"], "description": "The issue key, for example WEB-48." },
-        "requestedBy": { "type": "string", "description": "The person who delegated." },
+        "requestedBy": {
+          "type": ["string", "null"],
+          "description": "The person who delegated, by the opaque id the chain names people with (person: and 32 hex digits; their email and name are texts kept beside the chain, in a note of kind person). Null in a file opened before 1.18, whose chain does not say."
+        },
         "agent": {
           "type": "object",
           "additionalProperties": false,
@@ -38,6 +41,10 @@
           }
         },
         "runner": { "type": ["string", "null"] },
+        "runnerFacts": {
+          "const": "agent-machine",
+          "description": "Present when a runner took the mission: what it reports (its tests, the agent and its model, the numbers of its events) comes from the computer where the agent works, whatever the custody of the key."
+        },
         "taskforce": { "type": ["string", "null"] }
       }
     },
@@ -49,9 +56,17 @@
     },
     "texts": {
       "type": "object",
-      "description": "The texts kept beside the chain, by their hash: the chain holds only their sha256 and length. An erased text is absent.",
+      "description": "The texts kept beside the chain, by their hash: the chain holds only their sha256 and length. The hash is the SHA-256 of the text's salt followed by the text, so a hash left alone does not confirm a guess. An erased text is absent, with its salt.",
       "propertyNames": { "pattern": "^sha256:[0-9a-f]{64}$" },
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["salt", "text"],
+        "properties": {
+          "salt": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "128 random bits, drawn for this text." },
+          "text": { "type": "string" }
+        }
+      }
     },
     "seal": { "$ref": "#/$defs/envelope" }
   },

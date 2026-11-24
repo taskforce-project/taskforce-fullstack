@@ -80,6 +80,25 @@ class MissionDossierProbeIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("M6 : la personne entre dans la chaîne par un identifiant opaque ; son courriel, seulement à côté")
+    void people_enter_the_chain_by_an_opaque_id() throws Exception {
+        JsonNode file = export();
+        JsonNode started = file.get("events").get(0).get("data");
+
+        assertThat(started.get("requestedBy").asText()).startsWith("person:");
+        assertThat(file.get("mission").get("requestedBy").asText()).startsWith("person:");
+        assertThat(file.get("events").toString()).doesNotContain("ada@probe.dev").doesNotContain("Ada Lovelace");
+    }
+
+    @Test
+    @DisplayName("M6 : l'empreinte d'un titre est salée : seule, elle ne confirme pas une supposition")
+    void a_title_digest_is_salted() throws Exception {
+        JsonNode title = export().get("events").get(0).get("data").get("request").get("title");
+
+        assertThat(title.get("sha256").asText()).isNotEqualTo(EvidenceChain.sha256("Fix login for Paul Dupont"));
+    }
+
+    @Test
     @DisplayName("M5 : la chaîne et l'en-tête disent que les faits du runner viennent du poste de l'agent")
     void the_runner_s_facts_come_from_the_agent_s_machine() throws Exception {
         JsonNode file = export();

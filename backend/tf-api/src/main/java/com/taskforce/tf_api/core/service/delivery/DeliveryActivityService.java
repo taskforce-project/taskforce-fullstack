@@ -174,7 +174,8 @@ public class DeliveryActivityService {
         Map<String, Object> asked = approvalData(approval);
         asked.put("askedBy", approval.getAskedBy());
         asked.put("effect", refused ? "deny" : "ask");
-        asked.put("asked", run.getStartedBy() != null ? run.getStartedBy().getEmail() : null);
+        // La personne à qui l'on demande, par son identifiant opaque comme partout dans la chaîne (R159, M6).
+        asked.put("asked", run.getStartedBy() != null ? evidenceService.person(run, run.getStartedBy()).id() : null);
         if (require != null) {
             asked.put("require", Map.of("approvers", require.approvers(), "signatures", require.signatures(),
                 "separate", require.separate()));
@@ -527,13 +528,14 @@ public class DeliveryActivityService {
         return approval.getScope();
     }
 
-    /** La personne qui décide, telle que le dossier la nomme : son adresse, comme pour la personne qui a délégué. */
+    /**
+     * La personne qui décide, telle que le dossier la nomme : son identifiant opaque, son courriel et son nom à côté de la
+     * chaîne (R159, M6), comme pour la personne qui a délégué.
+     */
     private MissionEvidenceService.Actor personActor(DeliveryRun run, Long userId) {
-        if (run.getStartedBy() != null && Objects.equals(run.getStartedBy().getId(), userId)) {
-            return new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail());
-        }
-        String email = userRepository.findById(userId).map(User::getEmail).orElse(String.valueOf(userId));
-        return new MissionEvidenceService.Actor("person", email);
+        User user = run.getStartedBy() != null && Objects.equals(run.getStartedBy().getId(), userId)
+            ? run.getStartedBy() : userRepository.findById(userId).orElse(null);
+        return evidenceService.person(run, user);
     }
 
     // ---------------------------------------------------------------------

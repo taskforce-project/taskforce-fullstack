@@ -46,6 +46,7 @@ import com.taskforce.tf_api.core.model.IssueChecklistItem;
 import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.MissionDossierSeal;
 import com.taskforce.tf_api.core.model.MissionDossierText;
+import com.taskforce.tf_api.core.model.MissionPerson;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
@@ -56,6 +57,7 @@ import com.taskforce.tf_api.core.repository.IssueChecklistItemRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
+import com.taskforce.tf_api.core.repository.MissionPersonRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 
 /**
@@ -88,9 +90,15 @@ class EvidenceExampleContractTest {
         for (String field : projection.covered()) {
             assertThat(CanonicalJson.of(file.get("mission").get(field))).as(field).isEqualTo(CanonicalJson.of(projection.header().get(field)));
         }
-        // Les textes gardés à côté ont l'empreinte que la chaîne porte.
-        file.get("texts").properties().forEach(text ->
-            assertThat(EvidenceChain.sha256(text.getValue().asText())).isEqualTo(text.getKey()));
+        // Les textes gardés à côté ont l'empreinte que la chaîne porte : celle de leur sel suivi du texte (R159, M6).
+        file.get("texts").properties().forEach(text -> {
+            assertThat(text.getValue().get("salt").asText()).matches("[0-9a-f]{32}");
+            assertThat(EvidenceChain.sha256(text.getValue().get("salt").asText() + text.getValue().get("text").asText()))
+                .isEqualTo(text.getKey());
+        });
+        // Aucune personne n'y entre par son courriel : son identifiant opaque, son courriel à côté.
+        assertThat(file.get("events").toString()).doesNotContain("@example.com");
+        assertThat(file.get("mission").get("requestedBy").asText()).matches("person:[0-9a-f]{32}");
         // Le paquet de règles est celui de la mission, et chaque décision se rejuge à l'identique.
         RulesBundle rules = JSON.treeToValue(file.get("rules"), RulesBundle.class);
         assertThat(RulesDigest.of(file.get("rules"))).isEqualTo(rules.digest()).isEqualTo(file.get("mission").get("rules").get("digest").asText());
@@ -131,7 +139,7 @@ class EvidenceExampleContractTest {
     void the_example_carries_a_whole_mission() throws Exception {
         List<String> kinds = new ArrayList<>();
         example().get("events").forEach(e -> kinds.add(e.get("type").asText() + "/" + e.get("data").path("kind").asText(e.get("data").path("decision").asText())));
-        assertThat(kinds).contains("note/brief", "note/agent", "note/text", "note/gap", "test.result/test", "note/changes",
+        assertThat(kinds).contains("note/person", "note/brief", "note/agent", "note/text", "note/gap", "test.result/test", "note/changes",
             "note/runner", "note/checklist", "note/checklist.checked", "note/witness", "human.decision/ALLOWED", "human.decision/APPLY");
     }
 
@@ -152,8 +160,16 @@ class EvidenceExampleContractTest {
         final Map<Long, MissionDossier> rows = new HashMap<>();
         final List<MissionDossierSeal> seals = new ArrayList<>();
         final List<MissionDossierText> texts = new ArrayList<>();
+        final Map<Long, MissionPerson> persons = new HashMap<>();
 
         String mission() {
+            MissionPersonRepository people = mock(MissionPersonRepository.class);
+            lenient().when(people.findById(anyLong())).thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))));
+            lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
+                MissionPerson person = inv.getArgument(0);
+                persons.put(person.getUserId(), person);
+                return person;
+            });
             DeliveryRunEvidenceRepository repository = mock(DeliveryRunEvidenceRepository.class);
             DeliveryRunRepository runRepository = mock(DeliveryRunRepository.class);
             MissionDossierRepository dossiers = mock(MissionDossierRepository.class);
@@ -189,6 +205,11 @@ class EvidenceExampleContractTest {
             lenient().when(textRepository.existsByRunIdAndHash(anyLong(), anyString()))
                 .thenAnswer(inv -> texts.stream().anyMatch(t -> t.getHash().equals(inv.getArgument(1))));
             lenient().when(textRepository.findByRunIdOrderByIdAsc(42L)).thenAnswer(inv -> List.copyOf(texts));
+            lenient().when(textRepository.findFirstByRunIdAndKindAndBody(anyLong(), anyString(), anyString()))
+                .thenAnswer(inv -> texts.stream().filter(t -> t.getKind().equals(inv.getArgument(1)) && inv.getArgument(2).equals(t.getBody()))
+                    .findFirst());
+            lenient().when(textRepository.existsByRunIdAndPersonAndKind(anyLong(), anyString(), anyString()))
+                .thenAnswer(inv -> texts.stream().anyMatch(t -> inv.getArgument(1).equals(t.getPerson()) && t.getKind().equals(inv.getArgument(2))));
 
             User ada = User.builder().id(7L).email("ada@example.com").displayName("Ada").build();
             User grace = User.builder().id(8L).email("grace@example.com").displayName("Grace").build();
@@ -210,7 +231,7 @@ class EvidenceExampleContractTest {
                 mock(WorkspaceMemberRepository.class));
             RulesBundle rules = rulesService.bundleFor(workspace, new HarnessRulesService.Work(12L, null, 7L));
             MissionEvidenceService service = new MissionEvidenceService(repository, runRepository, dossiers, sealRepository,
-                textRepository, mock(HarnessRuleSetRepository.class), checklist, new EvidenceSigner("", "", ""),
+                textRepository, mock(HarnessRuleSetRepository.class), checklist, people, new EvidenceSigner("", "", ""),
                 mock(ApplicationEventPublisher.class));
 
             service.open(run, rules, "tf-runner-ada", Map.of());
@@ -219,7 +240,8 @@ class EvidenceExampleContractTest {
                 null, null, null, "You are working on a task delegated from TaskForce: WEB-48 - Fix the footer links\n...", null, null));
             service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300 with claude-sonnet-5-20261001",
                 null, null, ++n, null, null, null, null,
-                new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "4f1c9a52-1b7e-4c38-9a0e-5d2f6b8c1e77", "anthropic"),
+                new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "4f1c9a52-1b7e-4c38-9a0e-5d2f6b8c1e77", "anthropic",
+                    "sonnet", List.of("claude-sonnet-5-20261001")),
                 null));
             service.runnerEvent(run, new RunnerEventsRequest.Event("text", null, "I will read the footer component first.", null, null,
                 ++n, null, null, null, null, null, null));
@@ -244,7 +266,7 @@ class EvidenceExampleContractTest {
             asked.put("rule", "search-web");
             asked.put("askedBy", "agent");
             asked.put("effect", "ask");
-            asked.put("asked", "ada@example.com");
+            asked.put("asked", service.person(run, ada).id());
             asked.put("input", "sha256:" + "6".repeat(64));
             asked.put("facts", List.of(Map.of("action", "web.search", "tool", "WebSearch", "actor", "agent")));
             service.append(run, "action.decided", MissionEvidenceService.Actor.SERVER, asked);
@@ -257,7 +279,7 @@ class EvidenceExampleContractTest {
             decided.put("decision", "ALLOWED");
             decided.put("scope", "ONCE");
             decided.put("reason", "Only the public docs site, to check the new addresses.");
-            service.append(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@example.com"), decided);
+            service.append(run, "human.decision", service.person(run, ada), decided);
             // L'événement suivant n'arrive jamais : le dossier marque le trou.
             ++n;
             service.runnerEvent(run, new RunnerEventsRequest.Event("tool", "WebSearch", "docs.example.com footer links", null, null,
@@ -295,6 +317,8 @@ class EvidenceExampleContractTest {
             witness.put("pullRequest", "https://github.com/acme/website/pull/212");
             witness.put("root", end.getRoot());
             witness.put("seq", end.getSeq());
+            // Un dépôt que GitHub dit privé : le commentaire porte le lien de la page (R159, B2).
+            witness.put("pageLinked", true);
             witness.put("written", true);
             witness.put("comment", "https://github.com/acme/website/pull/212#issuecomment-1");
             service.appendToDossier(42L, "note", MissionEvidenceService.Actor.SERVER, witness);
@@ -305,7 +329,7 @@ class EvidenceExampleContractTest {
             apply.put("pullRequest", "https://github.com/acme/website/pull/212");
             apply.put("merged", true);
             apply.put("testsFailed", false);
-            service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@example.com"), apply);
+            service.appendAfterEnd(run, "human.decision", service.person(run, ada), apply);
             return service.dossierJson(42L).orElseThrow();
         }
 

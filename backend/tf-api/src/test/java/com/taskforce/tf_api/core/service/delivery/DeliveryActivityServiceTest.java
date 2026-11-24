@@ -99,6 +99,11 @@ class DeliveryActivityServiceTest {
         lenient().when(approvalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         // Le dossier reçoit chaque événement neuf (le détail, MissionEvidenceServiceTest) ; un doublon renvoyé n'y entre pas.
         lenient().when(evidenceService.runnerEvent(any(), any())).thenReturn(true);
+        // Le dossier nomme une personne par son identifiant opaque (R159, M6 ; le détail, MissionEvidenceServiceTest).
+        lenient().when(evidenceService.person(any(), any())).thenAnswer(inv -> {
+            User user = inv.getArgument(1);
+            return new MissionEvidenceService.Actor("person", user == null ? "unknown" : "person:" + user.getId());
+        });
         // Par défaut, la lecture qui trouve une demande échue est la seule : c'est elle qui la clôt.
         lenient().when(approvalRepository.expireIfPending(any(), any(), eq(DeliveryApprovalStatus.PENDING),
             eq(DeliveryApprovalStatus.EXPIRED))).thenReturn(1);
@@ -226,7 +231,10 @@ class DeliveryActivityServiceTest {
         assertThat(saved.getValue().getRuleReason()).isEqualTo("A web search sends its query out of the machine.");
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
         verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
-        assertThat(data.getValue()).containsEntry("action", "web.search").containsEntry("rule", "search-web");
+        assertThat(data.getValue()).containsEntry("action", "web.search").containsEntry("rule", "search-web")
+            // R159, M6 : la personne à qui l'on demande entre par son identifiant, jamais par son courriel.
+            .containsEntry("asked", "person:7");
+        assertThat(data.getValue().toString()).doesNotContain("ada@taskforce.dev");
     }
 
     @Test
@@ -412,7 +420,7 @@ class DeliveryActivityServiceTest {
         assertThat(approval.getDecidedBy()).isEqualTo(delegator);
         assertThat(approval.getDecidedAt()).isNotNull();
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
-        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), data.capture());
         assertThat(data.getValue()).containsEntry("decision", "ALLOWED").containsEntry("approval", 9L).containsEntry("scope", "ONCE");
         assertThat(approval.getScope()).isEqualTo("ONCE");
     }
@@ -427,7 +435,7 @@ class DeliveryActivityServiceTest {
         String scope = service.decide("acme", 100L, 9L, allow, false, "  The build only reads the lock file  ", 7L);
 
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
-        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), data.capture());
         assertThat(data.getValue()).containsEntry("decision", decision).containsEntry("scope", "ONCE")
             .containsEntry("reason", "The build only reads the lock file");
         // Rien d'autre ne change : la même décision, la même portée, la même personne.

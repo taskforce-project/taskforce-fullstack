@@ -106,6 +106,11 @@ class MissionChangesServiceTest {
         lenient().when(rulesService.bundleFor(any(), any())).thenReturn(RULES);
         lenient().when(userRepository.getReferenceById(USER_ID)).thenReturn(ada);
         lenient().when(userRepository.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));
+        // Le dossier nomme une personne par son identifiant opaque (R159, M6 ; le détail, MissionEvidenceServiceTest).
+        lenient().when(evidence.person(any(), any())).thenAnswer(i -> {
+            User user = i.getArgument(1);
+            return new MissionEvidenceService.Actor("person", user == null ? "unknown" : "person:" + user.getId());
+        });
         lenient().when(commandRepository.save(any())).thenAnswer(i -> {
             DeliveryRunCommand command = i.getArgument(0);
             if (command.getId() == null) command.setId(55L);
@@ -337,7 +342,7 @@ class MissionChangesServiceTest {
         assertThat(saved.getValue().getPath()).isEqualTo("a.txt");
         assertThat(saved.getValue().getStatus()).isEqualTo(DeliveryCommandStatus.PENDING);
         ArgumentCaptor<Map<String, Object>> data = dataCaptor();
-        verify(evidence).appendAfterEnd(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        verify(evidence).appendAfterEnd(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), data.capture());
         assertThat(data.getValue()).containsEntry("decision", "REVERT_FILE").containsEntry("path", "a.txt");
         verify(visibilityGuard).assertCanWrite(project, USER_ID);
     }

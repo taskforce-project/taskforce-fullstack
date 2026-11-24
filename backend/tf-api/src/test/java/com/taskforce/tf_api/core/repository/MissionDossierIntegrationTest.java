@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,9 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     @Autowired private HarnessRulesService rules;
     @Autowired private TestEntityManager em;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private MissionDossierSealRepository seals;
+    @Autowired private DeliveryRunEvidenceRepository evidenceRepository;
+    @Autowired private EvidenceSigner signer;
 
     private User ada;
     private Workspace workspace;
@@ -95,14 +99,18 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         evidence.runnerEvent(run, new RunnerEventsRequest.Event("tool", "Edit", "src/footer.tsx", null, null, 5, null, null, null,
             null, null, null));
         evidence.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "## What I did\nThe footer links.", null, null));
-        evidence.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@it.dev"),
-            Map.of("decision", "MARK_DONE", "where", "taskforce"));
+        evidence.appendAfterEnd(run, "human.decision", evidence.person(run, ada), Map.of("decision", "MARK_DONE", "where", "taskforce"));
         em.flush();
         em.clear();
     }
 
     private JsonNode export() throws Exception {
         return JSON.readTree(evidence.dossierJson(run.getId()).orElseThrow());
+    }
+
+    /** L'empreinte salée du titre, telle que la chaîne la porte (R159, M6). */
+    private String title() {
+        return jdbc.queryForObject("SELECT hash FROM mission_dossier_texts WHERE run_id = ? AND kind = 'title'", String.class, run.getId());
     }
 
     private static List<ObjectNode> events(JsonNode file) {
@@ -119,7 +127,9 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         assertThat(before.get("mission").get("issue").asText()).isEqualTo("WEB-1");
         assertThat(before.get("mission").get("agent").get("model").asText()).isEqualTo("claude-sonnet-5-20261001");
         assertThat(before.get("rules").get("format").asText()).isEqualTo("taskforce-rules/1");
-        assertThat(before.get("texts").get(EvidenceChain.sha256("Fix the footer links")).asText()).isEqualTo("Fix the footer links");
+        JsonNode title = before.get("texts").get(title());
+        assertThat(title.get("text").asText()).isEqualTo("Fix the footer links");
+        assertThat(EvidenceChain.sha256(title.get("salt").asText() + "Fix the footer links")).isEqualTo(title());
         assertThat(events(before)).extracting(e -> e.get("data").path("kind").asText()).contains("gap");
         assertThat(EvidenceSeal.open(before.get("seal")).valid()).isTrue();
 
@@ -143,7 +153,7 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         mission();
         jdbc.update("DELETE FROM issues WHERE id = ?", issue.getId());
         em.clear();
-        String title = EvidenceChain.sha256("Fix the footer links");
+        String title = title();
 
         evidence.eraseText(run.getId(), title, userRepository.findById(ada.getId()).orElseThrow());
         em.flush();
@@ -214,10 +224,10 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("un texte à côté de la chaîne ne change pas : il ne fait que s'effacer, et ne part qu'avec son dossier")
+    @DisplayName("un texte à côté de la chaîne ne change pas : il ne fait que s'effacer, avec son sel, et ne part qu'avec son dossier")
     void a_text_is_only_erased() {
         mission();
-        String title = EvidenceChain.sha256("Fix the footer links");
+        String title = title();
 
         refused("UPDATE mission_dossier_texts SET body = 'Fix nothing' WHERE run_id = ? AND hash = ?", "never changes",
             run.getId(), title);
@@ -225,15 +235,107 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
             run.getId(), title);
         refused("UPDATE mission_dossier_texts SET erased_at = now() WHERE run_id = ? AND hash = ?", "never changes",
             run.getId(), title);
+        // R159, M6 : le sel ne change pas tant que le texte est là, ni la personne qu'un texte décrit.
+        refused("UPDATE mission_dossier_texts SET salt = '0123456789abcdef0123456789abcdef' WHERE run_id = ? AND hash = ?",
+            "never changes", run.getId(), title);
+        refused("UPDATE mission_dossier_texts SET salt = NULL WHERE run_id = ? AND hash = ?", "never changes", run.getId(), title);
+        refused("UPDATE mission_dossier_texts SET person = 'person:" + "0".repeat(32) + "' WHERE run_id = ? AND kind = 'email'",
+            "never changes", run.getId());
         refused("DELETE FROM mission_dossier_texts WHERE run_id = ? AND hash = ?", "only erased, never deleted",
             run.getId(), title);
-        jdbc.update("UPDATE mission_dossier_texts SET body = NULL, erased_at = now(), erased_by = ? WHERE run_id = ? AND hash = ?",
-            ada.getId(), run.getId(), title);
+        jdbc.update("UPDATE mission_dossier_texts SET body = NULL, salt = NULL, erased_at = now(), erased_by = ? "
+            + "WHERE run_id = ? AND hash = ?", ada.getId(), run.getId(), title);
         refused("UPDATE mission_dossier_texts SET body = 'Fix the footer links', erased_at = NULL, erased_by = NULL "
             + "WHERE run_id = ? AND hash = ?", "never changes", run.getId(), title);
+        refused("UPDATE mission_dossier_texts SET salt = '0123456789abcdef0123456789abcdef' WHERE run_id = ? AND hash = ?",
+            "never changes", run.getId(), title);
 
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE run_id = ? AND hash = ? AND body IS NULL",
-            Integer.class, run.getId(), title)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE run_id = ? AND hash = ? AND body IS NULL "
+            + "AND salt IS NULL", Integer.class, run.getId(), title)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("R159, M6 : chaque personne entre par un identifiant opaque, le même d'une mission à l'autre ; son courriel, à côté")
+    void people_enter_by_an_opaque_and_stable_id() throws Exception {
+        mission();
+
+        JsonNode file = export();
+        String id = jdbc.queryForObject("SELECT person FROM mission_people WHERE user_id = ?", String.class, ada.getId());
+        assertThat(id).matches("person:[0-9a-f]{32}");
+        assertThat(file.get("mission").get("requestedBy").asText()).isEqualTo(id);
+        assertThat(file.get("events").toString()).doesNotContain("ada@it.dev");
+        assertThat(events(file)).filteredOn(e -> "person".equals(e.get("data").path("kind").asText())).hasSize(1);
+        assertThat(events(file).getLast().get("actor").get("id").asText()).isEqualTo(id);
+        assertThat(file.get("texts").toString()).contains("ada@it.dev");
+        // Une autre mission de la même personne la nomme du même identifiant.
+        DeliveryRun other = runRepository.saveAndFlush(DeliveryRun.builder().issue(issueRepository.findById(issue.getId()).orElseThrow())
+            .providerKey("claude-code").model("sonnet").status(DeliveryRunStatus.RUNNING).startedBy(ada).claimedBy("tf-runner-ada")
+            .origin("app").build());
+        evidence.open(other, null, "tf-runner-ada", Map.of());
+        em.flush();
+        assertThat(JSON.readTree(evidence.dossierJson(other.getId()).orElseThrow()).get("mission").get("requestedBy").asText())
+            .isEqualTo(id);
+    }
+
+    @Test
+    @DisplayName("R159, M6 : le compte purgé, son courriel et son nom s'effacent de chaque dossier ; la chaîne tient, un sceau neuf la couvre")
+    void a_purged_account_is_forgotten() throws Exception {
+        mission();
+        String id = jdbc.queryForObject("SELECT person FROM mission_people WHERE user_id = ?", String.class, ada.getId());
+
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(1);
+        em.flush();
+        em.clear();
+
+        JsonNode file = export();
+        // La chaîne, l'en-tête et les textes ; le paquet de règles nomme encore qui répond de chaque règle, comme le contrat
+        // des règles le veut (taskforce-rules/1).
+        String record = file.get("events").toString() + file.get("mission") + file.get("texts");
+        assertThat(record).doesNotContain("ada@it.dev").doesNotContain("\"Ada\"");
+        assertThat(EvidenceChain.firstBrokenLink(events(file))).isEqualTo(-1);
+        JsonNode erased = events(file).getLast().get("data");
+        assertThat(erased.get("kind").asText()).isEqualTo("erased");
+        assertThat(erased.get("person").asText()).isEqualTo(id);
+        assertThat(erased.get("reason").asText()).isEqualTo("account-deleted");
+        EvidenceSeal.Opened seal = EvidenceSeal.open(file.get("seal"));
+        assertThat(seal.valid()).isTrue();
+        assertThat(seal.statement().get("predicate").get("seq").asInt()).isEqualTo(events(file).size());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE user_id = ?", Integer.class, ada.getId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_dossier_texts WHERE person = ? AND (body IS NOT NULL OR salt IS NOT NULL)",
+            Integer.class, id)).isZero();
+    }
+
+    @Test
+    @DisplayName("R159, M3 : les clés qui ont scellé les dossiers de l'espace se lisent dans les sceaux, sans table de plus")
+    void the_keys_used_come_from_the_seals() {
+        mission();
+
+        List<MissionDossierSealRepository.KeyUse> used = seals.keysUsedIn(workspace.getId());
+
+        assertThat(used).hasSize(1);
+        assertThat(used.getFirst().getKeyId()).isEqualTo(signer.key().id());
+        // La fin, puis le geste qui la suit : deux sceaux.
+        assertThat(used.getFirst().getSeals()).isEqualTo(2L);
+        assertThat(used.getFirst().getFirstUsed()).isLessThanOrEqualTo(used.getFirst().getLastUsed());
+        assertThat(seals.lastEnvelopeOf(workspace.getId(), signer.key().id())).get().asString().contains("in-toto");
+        assertThat(seals.keysUsedIn(workspace.getId() + 1000)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("R159, L7 : une mission scellée sans témoin se retrouve, jusqu'à ce que son témoin, ou la raison de son absence, s'écrive")
+    void an_unwitnessed_mission_is_found_until_its_witness_is_written() {
+        mission();
+        LocalDateTime now = LocalDateTime.now();
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(1), run.getId());
+
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).contains(run.getId());
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusHours(2))).doesNotContain(run.getId());
+
+        evidence.appendToDossier(run.getId(), "note", MissionEvidenceService.Actor.SERVER,
+            Map.of("kind", "witness", "written", false, "reason", "GitHub can't be reached."));
+        em.flush();
+
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).doesNotContain(run.getId());
     }
 
     @Test

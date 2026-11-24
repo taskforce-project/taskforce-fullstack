@@ -78,26 +78,56 @@ examples of the RFC, replayed on both sides. Compared on the cases an evidence f
 ### The header comes from the chain
 
 The export's `mission` is not written beside the chain: `mission.started` carries `mission` (the id), `workspace`,
-`project`, `issue`, `requestedBy`, `agent` (`kind`, the `model` chosen), `rules` (`version`, `digest`), `runner` and
-`taskforce`, and the last `note` of kind `agent` gives the model that really ran and the agent's `version`. Anyone
-rebuilds the header from the events and compares (`EvidenceHeader` in Java, `headerOf` in `taskforce-runner`). A file
-opened before 1.18 covers only part of its header; the verifier says which fields are not covered.
+`project`, `issue`, `requestedBy`, `agent` (`kind`, the `model` chosen), `rules` (`version`, `digest`), `runner`,
+`runnerFacts` and `taskforce`, and the last `note` of kind `agent` gives the model that really ran and the agent's
+`version`. Anyone rebuilds the header from the events and compares (`EvidenceHeader` in Java, `headerOf` in
+`taskforce-runner`): a covered field that differs, or that the header lacks, fails. A file opened before 1.18 covers
+only part of its header; the verifier says which fields are not covered, and its `requestedBy` is null.
+
+### People
+
+A person enters the chain by an opaque id, `person:` and 32 hex digits, drawn the first time and the same in every
+mission: `requestedBy`, `accountable`, `request.reporter`, the `author` of each rules layer, the person a request is
+`asked` of, and the actor of each gesture. A `note` of kind `person` introduces each one in a dossier, once: `person`,
+and `email` and `name` as texts kept beside the chain. A GitHub account that merges the pull request enters the same
+way, by the text of its login. When an account is purged, its email and name are erased in every dossier, with their
+salt, and a `note` of kind `erased` (`person`, `texts`, `reason: account-deleted`) says so; the id stays in the
+chains, linked to no one. A chain written before 1.18 named people by their email: it cannot be erased without
+breaking the chain. The rules bundle names who answers for each rule as `taskforce-rules/1` does (`owner`).
 
 ### What the file carries besides the chain
 
 - `rules`: the rules bundle as the mission received it (`taskforce-rules/1`). Its digest is the one `mission.started`
   holds; anyone judges each `action.decided` of kind `decision` again with the `facts` it keeps.
-- `texts`: the texts kept beside the chain, by their hash (`sha256:` and the SHA-256 of the UTF-8 text). The chain holds
-  only `{ "sha256": ..., "chars": ... }` for the request's title and description, the brief, what the agent says and
-  its summary. A text can be erased: its hash stays, the chain still holds, and a `human.decision` of kind `erased`
-  says who and when.
+- `texts`: the texts kept beside the chain, by their hash, each as `{ "salt": ..., "text": ... }`. The hash is `sha256:`
+  and the SHA-256 of the UTF-8 bytes of the salt (32 hex digits, drawn for this text) followed by the text: a short
+  text, erased, cannot be confirmed by guessing it. The chain holds only `{ "sha256": ..., "chars": ... }` for the
+  request's title and description, the brief, what the agent says, its summary, the lines of the checklist, and the
+  email, name or login of a person. Every text the file keeps must be named by the chain. A text can be erased with
+  its salt: its hash stays, the chain still holds, and a `human.decision` of kind `erased` says who and when.
 - `seal`: the last seal (below).
 
-### Gaps
+### What the runner reports
+
+The runner's facts (its tests, the agent and its model, the numbers of its events) come from the computer where the
+agent works, under the same user: they are worth what that computer is worth, whatever the custody of the key. When a
+runner takes the mission, `mission.started` says so with `runnerFacts: "agent-machine"`, and the verifier repeats it.
+A `test.result` lists in `definitionChanged` the files of the branch that define how the tests run (`package.json`,
+`pom.xml`, `pyproject.toml` and the like, or a script the command names): the result then only says that the agent's
+version of the tests passes. The `note` of kind `agent` gives the model the configuration asked for (`configured`), each
+model the answers named (`served`), and who serves it (`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or
+`another-endpoint`).
+
+### Gaps and the cap
 
 The runner numbers its events (`n`: 1, 2, 3...) and sends a batch again until it gets through. The server keeps the
 last number it received: a number already received is dropped, a number that skips first leaves a `note` of kind
 `gap` (`from`, `to`). At the end, the runner says how many events it numbered; the ones that never came are marked too.
+A runner that stops answering leaves a `gap` with `to: null`: any event after `from - 1` may be missing.
+
+A dossier keeps 10,000 events from the agent's computer (actors `agent`, `rule`, `runner`); the next one becomes a
+`limit.reached`, and the rest is not kept. What the server and people write (the end, gestures and their reason, the
+witness, an erasure) still is, in a reserve of 1,000 more.
 
 ### Seal
 
@@ -114,6 +144,8 @@ at the end of the mission, and again after each later gesture; `GET .../evidence
 may run on the machine that holds it, `separate-machine` when the operator declares that none does. A seal proves that
 the key saw this chain up to `seq`; it proves nothing more than the custody of its key. The statement's subject is the
 root it names: a verifier refuses a seal whose `subject[0].digest.sha256` is not `predicate.root` without its prefix.
+`kept` says whether the key outlives a restart: by default the server keeps it in a file of its data volume, as the
+desktop app does (`SELF_HOSTING.md`); a key drawn at start, because that file cannot be written, says `kept: false`.
 
 The file carries the public key of its seal, so a seal checked with that key alone proves nothing: anyone who rewrites
 a record can seal it again with a key of their own. Check a seal against the key the operator publishes, which a
@@ -131,11 +163,15 @@ key (`publicKey`, base64-decoded, as DER) to a third, then
 
 ### Witness
 
-At the end of the mission, the server writes the sealed head in the mission's pull request, with the link of the
-verification page and nothing else, then keeps a `note` of kind `witness` (`root`, `seq`, `pullRequest`, `comment`, or
-`written: false` and its `reason`). GitHub dates the comment and keeps its edits: a chain rewritten afterwards no longer
-holds that head. A mission without a pull request has no witness. `example-mission.json` is the export of a whole
-mission, sealed by a key drawn for it; both sides check it.
+At the end of the mission, the server writes the sealed head in the mission's pull request, then keeps a `note` of kind
+`witness` (`root`, `seq`, `pullRequest`, `comment`, or `written: false` and its `reason`). GitHub dates the comment and
+keeps its edits: a chain rewritten afterwards no longer holds that head. The comment always carries the head; it links
+the verification page only when GitHub says the repository is private, never from the desktop app or to the machine
+itself, and never names a workspace, a person or a host otherwise: `pageLinked`, and `pageLeftOut` (`desktop-app`,
+`local-address`, `visibility-unknown`, `public-repository`, `internal-repository`). A failure is tried again, and a
+regular pass writes the witness of a sealed mission that has none. A mission without a pull request gets a `witness`
+note with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
+drawn for it; both sides check it.
 
 ## Mission steps: two codes, one set of cases
 

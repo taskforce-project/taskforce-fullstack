@@ -183,11 +183,12 @@ const CUSTODY: Record<string, string> = {
 
 /**
  * Un texte gardé à côté de la chaîne, face à l'empreinte que la chaîne porte : `{ salt, text }`, et l'empreinte est le
- * SHA-256 du sel suivi du texte ; un texte sans sel (avant le sel, R159 M6) se compare au SHA-256 du texte seul.
+ * SHA-256 du sel (32 chiffres hexadécimaux) suivi du texte (R159, M6). Un texte sans son sel ne se vérifie pas.
  */
 async function textMatches(hash: string, entry: unknown): Promise<boolean> {
-  if (typeof entry === "string") return (await sha256(entry)) === hash;
-  if (!isObj(entry) || typeof entry.salt !== "string" || typeof entry.text !== "string") return false;
+  if (!isObj(entry) || typeof entry.salt !== "string" || !/^[0-9a-f]{32}$/.test(entry.salt) || typeof entry.text !== "string") {
+    return false;
+  }
   return (await sha256(`${entry.salt}${entry.text}`)) === hash;
 }
 
