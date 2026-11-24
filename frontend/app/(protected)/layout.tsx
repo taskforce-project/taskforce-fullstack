@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
+import { clearReturnPath, rememberReturnPath, returnPath } from "@/lib/auth/return-path"
 import { useAuth } from "@/lib/contexts/auth-context"
 import { AppShell } from "@/components/layout/app-shell"
 import { LoginIntro } from "@/components/layout/login-intro"
@@ -18,6 +19,7 @@ export default function ProtectedLayout({
 }) {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
 
   // Intro de connexion : jouée UNE fois juste après un login (drapeau `tf.intro` posé par le callback
@@ -53,9 +55,14 @@ export default function ProtectedLayout({
     // App desktop : pas de page de connexion dans l'interface, la coque connecte le compte avant d'ouvrir la fenêtre.
     const hasLocalToken = !!getSessionToken()
     if (!isAuthenticated && !hasLocalToken && !IS_DESKTOP) {
+      // La page de vérification d'un dossier, ou le lien d'un témoin : la connexion y ramènera (R161 M4 de #552).
+      rememberReturnPath(globalThis.location?.pathname ?? "")
       router.replace("/auth/login")
+    } else if (isAuthenticated && returnPath() === pathname) {
+      // Arrivée sur la page demandée avant la connexion : elle ne détourne plus les connexions suivantes.
+      clearReturnPath()
     }
-  }, [mounted, isAuthenticated, isLoading, router])
+  }, [mounted, isAuthenticated, isLoading, router, pathname])
 
   const authLoading = !mounted || isLoading
   const hasLocalToken = typeof window !== "undefined" && !!getSessionToken()

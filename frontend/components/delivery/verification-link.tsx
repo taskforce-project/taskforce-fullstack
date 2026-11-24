@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
-import { Unavailable } from "@/components/delivery/verification-view"
+import { RecordUnavailable } from "@/components/delivery/record-unavailable"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { verificationPath } from "@/lib/window/address"
@@ -45,10 +45,10 @@ export function VerificationLink({ id }: Readonly<{ id: string }>) {
   const home = (
     <Link href="/" className="w-fit text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">{t.home}</Link>
   )
-  if (!valid || link === null) return <Unavailable title={t.title} message={t.denied} hint={t.deniedHint} back={home} />
+  if (!valid || link === null) return <RecordUnavailable title={t.title} message={t.denied} hint={t.deniedHint} back={home} />
   if (failed && link === undefined) {
     return (
-      <Unavailable title={t.title} message={t.failed} hint={t.failedHint} back={home}
+      <RecordUnavailable title={t.title} message={t.failed} hint={t.failedHint} back={home}
         action={(
           <button type="button" onClick={() => { setFailed(false); read() }}
             className="w-fit border border-border px-2 py-1 text-xs text-foreground hover:bg-muted">{t.tryAgain}</button>

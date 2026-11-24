@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { Download, FileJson, Loader2, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
+import { RecordUnavailable } from "@/components/delivery/record-unavailable"
 import { PaneLink } from "@/components/layout/pane-link"
 import type { MissionEvidence } from "@/lib/api/delivery-service"
 import { saveBlob } from "@/lib/api/project-service"
@@ -140,21 +141,6 @@ function SectionBlock({ section, t }: Readonly<{ section: Section; t: Texts }>) 
   )
 }
 
-/** Un état sans dossier à montrer : un titre, ce qui s'est passé, quoi faire, et le retour à la mission (R161 M3). */
-export function Unavailable({ title, message, hint, action, back }: Readonly<{
-  title: string; message: string; hint: string; action?: React.ReactNode; back: React.ReactNode
-}>) {
-  return (
-    <article className="mx-auto flex w-full max-w-3xl flex-col gap-2" aria-labelledby="verification-title">
-      <h2 id="verification-title" className="text-base font-semibold text-foreground">{title}</h2>
-      <p role="status" className="text-sm text-foreground">{message}</p>
-      <p className="text-xs text-muted-foreground">{hint}</p>
-      {action}
-      {back}
-    </article>
-  )
-}
-
 /**
  * La page de vérification d'une mission (R212) : `/{slug}/missions/{runId}/verification`. Tout y vient du dossier exporté
  * de la mission, assemblé par du code ({@link verificationPage}), et vérifié dans l'app avant d'en rien dire, avec le
@@ -223,7 +209,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
   if (evidence === undefined) {
     if (failed) {
       return (
-        <Unavailable title={t.title} message={t.failed} hint={t.failedHint} back={back}
+        <RecordUnavailable title={t.title} message={t.failed} hint={t.failedHint} back={back}
           action={<button type="button" onClick={retry} className="w-fit border border-border px-2 py-1 text-xs text-foreground hover:bg-muted">{t.tryAgain}</button>} />
       )
     }
@@ -242,7 +228,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
       else toast.error(t.markdownDownloadFailed)
     }
     return (
-      <Unavailable title={t.title} message={t.legacyDenied} hint={t.legacyDeniedHint} back={back}
+      <RecordUnavailable title={t.title} message={t.legacyDenied} hint={t.legacyDeniedHint} back={back}
         action={(
           <button type="button" onClick={() => void downloadMarkdown()}
             className="inline-flex w-fit items-center gap-1.5 border border-border px-2 py-1 text-xs text-foreground hover:bg-muted">
@@ -252,7 +238,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
     )
   }
   // 403 et 404 : un seul message, qui ne dit pas lequel (R159 P2).
-  if (evidence === null || !page || !sections) return <Unavailable title={t.title} message={t.denied} hint={t.deniedHint} back={back} />
+  if (evidence === null || !page || !sections) return <RecordUnavailable title={t.title} message={t.denied} hint={t.deniedHint} back={back} />
 
   const heading = pageTitle(page, t)
   const verdict = verdictLines(page, t)
