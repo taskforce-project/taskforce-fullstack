@@ -38,6 +38,7 @@ const WORKFLOW_ELSEWHERE = [
  */
 const VERIFICATION = [
   "lib/delivery/verification.ts",
+  "lib/delivery/verification-check.ts",
   "lib/delivery/verification-words.ts",
   "lib/delivery/verification-html.ts",
   "components/delivery/verification-view.tsx",
