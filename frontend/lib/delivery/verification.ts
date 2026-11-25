@@ -1,4 +1,5 @@
 import type { MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
+import { parseServerDate } from "@/lib/utils/server-date"
 
 import type { RecordCheck } from "./verification-check"
 
@@ -232,6 +233,19 @@ export interface PageRecord {
   readonly witness: {
     readonly written: boolean; readonly root: string | null; readonly seq: number | null; readonly url: string | null
     readonly reason: string | null; readonly key: string | null
+    /**
+     * La tête qu'il nomme est-elle celle de cette chaîne à cet événement ? Nul tant que la page n'a pas vérifié, ou quand la
+     * chaîne ne tient pas (R159 de #552, second tour, V1).
+     */
+    readonly holds: boolean | null
+    /** L'empreinte que la chaîne donne à l'événement qu'il nomme : c'est elle qu'on compare au commentaire, jamais la note. */
+    readonly chainRoot: string | null
+    /** Un premier échec, que TaskForce reprend jusqu'à `until`, sept jours après la fin (troisième tour de #551, c-d). */
+    readonly retrying: boolean
+    readonly until: string | null
+    /** TaskForce a cessé d'essayer, le jour de sa note (`notedAt`). */
+    readonly abandoned: boolean
+    readonly notedAt: string
     /**
      * Le commentaire lie cette page (par un identifiant opaque du dossier), ou pourquoi il ne la lie pas : l'app de bureau,
      * une adresse locale, un lien coupé par l'exploitant, un dépôt qui n'est pas privé (R159 B2 et M1 de #551, R161 B4).
@@ -640,6 +654,12 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
   const key = predicate && isObj(predicate.key) ? predicate.key : {}
   const witnessNote = notes("witness").at(-1)
   const w = witnessNote ? data(witnessNote) : null
+  // Ce que la page a vérifié du témoin : sa tête est-elle celle de la chaîne (R159 de #552, second tour, V1) ?
+  const witnessCheck = witnessNote ? check?.details?.witnesses.find((c) => c.seq === witnessNote.seq) : undefined
+  const witnessAt = w ? num(w.seq) : null
+  // Sept jours après la fin, TaskForce cesse de reprendre un témoin que GitHub a empêché (troisième tour de #551, c-d).
+  const endedAt = ended ? parseServerDate(ended.at) : null
+  const until = endedAt && !Number.isNaN(endedAt.getTime()) ? new Date(endedAt.getTime() + 7 * 24 * 3600 * 1000).toISOString() : null
   // Le plafond du dossier, que seul le serveur constate ; le runner a ses propres limites (tours, durée), dites autrement.
   const capped = events.find((e) => e.type === "limit.reached" && e.actor.kind === "server" && typeof data(e).max === "number")
   const seq = predicate ? num(predicate.seq) : null
@@ -657,9 +677,13 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
       coversAll: seq === events.length,
       late: predicate.late === true,
     } : null,
-    witness: w ? { written: w.written === true, root: str(w.root), seq: num(w.seq), url: str(w.comment) ?? str(w.pullRequest),
+    witness: w && witnessNote ? { written: w.written === true, root: str(w.root), seq: witnessAt, url: str(w.comment) ?? str(w.pullRequest),
       reason: str(w.reason), key: str(w.key), pageLinked: typeof w.pageLinked === "boolean" ? w.pageLinked : null,
-      pageLeftOut: str(w.pageLeftOut) } : null,
+      pageLeftOut: str(w.pageLeftOut),
+      holds: witnessCheck ? witnessCheck.holds : null,
+      chainRoot: witnessAt !== null ? (events[witnessAt - 1]?.hash ?? null) : null,
+      retrying: w.written !== true && w.retrying === true, until,
+      abandoned: w.written !== true && w.abandoned === true, notedAt: witnessNote.at } : null,
     pullRequest: pullRequest !== null,
     gaps: notes("gap").map((e) => ({ from: num(data(e).from) ?? 0, to: num(data(e).to), noted: e.seq })),
     runnerFacts: s.runnerFacts === "agent-machine",

@@ -231,6 +231,13 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   if (d.seal.late && (d.seal.state === "trusted" || d.seal.state === "self")) {
     lines.push({ text: fillText(v.late, { date: when(d.seal.sealedAt) }), tone: "warn" })
   }
+  // Le témoin est la seule ancre contre qui tient la clé : un témoin qui ne tient pas dit le dossier réécrit, quel que soit
+  // le sceau (R159 de #552, second tour, V1).
+  for (const witness of d.witnesses) {
+    if (witness.written && !witness.holds) {
+      lines.push({ text: fillText(v.witnessBroken, { seq: witness.at ?? "?", root: short(witness.root) }), tone: "warn" })
+    }
+  }
   if (d.runnerFacts) lines.push({ text: v.runnerFacts, tone: "warn" })
   return lines
 }
@@ -515,9 +522,14 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     if (!r.seal.coversAll) lines.push({ text: fillText(rec.notAll, { from: r.seal.seq + 1, to: r.events }), tone: "warn" })
     if (!r.seal.kept) lines.push({ text: rec.notKept, tone: "warn" })
   }
-  if (r.witness?.written) {
+  if (r.witness?.written && r.witness.holds !== true) {
+    // Il ne tient pas, ou la page n'a pas pu le comparer : jamais montré comme s'il tenait (R159 de #552, second tour, V1).
+    lines.push({ text: fillText(r.witness.holds === false ? rec.witnessBroken : rec.witnessUnchecked,
+      { seq: r.witness.seq ?? "?", root: short(r.witness.root) }), tone: "warn" })
+  } else if (r.witness?.written) {
     const url = r.witness.url ?? ""
-    lines.push({ text: fillText(rec.witness, { seq: r.witness.seq ?? "?", root: short(r.witness.root), url }), ...(linkable(url) ? { link: url } : {}) })
+    // L'empreinte que la chaîne donne à cet événement, celle que le lecteur compare au commentaire : jamais la note.
+    lines.push({ text: fillText(rec.witness, { seq: r.witness.seq ?? "?", root: short(r.witness.chainRoot), url }), ...(linkable(url) ? { link: url } : {}) })
     // La clé du commentaire, datée par GitHub : c'est elle qu'on compare à la clé qu'on vous donne, pas une liste de
     // l'exploitant (N6). Entière : on la compare caractère par caractère.
     if (r.witness.key) lines.push({ text: fillText(rec.witnessKey, { key: r.witness.key }), tone: "muted" })
@@ -530,7 +542,12 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     }
     if (r.witness.seq !== null && r.witness.seq < r.events) lines.push({ text: fillText(rec.witnessLater, { seq: r.witness.seq }), tone: "muted" })
   } else if (r.witness) {
-    lines.push({ text: fillText(rec.noWitness, { reason: r.witness.reason ?? "" }), tone: "warn" })
+    // Où en est un témoin que GitHub a empêché : repris jusqu'au septième jour après la fin, ou abandonné (troisième tour de
+    // #551, c-d).
+    const reason = (r.witness.reason ?? "").replace(/\.$/, "")
+    lines.push({ text: r.witness.retrying ? fillText(rec.witnessRetrying, { reason, until: when(r.witness.until) })
+      : r.witness.abandoned ? fillText(rec.witnessAbandoned, { date: when(r.witness.notedAt) })
+      : fillText(rec.noWitness, { reason: r.witness.reason ?? "" }), tone: "warn" })
   } else {
     lines.push({ text: page.running ? rec.noWitnessYet : r.pullRequest ? rec.noWitnessPr : rec.noPullRequest, tone: "warn" })
   }

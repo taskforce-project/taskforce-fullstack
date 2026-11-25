@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest"
 
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
-import { brokenChain, chained, example, exampleKey, inheritedTicks, lateSealed, olderFailed, running, tamperedTitle } from "./__tests__/records"
+import {
+  brokenChain, chained, example, exampleKey, inheritedTicks, lateSealed, olderFailed, rechained, resealed, rewrittenResealed, running, tamperedTitle,
+} from "./__tests__/records"
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
 import {
@@ -87,7 +89,9 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(lines.join(" ")).not.toMatch(/claude-code|not on this computer/)
   })
 
-  it("le dossier : R161 M5, la garde de la clé avant le sceau ; R161 F2, une seule numérotation des événements", () => {
+  it("le dossier : R161 M5, la garde de la clé avant le sceau ; R161 F2, une seule numérotation des événements", async () => {
+    // Le témoin ne se montre comme tenant qu'une fois vérifié (R159 de #552, second tour, V1).
+    const page = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
     const lines = texts(verificationSections(page, t, context), "record")
     const custody = lines.indexOf(t.record.custody["same-machine"])
     expect(custody).toBeGreaterThan(0)
@@ -438,5 +442,58 @@ describe("le reste du dossier, dit en clair", () => {
     expect(when("2026-11-22T08:00:00.000Z")).toBe("2026-11-22 08:00 UTC")
     expect(when(null)).toBe("?")
     expect(when("not a date")).toBe("not a date")
+  })
+})
+
+describe("R159 de #552, second tour : la page lit le témoin (V1)", () => {
+  const witnessOf = (file: ReturnType<typeof example>) => file.events.find((e) => e.type === "note" && (e.data as { kind?: unknown }).kind === "witness")
+
+  it.each(["separate-machine", "same-machine"] as const)("un dossier réécrit puis re-signé par une clé que l'instance liste (garde %s) : le témoin ne tient pas, et la page le dit", async (custody) => {
+    const { file, key } = rewrittenResealed(custody)
+    const check = await checkRecord(file, [key], at)
+    expect(check.details?.seal.state).toBe("trusted")
+    const page = verificationPage(file, check)
+    expect(page.record.witness?.holds).toBe(false)
+    const verdict = verdictLines(page, t).map((l) => l.text).join(" ")
+    expect(verdict).toContain("The witness in the pull request names event 23 with sha256:444a25d36e50, which is not in this record")
+    const record = texts(verificationSections(page, t, context), "record")
+    expect(record.some((l) => l.startsWith("Witness: the head"))).toBe(false)
+    expect(record).toContain(t.record.witnessBroken.replace("{seq}", "23").replace("{root}", "sha256:444a25d36e50"))
+  })
+
+  it("un témoin qui tient : la page montre l'empreinte que la chaîne donne à l'événement, à comparer au commentaire", async () => {
+    const file = example()
+    const page = verificationPage(file, await checkRecord(file, [exampleKey()], at))
+    expect(page.record.witness?.holds).toBe(true)
+    const chainRoot = file.events[22]?.hash ?? ""
+    expect(page.record.witness?.chainRoot).toBe(chainRoot)
+    const line = texts(verificationSections(page, t, context), "record").find((l) => l.startsWith("Witness: the head"))
+    expect(line).toContain(`(${short(chainRoot)})`)
+    expect(verdictLines(page, t).map((l) => l.text).join(" ")).not.toContain("which is not in this record")
+  })
+
+  it("v-c : une clé que l'instance liste n'est pas une garantie ; l'ancre est le commentaire de la pull request", async () => {
+    const { file, key } = resealed(example(), "separate-machine")
+    const page = verificationPage(file, await checkRecord(file, [key], at))
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.trusted)
+    expect(t.verdict.trusted).toContain("what anchors the key is the comment in the pull request")
+  })
+
+  it("c-d du troisième tour de #551 : un premier échec se dit repris jusqu'au septième jour après la fin ; l'abandon, avec sa date", async () => {
+    const source = example()
+    const withNote = (note: Record<string, unknown>) => rechained(source, source.events.map((e) => (e === witnessOf(source)
+      ? { ...e, data: { kind: "witness", where: "github-pull-request", pullRequest: "https://github.com/acme/website/pull/212", root: source.events[22]?.hash, seq: 23, ...note } }
+      : e)))
+    const ended = source.events.find((e) => e.type === "mission.ended")?.at ?? ""
+    const until = when(new Date(new Date(ended).getTime() + 7 * 24 * 3600 * 1000).toISOString())
+    const retrying = withNote({ written: false, retrying: true, reason: "GitHub can't be reached: nothing changed. Try again in a moment." })
+    const retryingPage = verificationPage(retrying, await checkRecord(retrying, [], at))
+    expect(texts(verificationSections(retryingPage, t, context), "record")).toContain(
+      `No witness yet: GitHub can't be reached: nothing changed. Try again in a moment. TaskForce tries again until ${until}.`)
+    const abandoned = withNote({ written: false, abandoned: true, reason: "TaskForce could not write it in the pull request within the seven days after the mission ended, and stopped trying" })
+    const abandonedPage = verificationPage(abandoned, await checkRecord(abandoned, [], at))
+    const notedAt = abandoned.events.find((e) => e.type === "note" && (e.data as { kind?: unknown }).kind === "witness")?.at ?? null
+    expect(texts(verificationSections(abandonedPage, t, context), "record")).toContain(
+      t.record.witnessAbandoned.replace("{date}", when(notedAt)))
   })
 })
