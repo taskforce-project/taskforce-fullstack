@@ -382,9 +382,12 @@ public class MissionEvidenceService {
             log.warn("Run {} : dossier de preuve plein ({} événements){}", runId, MAX_EVENTS, working ? " : la mission s'arrête" : "");
             type = LIMIT_REACHED;
             actor = Actor.SERVER;
+            // Entre ce constat et l'arrêt de Claude Code, quelques secondes : ce que l'agent a fait alors a pu ne pas s'écrire,
+            // et le dossier le dit (R159, troisième tour, c-c).
             data = Map.of("max", MAX_EVENTS, "stopped", working, "text", "The evidence of this mission reached its cap of "
                 + MAX_EVENTS + " events" + (working ? ": TaskForce stopped the mission, so that nothing goes on without being "
-                + "written" : "") + ". Later events are not kept, except the end, the people's gestures and the witness.");
+                + "written" : "") + ". Later events are not kept, except the end, the people's gestures and the witness."
+                + (working ? " What the agent did in the last seconds before the runner stopped it may not have been written." : ""));
             // Rien ne continue sans être écrit : la mission s'arrête par le chemin de toujours, une fois ce constat validé.
             if (working) publisher.publishEvent(new EvidenceCapped(runId));
         }
@@ -840,6 +843,15 @@ public class MissionEvidenceService {
             touched++;
         }
         return touched;
+    }
+
+    /**
+     * Le dossier a-t-il atteint son plafond ? Le serveur l'a écrit (`limit.reached`), et la mission s'arrête : le runner
+     * l'apprend dans la réponse à ses événements (R159, troisième tour, c-c).
+     */
+    @Transactional(readOnly = true)
+    public boolean capped(Long runId) {
+        return repository.existsByRunIdAndTypeAndActorKind(runId, LIMIT_REACHED, Actor.SERVER.kind());
     }
 
     /**

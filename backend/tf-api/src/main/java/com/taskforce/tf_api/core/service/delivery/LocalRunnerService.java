@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
+import com.taskforce.tf_api.core.dto.response.RunnerEventsResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
@@ -245,11 +246,14 @@ public class LocalRunnerService {
 
     /** Chronologie en direct (OSS-5.3) : le run est verrouillé, les numéros d'ordre restent continus. */
     @Transactional
-    public void appendEvents(Long runId, RunnerIdentity runner, RunnerEventsRequest request) {
+    public RunnerEventsResponse appendEvents(Long runId, RunnerIdentity runner, RunnerEventsRequest request) {
         DeliveryRun run = runRepository.findByIdForUpdate(runId)
             .orElseThrow(() -> new ForbiddenException(REFUSED));
         assertHeldBy(run, runner);
         activityService.appendEvents(run, request.events());
+        // Le lot qui atteint le plafond du dossier, et ceux qui le suivent encore, portent la consigne d'arrêt : rien ne
+        // tourne après le plafond sans être dit (R159 de #551, troisième tour, c-c).
+        return new RunnerEventsResponse(evidenceService.capped(runId));
     }
 
     /** Ouvre une demande de validation d'une action de l'agent (OSS-5.4). */

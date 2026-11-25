@@ -206,6 +206,19 @@ class DeliveryRunnerControllerWebMvcTest {
         verify(localRunnerService).appendEvents(eq(100L), any(RunnerIdentity.class), any());
     }
 
+    @Test
+    @DisplayName("POST /events : au plafond du dossier, la réponse porte la consigne d'arrêt (R159 de #551, troisième tour, c-c)")
+    void the_batch_that_reaches_the_cap_says_stop() throws Exception {
+        org.mockito.Mockito.when(localRunnerService.appendEvents(eq(100L), any(RunnerIdentity.class), any()))
+            .thenReturn(new com.taskforce.tf_api.core.dto.response.RunnerEventsResponse(true));
+
+        mockMvc.perform(post("/api/delivery/runner/runs/100/events").with(runner())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"events\":[{\"kind\":\"tool\",\"tool\":\"Bash\",\"text\":\"npm test\"}]}"))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.stop").value(true));
+    }
+
     @ParameterizedTest(name = "POST /events : corps invalide refusé (400) : {0}")
     @ValueSource(strings = {
         "{\"events\":[]}",
