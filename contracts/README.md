@@ -109,7 +109,7 @@ chains, linked to no one. So is the login of its merges, whatever its case, when
 (the login of a GitHub connection the account made); a dossier that holds only that login gets the note without
 `person`. A chain written before 1.18 named people by their email (its `mission.started` has no
 `accountable`): those events cannot change without breaking the chain. When the account of a person it names is
-purged, the record gets a `note` of kind `erased` with `legacy: true`, the `events` that keep the email and the
+purged (its current email, whatever its case), the record gets a `note` of kind `erased` with `legacy: true`, the `events` that keep the email and the
 `reason`, naming no one, then a late seal (below). TaskForce hides the emails of such a record when it shows it (the
 page, the Markdown export), and only an owner or admin of the workspace exports its JSON or its seal, which carry them.
 The rules bundle names the `owner` of each rule by their opaque id already, and the record introduces each owner by

@@ -384,14 +384,19 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
 
     /** Un dossier d'avant la 1.18 : sa ligne, et une chaîne qui nomme la personne par son courriel, sans sceau. */
     private void legacyRecord() {
+        legacyRecord("ada@it.dev");
+    }
+
+    /** Le même, la chaîne écrivant le courriel ainsi. */
+    private void legacyRecord(String email) {
         dossiers.saveAndFlush(MissionDossier.builder().runId(run.getId()).workspace(workspace).projectId(issue.getProject().getId())
             .issueId(issue.getId()).issueKey("WEB-1").delegatedBy(ada).createdAt(LocalDateTime.now()).build());
         String prev = EvidenceChain.ZERO_HASH;
         List<Object[]> rows = new ArrayList<>();
         Object[][] events = {
-            {"mission.started", "server", "taskforce", JSON.createObjectNode().put("issue", "WEB-1").put("requestedBy", "ada@it.dev")},
-            {"action.decided", "server", "taskforce", JSON.createObjectNode().put("approval", 3).put("effect", "ask").put("asked", "ada@it.dev")},
-            {"human.decision", "person", "ada@it.dev", JSON.createObjectNode().put("approval", 3).put("decision", "ALLOWED")},
+            {"mission.started", "server", "taskforce", JSON.createObjectNode().put("issue", "WEB-1").put("requestedBy", email)},
+            {"action.decided", "server", "taskforce", JSON.createObjectNode().put("approval", 3).put("effect", "ask").put("asked", email)},
+            {"human.decision", "person", email, JSON.createObjectNode().put("approval", 3).put("decision", "ALLOWED")},
             {"mission.ended", "server", "taskforce", JSON.createObjectNode().put("status", "DONE")},
         };
         for (int i = 0; i < events.length; i++) {
@@ -430,6 +435,21 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         assertThat(seal.statement().get("predicate").get("late").asBoolean()).isTrue();
         // L'export lisible masque chaque courriel de la chaîne.
         assertThat(evidence.dossierMarkdown(run.getId()).orElseThrow()).doesNotContain("ada@it.dev").contains("(email hidden)");
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-h : la purge trouve le courriel d'une chaîne d'avant la 1.18 écrit avec une autre casse")
+    void a_purge_finds_the_email_whatever_its_case() throws Exception {
+        legacyRecord("Ada@IT.dev");
+
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(1);
+        em.flush();
+
+        JsonNode note = events(export()).getLast().get("data");
+        assertThat(note.get("kind").asText()).isEqualTo("erased");
+        assertThat(note.get("legacy").asBoolean()).isTrue();
+        assertThat(note.get("events")).extracting(JsonNode::asInt).containsExactly(1, 2, 3);
+        assertThat(evidence.dossierMarkdown(run.getId()).orElseThrow()).doesNotContain("Ada@IT.dev");
     }
 
     @Test

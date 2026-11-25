@@ -154,9 +154,10 @@ kept as written. The saved versions of the live rules keep who wrote each one.
 Records written before TaskForce 1.18 name people by their email in their chain: who delegated, who was asked, who
 answered. These events cannot change without breaking the chain, so purging an account cannot remove the email from
 them. TaskForce adds a note to each such record, saying the date and which events keep the email, seals it again, and
-hides these emails wherever it shows the record; only owners and admins of the workspace can export it as JSON.
-Whether to keep these records, and for how long, is your decision as the operator: TaskForce keeps them until their
-workspace is deleted.
+hides these emails wherever it shows the record; only owners and admins of the workspace can export it as JSON. The
+purge looks for the account's current email in these records, whatever its case: an email the account had before is
+not looked for. Whether to keep these records, and for how long, is your decision as the operator: TaskForce keeps
+them until their workspace is deleted.
 
 ## Integrations
 

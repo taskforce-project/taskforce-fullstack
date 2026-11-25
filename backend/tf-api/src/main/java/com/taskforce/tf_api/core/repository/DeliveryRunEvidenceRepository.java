@@ -29,17 +29,18 @@ public interface DeliveryRunEvidenceRepository extends JpaRepository<DeliveryRun
     /**
      * Les dossiers d'avant la 1.18 dont la chaîne nomme ce courriel (R159, second tour, N4) : comme acteur, ou comme une
      * valeur de ses données ({@code pattern} : le courriel entre guillemets, échappé pour LIKE). Avant la 1.18, la chaîne
-     * nommait les personnes par leur courriel ; son {@code mission.started} n'a pas de {@code accountable}.
+     * nommait les personnes par leur courriel ; son {@code mission.started} n'a pas de {@code accountable}. Sans tenir
+     * compte de la casse (R159, troisième tour, c-h) : le même courriel écrit autrement reste le même.
      */
     @Query(value = "SELECT DISTINCT e.run_id FROM delivery_run_evidence e "
-        + "WHERE (e.actor_id = :email OR e.data LIKE :pattern ESCAPE '\\') "
+        + "WHERE (lower(e.actor_id) = lower(:email) OR e.data ILIKE :pattern ESCAPE '\\') "
         + "AND NOT EXISTS (SELECT 1 FROM delivery_run_evidence s WHERE s.run_id = e.run_id AND s.type = 'mission.started' "
         + "AND (CAST(s.data AS jsonb) -> 'accountable') IS NOT NULL) ORDER BY e.run_id", nativeQuery = true)
     List<Long> findLegacyRunsNaming(@Param("email") String email, @Param("pattern") String pattern);
 
-    /** Les rangs des événements de ce dossier qui nomment ce courriel. */
+    /** Les rangs des événements de ce dossier qui nomment ce courriel, sans tenir compte de la casse. */
     @Query(value = "SELECT e.seq FROM delivery_run_evidence e WHERE e.run_id = :runId "
-        + "AND (e.actor_id = :email OR e.data LIKE :pattern ESCAPE '\\') ORDER BY e.seq", nativeQuery = true)
+        + "AND (lower(e.actor_id) = lower(:email) OR e.data ILIKE :pattern ESCAPE '\\') ORDER BY e.seq", nativeQuery = true)
     List<Integer> findSeqsNaming(@Param("runId") Long runId, @Param("email") String email, @Param("pattern") String pattern);
 
     /**
