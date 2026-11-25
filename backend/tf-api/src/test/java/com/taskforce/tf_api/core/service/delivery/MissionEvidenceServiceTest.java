@@ -750,6 +750,21 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
+        @DisplayName("R159 de #551, troisième tour (v-j, relecture de #552) : le Markdown d'un dossier d'avant la 1.18 masque aussi un courriel aux lettres non ASCII")
+        void the_markdown_hides_emails_beyond_ascii() throws Exception {
+            startAndAct();
+            service.append(run, "human.decision", new MissionEvidenceService.Actor("person", "zoé.müller@bücher.example"),
+                Map.of("decision", "ALLOWED"));
+            service.append(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@taskforce.dev"),
+                Map.of("decision", "ALLOWED"));
+
+            assertThat(service.legacy(100L)).isTrue();
+            String md = service.dossierMarkdown(100L).orElseThrow();
+            assertThat(md).doesNotContain("zoé").doesNotContain("müller").doesNotContain("bücher").doesNotContain("ada@taskforce.dev");
+            assertThat(md.split("\\(email hidden\\)", -1)).hasSizeGreaterThanOrEqualTo(3);
+        }
+
+        @Test
         @DisplayName("R159, M6 : un dossier d'avant la 1.18, scellé, se vérifie encore après la purge de la personne qui a délégué")
         void an_older_sealed_dossier_still_checks_after_the_delegator_is_purged() throws Exception {
             startAndAct();

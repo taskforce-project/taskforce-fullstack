@@ -890,7 +890,10 @@ public class MissionEvidenceService {
     }
 
     /** Un courriel, où qu'il soit dans un texte. */
-    private static final java.util.regex.Pattern EMAIL = java.util.regex.Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+");
+    // Les lettres de toutes les langues, dans la partie locale comme dans le domaine (R159 de #551, troisième tour ; v-j de
+    // la relecture de #552) : « zoé@exemple.fr », ou une adresse d'un domaine internationalisé, se masquent aussi.
+    private static final java.util.regex.Pattern EMAIL =
+        java.util.regex.Pattern.compile("[\\p{L}\\p{M}\\p{N}._%+-]+@[\\p{L}\\p{M}\\p{N}-]+(\\.[\\p{L}\\p{M}\\p{N}-]+)+");
 
     /** Ce que TaskForce écrit à la place d'un courriel qu'une chaîne d'avant la 1.18 garde (R159, second tour, N4). */
     static final String HIDDEN_EMAIL = "(email hidden)";
