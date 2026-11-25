@@ -51,6 +51,19 @@ export async function sha256(data: Bytes | string): Promise<string> {
   return `sha256:${[...digest].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
+/** La clé publique du premier exemple de la RFC 8032, en SubjectPublicKeyInfo : de quoi savoir si la plateforme sait vérifier. */
+const PROBE = "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=";
+let probed: Promise<boolean> | null = null;
+
+/**
+ * La Web Crypto de cette plateforme sait-elle lire une clé Ed25519 ? Node 20 et les navigateurs récents oui ; un
+ * navigateur plus ancien non, et un sceau ne s'y vérifie pas : il ne faut pas le dire faux pour autant.
+ */
+export function ed25519Supported(): Promise<boolean> {
+  probed ??= crypto.subtle.importKey("spki", fromBase64(PROBE), { name: "Ed25519" }, false, ["verify"]).then(() => true, () => false);
+  return probed;
+}
+
 /** Une clé publique Ed25519, SubjectPublicKeyInfo en DER ; null si ces octets n'en sont pas une. */
 export async function ed25519Key(spki: Bytes): Promise<CryptoKey | null> {
   try {

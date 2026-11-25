@@ -13,9 +13,16 @@ export interface PaneRoute {
 
 const ID = /^\d+$/
 
+/** La section de la page de vérification d'une mission (R212), et du lien de son témoin (`/verify/<id>`). */
+export const VERIFICATION = "verification"
+
 export function paneOf(pathname: string | null | undefined): PaneRoute | null {
   const segments = (pathname ?? "").split("/").filter(Boolean)
+  // Le lien du témoin, hors de tout espace : il ouvre la page de vérification, et en porte le nom (second tour de #551, M-b).
+  if (segments[0] === "verify" && segments.length === 2) return { section: VERIFICATION, projectId: null }
   if (segments.length < 2) return null
+  // La page de vérification d'une mission a son propre nom de volet, pas celui de la vue du travail (R161 M7).
+  if (segments[1] === "missions" && segments[3] === VERIFICATION && segments.length === 4) return { section: VERIFICATION, projectId: null }
   const section = segments[1]
   const projectId = section === "projects" && ID.test(segments[2] ?? "") ? Number(segments[2]) : null
   return { section, projectId }

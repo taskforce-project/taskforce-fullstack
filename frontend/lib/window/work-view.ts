@@ -85,14 +85,33 @@ export async function diffAnchor(path: string): Promise<string | null> {
   return `diff-${[...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("")}`
 }
 
-/** La preuve telle qu'elle se construit : combien d'événements le dossier garde, et s'il est scellé. */
+/**
+ * La preuve telle qu'elle se construit : combien d'événements le dossier garde, et si la mission a fini. Rien du sceau :
+ * ici, rien ne le vérifie, et la ligne ne dit jamais « signé » sans l'avoir vérifié ; elle mène à la page de vérification,
+ * qui le vérifie (R159 de #552, second tour, v-g).
+ */
 export interface Proof {
   readonly count: number
-  /** La mission est finie : l'empreinte du dernier événement scelle le dossier. */
-  readonly sealed: boolean
+  readonly ended: boolean
 }
 
 export function proofOf(evidence: MissionEvidence | null | undefined): Proof {
   const events = evidence?.events ?? []
-  return { count: events.length, sealed: events.some((event) => event.type === "mission.ended") }
+  return { count: events.length, ended: events.some((event) => event.type === "mission.ended") }
+}
+
+/** Les mots de la ligne de la preuve, les mêmes dans la vue du travail et l'inspecteur du workflow. */
+export interface ProofTexts {
+  readonly none: string
+  readonly events: string
+  readonly eventsOne: string
+  readonly soFar: string
+  readonly ended: string
+}
+
+/** La ligne de la preuve : ce qu'elle sait, un dossier fini ou en cours ; jamais « signed » ni « sealed ». */
+export function proofLine(proof: Proof, t: ProofTexts): string {
+  if (proof.count === 0) return t.none
+  const events = proof.count === 1 ? t.eventsOne : t.events.replace("{count}", String(proof.count))
+  return (proof.ended ? t.ended : t.soFar).replace("{events}", events)
 }

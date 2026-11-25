@@ -61,6 +61,8 @@ const EVIDENCE: MissionEvidence = {
 const SEALED: MissionEvidence = {
   ...EVIDENCE, events: [...EVIDENCE.events, { ...EVIDENCE.events[1], seq: 3, type: "mission.ended", hash: "cccccccccccc3333" }], root: "cccccccccccc3333",
 }
+/** Le sceau d'un dossier, tel que la ligne de la preuve en lit l'énoncé : la garde de sa clé ; sa signature, la page la vérifie. */
+const seal = (custody: string) => ({ payload: btoa(JSON.stringify({ predicate: { key: { custody } } })) })
 
 const DONE: DeliveryRun = { ...RUN, status: "DONE", endedAt: "2026-11-07T10:04:00", summary: "## What I did\nFixed **three** links." }
 
@@ -304,10 +306,13 @@ describe("WorkView", () => {
 
   describe("the proof", () => {
     it.each([
-      ["while it builds", EVIDENCE, "2 events so far"],
-      ["sealed", SEALED, "3 events, sealed"],
-      ["one event", { ...EVIDENCE, events: EVIDENCE.events.slice(0, 1) }, "1 event so far"],
-      ["one event, sealed", { ...EVIDENCE, events: [SEALED.events[2]] }, "1 event, sealed"],
+      ["while it builds", EVIDENCE, "A record of 2 events so far: the verification page checks it"],
+      ["ended", SEALED, "A record of 3 events, the mission ended: the verification page checks it"],
+      ["one event", { ...EVIDENCE, events: EVIDENCE.events.slice(0, 1) }, "A record of 1 event so far: the verification page checks it"],
+      ["one event, ended", { ...EVIDENCE, events: [SEALED.events[2]] }, "A record of 1 event, the mission ended: the verification page checks it"],
+      // Un sceau : rien ici ne le vérifie, la ligne ne dit pas « signed » et mène à la page (v-g du second tour de #552).
+      ["sealed on the agent's computer", { ...SEALED, seal: seal("same-machine") }, "A record of 3 events, the mission ended: the verification page checks it"],
+      ["sealed away from it", { ...SEALED, seal: seal("separate-machine") }, "A record of 3 events, the mission ended: the verification page checks it"],
     ])("folds into one line: %s", (_label, evidence, line) => {
       useDeliveryStore.setState({ evidence: { 100: evidence } })
       render(<WorkView runId={100} />)
@@ -322,6 +327,15 @@ describe("WorkView", () => {
 
       expect(screen.getByText("No record yet")).toBeInTheDocument()
       expect(screen.queryByRole("button", { name: "JSON" })).toBeNull()
+    })
+
+    it("opens the verification page of the mission (R212)", () => {
+      render(<WorkView runId={100} />)
+
+      const link = screen.getByRole("link", { name: "Verification page" })
+      expect(link).toHaveAttribute("href", "/acme/missions/100/verification")
+      fireEvent.click(link)
+      expect(nav.push).toHaveBeenCalledWith("/acme/missions/100/verification", { scroll: false })
     })
 
     it("downloads the record", () => {

@@ -137,6 +137,12 @@ export function screenUnder(pathname: string | null | undefined): string {
 /** La vue du travail d'une mission (R95, point 3). */
 export const missionPath = (slug: string, runId: number): string => `/${slug}/missions/${runId}`
 
+/**
+ * La page de vérification d'une mission (R212) : celle qu'on ouvre depuis la mission, et que le lien de sa pull request
+ * nomme (le témoin, TF-J2-7).
+ */
+export const verificationPath = (slug: string, runId: number): string => `${missionPath(slug, runId)}/verification`
+
 /** La mission d'une vue du travail (`/{slug}/missions/{runId}`), sinon null. */
 export function missionOf(pathname: string | null | undefined): number | null {
   const segments = (pathname ?? "").split("/").filter(Boolean)

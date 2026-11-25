@@ -443,11 +443,59 @@ export interface MissionEvidenceEvent {
   hash: string;
 }
 
-/** Le dossier de preuve d'une mission, tel qu'il se construit : ses événements et l'empreinte du dernier. */
+/**
+ * Le dossier de preuve d'une mission, tel qu'il se construit : ses événements et l'empreinte du dernier ; puis, depuis
+ * TF-J2-7, l'en-tête tiré de la chaîne, le paquet de règles de la mission, les textes gardés à côté de la chaîne et le
+ * dernier sceau (contracts/evidence). La page de vérification le lit, et lui seul (`lib/delivery/verification.ts`).
+ */
 export interface MissionEvidence {
   format: string;
   events: MissionEvidenceEvent[];
   root: string;
+  mission?: Record<string, unknown>;
+  rules?: Record<string, unknown>;
+  /** Chaque texte par son empreinte : le SHA-256 de son sel suivi du texte (R159, M6). */
+  texts?: Record<string, { salt: string; text: string }>;
+  seal?: Record<string, unknown>;
+}
+
+/** Une clé qui scelle, ou a scellé, les dossiers de l'instance (R159, M3). */
+export interface EvidenceKey {
+  id: string;
+  algorithm: string;
+  publicKey: string | null;
+  custody: string | null;
+  kept: boolean | null;
+  firstUsed: string | null;
+  lastUsed: string | null;
+  seals: number | null;
+}
+
+/** Les clés de l'instance : celle qui scelle aujourd'hui, et celles qui ont déjà scellé des dossiers de l'espace. */
+export interface EvidenceKeys {
+  current: EvidenceKey;
+  used: EvidenceKey[];
+}
+
+/** Les clés qui scellent les dossiers de cette instance, pour vérifier un sceau dans l'app. Une erreur remonte. */
+export async function getEvidenceKeys(slug: string): Promise<EvidenceKeys> {
+  const res = await apiClient.get<{ data: EvidenceKeys }>(DELIVERY_ROUTES.EVIDENCE_KEY(slug), { silentError: true });
+  return res.data.data;
+}
+
+/** Où mène le lien du témoin d'un dossier : l'adresse de son espace et sa mission (R159, second tour de #551, M-b). */
+export interface EvidenceLink {
+  workspace: string;
+  runId: number;
+}
+
+/**
+ * Le lien du témoin, `/verify/<id>` : un identifiant opaque du dossier, qui ne nomme ni l'espace ni la mission. Un lien
+ * qui ne mène à rien, ou à un dossier que la personne ne peut pas lire, répond 404 ; l'erreur remonte à l'appelant.
+ */
+export async function getEvidenceLink(id: string): Promise<EvidenceLink> {
+  const res = await apiClient.get<{ data: EvidenceLink }>(DELIVERY_ROUTES.EVIDENCE_LINK(id), { silentError: true });
+  return res.data.data;
 }
 
 /**

@@ -5,6 +5,7 @@ import { ArrowLeft, ExternalLink, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { MissionSteps } from "@/components/delivery/mission-steps"
+import { PaneLink } from "@/components/layout/pane-link"
 import { DecisionPanel } from "@/components/workflow/decision-panel"
 import { NodeMenu, nodeCan, type NodeGestures } from "@/components/workflow/node-gestures"
 import { StateMark } from "@/components/workflow/state-mark"
@@ -15,12 +16,15 @@ import type { IssueStatus } from "@/lib/api/issue-service"
 import { approvalOutcome, approvalWords } from "@/lib/delivery/approval-words"
 import { missionSequence, requestWant } from "@/lib/delivery/mission-sequence"
 import { fillText } from "@/lib/delivery/result-card"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { describeActivity } from "@/lib/issue-activity"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { useIssueStore } from "@/lib/store/issue-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { cn } from "@/lib/utils"
+import { verificationPath } from "@/lib/window/address"
 import { isMine } from "@/lib/window/missions"
+import { proofLine, proofOf } from "@/lib/window/work-view"
 import { issueKey, nextStage, type WorkflowModel, type WorkflowNode } from "@/lib/workflow/model"
 import { markStill, pendingOf } from "@/lib/workflow/node-state"
 import { countWords, momentWords, nodeSentence } from "@/lib/workflow/sentence"
@@ -444,6 +448,8 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
   const t = usePreferencesStore((s) => s.t.workflow.inspector)
   const missions = usePreferencesStore((s) => s.t.missions)
   const sequenceTexts = usePreferencesStore((s) => s.t.missionSequence)
+  const page = usePreferencesStore((s) => s.t.verification)
+  const { openVerification } = usePaneNavigation()
   const run = node.run?.run ?? null
   const runId = run?.id ?? null
   const evidence = useDeliveryStore((s) => (runId !== null ? s.evidence[runId] : undefined))
@@ -465,8 +471,8 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
   const rules = [...new Set(approvals.map((approval) => approval.reason?.trim()).filter((reason): reason is string => Boolean(reason)))]
   const pr = node.run?.links.pullRequestUrl ?? null
   const tests = run.tests
-  const events = evidence?.events.length ?? 0
-  const sealed = run.status === "DONE" || run.status === "FAILED"
+  // La ligne de la preuve de la vue du travail : ce qu'elle sait, jamais « signed » sans vérifier (v-g de #552).
+  const proof = proofLine(proofOf(evidence), sequenceTexts.proof)
 
   async function download() {
     if (runId === null) return
@@ -550,8 +556,17 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
       <Row label={sequenceTexts.proof.name}>
         {evidence ? (
           <div className="flex flex-col gap-1.5">
-            <p>{sealed ? fillText(t.proofSealed, { count: events }) : fillText(sequenceTexts.proof.building, { count: events })}</p>
-            <Button variant="outline" size="sm" className="h-7 w-fit text-xs" onClick={() => void download()}>{t.download}</Button>
+            <p>{proof}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* La page de vérification, à côté du dossier brut (R208, R161 M8). */}
+              {runId !== null && (
+                <PaneLink href={verificationPath(slug, runId)} open={() => openVerification(runId)} title={page.openHint}
+                  className="text-xs text-foreground underline underline-offset-2">
+                  {page.open}
+                </PaneLink>
+              )}
+              <Button variant="outline" size="sm" className="h-7 w-fit text-xs" onClick={() => void download()}>{t.download}</Button>
+            </div>
           </div>
         ) : <p className="text-muted-foreground">{t.noEvidence}</p>}
       </Row>
