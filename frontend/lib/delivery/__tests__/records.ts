@@ -74,6 +74,19 @@ export function large(): MissionEvidence {
   ], { texts: Object.fromEntries([summary.entry]) })
 }
 
+/**
+ * Une mission qui change plus de fichiers que son dossier n'en nomme : `listed` fichiers nommés, `more` comptés dans les
+ * totaux sans leur nom (R161 N7 du second tour de #552).
+ */
+export function manyFiles(listed: number, more: number): MissionEvidence {
+  const files = Array.from({ length: listed }, (_, i) => ({ path: `src/file-${i}.ts`, status: "modified", added: 1, removed: 0 }))
+  return chained([
+    { type: "mission.started", data: { mission: 9, workspace: "acme", issue: "WEB-61", runnerFacts: "agent-machine" } },
+    { type: "note", actor: { kind: "runner", id: "r" }, data: { kind: "changes", files, added: listed + more, removed: 0, more, mode: "repo" } },
+    { type: "mission.ended", data: { status: "DONE", commits: 1 } },
+  ])
+}
+
 /** Une mission d'avant la 1.18, finie en échec : ni la demande, ni le modèle, ni le sceau ne sont dans son dossier. */
 export function olderFailed(): MissionEvidence {
   return chained([

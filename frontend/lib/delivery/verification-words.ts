@@ -38,8 +38,11 @@ export interface Line {
   readonly blocks?: readonly Block[]
   /** Une adresse que la ligne nomme : un lien seulement vers GitHub (R159 P7). */
   readonly link?: string
-  /** Une longue liste (les fichiers), repliée au-delà de `fold` lignes (R161 M1). */
-  readonly list?: { readonly lines: readonly Line[]; readonly fold: number }
+  /**
+   * Une longue liste (les fichiers), repliée au-delà de `fold` lignes (R161 M1), et le bouton qui la déplie (`show`), qui
+   * compte les seules lignes de la liste (R161 N7 du second tour de #552).
+   */
+  readonly list?: { readonly lines: readonly Line[]; readonly fold: number; readonly show: string }
   /**
    * Le dossier a changé après coup : la chaîne casse, l'en-tête, le sceau ou le témoin ne tiennent pas. Ces lignes du verdict
    * vont dans une alerte à part, distincte des réserves que porte tout dossier sain (R161 N1, R159 V1 de #552).
@@ -373,9 +376,13 @@ function changed(page: VerificationPage, t: Texts): Line[] {
       const written = file.writtenAt === null ? "" : `; ${fillText(t.changed.writtenAt, { seq: file.writtenAt })}`
       return { text: `“${file.path}” (${size})${written}`, tone: "muted" }
     })
-    if (c.more > 0) files.push({ text: fillText(t.changed.more, { count: c.more }), tone: "muted" })
-    lines.push({ text: fillText(count === 1 ? t.changed.oneFile : t.changed.files, { count, added: c.added, removed: c.removed }),
-      list: { lines: files, fold: FOLD } })
+    // Le dossier compte des fichiers sans les nommer : la première ligne le dit, à côté du total juste, et le bouton ne compte
+    // que les fichiers listés (R161 N7 du second tour de #552).
+    const listed = files.length
+    let intro: string = count === 1 ? t.changed.oneFile : t.changed.files
+    if (c.more > 0) intro = c.more === 1 ? t.changed.filesUnlistedOne : t.changed.filesUnlisted
+    lines.push({ text: fillText(intro, { count, added: c.added, removed: c.removed, listed, more: c.more }),
+      list: { lines: files, fold: FOLD, show: fillText(c.more > 0 ? t.showListedFiles : t.showAllFiles, { count: listed }) } })
   }
   // Au plafond du dossier, TaskForce arrête la mission : la page le dit dans ses mots, comme la vue du travail (N2).
   const cap = page.record.cap

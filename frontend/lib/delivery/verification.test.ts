@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest"
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
 import {
-  brokenChain, chained, example, exampleKey, inheritedTicks, lateSealed, olderFailed, rechained, resealed, rewrittenResealed, running, tamperedTitle,
+  brokenChain, chained, example, exampleKey, inheritedTicks, lateSealed, manyFiles, olderFailed, rechained, resealed, rewrittenResealed, running,
+  tamperedTitle,
 } from "./__tests__/records"
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
@@ -341,6 +342,26 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
 })
 
 describe("le reste du dossier, dit en clair", () => {
+  it("R161 N7 du second tour : le bouton compte les seuls fichiers listés, et la page dit combien le dossier n'en nomme pas", () => {
+    const filesLine = (listed: number, more: number) => {
+      const sections = verificationSections(verificationPage(manyFiles(listed, more)), t, context)
+      return { sections, files: sections.find((s) => s.id === "changed")?.lines.find((l) => l.list) }
+    }
+    // La première ligne de la rubrique, qui se lit sans rien déplier, dit les deux nombres ; la liste n'a que ses fichiers.
+    const { sections, files } = filesLine(300, 45)
+    expect(texts(sections, "changed")[0]).toBe("345 files changed: 345 lines added, 0 removed. The record names 300 of them, as the agent wrote them, "
+      + "and counts the other 45 without their names:")
+    expect(files?.list?.lines).toHaveLength(300)
+    expect(files?.list?.lines.map((l) => l.text).join(" ")).not.toMatch(/more files/)
+    expect(files?.list?.show).toBe("Show the 300 listed files")
+    expect(filesLine(300, 1).files?.text).toBe("301 files changed: 301 lines added, 0 removed. The record names 300 of them, as the agent wrote them, "
+      + "and counts the other one without its name:")
+    // Le dossier nomme tous les fichiers : « Show all ».
+    const every = filesLine(12, 0)
+    expect(every.files?.text).toBe("12 files changed: 12 lines added, 0 removed. Their names, as the agent wrote them:")
+    expect(every.files?.list?.show).toBe("Show all 12 files")
+  })
+
   it("R161 F7 : un texte effacé dit lequel, par qui et quand", () => {
     const erased = `sha256:${"e".repeat(64)}`
     const page = verificationPage(chained([

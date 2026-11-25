@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
-import { brokenChain, example, exampleKey } from "./__tests__/records"
+import { brokenChain, example, exampleKey, manyFiles } from "./__tests__/records"
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
 import { CONTENT_SECURITY_POLICY, embedJson, escapeHtml, verificationHtml, type ExportHead } from "./verification-html"
@@ -28,7 +28,6 @@ async function exported() {
     sentence: summarySentence(page, t),
     notes: [t.audience, t.assembled, t.scope],
     howTo: t.export.howTo.replaceAll("{id}", "42").replace("{key}", ""),
-    moreFiles: t.showAllFiles,
   }
   return { file, page, sections, head, html: verificationHtml(head, sections, JSON.stringify(file, null, 2)) }
 }
@@ -93,7 +92,7 @@ describe("la page exportée avec son dossier", () => {
     const verdict = verdictLines(page, t)
     const html = verificationHtml({ title: "x", assembled: "", verdict: verdict.filter((l) => !l.alert),
       alert: { title: t.changedRecord.title, lines: alertLines(verdict), says: t.changedRecord.says }, proves: "p", sentence: "THE SENTENCE",
-      notes: [], howTo: "", moreFiles: t.showAllFiles }, [], null)
+      notes: [], howTo: "" }, [], null)
     expect(html).toMatch(new RegExp(`<div class="alert" role="alert"><p><strong>${t.changedRecord.title}</strong></p><p>[^<]*Its chain breaks at event \\d+`))
     expect(html.indexOf(t.changedRecord.says)).toBeLessThan(html.indexOf("THE SENTENCE"))
     const { html: sound } = await exported()
@@ -112,17 +111,27 @@ describe("la page exportée avec son dossier", () => {
 
   it("N4 du second tour de #551 : la page exportée d'un dossier d'avant la 1.18 ne porte pas ce dossier, ni ses courriels", () => {
     const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [],
-      howTo: t.export.howToLegacy.replace("{id}", "3"), moreFiles: t.showAllFiles }, [], null)
+      howTo: t.export.howToLegacy.replace("{id}", "3") }, [], null)
     expect(html).not.toContain("<script")
     expect(html).toContain(escapeHtml("this file does not carry it. An owner or admin of the workspace can download it as JSON"))
   })
 
   it("R161 M1 : une longue liste se replie avec son nombre", () => {
     const files = Array.from({ length: FOLD + 2 }, (_, i) => line(`file-${i}.ts`))
-    const sections: Section[] = [{ id: "changed", title: "2. What changed", lines: [{ text: "12 files changed", list: { lines: files, fold: FOLD } }] }]
-    const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [], howTo: "", moreFiles: t.showAllFiles },
+    const sections: Section[] = [{ id: "changed", title: "2. What changed", lines: [{ text: "12 files changed",
+      list: { lines: files, fold: FOLD, show: "Show all 12 files" } }] }]
+    const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [], howTo: "" },
       sections, "{}")
     expect(html).toContain("<p>file-9.ts</p><details open><summary class=\"muted\">Show all 12 files</summary><p>file-10.ts</p><p>file-11.ts</p></details>")
+  })
+
+  it("R161 N7 du second tour : 345 fichiers dont 300 listés, la page exportée compte les 300 et dit les 45 autres", () => {
+    const sections = verificationSections(verificationPage(manyFiles(300, 45)), t, { runId: 9, desktop: false })
+    const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [], howTo: "" }, sections, "{}")
+    expect(html).toContain("<details open><summary class=\"muted\">Show the 300 listed files</summary>")
+    expect(html).toContain("<p>345 files changed: 345 lines added, 0 removed. The record names 300 of them, as the agent wrote them, "
+      + "and counts the other 45 without their names:</p>")
+    expect(html).not.toMatch(/Show all 301 files|And 45 more files/)
   })
 
   it("R159 P7 : rien de ce que le dossier porte ne devient du code ni un lien ailleurs que GitHub", () => {
@@ -133,7 +142,7 @@ describe("la page exportée avec son dossier", () => {
     expect(embedded).not.toContain("<!--")
     expect(JSON.parse(embedded)).toEqual(JSON.parse(json))
     const hostile = verificationHtml({ title: "<b>", assembled: "<i>", verdict: [{ text: "<u>", tone: "warn" }], proves: "<s>", sentence: "<q>",
-      notes: ["<em>"], howTo: "<script>z</script>", moreFiles: "{count}" },
+      notes: ["<em>"], howTo: "<script>z</script>" },
       [{ id: "request", title: "<i>", lines: [
         { text: "<script>x</script>", body: "</pre><script>y</script>" },
         { text: "Pull request: javascript:alert(1)", link: "javascript:alert(1)" },

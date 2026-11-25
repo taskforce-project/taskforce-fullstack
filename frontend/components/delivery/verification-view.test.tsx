@@ -14,7 +14,7 @@ vi.mock("@/lib/api/project-service", () => ({ saveBlob: saved.saveBlob }))
 import { VerificationView } from "./verification-view"
 import type { MissionEvidence } from "@/lib/api/delivery-service"
 import { CONSTANTS_EN } from "@/lib/constants_en"
-import { brokenChain, example, exampleKey, large, running, tamperedTitle } from "@/lib/delivery/__tests__/records"
+import { brokenChain, example, exampleKey, large, manyFiles, running, tamperedTitle } from "@/lib/delivery/__tests__/records"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 
 /**
@@ -154,6 +154,18 @@ describe("VerificationView", () => {
     expect(within(changed).getByText("Step 8")).toBeInTheDocument()
     fireEvent.click(within(changed).getByRole("button", { name: t.showLess }))
     expect(within(changed).queryByText("Step 8")).not.toBeInTheDocument()
+  })
+
+  it("R161 N7 du second tour : 345 fichiers dont 300 listés, le bouton compte les 300, et les 45 autres se lisent sans déplier", async () => {
+    show(manyFiles(300, 45), [])
+    await screen.findByText(/^Checked in this app on/)
+
+    const changed = screen.getByRole("region", { name: t.sections.changed })
+    expect(within(changed).getByText("345 files changed: 345 lines added, 0 removed. The record names 300 of them, as the agent wrote them, "
+      + "and counts the other 45 without their names:")).toBeInTheDocument()
+    fireEvent.click(within(changed).getByRole("button", { name: "Show the 300 listed files" }))
+    expect(within(changed).getByText("src/file-299.ts", { exact: false })).toBeInTheDocument()
+    expect(within(changed).queryByRole("button", { name: /Show all/ })).toBeNull()
   })
 
   it("R161 B3 : une mission en cours le dit, avec l'heure de lecture, et se relit", async () => {

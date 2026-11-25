@@ -89,7 +89,7 @@ function FoldedList({ list, t }: Readonly<{ list: NonNullable<Line["list"]>; t: 
       {list.lines.length > list.fold && (
         <button type="button" aria-expanded={all} aria-controls={id} onClick={() => setAll(!all)}
           className="w-fit text-xs text-foreground underline underline-offset-2">
-          {all ? t.showFewerFiles : fillText(t.showAllFiles, { count: list.lines.length })}
+          {all ? t.showFewerFiles : list.show}
         </button>
       )}
     </div>
@@ -282,7 +282,6 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
         sentence,
         notes: [t.audience, t.assembled, t.scope],
         howTo: exportHowTo(page, t, context),
-        moreFiles: t.showAllFiles,
         // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : la page exportée ne la porte pas (N4).
       }, sections, page.legacy ? null : JSON.stringify(evidence, null, 2))
       saveBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `verification-run-${id}.html`)

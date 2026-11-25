@@ -50,8 +50,6 @@ export interface ExportHead {
   readonly sentence: string
   readonly notes: readonly string[]
   readonly howTo: string
-  /** Le libellé d'une liste repliée, avec `{count}` : « Show all {count} files ». */
-  readonly moreFiles: string
 }
 
 function lineText(line: Line): string {
@@ -81,7 +79,7 @@ function blocksHtml(blocks: readonly Block[]): string {
   return out.join("")
 }
 
-function lineHtml(line: Line, moreFiles: string): string {
+function lineHtml(line: Line): string {
   const cls = line.tone && line.tone !== "agent" ? ` class="${line.tone}"` : ""
   // Un long texte du dossier (la description, le brief) se replie sous sa ligne, ouvert : la copie imprimée, celle qu'un
   // auditeur classe, le garde (R161 N4 du second tour de #552).
@@ -89,11 +87,11 @@ function lineHtml(line: Line, moreFiles: string): string {
   const parts = [`<p${cls}>${lineText(line)}</p>`]
   if (line.blocks) parts.push(`<div class="agent" data-agent="true">${blocksHtml(line.blocks)}</div>`)
   if (line.list) {
-    parts.push(line.list.lines.slice(0, FOLD).map((l) => lineHtml(l, moreFiles)).join(""))
+    parts.push(line.list.lines.slice(0, FOLD).map((l) => lineHtml(l)).join(""))
     const rest = line.list.lines.slice(FOLD)
     if (rest.length > 0) {
-      const label = escapeHtml(moreFiles.replace("{count}", String(line.list.lines.length)))
-      parts.push(`<details open><summary class="muted">${label}</summary>${rest.map((l) => lineHtml(l, moreFiles)).join("")}</details>`)
+      // Le libellé de l'écran, qui ne compte que les fichiers listés (R161 N7 du second tour de #552).
+      parts.push(`<details open><summary class="muted">${escapeHtml(line.list.show)}</summary>${rest.map((l) => lineHtml(l)).join("")}</details>`)
     }
   }
   return parts.join("")
@@ -107,10 +105,10 @@ export function verificationHtml(head: ExportHead, sections: readonly Section[],
   const body = sections.map((section) => [
     `<details class="section" id="${section.id}" open><summary><h2>${escapeHtml(section.title)}</h2></summary>`,
     // Pas les consignes de l'écran, qui parlent de son bouton : la page exportée a la sienne, à la fin (R161 N5, v-e).
-    section.lines.filter((line) => !line.screenOnly).map((line) => lineHtml(line, head.moreFiles)).join("\n"),
+    section.lines.filter((line) => !line.screenOnly).map((line) => lineHtml(line)).join("\n"),
     "</details>",
   ].join("\n")).join("\n")
-  const verdict = head.verdict.map((line) => lineHtml(line, head.moreFiles)).join("")
+  const verdict = head.verdict.map((line) => lineHtml(line)).join("")
   const notes = head.notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")
   const alert = !head.alert ? ""
     : `<div class="alert" role="alert"><p><strong>${escapeHtml(head.alert.title)}</strong></p>`
