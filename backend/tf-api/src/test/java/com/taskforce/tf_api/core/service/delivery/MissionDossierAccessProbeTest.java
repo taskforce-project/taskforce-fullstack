@@ -103,4 +103,28 @@ class MissionDossierAccessProbeTest {
         assertThatThrownBy(() -> access.byLink("f".repeat(32), 8L))
             .isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-e (sonde F) : un id inconnu, un non-membre, un membre qui ne voit pas le projet privé : le même message")
+    void a_witness_link_says_the_same_to_whoever_cannot_read() {
+        Workspace workspace = Workspace.builder().id(3L).slug("acme").build();
+        com.taskforce.tf_api.core.model.Project secret = com.taskforce.tf_api.core.model.Project.builder().id(12L).build();
+        MissionDossier dossier = MissionDossier.builder().runId(100L).workspace(workspace).projectId(12L).build();
+        String link = "0123456789abcdef0123456789abcdef";
+        lenient().when(dossiers.findByLinkId(link)).thenReturn(Optional.of(dossier));
+        lenient().when(evidence.dossier(100L)).thenReturn(Optional.of(dossier));
+        lenient().when(projects.findById(12L)).thenReturn(Optional.of(secret));
+        lenient().when(members.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty());
+        lenient().when(members.findByWorkspaceIdAndUserId(3L, 9L)).thenReturn(Optional.of(WorkspaceMember.builder()
+            .role(WorkspaceRole.MEMBER).build()));
+        // Comme le garde le fait pour un projet privé qu'on ne voit pas.
+        org.mockito.Mockito.lenient().doThrow(new com.taskforce.tf_api.shared.exception.ResourceNotFoundException("Project not found"))
+            .when(visibilityGuard).assertCanView(secret, 9L);
+
+        for (Runnable reader : java.util.List.<Runnable>of(() -> access.byLink("f".repeat(32), 9L), () -> access.byLink(link, 7L),
+            () -> access.byLink(link, 9L))) {
+            assertThatThrownBy(reader::run).isInstanceOf(com.taskforce.tf_api.shared.exception.ResourceNotFoundException.class)
+                .hasMessage(MissionDossierAccess.NOT_FOUND);
+        }
+    }
 }

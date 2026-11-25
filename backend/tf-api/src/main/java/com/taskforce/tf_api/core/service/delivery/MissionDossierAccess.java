@@ -82,7 +82,9 @@ public class MissionDossierAccess {
     /**
      * Ce que désigne le lien d'un témoin (R159, second tour, M-b) : le lien ne porte qu'un identifiant opaque du dossier, et
      * la page qu'il ouvre garde ses contrôles d'accès. La personne doit pouvoir lire le dossier, comme par son adresse dans
-     * l'espace ; sinon, le lien répond comme un lien qui ne mène à rien, sans dire lequel.
+     * l'espace ; sinon, le lien répond comme un lien qui ne mène à rien, sans dire lequel. Un id inconnu, quelqu'un hors de
+     * l'espace et un membre qui ne voit pas le projet reçoivent le même message (R159, troisième tour, c-e) : « Project not
+     * found » disait qu'il y avait là un dossier, dans un projet qu'on ne voit pas.
      */
     @Transactional(readOnly = true)
     public Linked byLink(String linkId, Long userId) {
@@ -92,7 +94,7 @@ public class MissionDossierAccess {
         }
         try {
             readable(dossier.getWorkspace().getSlug(), dossier.getRunId(), userId);
-        } catch (ForbiddenException e) {
+        } catch (ForbiddenException | ResourceNotFoundException e) {
             throw new ResourceNotFoundException(NOT_FOUND);
         }
         return new Linked(dossier.getWorkspace().getSlug(), dossier.getRunId());
