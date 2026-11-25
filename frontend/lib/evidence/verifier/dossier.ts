@@ -400,7 +400,10 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         const at = `${late ? "Sealed late" : "Sealed"} at event ${seq} on ${String(predicate.sealedAt)}`;
         if (late) {
           lateOn = String(predicate.sealedAt);
-          lines.push({ level: "warn", text: `This record was sealed late, on ${lateOn}, after its mission had ended: the seal proves the chain as it was on that date, not what happened before.` });
+          // Ne dire que ce que la chaîne montre : une mission supprimée en cours de route n'a pas de fin (R159, troisième
+          // tour, c-f).
+          const ended = events.some((e) => e.type === "mission.ended");
+          lines.push({ level: "warn", text: `This record was sealed late, on ${lateOn}${ended ? ", after its mission had ended" : ""}: the seal proves the chain as it was on that date, not what happened before.` });
         }
         if (options.key !== undefined) {
           const trusted = await trustedKeyId(options.key);

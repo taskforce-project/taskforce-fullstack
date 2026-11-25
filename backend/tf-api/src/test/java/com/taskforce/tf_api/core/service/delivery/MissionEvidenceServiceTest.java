@@ -649,6 +649,34 @@ class MissionEvidenceServiceTest {
             assertThat(seals).isEmpty();
             verify(publisher, never()).publishEvent(any());
         }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-f : sa mission supprimée, le sceau tardif verrouille le dossier avant de chercher un sceau, ne dit pas qu'elle a fini, et la ligne Seal du Markdown dit le retard")
+        void a_late_seal_of_a_deleted_mission_says_only_what_is_known() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.empty());
+            run.setIssue(null);
+            List<String> calls = new ArrayList<>();
+            lenient().when(dossiers.findByIdForUpdate(100L)).thenAnswer(inv -> {
+                calls.add("lock");
+                return Optional.ofNullable(rows.get(100L));
+            });
+            lenient().when(sealRepository.findTopByRunIdOrderBySeqDesc(100L)).thenAnswer(inv -> {
+                calls.add("sealed?");
+                return seals.isEmpty() ? Optional.empty() : Optional.of(seals.getLast());
+            });
+
+            assertThat(service.sealLate(100L)).isTrue();
+
+            // Deux serveurs qui démarrent ensemble : le second attend le verrou, puis trouve le sceau du premier.
+            assertThat(calls).startsWith("lock", "sealed?");
+            assertThat(data(stored.size() - 1).get("text").asText()).startsWith("TaskForce sealed this record late, on ")
+                .contains(", after its mission was deleted: ").doesNotContain("had ended");
+            assertThat(seals.getLast().isLate()).isTrue();
+            assertThat(service.dossierMarkdown(100L).orElseThrow())
+                .contains("- Seal: event " + seals.getLast().getSeq() + ", signed late by key `")
+                .contains(": a late seal proves the chain as it was on that date, not what happened before.");
+        }
     }
 
     @Nested

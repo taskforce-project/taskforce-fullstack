@@ -1022,13 +1022,17 @@ public class MissionEvidenceService {
     @Transactional
     public boolean sealLate(Long runId) {
         DeliveryRun run = runRepository.findByIdForUpdate(runId).orElse(null);
-        if (seals.findTopByRunIdOrderBySeqDesc(runId).isPresent()) {
+        // Le dossier, verrouillé avant de chercher son sceau, même quand sa mission n'existe plus : deux serveurs qui
+        // démarrent ensemble ne le scellent pas chacun (R159, troisième tour, c-f).
+        if (dossiers.findByIdForUpdate(runId).isEmpty() || seals.findTopByRunIdOrderBySeqDesc(runId).isPresent()) {
             return false;
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("kind", LATE_SEAL);
-        data.put("text", "TaskForce sealed this record late, on " + EvidenceChain.AT.format(Instant.now()) + ", after its mission "
-            + "had ended: the seal proves the chain as it was on that date, not what happened before.");
+        // Ne dire que ce qu'on sait : une mission supprimée a pu l'être avant sa fin (c-f).
+        data.put("text", "TaskForce sealed this record late, on " + EvidenceChain.AT.format(Instant.now())
+            + (run == null ? ", after its mission was deleted" : ", after its mission had ended")
+            + ": the seal proves the chain as it was on that date, not what happened before.");
         Optional<String> hash = appendTo(runId, "note", Actor.SERVER, data);
         if (hash.isEmpty()) {
             return false;
@@ -1167,8 +1171,11 @@ public class MissionEvidenceService {
         md.append("- Chain: ").append(broken < 0
             ? "checked when exported, every hash holds."
             : "BROKEN at event " + events.get(broken).get("seq").asInt() + ": this file was changed after it was written.").append('\n');
-        md.append("- Seal: ").append(seal.map(s -> "event " + s.getSeq() + ", signed by key `" + s.getKeyId() + "` at "
-            + s.getSealedAt() + " (" + custodyWords(s) + ")").orElse("none yet: the mission has not ended.")).append('\n');
+        // Un sceau tardif le dit ici aussi, pas seulement dans le tableau des événements (R159, troisième tour, c-f).
+        md.append("- Seal: ").append(seal.map(s -> "event " + s.getSeq() + ", signed " + (s.isLate() ? "late " : "") + "by key `"
+            + s.getKeyId() + "` at " + s.getSealedAt() + " (" + custodyWords(s) + ")" + (s.isLate()
+                ? ": a late seal proves the chain as it was on that date, not what happened before." : ""))
+            .orElse("none yet: the mission has not ended.")).append('\n');
         // Ce que le runner rapporte vient du poste de l'agent, quelle que soit la garde de la clé (R159, M5).
         if (AGENT_MACHINE.equals(mission.path("runnerFacts").asText(null))) {
             md.append("- The runner's facts (its tests, the agent and its model, the numbers of its events) come from the ")
