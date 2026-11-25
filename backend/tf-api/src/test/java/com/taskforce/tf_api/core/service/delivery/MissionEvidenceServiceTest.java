@@ -681,6 +681,25 @@ class MissionEvidenceServiceTest {
                 .contains("- Seal: event " + seals.getLast().getSeq() + ", signed late by key `")
                 .contains(": a late seal proves the chain as it was on that date, not what happened before.");
         }
+
+        @Test
+        @DisplayName("R159 de #551, quatrième tour, d-e : un dossier scellé tard sort du passage du témoin, et sa note dit qu'aucun commentaire n'est écrit pour lui")
+        void a_late_seal_leaves_the_witness_pass() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(run));
+            lenient().when(dossiers.findByIdForUpdate(100L)).thenAnswer(inv -> Optional.ofNullable(rows.get(100L)));
+            lenient().when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+                .thenAnswer(inv -> seals.isEmpty() ? Optional.empty() : Optional.of(seals.getLast()));
+
+            assertThat(service.sealLate(100L)).isTrue();
+
+            assertThat(data(stored.size() - 1).get("text").asText()).contains(", after its mission had ended: ")
+                .endsWith(" No comment is written in a pull request for it.");
+            assertThat(seals.getLast().isLate()).isTrue();
+            // Aucun témoin par décision : le passage régulier ne le relit plus.
+            verify(dossiers).markWitnessed(100L);
+            verify(publisher, never()).publishEvent(any(MissionSealed.class));
+        }
     }
 
     @Nested

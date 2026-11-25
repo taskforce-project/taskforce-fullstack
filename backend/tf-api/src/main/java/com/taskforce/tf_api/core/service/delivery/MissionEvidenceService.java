@@ -1069,13 +1069,17 @@ public class MissionEvidenceService {
         // Ne dire que ce qu'on sait : une mission supprimée a pu l'être avant sa fin (c-f).
         data.put("text", "TaskForce sealed this record late, on " + EvidenceChain.AT.format(Instant.now())
             + (run == null ? ", after its mission was deleted" : ", after its mission had ended")
-            + ": the seal proves the chain as it was on that date, not what happened before.");
+            + ": the seal proves the chain as it was on that date, not what happened before. No comment is written in a pull "
+            + "request for it.");
         Optional<String> hash = appendTo(runId, "note", Actor.SERVER, data);
         if (hash.isEmpty()) {
             return false;
         }
         if (run != null && run.getEvidenceRoot() != null) run.setEvidenceRoot(hash.get());
         seal(runId, false, true);
+        // Un sceau tardif n'a pas de témoin, par décision : le dossier sort tout de suite du passage régulier du témoin,
+        // au lieu de rester dans son index à être relu, puis écarté, à chaque passage (R159 de #551, quatrième tour, d-e).
+        dossiers.markWitnessed(runId);
         return true;
     }
 
