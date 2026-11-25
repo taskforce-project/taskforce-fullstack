@@ -2413,7 +2413,9 @@ export const CONSTANTS_EN = {
         "reversible-exit": "left the copy, and can be undone",
         irreversible: "cannot be undone",
       },
-      notComputed: "TaskForce does not yet give a class to the change itself: a rule written beforehand by a person would have to judge the change. Below, the rules that judged how it left the agent's copy, and the heaviest action of the mission.",
+      exitsFirst: "Left the agent's copy under the rules {rules}: {class}.",
+      exitsFirstOne: "Left the agent's copy under the rule {rules}: {class}.",
+      notComputed: "TaskForce does not yet give a class to the change itself: a rule written beforehand by a person would have to judge the change.",
       exit: "{action} under the rule “{reason}”: {class}.",
       exitTools: {
         "git push": "The branch was pushed",

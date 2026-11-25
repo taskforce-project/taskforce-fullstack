@@ -52,7 +52,12 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     // La lecture, l'écriture et la recherche, puis les deux sorties : la demande posée par le serveur n'est pas un jugement de plus.
     expect(page.classOf.judged).toBe(page.classOf.exits.length + 3)
     const lines = texts(verificationSections(page, t, context), "classification")
-    expect(lines[0]).toBe(t.classification.notComputed)
+    // R161 N2 du second tour de #552 : repliée, la rubrique dit d'abord sous quelles règles le changement est sorti, puis
+    // l'avertissement de R210, sans « Below ».
+    const [push, pr] = page.classOf.exits.map((e) => e.rule.reason ?? e.rule.id)
+    expect(lines[0]).toBe(`Left the agent's copy under the rules “${push}” and “${pr}”: left the copy, and can be undone.`)
+    expect(lines[1]).toBe(t.classification.notComputed)
+    expect(t.classification.notComputed).not.toContain("Below")
     expect(lines.some((l) => l.startsWith("The branch was pushed under the rule"))).toBe(true)
     expect(lines.some((l) => l.startsWith("The pull request was opened under the rule"))).toBe(true)
     expect(lines.some((l) => l.startsWith("Heaviest action of the mission: WebSearch “docs.example.com footer links”"))).toBe(true)

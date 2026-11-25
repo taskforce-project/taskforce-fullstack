@@ -63,6 +63,9 @@ export interface WordsContext {
 /** Au-delà, une liste se replie : la page se lit en deux à cinq minutes, même à 345 fichiers (R161 M1). */
 export const FOLD = 10
 
+/** Les classes d'un changement, de la plus légère à la plus lourde (R210). */
+const CLASS_ORDER: readonly string[] = ["read", "sandbox-write", "reversible-exit", "irreversible"]
+
 /** Une date du dossier, dite pour une personne, en UTC pour qu'un auditeur la relise telle quelle. */
 export function when(at: string | null): string {
   if (!at) return "?"
@@ -376,7 +379,15 @@ function authorWords(rule: PageRule, t: Texts): string {
 function classification(page: VerificationPage, t: Texts): Line[] {
   const k = page.classOf
   const c = t.classification
-  const lines: Line[] = [{ text: c.notComputed }]
+  // Sous quelle règle, dès la première ligne : celles qui ont jugé la sortie du changement, puis l'avertissement de R210
+  // (R161 N2 du second tour de #552).
+  const exitRules = [...new Map(k.exits.map((exit) => [exit.rule.id, exit.rule])).values()]
+  const heaviestExit = exitRules.reduce<string | null>((top, rule) => (rule.class && (!top || CLASS_ORDER.indexOf(rule.class) > CLASS_ORDER.indexOf(top)) ? rule.class : top), null)
+  const quotedRules = exitRules.map((rule) => `“${rule.reason ?? rule.id}”`)
+  const ruleList = quotedRules.length <= 1 ? quotedRules.join("") : `${quotedRules.slice(0, -1).join(", ")} and ${quotedRules.at(-1) ?? ""}`
+  const lines: Line[] = [exitRules.length === 0 ? { text: c.noExit }
+    : { text: fillText(exitRules.length === 1 ? c.exitsFirstOne : c.exitsFirst, { rules: ruleList,
+      class: heaviestExit ? c.classes[heaviestExit as keyof typeof c.classes] : "?" }) }, { text: c.notComputed, tone: "muted" }]
   const tools = c.exitTools as Record<string, string>
   for (const exit of k.exits) {
     const action = (exit.tool && tools[exit.tool]) || fillText(c.exitOther, { tool: exit.tool ?? "?" })
@@ -384,7 +395,6 @@ function classification(page: VerificationPage, t: Texts): Line[] {
       class: exit.rule.class ? c.classes[exit.rule.class] : "?" }) })
     lines.push({ text: fillText(c.exitWho, { id: exit.rule.id, version: exit.rule.version ?? "?", author: authorWords(exit.rule, t) }), tone: "muted" })
   }
-  if (k.exits.length === 0 && k.judged > 0) lines.push({ text: c.noExit, tone: "muted" })
   if (k.heaviest) {
     const h = k.heaviest
     const action = h.what ? fillText(c.heaviestWhat, { tool: h.tool ?? "", what: h.what }).trim() : fillText(c.heaviestTool, { tool: h.tool ?? "?" })
