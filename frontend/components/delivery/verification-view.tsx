@@ -168,7 +168,9 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
     if (!slug) return
     void fetchEvidence(slug, runId).then((file) => {
       setFailed(file === null)
-      setReadAt(new Date().toISOString())
+      // L'heure de la lecture n'avance qu'avec une lecture qui a réussi : une relecture qui échoue laisse le dossier d'avant,
+      // et son heure (R159 de #552, second tour, v-d).
+      if (file !== null) setReadAt(new Date().toISOString())
     })
   }, [slug, runId, fetchEvidence])
 

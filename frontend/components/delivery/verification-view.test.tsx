@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
 
 const nav = vi.hoisted(() => ({ push: vi.fn() }))
 const saved = vi.hoisted(() => ({ saveBlob: vi.fn() }))
@@ -163,6 +163,32 @@ describe("VerificationView", () => {
     expect(screen.getByText(/^The mission is still running: this page shows its record as it was at \d{4}-\d\d-\d\d \d\d:\d\d UTC\.$/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: t.refresh }))
     expect(fetchEvidence).toHaveBeenCalledTimes(2)
+  })
+
+  it("v-d du second tour de #552 : une relecture qui échoue ne change pas l'heure affichée", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    try {
+      vi.setSystemTime(new Date("2026-11-24T09:00:00.000Z"))
+      show(running(), [])
+      await screen.findByText(t.verdict.notSealedRunning)
+      expect(screen.getByText(/as it was at 2026-11-24 09:00 UTC\./)).toBeInTheDocument()
+
+      vi.setSystemTime(new Date("2026-11-24T11:00:00.000Z"))
+      let answer: (file: MissionEvidence | null) => void = () => undefined
+      fetchEvidence.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+      fireEvent.click(screen.getByRole("button", { name: t.refresh }))
+      expect(fetchEvidence).toHaveBeenCalledTimes(2)
+      // La relecture échoue, et React a rendu ce qu'elle change.
+      await act(async () => {
+        answer(null)
+        await Promise.resolve()
+      })
+
+      expect(screen.getByText(/as it was at 2026-11-24 09:00 UTC\./)).toBeInTheDocument()
+      expect(screen.queryByText(/as it was at 2026-11-24 11:00 UTC\./)).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("R159 P2 et R161 M3 : un 403 ou un 404, un seul message neutre, un titre et le retour à la mission", () => {
