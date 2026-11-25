@@ -239,6 +239,21 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
   }
   // 403 et 404 : un seul message, qui ne dit pas lequel (R159 P2).
   if (evidence === null || !page || !sections) return <RecordUnavailable title={t.title} message={t.denied} hint={t.deniedHint} back={back} />
+  // Rien du dossier avant la fin de sa vérification, pas même le titre de la demande : un texte changé ne s'affiche jamais,
+  // même un instant (R159 de #552, second tour, V4).
+  if (!check) {
+    return (
+      <article className="mx-auto flex w-full max-w-3xl flex-col gap-4" aria-labelledby="verification-title">
+        <header className="flex flex-col gap-2">
+          <h2 id="verification-title" className="text-base font-semibold text-foreground">{t.title}</h2>
+          <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" /> {t.checking}
+          </p>
+          {back}
+        </header>
+      </article>
+    )
+  }
 
   const heading = pageTitle(page, t)
   const verdict = verdictLines(page, t)
@@ -285,7 +300,6 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
         <ul aria-live="polite" className="flex flex-col gap-1">
           {verdict.map((line, i) => (
             <li key={i} className={cn("flex items-start gap-2 text-sm", line.tone && TONE[line.tone])}>
-              {!check && <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />}
               <span>{line.text}</span>
             </li>
           ))}
@@ -300,7 +314,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
         )}
         <p className="text-sm text-foreground">{sentence}</p>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={downloadPage} disabled={!check}
+          <button type="button" onClick={downloadPage}
             className="inline-flex items-center gap-1.5 border border-border px-2 py-1 text-xs text-foreground hover:bg-muted disabled:opacity-50">
             <Download className="size-3.5" aria-hidden="true" /> {t.record.download}
           </button>

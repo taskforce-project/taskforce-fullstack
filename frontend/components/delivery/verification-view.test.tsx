@@ -49,12 +49,25 @@ describe("VerificationView", () => {
 
     expect(fetchEvidence).toHaveBeenCalledWith("acme", 42)
     expect(fetchEvidenceKeys).toHaveBeenCalledWith("acme")
-    expect(screen.getByRole("heading", { name: "Verification of WEB-48: Fix the footer links" })).toBeInTheDocument()
     expect(screen.getByText(t.checking)).toBeInTheDocument()
     expect(await screen.findByText(/^Checked in this app on .+: every digest of the chain holds \(25 events\)/)).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Verification of WEB-48: Fix the footer links" })).toBeInTheDocument()
     expect(screen.getByText(t.verdict.trustedSameMachine)).toBeInTheDocument()
     expect(screen.getByText(t.verdict.runnerFacts)).toBeInTheDocument()
     expect(screen.queryByText(t.checking)).not.toBeInTheDocument()
+  })
+
+  it("R159 de #552, second tour, V4 : rien du dossier avant la fin de sa vérification, pas même le titre de la demande", async () => {
+    show(tamperedTitle().file)
+
+    // La vue observée avant la fin de sa vérification : le titre de la page, « Checking », et rien d'autre du dossier.
+    expect(screen.getByRole("heading", { name: t.title })).toBeInTheDocument()
+    expect(screen.getByRole("status")).toHaveTextContent(t.checking)
+    expect(document.body.textContent).not.toContain("Fix the header links")
+    expect(document.body.textContent).not.toContain("WEB-48")
+    expect(screen.queryByRole("region", { name: t.sections.request })).not.toBeInTheDocument()
+    expect(await screen.findByText(t.verdict.textsOne)).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain("Fix the header links")
   })
 
   it("une chaîne cassée se dit en tête ; un texte changé n'est pas montré comme la demande", async () => {
@@ -177,9 +190,10 @@ describe("VerificationView", () => {
 
   it("R161 B1, M6 et F5 : la page ne s'exporte qu'une fois vérifiée, en un fichier qui dit ce qui a été vérifié, et porte son dossier", async () => {
     show(example())
-    const download = screen.getByRole("button", { name: t.record.download })
-    expect(download).toBeDisabled()
+    // Rien du dossier, ni son export, avant la fin de la vérification (V4).
+    expect(screen.queryByRole("button", { name: t.record.download })).not.toBeInTheDocument()
     await screen.findByText(/^Checked in this app on/)
+    const download = screen.getByRole("button", { name: t.record.download })
     expect(download).toBeEnabled()
 
     fireEvent.click(download)
@@ -208,6 +222,7 @@ describe("VerificationView", () => {
 
   it("R161 M6 : offre le dossier lui-même, en JSON, à côté de la page", async () => {
     show(example())
+    await screen.findByText(/^Checked in this app on/)
 
     fireEvent.click(screen.getByRole("button", { name: t.record.downloadRecord }))
     expect(downloadEvidence).toHaveBeenCalledWith("acme", 42, "json")
