@@ -558,8 +558,12 @@ public class MissionEvidenceService {
                     data.put("served", agent.served().stream().filter(m -> m != null && !m.isBlank())
                         .map(m -> EvidenceIntake.clip(m.strip(), 120)).toList());
                 }
-                // D'où le runner a lu le fournisseur : la configuration du lancement (R159, second tour, L-c).
+                // D'où le runner a lu le fournisseur : la configuration du lancement (R159, second tour, L-c) ; et ce qu'il
+                // n'en lit pas, que le dossier dit plutôt que de le deviner (troisième tour, c-a).
                 if (agent != null && agent.providerFrom() != null) data.put("providerFrom", blankToNull(agent.providerFrom()));
+                if (agent != null && agent.providerUnread() != null && !agent.providerUnread().isEmpty()) {
+                    data.put("providerUnread", agent.providerUnread().stream().filter(s -> s != null && !s.isBlank()).map(String::strip).toList());
+                }
                 // Anthropic ne donne pas d'empreinte du modèle servi : la version datée du modèle en tient lieu.
                 data.put("fingerprint", null);
                 data.put("text", EvidenceIntake.clip(event.text(), MAX_TEXT));

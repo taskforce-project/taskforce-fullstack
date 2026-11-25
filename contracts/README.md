@@ -148,8 +148,12 @@ TaskForce looks for, so "none of these files changed", never "the tests are the 
 the model the configuration asked for (`configured`), each model the answers named (`served`), and who serves it
 (`provider`: `anthropic`, `amazon-bedrock`, `google-vertex`, or `another-endpoint`), as the configuration said when
 the agent was launched (`providerFrom: launch-configuration`): the runner's environment, then the `env` of Claude
-Code's user settings and of the organization's managed settings. The repository's settings are not read: the runner
-launches Claude Code without them.
+Code's user settings and of the organization's managed settings files, where Claude Code reads them
+(`managed-settings.json` and the `*.json` of `managed-settings.d/` next to it, in `C:\Program Files\ClaudeCode`,
+`/Library/Application Support/ClaudeCode` or `/etc/claude-code`, as https://code.claude.com/docs/en/managed-settings
+describes). The repository's settings are not read: the runner launches Claude Code without them. What the runner
+cannot read is listed rather than guessed (`providerUnread`): the Windows registry policy or macOS managed preferences,
+and the settings Anthropic's server pushes; any of them may name another provider.
 
 ### Gaps and the cap
 

@@ -517,6 +517,18 @@ class MissionEvidenceServiceTest {
                     "sonnet", List.of(), "launch-configuration"), null));
 
             assertThat(data(0).get("providerFrom").asText()).isEqualTo("launch-configuration");
+            assertThat(data(0).has("providerUnread")).isFalse();
+        }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-a : le dossier dit ce que le runner ne lit pas, le registre et les réglages du serveur")
+        void the_record_says_what_the_runner_does_not_read() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "anthropic",
+                    "sonnet", List.of(), "launch-configuration", List.of("windows-registry", "server-managed-settings")), null));
+
+            assertThat(data(0).get("providerUnread")).extracting(JsonNode::asText)
+                .containsExactly("windows-registry", "server-managed-settings");
         }
 
         @Test
