@@ -2309,8 +2309,10 @@ export const CONSTANTS_EN = {
     // The first lines: what the page checked, where and when.
     verdict: {
       holds: "Checked in this app on {date}: every digest of the chain holds ({events} events), the header comes from the chain, and the {texts} texts kept beside it match their digests.",
+      holdsOne: "Checked in this app on {date}: every digest of the chain holds ({events} events), the header comes from the chain, and the one text kept beside it matches its digest.",
       holdsNoTexts: "Checked in this app on {date}: every digest of the chain holds ({events} events) and the header comes from the chain.",
       holdsTextsOnly: "Checked in this app on {date}: every digest of the chain holds ({events} events), and the {texts} texts kept beside it match their digests.",
+      holdsTextsOnlyOne: "Checked in this app on {date}: every digest of the chain holds ({events} events), and the one text kept beside it matches its digest.",
       holdsChainOnly: "Checked in this app on {date}: every digest of the chain holds ({events} events).",
       holdsOlder: "Checked in this app on {date}: every digest of the chain holds ({events} events). The chain does not cover the header: the mission started before TaskForce 1.18.",
       legacy: "Its chain names people by their email, as records did before TaskForce 1.18: this page hides each of them.",
@@ -2441,6 +2443,7 @@ export const CONSTANTS_EN = {
       owner: "Answered for by {owner}.",
       bundle: "Rules version {version} (digest {digest}).",
       counts: "{judged} actions judged by the rules before they ran, the pushes included: {asked} waited for a person, {refused} refused.",
+      countsOne: "1 action judged by the rules before it ran, the pushes included: {asked} waited for a person, {refused} refused.",
       noRules: "The rules are not in this file: a third party cannot judge the actions again.",
       noDecision: "No action was judged by the rules.",
       final: "Whatever the rules say, the change itself waits for a person: TaskForce merges nothing on its own.",
@@ -2454,6 +2457,7 @@ export const CONSTANTS_EN = {
       proof: "The full output is kept on that computer (digest {digest}).",
       definitions: "None of these files, which define how the tests run, changed during the mission: {paths}. It is the list TaskForce looks for, not a proof that the tests are the same.",
       rules: "Each of the {total} actions was judged by the rules before it ran.",
+      rulesOne: "The one action of the mission was judged by the rules before it ran.",
       byRules: "Checked by code: the rules engine, with no model.",
       none: "The record names no check of this mission.",
       noneYet: "No check yet: the mission is still running.",

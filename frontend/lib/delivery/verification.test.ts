@@ -4,7 +4,7 @@ import { CONSTANTS_EN } from "@/lib/constants_en"
 
 import {
   brokenChain, chained, example, exampleKey, inheritedTicks, lateSealed, manyFiles, olderFailed, rechained, resealed, rewrittenResealed, running,
-  tamperedTitle,
+  salted, tamperedTitle,
 } from "./__tests__/records"
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
@@ -635,6 +635,27 @@ describe("R161 N11 du second tour de #552 : « 1 text », au singulier", () => {
     expect(verdict.join(" ")).not.toContain("1 texts")
     delete texts[started.request.description.sha256]
     expect(verdictLines(verificationPage(one, await checkRecord(one, [], at)), t).map((l) => l.text)).toContain(t.verdict.erased.replace("{count}", "2"))
+  })
+
+  it("un seul texte gardé, une seule action jugée : au singulier aussi, comme les captures du second tour l'ont montré", async () => {
+    const title = salted("Fix the footer links")
+    const events = [
+      { type: "mission.started", data: { mission: 7, workspace: "acme", issue: "WEB-50", accountable: `who:${"1".repeat(32)}`, request: { title: title.ref } } },
+      { type: "action.decided", actor: { kind: "rule", id: "read-files" }, data: { kind: "decision", effect: "allow", tool: "Read", facts: [{ action: "read", path: "src/a.ts" }] } },
+      { type: "mission.ended", data: { status: "DONE" } },
+    ]
+    const kept = Object.fromEntries([title.entry])
+    const file = chained(events, { mission: { id: 7, workspace: "acme", issue: "WEB-50" }, texts: kept })
+    const page = verificationPage(file, await checkRecord(file, [], at))
+    expect(verdictLines(page, t)[0]?.text).toMatch(/holds \(3 events\), the header comes from the chain, and the one text kept beside it matches its digest\.$/)
+    const sections = verificationSections(page, t, context)
+    expect(texts(sections, "checks")).toContain("The one action of the mission was judged by the rules before it ran.")
+    expect(texts(sections, "classification")).toContain("1 action judged by the rules before it ran, the pushes included: 0 waited for a person, 0 refused.")
+    // Sans l'en-tête : la chaîne et le texte seuls, au singulier encore.
+    const bare = chained(events, { texts: kept })
+    expect(verdictLines(verificationPage(bare, await checkRecord(bare, [], at)), t)[0]?.text)
+      .toMatch(/holds \(3 events\), and the one text kept beside it matches its digest\.$/)
+    expect(JSON.stringify(sections) + JSON.stringify(verdictLines(page, t))).not.toMatch(/\b1 (texts|actions)\b|Each of the 1 /)
   })
 })
 

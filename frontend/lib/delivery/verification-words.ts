@@ -230,7 +230,10 @@ function verdictOf(page: VerificationPage, t: Texts, desktop: boolean): Line[] {
   const clean = headerHolds && changed === 0 && d.texts.unnamed.length === 0
   // La première ligne ne dit que ce qui a été vérifié : l'en-tête tiré de la chaîne seulement quand il l'est (R159 de #552,
   // second tour, V3).
-  const first = headerHolds ? (textsHold ? v.holds : v.holdsNoTexts) : (textsHold ? v.holdsTextsOnly : v.holdsChainOnly)
+  // Un seul texte se dit au singulier, comme « 1 text » plus bas (R161 N11 du second tour de #552).
+  const one = d.texts.matches.length === 1
+  let first: string = headerHolds ? v.holdsNoTexts : v.holdsChainOnly
+  if (textsHold) first = headerHolds ? (one ? v.holdsOne : v.holds) : (one ? v.holdsTextsOnlyOne : v.holdsTextsOnly)
   if (page.older) lines.push({ text: fillText(v.holdsOlder, { date, events: page.record.events }), tone: "ok" })
   else lines.push({ text: fillText(first, { date, events: page.record.events, texts: d.texts.matches.length }), tone: clean ? "ok" : undefined })
   // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : la page le dit avant d'en masquer un (N4).
@@ -440,7 +443,7 @@ function classification(page: VerificationPage, t: Texts): Line[] {
     lines.push({ text: fillText(c.heaviest, { action, reason: h.rule.reason ?? h.rule.id, id: h.rule.id, class: c.classes[h.class] }) })
     if (h.rule.owner) lines.push({ text: fillText(c.owner, { owner: whoWords(h.rule.owner, t) }), tone: "muted" })
   }
-  if (k.judged > 0) lines.push({ text: fillText(c.counts, { judged: k.judged, asked: k.asked, refused: k.refused }) })
+  if (k.judged > 0) lines.push({ text: fillText(k.judged === 1 ? c.countsOne : c.counts, { judged: k.judged, asked: k.asked, refused: k.refused }) })
   else lines.push({ text: c.noDecision, tone: "warn" })
   if (k.version !== null || k.digest) lines.push({ text: fillText(c.bundle, { version: k.version ?? "?", digest: short(k.digest) }), tone: "muted" })
   if (!k.rulesKnown) lines.push({ text: c.noRules, tone: "warn" })
@@ -463,7 +466,7 @@ function checks(page: VerificationPage, t: Texts): Line[] {
       // Ce que le runner a regardé : une liste, jamais « les tests sont les mêmes » (second tour de #551, L-b).
       if (check.definitions.length > 0) lines.push({ text: fillText(t.checks.definitions, { paths: quoted(check.definitions) }), tone: "muted" })
     } else {
-      lines.push({ text: fillText(t.checks.rules, { total: check.total ?? 0 }) })
+      lines.push({ text: check.total === 1 ? t.checks.rulesOne : fillText(t.checks.rules, { total: check.total ?? 0 }) })
       lines.push({ text: t.checks.byRules, tone: "muted" })
     }
   }
