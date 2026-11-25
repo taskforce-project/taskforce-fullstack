@@ -416,7 +416,8 @@ function classification(page: VerificationPage, t: Texts): Line[] {
   }
   if (k.heaviest) {
     const h = k.heaviest
-    const action = h.what ? fillText(c.heaviestWhat, { tool: h.tool ?? "", what: h.what }).trim() : fillText(c.heaviestTool, { tool: h.tool ?? "?" })
+    // Les mots des décisions, jamais « WebSearch » (R161 N10), et l'objet cité comme celui de l'agent (v-f).
+    const action = actionOf(h.tool, h.what, t)
     lines.push({ text: fillText(c.heaviest, { action, reason: h.rule.reason ?? h.rule.id, id: h.rule.id, class: c.classes[h.class] }) })
     if (h.rule.owner) lines.push({ text: fillText(c.owner, { owner: whoWords(h.rule.owner, t) }), tone: "muted" })
   }
@@ -458,7 +459,8 @@ function notCheckedLine(item: NotChecked, t: Texts): Line {
   const n = t.notChecked
   switch (item.kind) {
     case "noTests": return { text: n.noTests, tone: "warn" }
-    case "testsNotRun": return { text: fillText(n.testsNotRun, { why: item.why ?? "" }), tone: "warn" }
+    // La raison, telle que le runner l'a rapportée, citée comme la sienne (v-f).
+    case "testsNotRun": return { text: item.why ? fillText(n.testsNotRun, { why: item.why }) : n.testsNotRunNoWhy, tone: "warn" }
     case "testsFailed": return { text: n.testsFailed, tone: "warn" }
     case "testsOwnDefinition": {
       // La commande de test du projet, dans TaskForce, n'est pas un fichier de la branche (second tour de #551, L-b).
@@ -483,10 +485,18 @@ function notCheckedLine(item: NotChecked, t: Texts): Line {
 
 /** Ce qu'un accord a accordé, avec son objet d'abord (R161 F3) : la recherche, la commande telle que l'agent l'a écrite. */
 function actionWords(d: PageDecision, t: Texts): string {
+  return actionOf(d.tool, d.action, t)
+}
+
+/**
+ * Une action en mots, jamais par le nom d'un outil (R161 N10), et l'objet qu'en dit l'agent toujours cité comme le sien :
+ * la recherche, la page lue, le fichier écrit ou changé, la commande (R159 de #552, second tour, v-f).
+ */
+function actionOf(rawTool: string | null, what: string | null, t: Texts): string {
   const a = t.decisions.actions as Record<string, string>
-  if (!d.action) return t.decisions.actions.unknown
-  const tool = d.tool === "MultiEdit" ? "Edit" : d.tool
-  return fillText((tool && a[tool]) || a.other, { what: d.action })
+  if (!what) return t.decisions.actions.unknown
+  const tool = rawTool === "MultiEdit" ? "Edit" : rawTool
+  return fillText((tool && a[tool]) || a.other, { what })
 }
 
 function decisionWords(d: PageDecision, t: Texts): string {

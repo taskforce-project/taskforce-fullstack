@@ -60,7 +60,10 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(t.classification.notComputed).not.toContain("Below")
     expect(lines.some((l) => l.startsWith("The branch was pushed under the rule"))).toBe(true)
     expect(lines.some((l) => l.startsWith("The pull request was opened under the rule"))).toBe(true)
-    expect(lines.some((l) => l.startsWith("Heaviest action of the mission: WebSearch “docs.example.com footer links”"))).toBe(true)
+    // R161 N10 et v-f du second tour de #552 : les mots des décisions, jamais le nom d'un outil, et l'objet cité comme celui
+    // de l'agent.
+    expect(lines.some((l) => l.startsWith("Heaviest action of the mission: a web search for “docs.example.com footer links”, as the agent wrote it,"))).toBe(true)
+    expect(lines.join(" ")).not.toContain("WebSearch")
     expect(lines.join(" ")).not.toMatch(/Class of the change/)
     // La copie du paquet nomme qui répond de la règle par son identifiant ; la page le dit par son nom (second tour, N3).
     expect(JSON.stringify(example().rules)).toMatch(/"owner":"who:[0-9a-f]{32}"/)
@@ -82,7 +85,7 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(approval).toMatchObject({ decision: "ALLOWED", who: { kind: "named", name: "Ada" }, tool: "WebSearch", ruleId: "search-web", scope: "ONCE" })
     const lines = texts(verificationSections(page, t, context), "decisions")
     expect(lines[0]).toBe("Final decision: Applied by Ada.")
-    expect(lines.some((l) => /^Ada allowed a web search for “docs\.example\.com footer links”, \d{4}-\d\d-\d\d \d\d:\d\d UTC, in TaskForce\.$/.test(l))).toBe(true)
+    expect(lines.some((l) => /^Ada allowed a web search for “docs\.example\.com footer links”, as the agent wrote it, \d{4}-\d\d-\d\d \d\d:\d\d UTC, in TaskForce\.$/.test(l))).toBe(true)
     expect(lines.some((l) => /^Under the rule “.+” \(search-web\)\.$/.test(l))).toBe(true)
   })
 
@@ -542,6 +545,30 @@ describe("R161 N1 et R159 V1, second tour de #552 : un dossier changé se voit d
   it("un dossier qui tient, et ses réserves ordinaires (la clé, le runner) : aucune alerte", async () => {
     expect(await alertOf(example())).toEqual([])
     expect(await alertOf(tamperedTitle().file)).toEqual([])
+  })
+})
+
+describe("v-f du second tour de #552 : les mots de l'agent, tous cités comme les siens", () => {
+  it("la page lue, le fichier d'un accord, la raison des tests qui n'ont pas tourné", () => {
+    const approvals = (tool: string, summary: string) => [
+      { type: "action.decided", data: { approval: 1, effect: "ask", tool, summary, rule: "x" } },
+      { type: "human.decision", actor: { kind: "person", id: "ada" }, data: { approval: 1, decision: "ALLOWED", tool, summary } },
+    ]
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: "ada" } },
+      ...approvals("WebFetch", "https://docs.example.com/footer"),
+      ...approvals("Write", "src/footer.tsx"),
+      ...approvals("Edit", "src/header.tsx"),
+      { type: "test.result", actor: { kind: "runner", id: "r" }, data: { kind: "test", ran: false, text: "npm test: command not found" } },
+      { type: "mission.ended", data: { status: "DONE" } },
+    ]))
+    const decisions = texts(verificationSections(page, t, context), "decisions").join(" ")
+    expect(decisions).toContain("reading the page “https://docs.example.com/footer”, as the agent named it")
+    expect(decisions).toContain("writing “src/footer.tsx”, as the agent named it")
+    expect(decisions).toContain("a change to “src/header.tsx”, as the agent named it")
+    expect(texts(verificationSections(page, t, context), "notChecked")).toContain(
+      "The tests did not run, as the runner reported it: “npm test: command not found”")
+    expect(Object.keys(t)).not.toContain("asTheAgentNamedIt")
   })
 })
 

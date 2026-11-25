@@ -2296,7 +2296,6 @@ export const CONSTANTS_EN = {
     showFewerFiles: "Show fewer files",
     showMore: "Show the rest of the summary",
     showLess: "Show less of the summary",
-    asTheAgentNamedIt: "as the agent named it",
     // A record changed after it was written, told apart from the reserves every sound record carries.
     changedRecord: {
       title: "This record was changed after it was written",
@@ -2427,8 +2426,6 @@ export const CONSTANTS_EN = {
       exitWho: "Rule {id}, version {version}, written by {author}.",
       noExit: "Nothing left the agent's copy under a rule the record names.",
       heaviest: "Heaviest action of the mission: {action}, under the rule “{reason}” ({id}): {class}.",
-      heaviestTool: "the tool {tool}",
-      heaviestWhat: "{tool} “{what}”",
       author: {
         taskforce: "TaskForce, in its default rules",
         layer: "{who}, in the {layer} rules",
@@ -2456,7 +2453,8 @@ export const CONSTANTS_EN = {
     },
     notChecked: {
       noTests: "No test is configured for this project: nothing was tested.",
-      testsNotRun: "The tests did not run: {why}",
+      testsNotRun: "The tests did not run, as the runner reported it: “{why}”",
+      testsNotRunNoWhy: "The tests did not run, and the runner did not say why.",
       testsFailed: "The tests failed: the change was not shown to work.",
       testsOwnDefinition: "The branch changed {paths}, which defines how its tests run: the tests ran as the agent's version defines them, so their result is not a check.",
       testsOwnDefinitionAndCommand: "The branch changed {paths}, which defines how its tests run, and the project's test command in TaskForce changed during the mission: the tests ran as they were then defined, so their result is not a check.",
@@ -2501,11 +2499,11 @@ export const CONSTANTS_EN = {
         runner: "by the runner, on the computer where the agent works",
       },
       actions: {
-        WebSearch: "a web search for “{what}”",
-        WebFetch: "reading the page “{what}”",
+        WebSearch: "a web search for “{what}”, as the agent wrote it",
+        WebFetch: "reading the page “{what}”, as the agent named it",
         Bash: "the command “{what}”, as the agent wrote it",
-        Write: "writing “{what}”",
-        Edit: "a change to “{what}”",
+        Write: "writing “{what}”, as the agent named it",
+        Edit: "a change to “{what}”, as the agent named it",
         other: "“{what}”, as the agent wrote it",
         unknown: "an action the record does not describe",
       },
