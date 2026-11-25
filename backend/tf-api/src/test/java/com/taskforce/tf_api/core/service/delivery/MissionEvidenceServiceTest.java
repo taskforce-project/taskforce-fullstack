@@ -304,10 +304,38 @@ class MissionEvidenceServiceTest {
             // Le même paquet, membre pour membre : la copie ne réécrit rien.
             assertThat(CanonicalJson.of(copy)).isEqualTo(CanonicalJson.of(JSON.valueToTree(live)));
             assertThat(copy.get("digest").asText()).isEqualTo(digest).isEqualTo(data(0).get("rules").get("digest").asText());
+            // Rien de récrit : une seule empreinte, celle du runner (d-a).
+            assertThat(data(0).get("rules").has("issuedDigest")).isFalse();
+            assertThat(data(0).get("rules").has("rewritten")).isFalse();
             assertThat(copy.get("layers").get(0).get("digest").asText()).isEqualTo(layerDigest);
             // Ada a délégué, Bob a écrit l'issue, Carol répond d'une règle : chacun est présenté par sa note, une fois.
             assertThat(stored.stream().filter(e -> e.getData().contains("\"kind\":\"person\"")).map(e -> e.getData()))
                 .hasSize(3).anySatisfy(note -> assertThat(note).contains(ada7)).anySatisfy(note -> assertThat(note).contains(carol9));
+        }
+
+        @Test
+        @DisplayName("R159 de #551, quatrième tour, d-a : un paquet d'aujourd'hui dont une règle nomme un approbateur par son compte ; "
+            + "le dossier le récrit, garde l'empreinte que le runner a vérifiée, et dit ce qu'il a récrit")
+        void a_rewritten_bundle_keeps_the_runner_s_digest() throws Exception {
+            User carol = User.builder().id(9L).email("carol@taskforce.dev").displayName("Carol").build();
+            lenient().when(users.findById(9L)).thenReturn(Optional.of(carol));
+            String carol9 = service.personId(3L, carol);
+            RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
+                null, null, null, null), "reversible-exit", "ask", null, carol9, "Ask Carol first.", "2027-01-01", "workspace",
+                "Ask Carol first.", new RulesBundle.Require(List.of("person:9"), 1, false));
+            RulesBundle unsigned = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, null, null, List.of(ledger), null, null);
+            String digest = com.taskforce.tf_api.core.harness.rules.RulesDigest.of(JSON.valueToTree(unsigned));
+            RulesBundle live = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, digest, null, List.of(ledger), null, null);
+
+            service.open(run, live, "tf-runner-ada", Map.of());
+
+            JsonNode copy = JSON.readTree(rows.get(100L).getRulesBundle());
+            JsonNode rules = data(0).get("rules");
+            assertThat(copy.get("rules").get(0).get("require").get("approvers")).extracting(JsonNode::asText).containsExactly(carol9);
+            assertThat(rules.get("digest").asText()).isEqualTo(copy.get("digest").asText()).isNotEqualTo(digest);
+            // L'empreinte que le runner a vérifiée n'était nulle part : elle reste, avec ce qui a été récrit.
+            assertThat(rules.get("issuedDigest").asText()).isEqualTo(digest);
+            assertThat(rules.get("rewritten")).extracting(JsonNode::asText).containsExactly("approvers");
         }
 
         @Test
@@ -350,6 +378,10 @@ class MissionEvidenceServiceTest {
             // règles nommées comme le dossier les nomme : aucune ne confirme un courriel une fois effacé.
             assertThat(copy.get("digest").asText()).isEqualTo(com.taskforce.tf_api.core.harness.rules.RulesDigest.of(copy))
                 .isNotEqualTo(DIGEST).isEqualTo(data(0).get("rules").get("digest").asText());
+            // L'empreinte que le runner a vérifiée reste dans la chaîne, avec ce qui a été récrit (R159 de #551, d-a).
+            assertThat(data(0).get("rules").get("issuedDigest").asText()).isEqualTo(DIGEST);
+            assertThat(data(0).get("rules").get("rewritten")).extracting(JsonNode::asText)
+                .containsExactly("approvers", "owners", "person-layer");
             String layerDigest = copy.get("layers").get(0).get("digest").asText();
             assertThat(layerDigest).isNotEqualTo(liveLayerDigest).isEqualTo(data(0).get("rules").get("layers").get(0).get("digest").asText());
             assertThat(data(0).get("rules").get("layers").get(0).get("ref").asText()).isEqualTo(bob8);
