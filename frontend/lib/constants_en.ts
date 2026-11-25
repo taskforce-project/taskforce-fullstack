@@ -2297,6 +2297,11 @@ export const CONSTANTS_EN = {
     showMore: "Show the rest of the summary",
     showLess: "Show less of the summary",
     asTheAgentNamedIt: "as the agent named it",
+    // A record changed after it was written, told apart from the reserves every sound record carries.
+    changedRecord: {
+      title: "This record was changed after it was written",
+      says: "What the changed record says:",
+    },
     // The first lines: what the page checked, where and when.
     verdict: {
       holds: "Checked in this app on {date}: every digest of the chain holds ({events} events), the header comes from the chain, and the {texts} texts kept beside it match their digests.",

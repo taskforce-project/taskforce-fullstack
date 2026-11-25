@@ -40,6 +40,11 @@ export interface Line {
   readonly link?: string
   /** Une longue liste (les fichiers), repliée au-delà de `fold` lignes (R161 M1). */
   readonly list?: { readonly lines: readonly Line[]; readonly fold: number }
+  /**
+   * Le dossier a changé après coup : la chaîne casse, l'en-tête, le sceau ou le témoin ne tiennent pas. Ces lignes du verdict
+   * vont dans une alerte à part, distincte des réserves que porte tout dossier sain (R161 N1, R159 V1 de #552).
+   */
+  readonly alert?: boolean
 }
 
 export interface Section {
@@ -193,9 +198,10 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   if (!c) return [{ text: t.checking, tone: "muted" }]
   const v = t.verdict
   const date = when(c.at)
-  if (c.chain === "link") return [{ text: fillText(v.link, { date, event: c.brokenAt ?? "?" }), tone: "warn" }]
-  if (c.chain === "root") return [{ text: fillText(v.root, { date }), tone: "warn" }]
-  if (c.chain !== "holds" || !c.details) return [{ text: fillText(v.unreadable, { date }), tone: "warn" }]
+  // Ce qui dit un dossier changé après coup va dans une alerte à part (R161 N1, R159 V1 de #552).
+  if (c.chain === "link") return [{ text: fillText(v.link, { date, event: c.brokenAt ?? "?" }), tone: "warn", alert: true }]
+  if (c.chain === "root") return [{ text: fillText(v.root, { date }), tone: "warn", alert: true }]
+  if (c.chain !== "holds" || !c.details) return [{ text: fillText(v.unreadable, { date }), tone: "warn", alert: true }]
   const d = c.details
   const changed = d.texts.changed.length
   const lines: Line[] = []
@@ -207,7 +213,7 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : la page le dit avant d'en masquer un (N4).
   if (page.legacy) lines.push({ text: v.legacy, tone: "muted" })
   if (d.header.differs.length > 0 || d.header.missing.length > 0) {
-    lines.push({ text: fillText(v.header, { fields: [...d.header.differs, ...d.header.missing].join(", ") }), tone: "warn" })
+    lines.push({ text: fillText(v.header, { fields: [...d.header.differs, ...d.header.missing].join(", ") }), tone: "warn", alert: true })
   }
   if (changed > 0) lines.push({ text: changed === 1 ? v.textsOne : fillText(v.texts, { count: changed }), tone: "warn" })
   if (d.texts.unnamed.length > 0) lines.push({ text: v.unnamed, tone: "warn" })
@@ -224,7 +230,7 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
     case "trusted": lines.push(sameMachine ? { text: v.trustedSameMachine, tone: "warn" } : { text: v.trusted, tone: "ok" }); break
     case "self": lines.push({ text: c.keysKnown ? v.self : v.selfNoKeys, tone: "warn" }); break
     case "none": lines.push({ text: page.running ? v.notSealedRunning : v.notSealedEnded, tone: "warn" }); break
-    case "broken": lines.push({ text: v.broken, tone: "warn" }); break
+    case "broken": lines.push({ text: v.broken, tone: "warn", alert: true }); break
     case "unchecked": lines.push({ text: v.unchecked, tone: "warn" }); break
   }
   // Un sceau tardif tient, mais ne prouve rien d'avant sa date (R159, second tour de #551, N5).
@@ -235,11 +241,16 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   // le sceau (R159 de #552, second tour, V1).
   for (const witness of d.witnesses) {
     if (witness.written && !witness.holds) {
-      lines.push({ text: fillText(v.witnessBroken, { seq: witness.at ?? "?", root: short(witness.root) }), tone: "warn" })
+      lines.push({ text: fillText(v.witnessBroken, { seq: witness.at ?? "?", root: short(witness.root) }), tone: "warn", alert: true })
     }
   }
   if (d.runnerFacts) lines.push({ text: v.runnerFacts, tone: "warn" })
   return lines
+}
+
+/** Les lignes de l'alerte d'un dossier changé après coup, à part du reste du verdict ; vide pour un dossier qui tient. */
+export function alertLines(verdict: readonly Line[]): Line[] {
+  return verdict.filter((line) => line.alert === true)
 }
 
 /** La phrase d'abord (R161 M1) : qui a demandé quoi, ce qui a changé, ce qui a été vérifié, qui a tranché. */

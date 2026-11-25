@@ -8,8 +8,8 @@ import {
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
 import {
-  exportHowTo, inlineParts, linkable, pageTitle, short, summaryBlocks, summarySentence, verdictLines, verificationSections, when, whoWords,
-  type Section,
+  alertLines, exportHowTo, inlineParts, linkable, pageTitle, short, summaryBlocks, summarySentence, verdictLines, verificationSections, when,
+  whoWords, type Section,
 } from "./verification-words"
 
 /**
@@ -157,7 +157,7 @@ describe("R161 B1, R159 P5 : la page dit ce qu'elle a vérifié, où et quand", 
   it("une chaîne cassée se dit en tête, avec l'événement où elle casse", async () => {
     const { file, at: seq } = brokenChain()
     const lines = verdictLines(verificationPage(file, await checkRecord(file, [], at)), t)
-    expect(lines).toEqual([{ text: `Checked in this app on 2026-11-24 09:00 UTC: this record was changed after it was written. Its chain breaks at event ${seq}, so nothing below can be trusted.`, tone: "warn" }])
+    expect(lines).toEqual([{ text: `Checked in this app on 2026-11-24 09:00 UTC: this record was changed after it was written. Its chain breaks at event ${seq}, so nothing below can be trusted.`, tone: "warn", alert: true }])
   })
 
   it("un texte changé se dit à sa place, et n'est pas montré comme la demande", async () => {
@@ -442,6 +442,29 @@ describe("le reste du dossier, dit en clair", () => {
     expect(when("2026-11-22T08:00:00.000Z")).toBe("2026-11-22 08:00 UTC")
     expect(when(null)).toBe("?")
     expect(when("not a date")).toBe("not a date")
+  })
+})
+
+describe("R161 N1 et R159 V1, second tour de #552 : un dossier changé se voit d'un coup d'œil", () => {
+  const alertOf = async (file: ReturnType<typeof example>, keys: string[] = [exampleKey()]) =>
+    alertLines(verdictLines(verificationPage(file, await checkRecord(file, keys, at)), t)).map((l) => l.text)
+
+  it("la chaîne cassée, l'en-tête changé, le sceau qui ne tient pas, le témoin qui ne tient pas : chacun dans l'alerte", async () => {
+    expect((await alertOf(brokenChain().file)).join(" ")).toMatch(/Its chain breaks at event \d+/)
+    const header = example()
+    header.mission = { ...(header.mission ?? {}), requestedBy: "who:00000000000000000000000000000000" }
+    expect(await alertOf(header)).toEqual([t.verdict.header.replace("{fields}", "requestedBy")])
+    const seal = example()
+    const envelope = seal.seal as { signatures: Array<{ keyid: string; sig: string }> }
+    envelope.signatures = envelope.signatures.map((s) => ({ ...s, sig: `${s.sig.slice(0, -4)}AAA=` }))
+    expect(await alertOf(seal)).toEqual([t.verdict.broken])
+    const { file, key } = rewrittenResealed("separate-machine")
+    expect((await alertOf(file, [key])).join(" ")).toContain("The witness in the pull request names event 23")
+  })
+
+  it("un dossier qui tient, et ses réserves ordinaires (la clé, le runner) : aucune alerte", async () => {
+    expect(await alertOf(example())).toEqual([])
+    expect(await alertOf(tamperedTitle().file)).toEqual([])
   })
 })
 

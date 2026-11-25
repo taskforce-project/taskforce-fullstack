@@ -70,6 +70,25 @@ describe("VerificationView", () => {
     expect(document.body.textContent).not.toContain("Fix the header links")
   })
 
+  it("R161 N1 : une chaîne cassée se dit dans une alerte à part, et la phrase vient après « What the changed record says: »", async () => {
+    show(brokenChain().file)
+
+    const alert = await screen.findByRole("alert")
+    expect(within(alert).getByText(t.changedRecord.title)).toBeInTheDocument()
+    expect(within(alert).getByText(/Its chain breaks at event \d+/)).toBeInTheDocument()
+    const says = screen.getByText(t.changedRecord.says)
+    const sentence = screen.getByText(/^Ada asked for “Fix the footer links”/)
+    expect(says.compareDocumentPosition(sentence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(alert.compareDocumentPosition(says) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("un dossier sain n'a pas d'alerte, même avec ses réserves ordinaires", async () => {
+    show(example())
+    await screen.findByText(/^Checked in this app on/)
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(screen.queryByText(t.changedRecord.says)).not.toBeInTheDocument()
+  })
+
   it("une chaîne cassée se dit en tête ; un texte changé n'est pas montré comme la demande", async () => {
     const { unmount } = show(brokenChain().file)
     expect(await screen.findByText(/this record was changed after it was written\. Its chain breaks at event \d+/)).toBeInTheDocument()

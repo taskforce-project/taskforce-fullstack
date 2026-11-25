@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import { CONSTANTS_EN } from "@/lib/constants_en"
 
-import { example, exampleKey } from "./__tests__/records"
+import { brokenChain, example, exampleKey } from "./__tests__/records"
 import { verificationPage } from "./verification"
 import { checkRecord } from "./verification-check"
 import { CONTENT_SECURITY_POLICY, embedJson, escapeHtml, verificationHtml, type ExportHead } from "./verification-html"
-import { FOLD, pageTitle, summarySentence, verdictLines, verificationSections, type Section } from "./verification-words"
+import { alertLines, FOLD, pageTitle, summarySentence, verdictLines, verificationSections, type Section } from "./verification-words"
 
 /**
  * La page exportée avec son dossier (R212) : un fichier qui se lit seul, sans code (R159 P6), qui dit en tête ce qui a été
@@ -82,6 +82,20 @@ describe("la page exportée avec son dossier", () => {
     const embedded = /<script type="application\/json" id="taskforce-evidence">([\s\S]*)<\/script>/.exec(html)?.[1] ?? ""
     expect(JSON.parse(embedded)).toEqual(file)
     expect((await checkRecord(JSON.parse(embedded), [exampleKey()], at)).chain).toBe("holds")
+  })
+
+  it("R161 N1 : un dossier changé a son alerte dans la page exportée aussi, et la phrase vient après « What the changed record says: »", async () => {
+    const file = brokenChain().file
+    const page = verificationPage(file, await checkRecord(file, [exampleKey()], at))
+    const verdict = verdictLines(page, t)
+    const html = verificationHtml({ title: "x", assembled: "", verdict: verdict.filter((l) => !l.alert),
+      alert: { title: t.changedRecord.title, lines: alertLines(verdict), says: t.changedRecord.says }, proves: "p", sentence: "THE SENTENCE",
+      notes: [], howTo: "", moreFiles: t.showAllFiles }, [], null)
+    expect(html).toMatch(new RegExp(`<div class="alert" role="alert"><p><strong>${t.changedRecord.title}</strong></p><p>[^<]*Its chain breaks at event \\d+`))
+    expect(html.indexOf(t.changedRecord.says)).toBeLessThan(html.indexOf("THE SENTENCE"))
+    const { html: sound } = await exported()
+    expect(sound).not.toContain("class=\"alert\"")
+    expect(sound).not.toContain(t.changedRecord.says)
   })
 
   it("N4 du second tour de #551 : la page exportée d'un dossier d'avant la 1.18 ne porte pas ce dossier, ni ses courriels", () => {

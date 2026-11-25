@@ -32,7 +32,8 @@ const STYLE = [
   ".agent{border-left:3px solid #999;padding-left:.6rem}.agent h3{font-size:.95em;margin:.5rem 0 .2rem}code{font-size:.9em}",
   "pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f6f6;padding:.6rem;font-size:.85em;border:1px solid #e5e5e5}",
   "header p{color:#444}a{color:#0b57d0;overflow-wrap:anywhere}ul{padding-left:1.2rem}",
-  "@media (prefers-color-scheme:dark){body{background:#141414;color:#eee}.muted{color:#aaa}.warn{color:#f0b35a}.ok{color:#86efac}pre{background:#1f1f1f;border-color:#333}details.section{border-color:#333}header p{color:#bbb}a{color:#8ab4f8}}",
+  ".alert{border-left:4px solid #b91c1c;background:#fef2f2;padding:.5rem .75rem;margin:.5rem 0}header .alert p{color:#7f1d1d}.says{font-weight:600}",
+  "@media (prefers-color-scheme:dark){body{background:#141414;color:#eee}.muted{color:#aaa}.warn{color:#f0b35a}.ok{color:#86efac}pre{background:#1f1f1f;border-color:#333}details.section{border-color:#333}header p{color:#bbb}a{color:#8ab4f8}.alert{background:#2a0f0f;border-color:#ef4444}header .alert p{color:#fca5a5}}",
 ].join("")
 
 /** L'en-tête du fichier : ce qui a été vérifié à l'export, par qui et quand, la phrase, et à qui la page s'adresse. */
@@ -40,6 +41,11 @@ export interface ExportHead {
   readonly title: string
   readonly assembled: string
   readonly verdict: readonly Line[]
+  /**
+   * Un dossier changé après coup : l'alerte, son titre et ses lignes, puis les mots qui précèdent ce que dit le dossier
+   * changé (R161 N1, R159 V1 de #552). Nulle pour un dossier qui tient.
+   */
+  readonly alert?: { readonly title: string; readonly lines: readonly Line[]; readonly says: string } | null
   readonly proves: string
   readonly sentence: string
   readonly notes: readonly string[]
@@ -104,14 +110,18 @@ export function verificationHtml(head: ExportHead, sections: readonly Section[],
   ].join("\n")).join("\n")
   const verdict = head.verdict.map((line) => lineHtml(line, head.moreFiles)).join("")
   const notes = head.notes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")
+  const alert = !head.alert ? ""
+    : `<div class="alert" role="alert"><p><strong>${escapeHtml(head.alert.title)}</strong></p>`
+      + `${head.alert.lines.map((line) => `<p>${escapeHtml(line.text)}</p>`).join("")}</div>`
+  const says = !head.alert ? "" : `<p class="says">${escapeHtml(head.alert.says)}</p>`
   return [
     "<!doctype html>",
     "<html lang=\"en\"><head><meta charset=\"utf-8\">",
     `<meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}">`,
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
     `<title>${escapeHtml(head.title)}</title><style>${STYLE}</style></head><body>`,
-    `<header><h1>${escapeHtml(head.title)}</h1><p class="muted">${escapeHtml(head.assembled)}</p>${verdict}`
-      + `<p class="warn">${escapeHtml(head.proves)}</p><p>${escapeHtml(head.sentence)}</p>${notes}</header>`,
+    `<header><h1>${escapeHtml(head.title)}</h1><p class="muted">${escapeHtml(head.assembled)}</p>${alert}${verdict}`
+      + `<p class="warn">${escapeHtml(head.proves)}</p>${says}<p>${escapeHtml(head.sentence)}</p>${notes}</header>`,
     "<main>",
     body,
     `<section id="verify"><p class="muted">${escapeHtml(head.howTo)}</p></section>`,

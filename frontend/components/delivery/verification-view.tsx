@@ -16,7 +16,7 @@ import { verificationPage, type DossierFile } from "@/lib/delivery/verification"
 import { checkRecord, type RecordCheck } from "@/lib/delivery/verification-check"
 import { verificationHtml } from "@/lib/delivery/verification-html"
 import {
-  exportHowTo, linkable, pageTitle, summarySentence, verdictLines, verificationSections, when, type Block, type Line, type Section,
+  alertLines, exportHowTo, linkable, pageTitle, summarySentence, verdictLines, verificationSections, when, type Block, type Line, type Section,
 } from "@/lib/delivery/verification-words"
 import { IS_DESKTOP } from "@/lib/desktop"
 import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
@@ -257,6 +257,8 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
 
   const heading = pageTitle(page, t)
   const verdict = verdictLines(page, t)
+  // Un dossier changé après coup se voit d'un coup d'œil, à part des réserves de tout dossier sain (R161 N1, R159 V1).
+  const alert = alertLines(verdict)
   const sentence = summarySentence(page, t)
 
   function downloadPage() {
@@ -272,7 +274,8 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
           id,
           workspace: page.mission.workspace ?? slug,
         }),
-        verdict,
+        verdict: verdict.filter((line) => !line.alert),
+        alert: alert.length > 0 ? { title: t.changedRecord.title, lines: alert, says: t.changedRecord.says } : null,
         proves: t.export.proves,
         sentence,
         notes: [t.audience, t.assembled, t.scope],
@@ -297,8 +300,16 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
     <article className="mx-auto flex w-full max-w-3xl flex-col gap-4" aria-labelledby="verification-title">
       <header className="flex flex-col gap-2">
         <h2 id="verification-title" className="text-base font-semibold text-foreground">{heading}</h2>
+        {alert.length > 0 && (
+          <div role="alert" className="flex flex-col gap-1 border-l-4 border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500 dark:bg-red-950/40 dark:text-red-300">
+            <p className="font-semibold">{t.changedRecord.title}</p>
+            <ul className="flex flex-col gap-1">
+              {alert.map((line, i) => <li key={i}>{line.text}</li>)}
+            </ul>
+          </div>
+        )}
         <ul aria-live="polite" className="flex flex-col gap-1">
-          {verdict.map((line, i) => (
+          {verdict.filter((line) => !line.alert).map((line, i) => (
             <li key={i} className={cn("flex items-start gap-2 text-sm", line.tone && TONE[line.tone])}>
               <span>{line.text}</span>
             </li>
@@ -312,6 +323,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
             </button>
           </div>
         )}
+        {alert.length > 0 && <p className="text-sm font-semibold text-foreground">{t.changedRecord.says}</p>}
         <p className="text-sm text-foreground">{sentence}</p>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={downloadPage}
