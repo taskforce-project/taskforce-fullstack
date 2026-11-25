@@ -118,8 +118,12 @@ function logOutcome(outcome: AgentOutcome): void {
 async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, live: LiveMissions, shutdown?: AbortSignal): Promise<void> {
   log.info(`Run #${claim.runId} claimed: ${claim.issueKey} - ${claim.title}`);
   const heartbeat = startHeartbeat(api, claim.runId, HEARTBEAT_MS);
-  // L'agent s'arrête si le runner s'arrête, ou si la personne a arrêté la mission dans TaskForce (R138).
-  const signal = shutdown ? AbortSignal.any([shutdown, heartbeat.closed]) : heartbeat.closed;
+  // TaskForce arrête la mission par la réponse à ses événements : le dossier a atteint son plafond, ou la mission n'est
+  // plus à ce runner (R159 de #551, troisième tour, c-c). Sans attendre le prochain signe de vie.
+  const stopped = new AbortController();
+  // L'agent s'arrête si le runner s'arrête, ou si la personne a arrêté la mission dans TaskForce (R138), ou si TaskForce
+  // l'arrête au plafond du dossier.
+  const signal = AbortSignal.any([...(shutdown ? [shutdown] : []), heartbeat.closed, stopped.signal]);
 
   let result: RunResult;
   let worktree: Worktree | null = null;
@@ -127,7 +131,15 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
   let scratch: string | null = null;
   const liveIndex = liveIndexPath(config.home, claim.runId);
   // La chronologie de la mission, numérotée d'un bout à l'autre du run : un lot perdu laisse un trou que le dossier marque.
-  const relay = new EventRelay(api, claim.runId);
+  const relay = new EventRelay(api, claim.runId, {
+    onStop: (why) => {
+      if (stopped.signal.aborted) return;
+      log.info(why === "cap"
+        ? `Run #${claim.runId}: its record reached its cap in TaskForce, which stops the mission: the agent stops.`
+        : `Run #${claim.runId} ended in TaskForce: the agent stops.`);
+      stopped.abort();
+    },
+  });
   const kept = evidenceDir(config.home, claim.runId);
   let session: RunResult["session"];
   let head: string | undefined;
@@ -319,8 +331,8 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     removeLiveIndex(liveIndex);
   }
 
-  // Close dans TaskForce : le serveur a déjà sa fin, et son dossier est scellé.
-  if (heartbeat.closed.aborted) {
+  // Close dans TaskForce, ou arrêtée par lui au plafond du dossier : le serveur a déjà sa fin, et son dossier est scellé.
+  if (heartbeat.closed.aborted || stopped.signal.aborted) {
     await relay.close();
     log.info(`Run #${claim.runId}: stopped in TaskForce, nothing more is sent.`);
     return;

@@ -366,10 +366,14 @@ describe("le reste du dossier, dit en clair", () => {
 
   it("N2 du second tour de #551 : une décision prise sur un fait coupé pour tenir au dossier ne se rejuge pas, et la page le dit", async () => {
     const file = example()
+    // Coupé comme le runner coupe : 4 000 unités, la marque au bout, qui annonce plus (troisième tour de #551, c-b).
+    const long = `src/${"a".repeat(5000)}.ts`
+    const mark = `\n[TaskForce cut this text here: ${long.length} characters in all]`
+    const cut = `${long.slice(0, 4000 - mark.length)}${mark}`
     const events = file.events.filter((e) => !(e.type === "note" && (e.data as { kind?: unknown } | null)?.kind === "witness")).map((e) => {
       const d = (e.data ?? {}) as Record<string, unknown>
       const facts = e.seq === 7 && Array.isArray(d.facts) ? (d.facts as Array<Record<string, string>>)
-        .map((part) => ({ ...part, path: `${part.path ?? ""}\n[TaskForce cut this text here: 5000 characters in all]` })) : d.facts
+        .map((part) => ({ ...part, path: cut })) : d.facts
       return { type: e.type, at: e.at, actor: e.actor, data: facts === undefined ? d : { ...d, facts } }
     })
     const record = chained(events, { mission: file.mission, rules: file.rules, texts: file.texts })

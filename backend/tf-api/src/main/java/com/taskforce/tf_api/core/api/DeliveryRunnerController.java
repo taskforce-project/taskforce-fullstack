@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerCommandResponse;
+import com.taskforce.tf_api.core.dto.response.RunnerEventsResponse;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerService;
 import com.taskforce.tf_api.core.service.delivery.LocalRunnerSettings;
 import com.taskforce.tf_api.core.service.delivery.MissionChangesService;
@@ -81,15 +82,18 @@ public class DeliveryRunnerController {
         return ResponseEntity.ok(ApiResponse.success("Result saved", null));
     }
 
-    /** POST /api/delivery/runner/runs/{runId}/events : suite de la chronologie en direct du run (OSS-5.3). */
+    /**
+     * POST /api/delivery/runner/runs/{runId}/events : suite de la chronologie en direct du run (OSS-5.3). La réponse dit
+     * quand le dossier a atteint son plafond : le runner arrête alors la mission (R159 de #551, troisième tour, c-c).
+     */
     @PostMapping("/runs/{runId}/events")
-    public ResponseEntity<ApiResponse<Void>> events(
+    public ResponseEntity<ApiResponse<RunnerEventsResponse>> events(
         @AuthenticationPrincipal Jwt jwt,
         @PathVariable Long runId,
         @Valid @RequestBody RunnerEventsRequest request
     ) {
-        localRunnerService.appendEvents(runId, identityResolver.resolve(jwt), request);
-        return ResponseEntity.ok(ApiResponse.success("Events saved", null));
+        RunnerEventsResponse saved = localRunnerService.appendEvents(runId, identityResolver.resolve(jwt), request);
+        return ResponseEntity.ok(ApiResponse.success("Events saved", saved));
     }
 
     /** POST /api/delivery/runner/runs/{runId}/changes : ce que la mission a changé jusqu'ici, relevé par le runner (R139). */

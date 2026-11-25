@@ -15,6 +15,9 @@ public interface MissionPersonRepository extends JpaRepository<MissionPerson, Lo
     /** L'identifiant de cette personne dans cet espace, s'il a déjà été tiré. */
     Optional<MissionPerson> findByWorkspaceIdAndUserId(Long workspaceId, Long userId);
 
+    /** La personne qu'un identifiant de cet espace nomme, tant que son compte n'est pas purgé. */
+    Optional<MissionPerson> findByWorkspaceIdAndPerson(Long workspaceId, String person);
+
     /** Ses identifiants dans tous les espaces : à oublier avec son compte. */
     List<MissionPerson> findByUserId(Long userId);
 }

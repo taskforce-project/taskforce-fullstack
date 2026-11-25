@@ -39,6 +39,20 @@ const lateWords = (seal: SealState, on: string): string => seal === "trusted"
   ? `Sealed late, on ${on}, by the key you trust: it proves the chain as it was on that date, not what happened before.`
   : `Sealed late, on ${on}, by a key the file carries itself: anyone can make this seal. Check it with --key and the key the operator publishes.`;
 
+/**
+ * Ce que la première ligne dit des décisions qu'elle n'a pas pu rejuger (R159, troisième tour, c-b) : prises sur un fait
+ * coupé pour tenir au dossier, ou sans leurs faits. Rien quand il n'y en a pas.
+ */
+function notJudgedWords({ cut, noFacts }: { cut: number; noFacts: number }): string {
+  const total = cut + noFacts;
+  if (total === 0) return "";
+  const parts = [
+    cut > 0 ? `${cut} on ${cut === 1 ? "a fact" : "facts"} cut to fit the record` : null,
+    noFacts > 0 ? `${noFacts} without ${noFacts === 1 ? "its facts" : "their facts"}` : null,
+  ].filter((part): part is string => part !== null);
+  return ` ${total === 1 ? "1 recorded decision was" : `${total} recorded decisions were`} not judged again: ${parts.join(", ")}.`;
+}
+
 export async function verifyEvidence(text: string, options: VerifyOptions = {}): Promise<Verdict> {
   let file: unknown;
   try {
@@ -52,8 +66,9 @@ export async function verifyEvidence(text: string, options: VerifyOptions = {}):
   const record = file as Record<string, unknown>;
   const chain = chainOf(record);
   if (!chain.ok) return { ok: false, message: chain.message, lines: [], seal: "none" };
-  const { lines, seal, lateOn } = await readDossier(record, options);
-  const head = `Every hash holds: ${chain.events.length} events, root ${String(record.root)}. ${lateOn ? lateWords(seal, lateOn) : SEAL_WORDS[seal]}`;
+  const { lines, seal, lateOn, notJudged } = await readDossier(record, options);
+  const head = `Every hash holds: ${chain.events.length} events, root ${String(record.root)}. ${lateOn ? lateWords(seal, lateOn) : SEAL_WORDS[seal]}`
+    + notJudgedWords(notJudged);
   const ok = lines.every((line) => line.level !== "fail");
   return {
     ok,

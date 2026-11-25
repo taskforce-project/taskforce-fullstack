@@ -110,7 +110,9 @@ public record RunnerEventsRequest(
      * elles l'ont fait, sinon celui de sa configuration), celui de sa configuration, chaque modèle que ses réponses ont
      * nommé, et qui sert le modèle, lu dans la configuration du poste (R159, L5). {@code providerFrom} : d'où le runner l'a
      * lu, {@code launch-configuration} (l'environnement et les réglages que Claude Code charge au lancement, second tour,
-     * L-c) ; absent d'un runner plus ancien, qui ne lisait que son environnement.
+     * L-c) ; absent d'un runner plus ancien, qui ne lisait que son environnement. {@code providerUnread} : ce que le
+     * runner n'en lit pas, le registre de Windows, le profil géré de macOS, les réglages poussés par le serveur
+     * (troisième tour, c-a).
      */
     public record Agent(
         @Size(max = 80) String version,
@@ -119,17 +121,24 @@ public record RunnerEventsRequest(
         @Size(max = 80) String provider,
         @Size(max = 120) String configured,
         @Size(max = 10) List<@Size(max = 120) String> served,
-        @Size(max = 40) String providerFrom
+        @Size(max = 40) String providerFrom,
+        @Size(max = 4) List<@Size(max = 40) @Pattern(regexp = "[a-z-]+", message = "providerUnread names a source, like windows-registry") String> providerUnread
     ) {
 
         /** L'agent comme le décrit un runner d'avant la relecture R159 : ni modèle de configuration ni modèle servi. */
         public Agent(String version, String model, String session, String provider) {
-            this(version, model, session, provider, null, null, null);
+            this(version, model, session, provider, null, null, null, null);
         }
 
         /** L'agent comme le décrit un runner du premier tour de la relecture R159 : sans dire d'où vient le fournisseur. */
         public Agent(String version, String model, String session, String provider, String configured, List<String> served) {
-            this(version, model, session, provider, configured, served, null);
+            this(version, model, session, provider, configured, served, null, null);
+        }
+
+        /** L'agent comme le décrit un runner du second tour : sans dire ce qu'il ne lit pas. */
+        public Agent(String version, String model, String session, String provider, String configured, List<String> served,
+                     String providerFrom) {
+            this(version, model, session, provider, configured, served, providerFrom, null);
         }
     }
 

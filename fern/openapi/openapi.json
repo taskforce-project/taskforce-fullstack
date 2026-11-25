@@ -20846,6 +20846,17 @@
             "type": "string",
             "maxLength": 40,
             "minLength": 0
+          },
+          "providerUnread": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 0,
+              "pattern": "[a-z-]+"
+            },
+            "maxItems": 4,
+            "minItems": 0
           }
         }
       },

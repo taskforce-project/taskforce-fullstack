@@ -53,6 +53,9 @@ class MissionWitnessTest {
     private static final String HEAD = "TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of its record).";
     private static final String LINK = "0123456789abcdef0123456789abcdef";
     private static final String URL = "https://app.taskforce.dev/";
+    /** Le compte du jeton de l'espace, dont le témoin écrit ses commentaires. */
+    private static final String LOGIN = "acme-taskforce";
+    private static final String HASH = "sha256:" + "4".repeat(64);
 
     @Mock private DeliveryRunRepository runRepository;
     @Mock private DeliveryRunEvidenceRepository evidenceRepository;
@@ -82,6 +85,14 @@ class MissionWitnessTest {
         ArgumentCaptor<Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
         verify(evidence).appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
         return data.getValue();
+    }
+
+    /** Les notes du témoin, exactement {@code count}, dans l'ordre (R159, troisième tour, c-d : au plus deux). */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private List<Map<String, Object>> notes(int count) {
+        ArgumentCaptor<Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(Map.class);
+        verify(evidence, times(count)).appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
+        return data.getAllValues();
     }
 
     private String written() {
@@ -155,32 +166,54 @@ class MissionWitnessTest {
     }
 
     @Test
-    @DisplayName("GitHub refuse à chaque essai : le dossier dit pourquoi le témoin manque, après trois essais")
-    void a_refusal_is_kept_in_the_dossier() {
+    @DisplayName("R159 troisième tour, c-d : GitHub refuse à chaque essai ; le premier échec entre au dossier, et le passage régulier le reprendra")
+    void a_refusal_is_kept_in_the_dossier_and_tried_again_later() {
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.of(HASH));
         when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
             .thenThrow(new BusinessException("Connect GitHub in Settings > Integrations."));
 
         witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
 
         verify(pullRequests, times(3)).comment(anyLong(), anyString(), anyInt(), anyString());
-        assertThat(noted()).containsEntry("written", false).containsEntry("reason", "Connect GitHub in Settings > Integrations.");
+        assertThat(noted()).containsEntry("written", false).containsEntry("reason", "Connect GitHub in Settings > Integrations.")
+            .containsEntry("retrying", true).doesNotContainKey("abandoned");
+        verify(evidence).witnessTried(100L);
+        verify(evidence, never()).witnessed(100L);
     }
 
     @Test
-    @DisplayName("R159, L7 et second tour, M-a (sonde B) : GitHub écrit le commentaire mais sa réponse se perd ; l'essai suivant le trouve et ne reposte pas")
-    void a_passing_failure_is_retried() {
+    @DisplayName("R159 troisième tour, c-d : GitHub ne dit pas s'il a écrit ; pas de second commentaire tout de suite, le passage régulier le trouve")
+    void an_unanswered_comment_is_not_posted_again_and_the_sweep_finds_it() {
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
-        when(pullRequests.findComment(1L, "acme/website", 212, ROOT)).thenReturn(Optional.empty())
+        when(pullRequests.login(1L)).thenReturn(LOGIN);
+        when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.of(HASH));
+        when(evidence.witnessNoted(100L)).thenReturn(false, true);
+        // Le commentaire s'est écrit, mais la liste de GitHub ne le montre pas encore.
+        when(pullRequests.findComment(1L, "acme/website", 212, List.of(ROOT), LOGIN)).thenReturn(Optional.empty())
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-2"));
         when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
-            .thenThrow(new BusinessException("GitHub can't be reached: nothing changed. Try again in a moment."));
+            .thenThrow(new GitHubPullRequests.Unanswered("GitHub refused to comment on pull request #212 (HTTP 502)."));
+        MissionWitness witness = witness(URL, true);
 
-        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+        witness.write(new MissionSealed(100L, ROOT, 31));
 
         verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
-        assertThat(noted()).containsEntry("written", true).containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-2")
-            .doesNotContainKey("reason");
+        verify(evidence, never()).witnessed(100L);
+        verify(evidence).witnessTried(100L);
+
+        when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+        witness.sweep();
+
+        verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
+        List<Map<String, Object>> notes = notes(2);
+        assertThat(notes.get(0)).containsEntry("written", false).containsEntry("retrying", true)
+            .containsEntry("reason", MissionWitness.UNANSWERED);
+        assertThat(notes.get(1)).containsEntry("written", true)
+            .containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-2").doesNotContainKey("reason");
+        verify(evidence).witnessed(100L);
     }
 
     @Test
@@ -193,9 +226,107 @@ class MissionWitnessTest {
 
         witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
 
-        verify(pullRequests, times(2)).findComment(1L, "acme/website", 212, ROOT);
+        verify(pullRequests, times(2)).findComment(eq(1L), eq("acme/website"), eq(212), eq(List.of(ROOT)), any());
         verify(pullRequests, times(2)).comment(anyLong(), anyString(), anyInt(), anyString());
         assertThat(noted()).containsEntry("written", true).doesNotContainKey("reason");
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d : seuls comptent les commentaires du compte du jeton, lu une fois, sur toutes les têtes scellées du dossier")
+    void it_looks_for_its_own_comments_on_every_sealed_head() {
+        String older = "sha256:" + "8".repeat(64);
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(sealRepository.findRootsByRunId(100L)).thenReturn(List.of(older, ROOT));
+        when(pullRequests.login(1L)).thenReturn(LOGIN);
+        when(pullRequests.findComment(1L, "acme/website", 212, List.of(older, ROOT), LOGIN))
+            .thenThrow(new BusinessException("GitHub's answer for the comments of pull request #212 could not be read."))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-5"));
+
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+
+        // Une liste illisible est un échec : rien n'est posté sur un doute ; l'essai suivant la lit, et trouve le témoin.
+        verify(pullRequests, never()).comment(anyLong(), anyString(), anyInt(), anyString());
+        verify(pullRequests, times(1)).login(1L);
+        assertThat(noted()).containsEntry("written", true).containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-5");
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d : GitHub injoignable aux trois essais, puis à un passage ; le suivant écrit le témoin, et le dossier n'a que deux notes")
+    void a_witness_github_prevents_is_tried_again_with_two_notes_at_most() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.of(HASH));
+        when(evidence.witnessNoted(100L)).thenReturn(false, true);
+        BusinessException down = new GitHubPullRequests.Unanswered("GitHub can't be reached: nothing changed. Try again in a moment.");
+        when(pullRequests.login(1L)).thenThrow(down, down, down, down, down, down).thenReturn(LOGIN);
+        when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-6"));
+        when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+        MissionWitness witness = witness(URL, true);
+
+        witness.write(new MissionSealed(100L, ROOT, 31));
+        witness.sweep();
+        witness.sweep();
+
+        verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
+        List<Map<String, Object>> notes = notes(2);
+        assertThat(notes.get(0)).containsEntry("written", false).containsEntry("retrying", true)
+            .containsEntry("reason", "GitHub can't be reached: nothing changed. Try again in a moment.");
+        assertThat(notes.get(1)).containsEntry("written", true).containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-6");
+        verify(evidence, times(2)).witnessTried(100L);
+        verify(evidence, times(1)).witnessed(100L);
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d : ses sept jours passés, il cherche une dernière fois sans poster, puis le dossier dit qu'il abandonne")
+    void after_seven_days_it_looks_once_more_then_gives_up() {
+        when(evidenceRepository.findWitnessOverdue(any())).thenReturn(List.of(100L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.login(1L)).thenReturn(LOGIN);
+
+        witness(URL, true).sweep();
+
+        verify(pullRequests).findComment(1L, "acme/website", 212, List.of(ROOT), LOGIN);
+        verify(pullRequests, never()).comment(anyLong(), anyString(), anyInt(), anyString());
+        assertThat(noted()).containsEntry("written", false).containsEntry("abandoned", true)
+            .containsEntry("reason", MissionWitness.GAVE_UP).doesNotContainKey("retrying");
+        verify(evidence).witnessed(100L);
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d : ses sept jours passés, un témoin écrit à un essai d'avant se trouve encore")
+    void after_seven_days_a_witness_written_before_is_found() {
+        when(evidenceRepository.findWitnessOverdue(any())).thenReturn(List.of(100L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+            .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(pullRequests.login(1L)).thenReturn(LOGIN);
+        when(pullRequests.findComment(1L, "acme/website", 212, List.of(ROOT), LOGIN))
+            .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-7"));
+
+        witness(URL, true).sweep();
+
+        verify(pullRequests, never()).comment(anyLong(), anyString(), anyInt(), anyString());
+        assertThat(noted()).containsEntry("written", true).containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-7");
+        verify(evidence).witnessed(100L);
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d et N2 : la note du premier échec ne s'écrit pas ; le témoin a fini, le passage régulier ne le reprend pas")
+    void a_first_failure_that_is_not_kept_ends_the_attempts() {
+        when(runRepository.findById(100L)).thenReturn(Optional.of(run));
+        when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.empty());
+        when(pullRequests.comment(anyLong(), anyString(), anyInt(), anyString()))
+            .thenThrow(new BusinessException("GitHub refused this account."));
+
+        witness(URL, true).write(new MissionSealed(100L, ROOT, 31));
+
+        assertThat(noted()).containsEntry("written", false).containsEntry("retrying", true);
+        verify(evidence).witnessed(100L);
+        verify(evidence, never()).witnessTried(anyLong());
     }
 
     @Test
@@ -233,7 +364,7 @@ class MissionWitnessTest {
             .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.empty());
-        when(pullRequests.findComment(1L, "acme/website", 212, ROOT)).thenReturn(Optional.empty())
+        when(pullRequests.findComment(eq(1L), eq("acme/website"), eq(212), eq(List.of(ROOT)), any())).thenReturn(Optional.empty())
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-4"));
         when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-4"));

@@ -159,6 +159,8 @@ class MissionEvidenceServiceTest {
             .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(1))));
         lenient().when(people.findByUserId(anyLong()))
             .thenAnswer(inv -> Optional.ofNullable(persons.get(inv.<Long>getArgument(0))).stream().toList());
+        lenient().when(people.findByWorkspaceIdAndPerson(anyLong(), anyString()))
+            .thenAnswer(inv -> persons.values().stream().filter(p -> p.getPerson().equals(inv.getArgument(1))).findFirst());
         lenient().when(people.saveAndFlush(any())).thenAnswer(inv -> {
             MissionPerson person = inv.getArgument(0);
             persons.put(person.getUserId(), person);
@@ -263,7 +265,50 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
-        @DisplayName("R159 second tour, N3 : la copie du paquet nomme chaque personne par son identifiant ; ses empreintes se calculent sur elle")
+        @DisplayName("un paquet qui nomme ses propriétaires par leur identifiant : le dossier le garde tel que le runner l'a reçu, "
+            + "empreinte comprise, et présente chaque propriétaire")
+        void a_bundle_named_by_ids_is_kept_as_the_runner_received_it() throws Exception {
+            lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
+            // Carol n'a ni délégué ni écrit l'issue : elle n'entre au dossier que comme propriétaire d'une règle.
+            User carol = User.builder().id(9L).email("carol@taskforce.dev").displayName("Carol").build();
+            lenient().when(users.findById(9L)).thenReturn(Optional.of(carol));
+            String ada7 = service.personId(3L, ada);
+            String carol9 = service.personId(3L, carol);
+            // La couche de Carol telle qu'elle est gardée depuis la 1.18 : son propriétaire par son identifiant.
+            Map<String, Object> layerRule = new java.util.LinkedHashMap<>();
+            layerRule.put("id", "ledger");
+            layerRule.put("effect", "ask");
+            layerRule.put("owner", carol9);
+            layerRule.put("require", Map.of("approvers", List.of("role:admin")));
+            String layerDigest = com.taskforce.tf_api.core.harness.rules.HarnessRulesService.digestOf(List.of(layerRule));
+            lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3)).thenReturn(Optional.of(HarnessRuleSet.builder().version(3)
+                .createdBy(carol).rules(List.of(layerRule)).build()));
+            RulesBundle.Rule table = new RulesBundle.Rule("read-files", new RulesBundle.Condition("file.read", null, null, null, null,
+                null, null, null), "read", "allow", null, ada7, "Reading changes nothing.", "2027-01-01");
+            RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
+                null, null, null, null), "reversible-exit", "ask", null, carol9, "Ask Carol first.", "2027-01-01", "workspace",
+                "Ask Carol first.", new RulesBundle.Require(List.of("role:admin"), 1, false));
+            RulesBundle unsigned = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, null, null, List.of(ledger, table), null,
+                List.of(new RulesBundle.Layer("workspace", null, 3, layerDigest)));
+            String digest = com.taskforce.tf_api.core.harness.rules.RulesDigest.of(JSON.valueToTree(unsigned));
+            RulesBundle live = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, digest, null, List.of(ledger, table), null,
+                List.of(new RulesBundle.Layer("workspace", null, 3, layerDigest)));
+
+            service.open(run, live, "tf-runner-ada", Map.of());
+
+            JsonNode copy = JSON.readTree(rows.get(100L).getRulesBundle());
+            // Le même paquet, membre pour membre : la copie ne réécrit rien.
+            assertThat(CanonicalJson.of(copy)).isEqualTo(CanonicalJson.of(JSON.valueToTree(live)));
+            assertThat(copy.get("digest").asText()).isEqualTo(digest).isEqualTo(data(0).get("rules").get("digest").asText());
+            assertThat(copy.get("layers").get(0).get("digest").asText()).isEqualTo(layerDigest);
+            // Ada a délégué, Bob a écrit l'issue, Carol répond d'une règle : chacun est présenté par sa note, une fois.
+            assertThat(stored.stream().filter(e -> e.getData().contains("\"kind\":\"person\"")).map(e -> e.getData()))
+                .hasSize(3).anySatisfy(note -> assertThat(note).contains(ada7)).anySatisfy(note -> assertThat(note).contains(carol9));
+        }
+
+        @Test
+        @DisplayName("R159 second tour, N3 : la copie d'un paquet d'avant la 1.18 nomme chaque personne par son identifiant ; ses "
+            + "empreintes se calculent sur elle")
         void the_rules_copy_names_people_by_their_id() throws Exception {
             User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
             lenient().when(users.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));
@@ -472,6 +517,18 @@ class MissionEvidenceServiceTest {
                     "sonnet", List.of(), "launch-configuration"), null));
 
             assertThat(data(0).get("providerFrom").asText()).isEqualTo("launch-configuration");
+            assertThat(data(0).has("providerUnread")).isFalse();
+        }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-a : le dossier dit ce que le runner ne lit pas, le registre et les réglages du serveur")
+        void the_record_says_what_the_runner_does_not_read() throws Exception {
+            service.runnerEvent(run, new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 1, null, null,
+                null, null, new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5-20261001", "1b2c3d4e", "anthropic",
+                    "sonnet", List.of(), "launch-configuration", List.of("windows-registry", "server-managed-settings")), null));
+
+            assertThat(data(0).get("providerUnread")).extracting(JsonNode::asText)
+                .containsExactly("windows-registry", "server-managed-settings");
         }
 
         @Test
@@ -592,6 +649,34 @@ class MissionEvidenceServiceTest {
             assertThat(seals).isEmpty();
             verify(publisher, never()).publishEvent(any());
         }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-f : sa mission supprimée, le sceau tardif verrouille le dossier avant de chercher un sceau, ne dit pas qu'elle a fini, et la ligne Seal du Markdown dit le retard")
+        void a_late_seal_of_a_deleted_mission_says_only_what_is_known() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.empty());
+            run.setIssue(null);
+            List<String> calls = new ArrayList<>();
+            lenient().when(dossiers.findByIdForUpdate(100L)).thenAnswer(inv -> {
+                calls.add("lock");
+                return Optional.ofNullable(rows.get(100L));
+            });
+            lenient().when(sealRepository.findTopByRunIdOrderBySeqDesc(100L)).thenAnswer(inv -> {
+                calls.add("sealed?");
+                return seals.isEmpty() ? Optional.empty() : Optional.of(seals.getLast());
+            });
+
+            assertThat(service.sealLate(100L)).isTrue();
+
+            // Deux serveurs qui démarrent ensemble : le second attend le verrou, puis trouve le sceau du premier.
+            assertThat(calls).startsWith("lock", "sealed?");
+            assertThat(data(stored.size() - 1).get("text").asText()).startsWith("TaskForce sealed this record late, on ")
+                .contains(", after its mission was deleted: ").doesNotContain("had ended");
+            assertThat(seals.getLast().isLate()).isTrue();
+            assertThat(service.dossierMarkdown(100L).orElseThrow())
+                .contains("- Seal: event " + seals.getLast().getSeq() + ", signed late by key `")
+                .contains(": a late seal proves the chain as it was on that date, not what happened before.");
+        }
     }
 
     @Nested
@@ -662,6 +747,21 @@ class MissionEvidenceServiceTest {
             // R159, M6 : pas de courriel lu dans la ligne de la personne, qui changerait avec elle et casserait le sceau.
             assertThat(mission.get("requestedBy").isNull()).isTrue();
             assertThat(service.dossierMarkdown(100L).orElseThrow()).contains("- Requested by: not in the chain");
+        }
+
+        @Test
+        @DisplayName("R159 de #551, troisième tour (v-j, relecture de #552) : le Markdown d'un dossier d'avant la 1.18 masque aussi un courriel aux lettres non ASCII")
+        void the_markdown_hides_emails_beyond_ascii() throws Exception {
+            startAndAct();
+            service.append(run, "human.decision", new MissionEvidenceService.Actor("person", "zoé.müller@bücher.example"),
+                Map.of("decision", "ALLOWED"));
+            service.append(run, "human.decision", new MissionEvidenceService.Actor("person", "ada@taskforce.dev"),
+                Map.of("decision", "ALLOWED"));
+
+            assertThat(service.legacy(100L)).isTrue();
+            String md = service.dossierMarkdown(100L).orElseThrow();
+            assertThat(md).doesNotContain("zoé").doesNotContain("müller").doesNotContain("bücher").doesNotContain("ada@taskforce.dev");
+            assertThat(md.split("\\(email hidden\\)", -1)).hasSizeGreaterThanOrEqualTo(3);
         }
 
         @Test
@@ -793,6 +893,48 @@ class MissionEvidenceServiceTest {
             assertThat(persons).doesNotContainKey(7L);
             assertThat(service.forgetPerson(7L)).isZero();
             assertThat(service.forgetPerson(null)).isZero();
+        }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-g : le login GitHub de qui a fusionné s'efface avec le compte dont TaskForce le connaît, quelle que soit la casse")
+        void the_merge_login_is_erased_with_the_account() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "github"),
+                Map.of("decision", "MERGE", "where", "github", "by", service.text(run, "login", "Ada-GH")));
+            lenient().when(textRepository.findByKindAndBodyIgnoreCase(anyString(), anyString()))
+                .thenAnswer(inv -> texts.stream().filter(t -> t.getKind().equals(inv.getArgument(0)) && t.getBody() != null
+                    && t.getBody().equalsIgnoreCase(inv.getArgument(1))).toList());
+            MissionDossierText login = text("login");
+            assertThat(file().toString()).contains("Ada-GH");
+
+            assertThat(service.forgetPerson(7L, List.of(" ada-gh ", "ADA-GH"))).isEqualTo(1);
+
+            assertThat(login.getBody()).isNull();
+            assertThat(login.getSalt()).isNull();
+            assertThat(login.getErasedAt()).isNotNull();
+            assertThat(file().toString()).doesNotContain("Ada-GH");
+            assertThat(data(stored.size() - 1).get("texts")).extracting(JsonNode::asText).contains(login.getHash());
+        }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-g : un dossier où la personne n'est que le login qui a fusionné : la note ne nomme aucun identifiant")
+        void a_dossier_that_only_knows_the_login_names_no_id() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "github"),
+                Map.of("decision", "MERGE", "where", "github", "by", service.text(run, "login", "linus-gh")));
+            lenient().when(textRepository.findByKindAndBodyIgnoreCase(anyString(), anyString()))
+                .thenAnswer(inv -> texts.stream().filter(t -> t.getKind().equals(inv.getArgument(0)) && t.getBody() != null
+                    && t.getBody().equalsIgnoreCase(inv.getArgument(1))).toList());
+
+            // Linus n'a jamais été présenté dans ce dossier : seul son login y est.
+            assertThat(service.forgetPerson(9L, List.of("linus-gh"))).isEqualTo(1);
+
+            JsonNode erased = data(stored.size() - 1);
+            assertThat(erased.get("kind").asText()).isEqualTo("erased");
+            assertThat(erased.has("person")).isFalse();
+            assertThat(erased.get("texts")).extracting(JsonNode::asText).containsExactly(text("login").getHash());
         }
     }
 

@@ -29,6 +29,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AiUsageService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
 import com.taskforce.tf_api.core.service.LlmClient;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.brain.BrainSearchService;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
@@ -107,7 +108,7 @@ class ConnectorInjectionAttackTest {
         Workspace owned = Workspace.builder().id(1L).slug("acme").name("Acme")
             .owner(User.builder().email("owner@acme.test").build()).build();
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(owned));
-        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json));
+        ReflectionTestUtils.setField(service, "gate", new CortexGate(new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()), workspaces, projectRepository, issueRepository, json));
         ReflectionTestUtils.setField(service, "approvers",
             new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers));
         ReflectionTestUtils.setField(service, "mcpToolTier", "fast");

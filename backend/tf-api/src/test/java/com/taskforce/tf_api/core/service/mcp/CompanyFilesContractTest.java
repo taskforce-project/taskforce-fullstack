@@ -601,7 +601,7 @@ class CompanyFilesContractTest {
             tool = new SaveDocumentTool(save, storage);
             gate = new CortexGate(new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(
                 Mockito.mock(com.taskforce.tf_api.core.repository.HarnessRuleSetRepository.class),
-                Mockito.mock(com.taskforce.tf_api.core.repository.WorkspaceMemberRepository.class)), workspaces,
+                Mockito.mock(com.taskforce.tf_api.core.repository.WorkspaceMemberRepository.class), com.taskforce.tf_api.core.service.TestPersonIds.inMemory()), workspaces,
                 Mockito.mock(com.taskforce.tf_api.core.repository.ProjectRepository.class),
                 Mockito.mock(com.taskforce.tf_api.core.repository.IssueRepository.class), om);
         }

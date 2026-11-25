@@ -20,7 +20,7 @@ function record(test: Record<string, Json>): string {
  */
 
 describe("L-b : la définition des tests, ce que lancent les scripts et la liste regardée", () => {
-  it("les fichiers que la relecture a trouvés manquants", () => {
+  it("des fichiers de build et de test, ceux que c7e05efb voyait déjà et ceux qu'il ne voyait pas (mvnw, .mvn/, gradle/, *.config.json, vitest.workspace, *.mk), mais pas un test", () => {
     const changed = ["mvnw", ".mvn/wrapper/maven-wrapper.properties", "gradle/wrapper/gradle-wrapper.properties", "gradlew",
       "build.gradle.kts", "settings.gradle", "setup.cfg", "tox.ini", "pytest.ini", "tests/conftest.py", "noxfile.py",
       "jest.config.json", "vitest.config.mts", "vitest.workspace.ts", "playwright.config.ts", "Makefile", "build/rules.mk",

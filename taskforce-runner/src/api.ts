@@ -198,6 +198,8 @@ export interface RunnerEvent {
     version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string;
     /** D'où vient `provider` : `launch-configuration`, l'environnement et les réglages que Claude Code lit au lancement (L-c). */
     providerFrom?: string;
+    /** Ce que le runner ne lit pas pour `provider` : le registre ou le profil géré du système, les réglages du serveur (c-a). */
+    providerUnread?: string[];
   };
   /** `test` : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière gardée sur ce poste. */
   test?: {
@@ -295,10 +297,14 @@ export class TaskforceApi {
     await this.send("POST", `/delivery/runner/runs/${runId}/result`, result);
   }
 
-  /** Ajoute des événements à la chronologie du run (suivi en direct dans l'app). */
-  async events(runId: number, events: RunnerEvent[]): Promise<void> {
-    await this.send("POST", `/delivery/runner/runs/${runId}/events`,
+  /**
+   * Ajoute des événements à la chronologie du run (suivi en direct dans l'app). La réponse dit quand le dossier a atteint
+   * son plafond : TaskForce arrête alors la mission, et le runner avec elle (R159 de #551, troisième tour, c-c).
+   */
+  async events(runId: number, events: RunnerEvent[]): Promise<{ stop: boolean }> {
+    const saved = await this.send<{ stop?: unknown } | null>("POST", `/delivery/runner/runs/${runId}/events`,
       { events: events.map((event) => (event.facts ? { ...event, facts: reportedFacts(event.facts) } : event)) });
+    return { stop: saved?.stop === true };
   }
 
   /**

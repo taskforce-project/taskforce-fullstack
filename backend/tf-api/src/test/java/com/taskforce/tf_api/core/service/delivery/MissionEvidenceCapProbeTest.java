@@ -184,6 +184,18 @@ class MissionEvidenceCapProbeTest {
     }
 
     @Test
+    @DisplayName("c-c, troisième tour : au plafond, le serveur le sait pour le dire au runner, et le constat dit que les dernières secondes ont pu ne pas s'écrire")
+    void at_the_cap_the_server_knows_and_says_what_may_be_missing() throws Exception {
+        assertThat(service.capped(100L)).isFalse();
+
+        service.runnerEvent(run, tool(1));
+
+        assertThat(service.capped(100L)).isTrue();
+        assertThat(JSON.readTree(after().getFirst().getData()).get("text").asText())
+            .contains("What the agent did in the last seconds before the runner stopped it may not have been written.");
+    }
+
+    @Test
     @DisplayName("N2 : le plafond atteint après la fin ne prétend pas arrêter la mission")
     void a_cap_after_the_end_stops_nothing() throws Exception {
         run.setStatus(DeliveryRunStatus.DONE);
@@ -191,6 +203,8 @@ class MissionEvidenceCapProbeTest {
         service.append(run, "note", new MissionEvidenceService.Actor("runner", "tf-runner-ada"), Map.of("kind", "changes"));
 
         assertThat(JSON.readTree(stored.getLast().getData()).get("stopped").asBoolean()).isFalse();
+        // Rien n'a été arrêté : le constat ne parle pas des dernières secondes d'un agent.
+        assertThat(JSON.readTree(stored.getLast().getData()).get("text").asText()).doesNotContain("last seconds");
         verify(publisher, never()).publishEvent(any(EvidenceCapped.class));
     }
 

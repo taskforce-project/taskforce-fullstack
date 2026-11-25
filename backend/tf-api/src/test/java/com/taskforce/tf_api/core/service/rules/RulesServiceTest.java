@@ -46,7 +46,9 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 
@@ -79,14 +81,16 @@ class RulesServiceTest {
     private final List<HarnessRuleSet> rows = new ArrayList<>();
     private RulesService service;
     private HarnessRulesService rules;
+    private PersonIds personIds;
     private Workspace ws;
     private Project accounting;
 
     @BeforeEach
     void setUp() {
-        rules = new HarnessRulesService(repository, workspaceMembers);
+        personIds = TestPersonIds.inMemory();
+        rules = new HarnessRulesService(repository, workspaceMembers, personIds);
         service = new RulesService(access, authorization, visibility, repository, rules, workspaceMembers, projects,
-            projectMembers, connections, drafts, audit);
+            projectMembers, connections, drafts, audit, personIds);
         User admin = User.builder().id(ADMIN).email("pierre@example.com").displayName("Pierre").build();
         User finance = User.builder().id(FINANCE).email("marie@example.com").displayName("Marie Martin")
             .jobTitle("Finance lead").build();
@@ -171,7 +175,8 @@ class RulesServiceTest {
             assertThat(row.getRules()).singleElement().satisfies(r -> {
                 assertThat((String) r.get("id")).startsWith("ws-no-change-in-the-accounting-module");
                 assertThat(r.get("text")).isEqualTo(CEO_RULE);
-                assertThat(r.get("owner")).isEqualTo("pierre@example.com");
+                // La personne qui écrit en répond, par son identifiant dans l'espace : la version ne garde aucun courriel.
+                assertThat((String) r.get("owner")).matches("who:[0-9a-f]{32}").isEqualTo(personIds.of(1L, ADMIN));
                 assertThat(r.get("class")).isEqualTo("sandbox-write");
                 assertThat((List<?>) r.get("cases")).hasSize(4);
             });

@@ -121,6 +121,11 @@ export interface Reading {
    * cette date. Il prouve la chaîne telle qu'elle était ce jour-là, rien de ce qui précède. Null sinon.
    */
   lateOn: string | null;
+  /**
+   * Les décisions que le vérificateur n'a pas pu rejuger (R159, troisième tour, c-b) : prises sur un fait coupé pour tenir
+   * au dossier, ou sans leurs faits. La première ligne les compte.
+   */
+  notJudged: { cut: number; noFacts: number };
 }
 
 export interface SealReading {
@@ -181,11 +186,21 @@ const RUNNER_GATES = /^(cap:|allowed for this mission)/;
 
 /** Ce que le dossier garde d'un fait jugé ; au-delà, le runner le coupe et le dit (R159, L4 ; second tour, N2). */
 export const MAX_FACT = 4000;
-const CUT_MARK = /\n\[TaskForce cut this text here: \d+ characters in all\]$/;
+const CUT_MARK = /\n\[TaskForce cut this text here: (\d+) characters in all\]$/;
+
+/**
+ * Un fait que le runner a coupé pour tenir au dossier (R159 de #551, troisième tour, c-b) : la marque au bout d'un fait de
+ * la longueur de la coupe, {@link MAX_FACT} unités, ou une de moins quand la coupe a reculé devant une paire de
+ * substitution, et qui annonce plus de {@link MAX_FACT} caractères. Une marque ailleurs ne soustrait rien au rejugement.
+ */
+function cutToFit(value: unknown): boolean {
+  if (typeof value !== "string" || (value.length !== MAX_FACT && value.length !== MAX_FACT - 1)) return false;
+  const mark = CUT_MARK.exec(value);
+  return mark !== null && Number(mark[1]) > MAX_FACT;
+}
 
 /** Des faits dont l'un a été coupé pour tenir au dossier : les règles ont jugé le fait entier, qu'on n'a plus. */
-const cutFacts = (facts: readonly Facts[]): boolean =>
-  facts.some((part) => isObj(part) && Object.values(part).some((value) => typeof value === "string" && CUT_MARK.test(value)));
+const cutFacts = (facts: readonly Facts[]): boolean => facts.some((part) => isObj(part) && Object.values(part).some(cutToFit));
 
 const shortHash = (hash: unknown): string => (typeof hash === "string" ? `${hash.slice(0, 19)}...` : String(hash));
 
@@ -241,6 +256,8 @@ export interface RulesCheck {
   readonly judged: number;
   /** Les décisions prises sur un fait que le dossier n'a gardé qu'en partie : elles ne se rejugent pas (second tour, N2). */
   readonly cut: number;
+  /** Les décisions des règles qui ne gardent pas leurs faits : elles ne se rejugent pas non plus (troisième tour, c-b). */
+  readonly noFacts: number;
   readonly differ: ReadonlyArray<{ readonly seq: number; readonly effect: string; readonly rule: string; readonly recorded: string; readonly recordedRule: string }>;
 }
 
@@ -272,6 +289,10 @@ export interface WitnessCheck {
   /** La clé qui a scellé la tête, que le commentaire porte aussi (R159, second tour, N6) ; nulle pour une note plus ancienne. */
   readonly key: string | null;
   readonly reason: string | null;
+  /** Un premier échec, que TaskForce reprend pendant les sept jours qui suivent la fin (R159 de #551, troisième tour, c-d). */
+  readonly retrying: boolean;
+  /** L'issue d'un témoin que TaskForce n'a pas pu écrire en sept jours : il a cessé d'essayer (c-d). */
+  readonly abandoned: boolean;
 }
 
 /** Ce qu'un dossier dont la chaîne tient prouve, et ne prouve pas, champ par champ ; {@link readDossier} le dit en lignes. */
@@ -349,6 +370,7 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
   let digestHolds = false;
   let judged = 0;
   let cut = 0;
+  let noFacts = 0;
   const differ: Array<{ seq: number; effect: string; rule: string; recorded: string; recordedRule: string }> = [];
   if (rules) {
     let digest: string | null = null;
@@ -361,9 +383,14 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
     if (digestHolds) {
       for (const event of events) {
         const data = dataOf(event);
-        if (event.type !== "action.decided" || data?.kind !== "decision" || !Array.isArray(data.facts) || data.facts.length === 0) continue;
+        if (event.type !== "action.decided" || data?.kind !== "decision") continue;
         const ruleId = event.actor?.id ?? "none";
         if (RUNNER_GATES.test(ruleId)) continue;
+        // Une décision sans ses faits ne se rejuge pas : la première ligne la compte (R159, troisième tour, c-b).
+        if (!Array.isArray(data.facts) || data.facts.length === 0) {
+          if (event.actor?.kind === "rule") noFacts++;
+          continue;
+        }
         // Les règles ont jugé le fait entier ; le dossier n'en garde que le début (R159, second tour, N2).
         if (cutFacts(data.facts as Facts[])) {
           cut++;
@@ -409,13 +436,15 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
       where: typeof data.comment === "string" ? data.comment : typeof data.pullRequest === "string" ? data.pullRequest : null,
       key: typeof data.key === "string" ? data.key : null,
       reason: typeof data.reason === "string" ? data.reason : null,
+      retrying: !written && data.retrying === true,
+      abandoned: !written && data.abandoned === true,
     };
   });
 
   return {
     header: { covered, differs, missing: missingFields, uncovered },
     texts: { referenced: referenced.size, matches, changed, unnamed, absent },
-    rules: { present: rules !== null, digestHolds, judged, cut, differ },
+    rules: { present: rules !== null, digestHolds, judged, cut, noFacts, differ },
     gaps,
     runnerFacts: header.runnerFacts === "agent-machine",
     definitionChanged,
@@ -570,7 +599,10 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
   } else {
     const at = `${s.late ? "Sealed late" : "Sealed"} at event ${s.seq ?? -1} on ${String(s.sealedAt ?? undefined)}`;
     if (s.late) {
-      lines.push({ level: "warn", text: `This record was sealed late, on ${String(s.sealedAt)}, after its mission had ended: the seal proves the chain as it was on that date, not what happened before.` });
+      // Ne dire que ce que la chaîne montre : une mission supprimée en cours de route n'a pas de fin (R159, troisième
+      // tour, c-f).
+      const ended = events.some((e) => e.type === "mission.ended");
+      lines.push({ level: "warn", text: `This record was sealed late, on ${String(s.sealedAt)}${ended ? ", after its mission had ended" : ""}: the seal proves the chain as it was on that date, not what happened before.` });
     }
     if (s.kind === "unreadableKey") {
       lines.push({ level: "fail", text: "The key given with --key cannot be read (a key id sha256:..., or an Ed25519 public key)." });
@@ -587,10 +619,18 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     if (s.kept === false) lines.push({ level: "warn", text: "The key was drawn when the server started and is not kept: the operator cannot publish it." });
   }
 
-  // Le témoin.
-  for (const w of check.witnesses) {
+  // Le témoin. Au plus deux notes (R159 de #551, troisième tour, c-d) : un premier échec, que TaskForce reprend pendant
+  // sept jours, puis l'issue.
+  for (const [i, w] of check.witnesses.entries()) {
     if (!w.written) {
-      lines.push({ level: "warn", text: `No witness: ${w.reason ?? "it was not written"}.` });
+      const reason = w.reason === null ? "it was not written" : w.reason.replace(/\.$/, "");
+      if (w.retrying && i < check.witnesses.length - 1) {
+        lines.push({ level: "info", text: `The witness was not written at first: ${reason}. TaskForce tried again.` });
+      } else if (w.retrying) {
+        lines.push({ level: "warn", text: `No witness yet: ${reason}. TaskForce tries again during the seven days after the mission ended.` });
+      } else {
+        lines.push({ level: "warn", text: `No witness: ${reason}.` });
+      }
     } else if (!w.holds) {
       lines.push({ level: "fail", text: `The witness names event ${w.at ?? -1} with ${shortHash(w.root)}, which is not in this chain.` });
     } else if (w.key !== null) {
@@ -610,7 +650,8 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
         : "No witness: this mission has no pull request, so only the operator holds this chain." });
   }
   const state = s.kind === "noSeal" || s.kind === "unreadableKey" || s.kind === "key" ? sealStateOf(s) : s.state;
-  return { lines, seal: state, lateOn: s.late && (state === "trusted" || state === "self") ? s.sealedAt : null };
+  return { lines, seal: state, lateOn: s.late && (state === "trusted" || state === "self") ? s.sealedAt : null,
+    notJudged: { cut: check.rules.cut, noFacts: check.rules.noFacts } };
 }
 
 /** Ce que la première ligne dit d'un sceau qui ne tient pas pour la clé donnée. */

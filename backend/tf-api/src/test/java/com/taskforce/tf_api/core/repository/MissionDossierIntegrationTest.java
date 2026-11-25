@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,6 +25,7 @@ import com.taskforce.tf_api.core.dto.request.RunnerEventsRequest;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.enums.IssuePriority;
 import com.taskforce.tf_api.core.enums.IssueStatusCategory;
+import com.taskforce.tf_api.core.enums.RuleScope;
 import com.taskforce.tf_api.core.harness.evidence.CanonicalJson;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceChain;
 import com.taskforce.tf_api.core.harness.evidence.EvidenceSeal;
@@ -31,12 +33,14 @@ import com.taskforce.tf_api.core.harness.evidence.EvidenceSigner;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
 import com.taskforce.tf_api.core.model.DeliveryRun;
+import com.taskforce.tf_api.core.model.HarnessRuleSet;
 import com.taskforce.tf_api.core.model.Issue;
 import com.taskforce.tf_api.core.model.MissionDossier;
 import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.core.service.delivery.DeliveryPoll;
 import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.core.service.delivery.MissionLateSeals;
@@ -47,7 +51,7 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
  * (rien ne cascade), il s'exporte et se vérifie encore après elle, et la base refuse de modifier ou d'effacer un de ses
  * événements ou de ses sceaux, comme elle le refuse aux versions des règles. Il ne part qu'avec son espace de travail.
  */
-@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class})
+@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class, PersonIds.class})
 @DisplayName("Le dossier d'une mission survit à son issue (intégration Postgres)")
 class MissionDossierIntegrationTest extends AbstractIntegrationTest {
 
@@ -67,6 +71,7 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     @Autowired private MissionDossierSealRepository seals;
     @Autowired private DeliveryRunEvidenceRepository evidenceRepository;
     @Autowired private EvidenceSigner signer;
+    @Autowired private HarnessRuleSetRepository ruleSets;
 
     private User ada;
     private Workspace workspace;
@@ -336,16 +341,62 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
             Integer.class, id)).isZero();
     }
 
+    @Test
+    @DisplayName("le paquet nomme qui répond de chaque règle par son identifiant : le dossier le garde tel que le runner l'a "
+        + "reçu, empreinte comprise, et la purge du compte n'y laisse aucun courriel")
+    void the_record_keeps_the_bundle_the_runner_received() throws Exception {
+        // Une règle de l'organisation écrite avant la 1.18 : elle nomme son auteur par son courriel, et sa version ne change pas.
+        Map<String, Object> rule = new LinkedHashMap<>();
+        rule.put("id", "ws-ask-comments");
+        rule.put("when", Map.of("action", "comment.create"));
+        rule.put("class", "reversible-exit");
+        rule.put("effect", "ask");
+        rule.put("owner", "ada@it.dev");
+        rule.put("reason", "Ask before commenting.");
+        rule.put("review", "2027-05-24");
+        ruleSets.saveAndFlush(HarnessRuleSet.builder().workspace(workspace).version(2).scope(RuleScope.WORKSPACE).rules(List.of(rule))
+            .digest(HarnessRulesService.digestOf(List.of(rule))).createdBy(ada).createdAt(LocalDateTime.now()).build());
+        RulesBundle bundle = rules.bundleFor(workspace, new HarnessRulesService.Work(issue.getProject().getId(), null, ada.getId()));
+        String id = jdbc.queryForObject("SELECT person FROM mission_people WHERE user_id = ?", String.class, ada.getId());
+        assertThat(bundle.rules()).allSatisfy(r -> assertThat(r.owner()).isEqualTo(id));
+        assertThat(JSON.writeValueAsString(bundle)).doesNotContain("ada@it.dev");
+
+        evidence.open(run, bundle, "tf-runner-ada", Map.of());
+        em.flush();
+        em.clear();
+
+        JsonNode file = export();
+        // Le même paquet, membre pour membre, et la même empreinte : celle que le runner a vérifiée à la réclamation.
+        assertThat(CanonicalJson.of(file.get("rules"))).isEqualTo(CanonicalJson.of(JSON.valueToTree(bundle)));
+        assertThat(file.get("mission").get("rules").get("digest").asText()).isEqualTo(bundle.digest());
+        // Le propriétaire est présenté au dossier, une fois : il a aussi délégué.
+        assertThat(events(file)).filteredOn(e -> "person".equals(e.get("data").path("kind").asText())).hasSize(1);
+
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(1);
+        em.flush();
+        em.clear();
+        JsonNode purged = export();
+        String record = purged.get("events").toString() + purged.get("mission") + purged.get("texts") + purged.get("rules");
+        assertThat(record).doesNotContain("ada@it.dev");
+        assertThat(purged.get("rules")).isEqualTo(file.get("rules"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mission_people WHERE person = ?", Integer.class, id)).isZero();
+    }
+
     /** Un dossier d'avant la 1.18 : sa ligne, et une chaîne qui nomme la personne par son courriel, sans sceau. */
     private void legacyRecord() {
+        legacyRecord("ada@it.dev");
+    }
+
+    /** Le même, la chaîne écrivant le courriel ainsi. */
+    private void legacyRecord(String email) {
         dossiers.saveAndFlush(MissionDossier.builder().runId(run.getId()).workspace(workspace).projectId(issue.getProject().getId())
             .issueId(issue.getId()).issueKey("WEB-1").delegatedBy(ada).createdAt(LocalDateTime.now()).build());
         String prev = EvidenceChain.ZERO_HASH;
         List<Object[]> rows = new ArrayList<>();
         Object[][] events = {
-            {"mission.started", "server", "taskforce", JSON.createObjectNode().put("issue", "WEB-1").put("requestedBy", "ada@it.dev")},
-            {"action.decided", "server", "taskforce", JSON.createObjectNode().put("approval", 3).put("effect", "ask").put("asked", "ada@it.dev")},
-            {"human.decision", "person", "ada@it.dev", JSON.createObjectNode().put("approval", 3).put("decision", "ALLOWED")},
+            {"mission.started", "server", "taskforce", JSON.createObjectNode().put("issue", "WEB-1").put("requestedBy", email)},
+            {"action.decided", "server", "taskforce", JSON.createObjectNode().put("approval", 3).put("effect", "ask").put("asked", email)},
+            {"human.decision", "person", email, JSON.createObjectNode().put("approval", 3).put("decision", "ALLOWED")},
             {"mission.ended", "server", "taskforce", JSON.createObjectNode().put("status", "DONE")},
         };
         for (int i = 0; i < events.length; i++) {
@@ -384,6 +435,21 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
         assertThat(seal.statement().get("predicate").get("late").asBoolean()).isTrue();
         // L'export lisible masque chaque courriel de la chaîne.
         assertThat(evidence.dossierMarkdown(run.getId()).orElseThrow()).doesNotContain("ada@it.dev").contains("(email hidden)");
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-h : la purge trouve le courriel d'une chaîne d'avant la 1.18 écrit avec une autre casse")
+    void a_purge_finds_the_email_whatever_its_case() throws Exception {
+        legacyRecord("Ada@IT.dev");
+
+        assertThat(evidence.forgetPerson(ada.getId())).isEqualTo(1);
+        em.flush();
+
+        JsonNode note = events(export()).getLast().get("data");
+        assertThat(note.get("kind").asText()).isEqualTo("erased");
+        assertThat(note.get("legacy").asBoolean()).isTrue();
+        assertThat(note.get("events")).extracting(JsonNode::asInt).containsExactly(1, 2, 3);
+        assertThat(evidence.dossierMarkdown(run.getId()).orElseThrow()).doesNotContain("Ada@IT.dev");
     }
 
     @Test
@@ -450,20 +516,59 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("R159, L7 : une mission scellée sans témoin se retrouve, jusqu'à ce que son témoin, ou la raison de son absence, s'écrive")
-    void an_unwitnessed_mission_is_found_until_its_witness_is_written() {
+    @DisplayName("R159, L7 et troisième tour, c-d : une mission scellée sans témoin se retrouve sept jours, même après un premier échec noté ; puis elle est en retard")
+    void an_unwitnessed_mission_is_found_until_its_witness_is_done() {
         mission();
         LocalDateTime now = LocalDateTime.now();
         jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(1), run.getId());
 
         assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).contains(run.getId());
         assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusHours(2))).doesNotContain(run.getId());
+        assertThat(evidenceRepository.existsWitnessNote(run.getId())).isFalse();
 
+        // GitHub l'a empêché : le premier échec entre au dossier, et le passage régulier le reprendra.
         evidence.appendToDossier(run.getId(), "note", MissionEvidenceService.Actor.SERVER,
-            Map.of("kind", "witness", "written", false, "reason", "GitHub can't be reached."));
+            Map.of("kind", "witness", "written", false, "retrying", true, "reason", "GitHub can't be reached."));
+        evidence.witnessTried(run.getId());
         em.flush();
 
+        assertThat(evidenceRepository.existsWitnessNote(run.getId())).isTrue();
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).contains(run.getId());
+        assertThat(jdbc.queryForObject("SELECT witness_tried_at IS NOT NULL FROM mission_dossiers WHERE run_id = ?", Boolean.class,
+            run.getId())).isTrue();
+        // Le commentaire d'un essai d'avant porte l'une des têtes scellées du dossier, celle d'avant un geste comprise.
+        assertThat(seals.findRootsByRunId(run.getId())).containsExactlyElementsOf(jdbc.queryForList(
+            "SELECT root FROM mission_dossier_seals WHERE run_id = ? ORDER BY seq", String.class, run.getId())).hasSizeGreaterThan(1);
+
+        // Ses sept jours passés : il n'est plus repris, il est en retard, jusqu'à ce que le témoin ait fini.
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusDays(8), run.getId());
         assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).doesNotContain(run.getId());
+        assertThat(evidenceRepository.findWitnessOverdue(now.minusDays(7))).contains(run.getId());
+        evidence.witnessed(run.getId());
+        em.flush();
+        assertThat(evidenceRepository.findWitnessOverdue(now.minusDays(7))).doesNotContain(run.getId());
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d : le passage régulier prend d'abord la mission pas encore essayée, puis celle essayée il y a le plus longtemps")
+    void the_sweep_takes_untried_missions_first() {
+        mission();
+        DeliveryRun other = runRepository.saveAndFlush(DeliveryRun.builder().issue(issue).providerKey("claude-code").model("sonnet")
+            .status(DeliveryRunStatus.RUNNING).startedBy(ada).claimedBy("tf-runner-ada").origin("app").build());
+        RulesBundle bundle = rules.bundleFor(workspace, new HarnessRulesService.Work(issue.getProject().getId(), null, ada.getId()));
+        evidence.open(other, bundle, "tf-runner-ada", Map.of());
+        evidence.end(other, new DeliveryPoll(DeliveryRunStatus.DONE, "## What I did\nAgain.", null, null));
+        em.flush();
+        LocalDateTime now = LocalDateTime.now();
+        // La première finie le plus tôt : sans essai, elle passerait d'abord.
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(3), run.getId());
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(1), other.getId());
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).containsSubsequence(run.getId(), other.getId());
+
+        evidence.witnessTried(run.getId());
+        em.flush();
+
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).containsSubsequence(other.getId(), run.getId());
     }
 
     @Test

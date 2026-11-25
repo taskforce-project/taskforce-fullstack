@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { Approval, AskedBy, Ruling } from "./api.js";
+import { MAX_FACT, type Approval, type AskedBy, type Ruling } from "./api.js";
 import { decide, decideAll, type Decision, type Facts, type Rule, type RulesBundle } from "./harness/engine/rules-engine.js";
 import type { Exposure } from "./harness/exposure.js";
 import { changesTaskForce, toolFacts } from "./harness/facts.js";
@@ -64,6 +64,11 @@ export interface ApprovalServerOptions {
    * rapporte un contenu de dehors, une fois partie, s'y ajoute. Absent : aucun de ces faits.
    */
   exposure?: Exposure;
+  /**
+   * La mission s'arrête (R159 de #551, troisième tour, c-c) : dès que ce signal tombe, le hook refuse toute action, avant
+   * même que Claude Code ne soit arrêté ; rien ne tourne après le plafond sans être dit.
+   */
+  stopped?: AbortSignal;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -73,12 +78,44 @@ export interface ApprovalServerOptions {
 const DENIED_BY_PERSON = "Denied in TaskForce: the person who delegated this task did not allow this action. Do not retry "
   + "it; find another way or explain in your summary what you needed.";
 
+const STOPPED = "Denied: TaskForce stopped this mission (its record is full, or the mission was closed). Stop here: no "
+  + "action runs any more.";
+
 /**
  * Le plafond des changements dans TaskForce (R110) : son nom dans la trace, et la portée d'un accord pour la mission
  * qui le lève. Les deux-points le distinguent de toute règle du paquet (`^[a-z0-9][a-z0-9-]+$`) : un accord donné à
  * une règle ne lève pas le plafond.
  */
 export const CHANGES_CAP = "cap:taskforce-changes";
+
+/**
+ * Une demande d'accord ne part jamais sur un fait coupé (R159 de #551, troisième tour, C1) : le serveur la rejuge sur les
+ * faits qu'il reçoit, coupés à {@link MAX_FACT} pour tenir au dossier, et ce qu'une règle de l'entreprise vise peut se
+ * trouver au-delà. Une action dont un fait est plus long se refuse sans rien demander, et l'agent apprend qu'il doit la
+ * découper. La décision va au dossier, avec le fait coupé et l'empreinte de l'entrée entière.
+ */
+export const TOO_LONG_TO_ASK = "cap:fact-length";
+
+const TOO_LONG = `Denied: this action is too long for TaskForce to have it approved (one part of it is longer than ${MAX_FACT} `
+  + "characters). Split it into shorter commands and run them one after the other.";
+
+function tooLongRule(): Rule {
+  return {
+    id: TOO_LONG_TO_ASK, when: {}, class: "irreversible", effect: "deny", inverse: null, owner: "runner", review: "",
+    reason: `One part of this action is longer than the ${MAX_FACT} characters TaskForce keeps: the person asked could not `
+      + "see all of it, and TaskForce could not judge it again.",
+  };
+}
+
+/** Un fait plus long que ce que le dossier garde : aucune demande d'accord ne part sur lui. */
+export function tooLongToAsk(facts: readonly Facts[]): boolean {
+  return facts.some((part) => Object.values(part).some((value) => typeof value === "string" && value.length > MAX_FACT));
+}
+
+/** La réponse au hook `PreToolUse` pour une action trop longue pour être accordée. */
+export function tooLongAnswer(): Record<string, unknown> {
+  return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: TOO_LONG } };
+}
 
 /** Le plafond atteint, demandé comme par une règle, avec une raison que la personne lit. */
 function changesCap(made: number, cap: number): Rule {
@@ -224,6 +261,11 @@ export async function requestDecision(
   ruling: Ruling = {},
 ): Promise<Approval | null> {
   const deadline = Date.now() + waitMs;
+  // Aucune demande ne part sur un fait plus long que ce que le dossier garde (C1) : le serveur la refuserait.
+  if (ruling.facts && tooLongToAsk(ruling.facts)) {
+    log.warn(`Approval not requested, action denied: ${tool} is longer than TaskForce can have approved`);
+    return null;
+  }
   let approval: Approval;
   try {
     approval = await api.requestApproval(runId, tool, summary, askedBy, ruling);
@@ -309,6 +351,14 @@ export class ApprovalServer {
     }
     const input = await readJson(req);
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
+    // La mission s'arrête : plus rien ne passe, le temps que Claude Code s'arrête (c-c).
+    if (this.options.stopped?.aborted) {
+      log.info(`Denied, the mission is stopping: ${tool}`);
+      this.reply(res, 200, route === "/pre-tool-use"
+        ? { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: STOPPED } }
+        : hookDecision(false, STOPPED));
+      return;
+    }
     if (route === "/pre-tool-use") {
       const decision = this.judge(input);
       if (decision.effect !== "ask") {
@@ -321,18 +371,19 @@ export class ApprovalServer {
         this.took(tool, input.tool_input);
         this.reply(res, 200, {}); // aux permissions de Claude Code : autorisé d'avance, ou le hook PermissionRequest
       } else {
-        const allow = await this.askPerson(tool, input.tool_input, decision);
-        if (allow) {
+        const answer = await this.askPerson(tool, input.tool_input, decision);
+        if (answer === "allowed") {
           this.passed(decision);
           this.took(tool, input.tool_input);
         }
-        this.reply(res, 200, preToolUseAnswer(allow));
+        this.reply(res, 200, answer === "too-long" ? tooLongAnswer() : preToolUseAnswer(answer === "allowed"));
       }
       return;
     }
-    const allow = await this.askPerson(tool, input.tool_input);
-    if (allow) this.took(tool, input.tool_input);
-    this.reply(res, 200, allow ? hookDecision(true) : hookDecision(false, DENIED_BY_PERSON));
+    const answer = await this.askPerson(tool, input.tool_input);
+    if (answer === "allowed") this.took(tool, input.tool_input);
+    this.reply(res, 200, answer === "allowed" ? hookDecision(true)
+      : hookDecision(false, answer === "too-long" ? TOO_LONG : DENIED_BY_PERSON));
   }
 
   /** Une action part : ce qu'elle rapporte de dehors entre dans ce que la mission a en main (R158). */
@@ -357,7 +408,7 @@ export class ApprovalServer {
    * demandent (R46) ; vrai seulement si elle autorise. `decision` : ce que la porte a jugé, quand la demande vient du
    * hook `PreToolUse` (le plafond y demande à la place d'une règle).
    */
-  private async askPerson(tool: string, toolInput: unknown, decision?: Decision): Promise<boolean> {
+  private async askPerson(tool: string, toolInput: unknown, decision?: Decision): Promise<"allowed" | "denied" | "too-long"> {
     const summary = describeToolInput(tool, toolInput, this.workDir) || "(no details)";
     const { scopes, binds, ...ruling } = this.ruling(tool, toolInput, decision);
     // Un accord pour la mission ne couvre jamais une décision qui lie : elle se demande à chaque fois.
@@ -365,14 +416,21 @@ export class ApprovalServer {
       const scope = scopes.join(", ");
       log.info(`Allowed for this mission earlier: ${tool} (${scope})`);
       this.options.onMissionAllowed?.(tool, scope, toolInput);
-      return true;
+      return "allowed";
+    }
+    // Aucune demande sur un fait coupé (C1) : refusée sur place, et le dossier garde ce refus avec le fait coupé.
+    const facts = this.factsOf(tool, toolInput);
+    if (tooLongToAsk(facts)) {
+      log.warn(`Denied without asking: ${tool} is longer than TaskForce can have approved`);
+      this.options.onDecision?.(tool, { effect: "deny", rule: tooLongRule() }, toolInput, facts);
+      return "too-long";
     }
     await this.options.beforeAsk?.().catch(() => undefined);
     const approval = await requestDecision(this.api, this.runId, toolLabel(tool), summary, this.options.waitMs, this.pollMs,
       "agent", ruling);
     const allow = approval?.status === "ALLOWED";
     if (allow && approval?.scope === "MISSION" && !binds) for (const s of scopes) this.allowedForMission.add(s);
-    return allow;
+    return allow ? "allowed" : "denied";
   }
 
   /**

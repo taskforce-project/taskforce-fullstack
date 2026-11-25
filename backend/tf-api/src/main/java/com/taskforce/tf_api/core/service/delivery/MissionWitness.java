@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.service.delivery;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,9 +43,10 @@ import lombok.extern.slf4j.Slf4j;
  * hôte interne sur un dépôt public.</p>
  *
  * <p>Après le commit de la fin, hors de sa transaction : GitHub peut être lent ou injoignable, la mission est déjà close.
- * Un échec se retente (R159, L7), et un passage régulier écrit le témoin d'une mission scellée qui n'en a pas encore, si le
- * serveur a redémarré avant. Ce qui s'est passé entre au dossier, à la suite : le commentaire écrit, ou pourquoi il ne
- * l'est pas, et pour une mission sans pull request, une note qui le dit.</p>
+ * Un échec se retente (R159, L7), et un passage régulier écrit le témoin d'une mission scellée qui n'en a pas encore : le
+ * serveur a redémarré avant, ou GitHub l'a empêché, pendant les sept jours qui suivent la fin (troisième tour, c-d). Ce
+ * qui s'est passé entre au dossier, à la suite, en deux notes au plus : le premier échec, puis le commentaire écrit, ou
+ * l'abandon ; pour une mission sans pull request, une note qui le dit.</p>
  */
 @Slf4j
 @Component
@@ -108,8 +110,9 @@ public class MissionWitness {
     }
 
     /**
-     * Le passage régulier (R159, L7) : les missions scellées des sept derniers jours dont le dossier n'a ni témoin ni note
-     * qui dise pourquoi, parce que le serveur a redémarré avant l'écriture.
+     * Le passage régulier (R159, L7 ; troisième tour, c-d). Il reprend le témoin des missions scellées des sept derniers
+     * jours qui n'en ont pas : le serveur a redémarré avant de l'écrire, ou GitHub l'a empêché ; il cherche toujours
+     * d'abord. Ses sept jours passés, il cherche une dernière fois, puis le dossier dit qu'il abandonne.
      */
     @Scheduled(fixedDelayString = "${delivery.evidence.witness-sweep-ms:900000}",
         initialDelayString = "${delivery.evidence.witness-sweep-initial-ms:120000}")
@@ -118,20 +121,44 @@ public class MissionWitness {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        List<Long> runs = tx.execute(status -> evidenceRepository.findUnwitnessed(now.minus(SWEEP_WINDOW), now.minus(SWEEP_GRACE)));
+        LocalDateTime since = now.minus(SWEEP_WINDOW);
+        List<Long> overdue = tx.execute(status -> evidenceRepository.findWitnessOverdue(since));
+        for (Long runId : overdue == null ? List.<Long>of() : overdue) {
+            lastSeal(runId).ifPresent(sealed -> write(sealed, true));
+        }
+        List<Long> runs = tx.execute(status -> evidenceRepository.findUnwitnessed(since, now.minus(SWEEP_GRACE)));
         for (Long runId : runs == null ? List.<Long>of() : runs) {
-            sealRepository.findTopByRunIdOrderBySeqDesc(runId)
-                .ifPresent(seal -> write(new MissionSealed(runId, seal.getRoot(), seal.getSeq(), seal.getKeyId())));
+            lastSeal(runId).ifPresent(sealed -> write(sealed, false));
         }
     }
 
-    /**
-     * Écrit la tête du dossier dans la pull request de la mission, puis le dit au dossier. Avant de poster, et avant chaque
-     * nouvel essai, il cherche cette tête dans les commentaires de la pull request : une réponse de GitHub perdue ne fait
-     * jamais deux commentaires, et il n'en modifie jamais un (R159, second tour, M-a). Puis il a fini : le passage régulier
-     * ne relance pas une mission dont la note ne s'écrit pas (N2).
-     */
+    private Optional<MissionSealed> lastSeal(Long runId) {
+        return sealRepository.findTopByRunIdOrderBySeqDesc(runId)
+            .map(seal -> new MissionSealed(runId, seal.getRoot(), seal.getSeq(), seal.getKeyId()));
+    }
+
+    /** Pourquoi le témoin manque, quand GitHub n'a pas dit s'il a écrit le commentaire. */
+    static final String UNANSWERED = "GitHub did not say whether it wrote the comment (no answer in time, or an error on its "
+        + "side): TaskForce looks for it before trying again";
+    /** Pourquoi le témoin manque, ses sept jours passés. */
+    static final String GAVE_UP = "TaskForce could not write it in the pull request within the seven days after the mission "
+        + "ended, and stopped trying";
+
+    /** Le témoin à la fin de la mission, ou au passage régulier dans ses sept jours. */
     void write(MissionSealed sealed) {
+        write(sealed, false);
+    }
+
+    /**
+     * Écrit la tête du dossier dans la pull request de la mission, puis le dit au dossier (R159, second et troisième tours,
+     * M-a et c-d). Avant de poster, et avant chaque nouvel essai, il cherche parmi les commentaires du compte de son jeton
+     * une tête scellée de ce dossier, et n'en modifie jamais un. Une liste qu'il ne lit pas en entier est un échec : il ne
+     * poste pas sur un doute. Quand GitHub ne dit pas s'il a écrit (un délai passé, une erreur de son côté), il ne reposte
+     * pas : le passage régulier cherchera d'abord, plus tard, quand la liste de GitHub le montrera. Un témoin que GitHub
+     * empêche se reprend ainsi pendant sept jours ; le dossier en garde au plus deux notes : le premier échec, puis l'issue,
+     * écrit ou abandonné. {@code last} : les sept jours sont passés, il ne fait plus que chercher.
+     */
+    void write(MissionSealed sealed, boolean last) {
         Optional<Optional<Target>> found = tx.execute(status -> runRepository.findById(sealed.runId()).map(MissionWitness::target));
         if (found == null || found.isEmpty()) {
             return;
@@ -155,12 +182,14 @@ public class MissionWitness {
         String leftOut = linkLeftOut(target);
         data.put("pageLinked", leftOut == null);
         if (leftOut != null) data.put("pageLeftOut", leftOut);
-        String link = leftOut == null ? tx.execute(status -> evidence.linkId(sealed.runId())) : null;
-        String body = body(sealed, link);
+        List<String> roots = roots(sealed);
         String reason = null;
+        String login = null;
         for (int attempt = 0; attempt <= retries.size(); attempt++) {
             try {
-                Optional<String> existing = pullRequests.findComment(target.workspaceId(), target.repo(), target.number(), sealed.root());
+                // Le compte du jeton, lu une fois : seuls ses commentaires comptent.
+                if (login == null) login = pullRequests.login(target.workspaceId());
+                Optional<String> existing = pullRequests.findComment(target.workspaceId(), target.repo(), target.number(), roots, login);
                 if (existing.isPresent()) {
                     data.put("written", true);
                     data.put("comment", existing.get());
@@ -168,23 +197,89 @@ public class MissionWitness {
                     log.info("Run {} : témoin déjà écrit sur {}", sealed.runId(), target.pullRequest());
                     break;
                 }
-                String url = pullRequests.comment(target.workspaceId(), target.repo(), target.number(), body).orElse(null);
+                if (last) {
+                    reason = GAVE_UP;
+                    break;
+                }
+            } catch (BusinessException | IllegalStateException e) {
+                reason = last ? GAVE_UP + ": " + e.getMessage() : e.getMessage();
+                if (attempt < retries.size() && !pause(retries.get(attempt))) break;
+                continue;
+            }
+            try {
+                String link = leftOut == null ? tx.execute(status -> evidence.linkId(sealed.runId())) : null;
+                String url = pullRequests.comment(target.workspaceId(), target.repo(), target.number(), body(sealed, link)).orElse(null);
                 data.put("written", true);
                 data.put("comment", url);
                 reason = null;
                 log.info("Run {} : témoin écrit sur {}", sealed.runId(), target.pullRequest());
+                break;
+            } catch (GitHubPullRequests.Unanswered e) {
+                // Le commentaire a pu s'écrire : rien de plus maintenant, le passage régulier le cherchera d'abord.
+                reason = UNANSWERED;
                 break;
             } catch (BusinessException | IllegalStateException e) {
                 reason = e.getMessage();
                 if (attempt < retries.size() && !pause(retries.get(attempt))) break;
             }
         }
-        if (reason != null) {
-            data.put("written", false);
-            data.put("reason", reason);
-            log.warn("Run {} : témoin non écrit sur {} : {}", sealed.runId(), target.pullRequest(), LogSafe.of(reason));
+        if (reason == null) {
+            keep(sealed.runId(), data);
+            return;
         }
-        keep(sealed.runId(), data);
+        data.put("written", false);
+        data.put("reason", reason);
+        log.warn("Run {} : témoin non écrit sur {} : {}", sealed.runId(), target.pullRequest(), LogSafe.of(reason));
+        if (last) {
+            data.put("abandoned", true);
+            keep(sealed.runId(), data);
+        } else {
+            data.put("retrying", true);
+            tryLater(sealed.runId(), data);
+        }
+    }
+
+    /** Les têtes scellées de ce dossier : un commentaire qui porte l'une d'elles est son témoin, écrit à un essai d'avant. */
+    private List<String> roots(MissionSealed sealed) {
+        List<String> roots = new ArrayList<>();
+        List<String> sealedRoots = sealRepository == null ? null : tx.execute(status -> sealRepository.findRootsByRunId(sealed.runId()));
+        if (sealedRoots != null) roots.addAll(sealedRoots);
+        if (!roots.contains(sealed.root())) roots.add(sealed.root());
+        return roots;
+    }
+
+    /**
+     * GitHub a empêché le témoin : le passage régulier le reprendra. Le premier échec entre au dossier, les suivants non
+     * (au plus deux notes, le premier échec puis l'issue). Une note qui ne s'écrit pas met fin aux essais (N2).
+     */
+    private void tryLater(Long runId, Map<String, Object> data) {
+        Boolean noted;
+        try {
+            noted = tx.execute(status -> evidence.witnessNoted(runId));
+        } catch (RuntimeException e) {
+            // On ne sait pas s'il a déjà sa note : rien de plus maintenant, le passage régulier reprendra.
+            log.warn("Run {} : les notes du témoin ne se lisent pas : {}", runId, LogSafe.of(e.getMessage()));
+            return;
+        }
+        if (!Boolean.TRUE.equals(noted)) {
+            Optional<String> kept;
+            try {
+                kept = tx.execute(status -> evidence.appendToDossier(runId, "note", MissionEvidenceService.Actor.SERVER, data));
+            } catch (RuntimeException e) {
+                log.warn("Run {} : le témoin n'a pas pu entrer au dossier : {}", runId, LogSafe.of(e.getMessage()));
+                kept = Optional.empty();
+            }
+            if (kept == null || kept.isEmpty()) {
+                log.warn("Run {} : le témoin n'est pas entré au dossier : il ne sera pas relancé", runId);
+                finish(runId);
+                return;
+            }
+        }
+        try {
+            tx.executeWithoutResult(status -> evidence.witnessTried(runId));
+        } catch (RuntimeException e) {
+            log.warn("Run {} : l'essai du témoin n'a pas pu se noter : {}", runId, LogSafe.of(e.getMessage()));
+        }
     }
 
     /**
@@ -198,6 +293,11 @@ public class MissionWitness {
         } catch (RuntimeException e) {
             log.warn("Run {} : le témoin n'a pas pu entrer au dossier : {}", runId, LogSafe.of(e.getMessage()));
         }
+        finish(runId);
+    }
+
+    /** Le témoin a fini d'essayer : le passage régulier ne le relance plus. */
+    private void finish(Long runId) {
         try {
             tx.executeWithoutResult(status -> evidence.witnessed(runId));
         } catch (RuntimeException e) {

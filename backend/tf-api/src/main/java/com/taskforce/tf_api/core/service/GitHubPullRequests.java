@@ -1,5 +1,8 @@
 package com.taskforce.tf_api.core.service;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -33,18 +36,40 @@ import lombok.extern.slf4j.Slf4j;
 public class GitHubPullRequests {
 
     private static final String API = "https://api.github.com/repos/";
+    private static final String USER = "https://api.github.com/user";
+
+    /**
+     * GitHub n'a pas dit ce qu'il a fait d'une demande : le délai est passé, ou l'erreur vient de lui (5xx). Un envoi a pu
+     * passer quand même : le témoin ne reposte pas tout de suite un commentaire qui a pu s'écrire (R159, troisième tour, c-d).
+     */
+    public static class Unanswered extends BusinessException {
+        public Unanswered(String message) {
+            super(message);
+        }
+    }
 
     private final GitHubTokenSource tokens;
     private final RestTemplate http;
 
     @Autowired
     public GitHubPullRequests(GitHubTokenSource tokens) {
-        this(tokens, new RestTemplate(new JdkClientHttpRequestFactory()));
+        this(tokens, client());
     }
 
     GitHubPullRequests(GitHubTokenSource tokens, RestTemplate http) {
         this.tokens = tokens;
         this.http = http;
+    }
+
+    /**
+     * Un délai pour chaque appel (R159, troisième tour, c-d) : sans lui, un GitHub qui ne répond plus tenait sans fin le
+     * témoin, et le passage régulier avec lui.
+     */
+    private static RestTemplate client() {
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+        factory.setReadTimeout(Duration.ofSeconds(30));
+        return new RestTemplate(factory);
     }
 
     /** Fusionne la pull request ; une PR que GitHub ne peut pas fusionner (conflits, contrôles requis) le dit. */
@@ -69,7 +94,7 @@ public class GitHubPullRequests {
 
     /**
      * Commente la pull request (le témoin du dossier d'une mission, TF-J2-7) et rend l'adresse du commentaire, ou vide
-     * quand GitHub ne la donne pas.
+     * quand GitHub ne la donne pas. {@link Unanswered} quand GitHub n'a pas dit s'il l'a écrit.
      */
     public Optional<String> comment(Long workspaceId, String repo, int number, String body) {
         String answer = send(workspaceId, repo, "/issues/" + number + "/comments", HttpMethod.POST, Map.of("body", body),
@@ -87,11 +112,16 @@ public class GitHubPullRequests {
     static final int COMMENT_PAGES = 10;
 
     /**
-     * L'adresse du commentaire de la pull request qui porte déjà ce texte (la tête d'un dossier), ou vide (R159, second
-     * tour, M-a) : avant de poster, le témoin cherche s'il l'a déjà fait, une réponse de GitHub ayant pu se perdre après
-     * l'écriture. Par pages de cent, au plus {@value #COMMENT_PAGES}. Une lecture qui échoue le dit, comme un envoi.
+     * L'adresse du commentaire de la pull request qui porte déjà l'un de ces textes (les têtes scellées d'un dossier), ou
+     * vide (R159, second tour, M-a) : avant de poster, le témoin cherche s'il l'a déjà fait, une réponse de GitHub ayant pu
+     * se perdre après l'écriture. Par pages de cent, au plus {@value #COMMENT_PAGES}.
+     *
+     * <p>Seuls comptent les commentaires de {@code author}, le compte du jeton (R159, troisième tour, c-d) : sur un dépôt
+     * public, qui cite la tête ne fait pas noter son commentaire au dossier. Et « pas trouvé » ne se dit que d'une liste lue
+     * en entier : une lecture qui échoue, une réponse illisible ou plus de {@value #COMMENT_PAGES} pages pleines sont des
+     * échecs, et le témoin ne poste pas sur un doute.</p>
      */
-    public Optional<String> findComment(Long workspaceId, String repo, int number, String text) {
+    public Optional<String> findComment(Long workspaceId, String repo, int number, List<String> texts, String author) {
         for (int page = 1; page <= COMMENT_PAGES; page++) {
             String answer = send(workspaceId, repo, "/issues/" + number + "/comments?per_page=100&page=" + page, HttpMethod.GET, null,
                 "read the comments of pull request #" + number);
@@ -99,18 +129,38 @@ public class GitHubPullRequests {
             try {
                 comments = answer == null || answer.isBlank() ? null : JSON.readTree(answer);
             } catch (JsonProcessingException e) {
-                return Optional.empty();
+                comments = null;
             }
-            if (comments == null || !comments.isArray() || comments.isEmpty()) return Optional.empty();
+            if (comments == null || !comments.isArray()) {
+                throw new BusinessException("GitHub's answer for the comments of pull request #" + number + " could not be read.");
+            }
             for (JsonNode comment : comments) {
-                if (comment.path("body").asText("").contains(text)) {
+                String body = comment.path("body").asText("");
+                if (author.equalsIgnoreCase(comment.path("user").path("login").asText("")) && texts.stream().anyMatch(body::contains)) {
                     String url = comment.path("html_url").asText("");
                     return Optional.of(url.startsWith("https://") ? url : "https://github.com/" + repo + "/pull/" + number);
                 }
             }
             if (comments.size() < 100) return Optional.empty();
         }
-        return Optional.empty();
+        throw new BusinessException("Pull request #" + number + " has more than " + (COMMENT_PAGES * 100)
+            + " comments: TaskForce could not read them all to look for its witness.");
+    }
+
+    /**
+     * Le compte GitHub du jeton de l'espace ({@code login}), celui dont le témoin écrit ses commentaires : il ne cherche que
+     * les siens (R159, troisième tour, c-d). Une réponse sans compte est un échec.
+     */
+    public String login(Long workspaceId) {
+        String answer = exchange(workspaceId, USER, HttpMethod.GET, null, "read the account of its token");
+        String login = "";
+        try {
+            login = answer == null || answer.isBlank() ? "" : JSON.readTree(answer).path("login").asText("").strip();
+        } catch (JsonProcessingException e) {
+            login = "";
+        }
+        if (login.isEmpty()) throw new BusinessException("GitHub did not say which account its token belongs to.");
+        return login;
     }
 
     /**
@@ -135,23 +185,34 @@ public class GitHubPullRequests {
 
     private String send(Long workspaceId, String repo, String path, HttpMethod method, Object body, String what) {
         if (!GitHubRepoNames.isFullName(repo)) throw new BusinessException("This result's repository is not a GitHub repository.");
+        return exchange(workspaceId, API + repo + path, method, body, what, repo);
+    }
+
+    private String exchange(Long workspaceId, String url, HttpMethod method, Object body, String what) {
+        return exchange(workspaceId, url, method, body, what, null);
+    }
+
+    private String exchange(Long workspaceId, String url, HttpMethod method, Object body, String what, String repo) {
         String token = tokens.token(workspaceId).orElseThrow(() -> new BusinessException(tokens.missingHint()));
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         headers.set("Accept", "application/vnd.github+json");
         headers.setContentType(MediaType.APPLICATION_JSON);
         try {
-            return http.exchange(API + repo + path, method, new HttpEntity<>(body, headers), String.class).getBody();
+            return http.exchange(url, method, new HttpEntity<>(body, headers), String.class).getBody();
         } catch (HttpStatusCodeException e) {
             int status = e.getStatusCode().value();
             if (status == 405 || status == 409 || status == 422) {
-                throw new BusinessException("GitHub can't " + what + " on " + repo + " right now: it may have conflicts, "
-                    + "failing required checks, or be closed already. Open it on GitHub to see why.");
+                throw new BusinessException("GitHub can't " + what + (repo == null ? "" : " on " + repo) + " right now: it may "
+                    + "have conflicts, failing required checks, or be closed already. Open it on GitHub to see why.");
             }
             if (status == 401 || status == 403 || status == 404) throw new BusinessException(tokens.refusedHint());
+            // Une erreur de GitHub lui-même : la demande a pu passer avant (c-d).
+            if (status >= 500) throw new Unanswered("GitHub refused to " + what + " (HTTP " + status + ").");
             throw new BusinessException("GitHub refused to " + what + " (HTTP " + status + ").");
         } catch (RestClientException e) {
-            throw new BusinessException("GitHub can't be reached: nothing changed. Try again in a moment.");
+            // Pas de réponse : un délai passé, une connexion coupée. Ce qui est parti a pu passer (c-d).
+            throw new Unanswered("GitHub can't be reached: nothing changed. Try again in a moment.");
         }
     }
 }

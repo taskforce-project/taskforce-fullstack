@@ -30,9 +30,14 @@ CREATE TABLE mission_dossiers (
     -- l'espace ni le numéro de la mission. Posé une fois.
     link_id       VARCHAR(32)  UNIQUE,
     -- Quand le témoin a fini d'essayer, écrit ou non (N2) : le passage régulier ne le relance plus. Posé une fois.
-    witnessed_at  TIMESTAMP
+    witnessed_at  TIMESTAMP,
+    -- Son dernier essai que GitHub a empêché (R159, troisième tour, c-d) : le passage régulier le reprend pendant sept
+    -- jours, les dossiers pas encore essayés d'abord, puis ceux essayés il y a le plus longtemps.
+    witness_tried_at TIMESTAMP
 );
 CREATE INDEX idx_mission_dossiers_workspace ON mission_dossiers (workspace_id);
+-- Les dossiers dont le témoin n'a pas fini : le passage régulier ne parcourt qu'eux.
+CREATE INDEX idx_mission_dossiers_unwitnessed ON mission_dossiers (witness_tried_at) WHERE witnessed_at IS NULL;
 
 -- Les dossiers déjà ouverts reçoivent leur ligne, avant que leurs événements ne s'y rattachent.
 INSERT INTO mission_dossiers (run_id, workspace_id, project_id, issue_id, issue_key, delegated_by, created_at)
@@ -128,7 +133,8 @@ CREATE TRIGGER trg_mission_dossier_seals_immutable
     FOR EACH ROW EXECUTE FUNCTION mission_evidence_immutable();
 
 -- Seuls changent : la personne qui a délégué, quand son compte est supprimé (elle passe à NULL), le paquet de règles
--- d'un dossier ouvert avant ce lot, le lien du témoin et la fin de ses essais, chacun posé une fois.
+-- d'un dossier ouvert avant ce lot, le lien du témoin et la fin de ses essais, chacun posé une fois, et la date de son
+-- dernier essai empêché.
 CREATE OR REPLACE FUNCTION mission_dossiers_guard() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN

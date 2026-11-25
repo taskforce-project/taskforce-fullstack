@@ -148,6 +148,15 @@ public class DeliveryActivityService {
     @Transactional
     public RunnerApprovalResponse openApproval(DeliveryRun run, String tool, String summary, boolean byRunner,
                                                RunnerApprovalRequest ruling) {
+        // Une demande d'accord ne part jamais sur un fait coupé (R159, troisième tour, C1) : le serveur la rejuge sur les
+        // faits qu'il reçoit, et ce qu'une règle de l'entreprise vise (R98) peut se trouver au-delà de la coupe. Refusée
+        // comme l'était un fait trop long avant la coupe, et le runner refuse l'action. Le serveur ne s'en remet pas à lui
+        // (R159, M5).
+        if (ruling != null && ruling.facts() != null && ruling.facts().stream().filter(java.util.Objects::nonNull)
+            .flatMap(part -> part.values().stream()).anyMatch(MissionEvidenceService::cutToFit)) {
+            throw new BusinessException("A fact of this request was cut to fit the record, so TaskForce cannot judge it "
+                + "again: the action is refused. Split it into shorter commands.");
+        }
         // Le serveur rejuge l'action avec les mêmes règles (R157) : ce qu'une règle de l'entreprise demande à l'accord
         // (R98), et un refus que le runner n'aurait pas vu, qui clôt la demande aussitôt.
         RulesBundle bundle = bundleOf(run);

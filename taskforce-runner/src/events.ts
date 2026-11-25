@@ -18,7 +18,8 @@ function refusedForGood(e: unknown): boolean {
  * ({@link EventRelay.count}) : ceux qui manquent encore se marquent aussi.
  */
 export interface EventSink {
-  events(runId: number, events: RunnerEvent[]): Promise<void>;
+  /** Rend, quand TaskForce le dit, la consigne d'arrêt : le dossier a atteint son plafond (c-c). */
+  events(runId: number, events: RunnerEvent[]): Promise<{ stop?: boolean } | void>;
 }
 
 export interface EventRelayOptions {
@@ -33,6 +34,12 @@ export interface EventRelayOptions {
   retryMs: number;
   /** Envois tentés encore à la fin, avant de laisser au dossier la marque de ce qui n'est pas parti. */
   closeAttempts: number;
+  /**
+   * TaskForce arrête la mission (R159 de #551, troisième tour, c-c) : la réponse à un lot porte la consigne d'arrêt, le
+   * dossier ayant atteint son plafond, ou TaskForce refuse les événements (403), la mission n'étant plus à ce runner. Le
+   * runner refuse alors toute action de l'agent, puis arrête Claude Code, sans attendre son prochain signe de vie.
+   */
+  onStop?: (why: "cap" | "closed") => void;
 }
 
 const DEFAULTS: EventRelayOptions = { flushMs: 2_000, maxBatch: 20, maxEvents: 10_000, retryMs: 1_000, closeAttempts: 3 };
@@ -95,10 +102,13 @@ export class EventRelay {
     while (this.queue.length > 0) {
       const batch = this.queue.slice(0, this.options.maxBatch);
       try {
-        await this.sink.events(this.runId, batch);
+        const saved = await this.sink.events(this.runId, batch);
         this.queue.splice(0, batch.length);
         this.failures = 0;
+        if (saved?.stop) this.options.onStop?.("cap");
       } catch (e) {
+        // Refusés parce que la mission n'est plus à ce runner : elle s'arrête ici aussi, comme au refus du signe de vie.
+        if (e instanceof ApiError && e.status === 403) this.options.onStop?.("closed");
         if (refusedForGood(e)) {
           this.queue.splice(0, batch.length);
           log.warn(`TaskForce refused ${batch.length} events of run #${this.runId} (${(e as Error).message}): the evidence will show the gap.`);
