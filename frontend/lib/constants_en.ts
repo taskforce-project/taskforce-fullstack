@@ -188,6 +188,8 @@ export const CONSTANTS_EN = {
       // Login
       loginTitle: "Sign in",
       loginSubtitle: "Access your workspace.",
+      // A verification link (from a pull request) led here: the sign-in opens that page.
+      returnToVerification: "Sign in to open the verification page you followed.",
       forgotPassword: "Forgot password?",
       tooManyAttempts: "Too many attempts. Try again in {seconds} seconds",
       // 2FA (two-factor authentication)
