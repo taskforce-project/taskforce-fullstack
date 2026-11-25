@@ -34,6 +34,8 @@ export interface Line {
   readonly tone?: "agent" | "warn" | "muted" | "ok"
   /** Un long texte du dossier, montré à part : la description, le brief. */
   readonly body?: string
+  /** Ce qui déplie ce long texte, qui le nomme : « Show the description », « Show the brief » (R161 N9 du second tour de #552). */
+  readonly bodyLabel?: string
   /** Le résumé de l'agent, en blocs simples, sans lien ni image (R161 M2). */
   readonly blocks?: readonly Block[]
   /** Une adresse que la ligne nomme : un lien seulement vers GitHub (R159 P7). */
@@ -343,7 +345,7 @@ function request(page: VerificationPage, t: Texts): Line[] {
   const lines: Line[] = []
   lines.push(r.title.state === "text" ? { text: fillText(t.request.title, { title: r.title.text }) } : textLine(r.title, "title", t) ?? { text: t.unknown })
   if (r.issue) lines.push({ text: fillText(t.request.issue, { issue: r.issue }), tone: "muted" })
-  if (r.description.state === "text") lines.push({ text: t.request.description, body: r.description.text })
+  if (r.description.state === "text") lines.push({ text: t.request.description, body: r.description.text, bodyLabel: t.showDescription })
   else lines.push(textLine(r.description, "description", t) ?? { text: t.request.noDescription, tone: "muted" })
   if (r.writtenBy) lines.push({ text: fillText(t.request.writtenBy, { who: whoWords(r.writtenBy, t), date: when(r.writtenAt) }) })
   if (r.importedFrom) lines.push({ text: fillText(t.request.imported, { source: r.importedFrom }) })
@@ -355,7 +357,7 @@ function request(page: VerificationPage, t: Texts): Line[] {
     lines.push({
       text: fillText(t.request.brief, { chars: r.brief.chars ?? "?", digest: short(r.brief.sha256) }),
       tone: "muted",
-      ...(r.brief.text.state === "text" ? { body: r.brief.text.text } : {}),
+      ...(r.brief.text.state === "text" ? { body: r.brief.text.text, bodyLabel: t.showBrief } : {}),
     })
     const missing = textLine(r.brief.text, "brief", t)
     if (missing) lines.push(missing)

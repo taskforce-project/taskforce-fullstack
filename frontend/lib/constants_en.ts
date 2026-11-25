@@ -2289,6 +2289,11 @@ export const CONSTANTS_EN = {
     },
     showDetails: "Show the details",
     hideDetails: "Hide the details",
+    // What a screen reader hears for the button of each section: the section with it, as eight buttons alike told nothing.
+    showDetailsOf: "Show the details of {section}",
+    hideDetailsOf: "Hide the details of {section}",
+    showDescription: "Show the description",
+    showBrief: "Show the brief",
     showAllFiles: "Show all {count} files",
     showListedFiles: "Show the {count} listed files",
     showFewerFiles: "Show fewer files",

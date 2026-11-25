@@ -105,7 +105,7 @@ function SectionLine({ line, t }: Readonly<{ line: Line; t: Texts }>) {
       {line.list && <FoldedList list={line.list} t={t} />}
       {line.body && (
         <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">{t.showDetails}</summary>
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">{line.bodyLabel ?? t.showDetails}</summary>
           <p className="mt-1 whitespace-pre-wrap break-words border border-border bg-muted/40 p-2 leading-relaxed">{line.body}</p>
         </details>
       )}
@@ -113,7 +113,10 @@ function SectionLine({ line, t }: Readonly<{ line: Line; t: Texts }>) {
   )
 }
 
-/** Une rubrique : son titre et sa première ligne, le détail à un clic (R133, R161 M1). */
+/**
+ * Une rubrique : son titre et sa première ligne, le détail à un clic (R133, R161 M1). Le bouton porte le nom de sa rubrique,
+ * et le détail replié reste dans la page, caché, pour que `aria-controls` le trouve (R161 N9 du second tour de #552).
+ */
 function SectionBlock({ section, t }: Readonly<{ section: Section; t: Texts }>) {
   const [open, setOpen] = useState(false)
   const id = useId()
@@ -126,12 +129,11 @@ function SectionBlock({ section, t }: Readonly<{ section: Section; t: Texts }>) 
       </ul>
       {rest.length > 0 && (
         <>
-          {open && (
-            <ul id={id} className="flex flex-col gap-1.5">
-              {rest.map((line, index) => <SectionLine key={`${section.id}-${index}`} line={line} t={t} />)}
-            </ul>
-          )}
+          <ul id={id} hidden={!open} className="flex flex-col gap-1.5">
+            {rest.map((line, index) => <SectionLine key={`${section.id}-${index}`} line={line} t={t} />)}
+          </ul>
           <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}
+            aria-label={fillText(open ? t.hideDetailsOf : t.showDetailsOf, { section: section.title })}
             className="w-fit text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground">
             {open ? t.hideDetails : t.showDetails}
           </button>

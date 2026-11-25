@@ -109,16 +109,16 @@ describe("VerificationView", () => {
     for (const title of Object.values(t.sections)) expect(screen.getByRole("heading", { name: title })).toBeInTheDocument()
     const request = screen.getByRole("region", { name: t.sections.request })
     expect(within(request).getByText("Requested: Fix the footer links")).toBeInTheDocument()
-    expect(within(request).queryByText(/^Written by Grace/)).not.toBeInTheDocument()
+    expect(within(request).queryByText(/^Written by Grace/)).not.toBeVisible()
 
-    const details = within(request).getByRole("button", { name: t.showDetails })
+    const details = within(request).getByRole("button", { name: `Show the details of ${t.sections.request}` })
     expect(details).toHaveAttribute("aria-expanded", "false")
     fireEvent.click(details)
     expect(details).toHaveAttribute("aria-expanded", "true")
     expect(within(request).getByText(/^Written by Grace on /)).toBeInTheDocument()
     expect(within(request).getByText("The footer still links to the old documentation site. Point the three links to docs.example.com.")).toBeInTheDocument()
-    fireEvent.click(within(request).getByRole("button", { name: t.hideDetails }))
-    expect(within(request).queryByText(/^Written by Grace/)).not.toBeInTheDocument()
+    fireEvent.click(within(request).getByRole("button", { name: `Hide the details of ${t.sections.request}` }))
+    expect(within(request).queryByText(/^Written by Grace/)).not.toBeVisible()
   })
 
   it("R161 M2 et R159 P7 : le résumé de l'agent marqué comme le sien, sans Markdown brut ; un lien vers GitHub seulement", async () => {
@@ -126,7 +126,7 @@ describe("VerificationView", () => {
     await screen.findByText(/^Checked in this app on/)
 
     const changed = screen.getByRole("region", { name: t.sections.changed })
-    fireEvent.click(within(changed).getByRole("button", { name: t.showDetails }))
+    fireEvent.click(within(changed).getByRole("button", { name: `Show the details of ${t.sections.changed}` }))
     const agent = document.querySelectorAll("[data-agent='true']")
     expect(agent).toHaveLength(1)
     expect(agent[0]?.textContent).toContain("What I did")
@@ -148,12 +148,35 @@ describe("VerificationView", () => {
     expect(within(changed).getByText("src/file-11.ts", { exact: false })).toBeInTheDocument()
     expect(within(changed).getByRole("button", { name: t.showFewerFiles })).toHaveAttribute("aria-expanded", "true")
 
-    fireEvent.click(within(changed).getByRole("button", { name: t.showDetails }))
+    fireEvent.click(within(changed).getByRole("button", { name: `Show the details of ${t.sections.changed}` }))
     expect(within(changed).queryByText("Step 8")).not.toBeInTheDocument()
     fireEvent.click(within(changed).getByRole("button", { name: t.showMore }))
     expect(within(changed).getByText("Step 8")).toBeInTheDocument()
     fireEvent.click(within(changed).getByRole("button", { name: t.showLess }))
     expect(within(changed).queryByText("Step 8")).not.toBeInTheDocument()
+  })
+
+  it("R161 N9 du second tour : chaque dépliant nomme sa rubrique, et ce qu'il commande est dans la page, caché", async () => {
+    show(example())
+    await screen.findByText(/^Checked in this app on/)
+
+    // Un nom par rubrique : un lecteur d'écran ne liste plus huit boutons pareils.
+    const buttons = screen.getAllByRole("button", { name: /^Show the details/ })
+    expect(buttons.length).toBeGreaterThan(1)
+    expect(new Set(buttons.map((b) => b.getAttribute("aria-label"))).size).toBe(buttons.length)
+    expect(screen.getByRole("button", { name: `Show the details of ${t.sections.classification}` })).toHaveTextContent(t.showDetails)
+    // Replié, le détail reste dans la page, caché : `aria-controls` le trouve.
+    for (const button of buttons) {
+      const controlled = document.getElementById(button.getAttribute("aria-controls") ?? "")
+      expect(controlled).not.toBeNull()
+      expect(controlled).not.toBeVisible()
+    }
+    // Les dépliants imbriqués nomment leur texte : la description, le brief.
+    const request = screen.getByRole("region", { name: t.sections.request })
+    fireEvent.click(within(request).getByRole("button", { name: `Show the details of ${t.sections.request}` }))
+    expect(within(request).getByText(t.showDescription)).toBeVisible()
+    expect(within(request).getByText(t.showBrief)).toBeVisible()
+    expect(within(request).queryByText(t.showDetails)).toBeNull()
   })
 
   it("R161 N7 du second tour : 345 fichiers dont 300 listés, le bouton compte les 300, et les 45 autres se lisent sans déplier", async () => {
