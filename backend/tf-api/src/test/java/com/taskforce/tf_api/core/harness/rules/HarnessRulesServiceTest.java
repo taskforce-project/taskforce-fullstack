@@ -311,9 +311,10 @@ class HarnessRulesServiceTest {
         // Ada a écrit deux règles avant la 1.18, puis son compte a été purgé ; un compte neuf porte aujourd'hui son courriel.
         User newcomer = User.builder().id(12L).email("ada@acme.dev").createdAt(LocalDateTime.now()).build();
         lenient().when(users.findById(11L)).thenReturn(Optional.empty());
-        // La base cherche sans tenir compte de la casse : le compte neuf répond aux deux écritures.
+        // La base cherche sans tenir compte de la casse : le compte neuf répond aux deux écritures, et à la recherche exacte.
         lenient().when(users.findAllByEmailIgnoreCase("ada@acme.dev")).thenReturn(List.of(newcomer));
         lenient().when(users.findAllByEmailIgnoreCase("ADA@acme.dev")).thenReturn(List.of(newcomer));
+        lenient().when(users.findByEmail("ada@acme.dev")).thenReturn(Optional.of(newcomer));
         Map<String, Object> byAccount = rule("ws-ask-comments", "comment.create", "ask");
         byAccount.put("owner", "ada@acme.dev");
         byAccount.put("addedBy", 11);
