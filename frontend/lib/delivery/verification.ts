@@ -174,7 +174,8 @@ export type NotChecked =
 export interface PageDecision {
   readonly seq: number
   readonly at: string
-  readonly kind: "approval" | "signature" | "expired" | "gesture" | "erased"
+  /** `tooLong` : le runner a refusé une action trop longue pour être accordée, sans rien demander (troisième tour de #551, C1). */
+  readonly kind: "approval" | "signature" | "expired" | "gesture" | "erased" | "tooLong"
   readonly decision: string
   readonly who: Who | null
   readonly where: string | null
@@ -305,6 +306,9 @@ const OPAQUE_PERSON = /^(who|person):[0-9a-f]{32}$/
 /** Un courriel, où qu'il soit dans un texte : le motif du serveur (`MissionEvidenceService.EMAIL`). */
 export const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+/
 
+/** Le refus du runner d'une action trop longue pour être accordée (`approvals.ts`, troisième tour de #551, C1). */
+const TOO_LONG_TO_ASK = "cap:fact-length"
+
 /** Les gestes de la personne sur le résultat : la décision de fin est le dernier d'entre eux. */
 const END_GESTURES = new Set(["APPLY", "DISCARD", "RETRY", "MARK_DONE", "MERGE", "STOP"])
 const GESTURES = new Set([...END_GESTURES, "ASK_FOR_CHANGES", "REVERT_FILE", "CORRECTION"])
@@ -377,7 +381,8 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
   const who = (id: unknown): Who | null => {
     if (typeof id !== "string" || id.length === 0) return null
     if (legacy && EMAIL.test(id)) return { kind: "hidden" }
-    if (!OPAQUE_PERSON.test(id)) return id === "unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
+    // `who:unknown` : une personne que TaskForce ne trouve plus, que le paquet de règles nomme ainsi (troisième tour de #551).
+    if (!OPAQUE_PERSON.test(id)) return id === "unknown" || id === "who:unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
     const person = persons.get(id)
     if (!person) return { kind: "unnamed" }
     const name = refText(person.name) ?? refText(person.email)
@@ -618,6 +623,11 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
         where: base.where ?? "taskforce" })
     } else if (e.type === "action.decided" && typeof d.approval === "number" && d.effect === "deny" && e.actor.kind === "server") {
       decisions.push({ ...base, kind: "expired", decision: "EXPIRED", who: null, where: "taskforce" })
+    } else if (e.type === "action.decided" && d.kind === "decision" && e.actor.kind === "rule" && e.actor.id === TOO_LONG_TO_ASK) {
+      // Une demande d'accord ne part jamais sur un fait coupé : le runner refuse l'action (troisième tour de #551, C1).
+      const facts = Array.isArray(d.facts) && isObj(d.facts[0]) ? d.facts[0] : {}
+      decisions.push({ ...base, kind: "tooLong", decision: "DENIED", who: null, where: "runner",
+        action: str(d.text) ?? str(facts.command) ?? str(facts.path), rule: null, ruleId: null })
     } else if (e.type === "human.decision" && typeof d.decision === "string" && GESTURES.has(d.decision)) {
       const merger = d.decision === "MERGE" ? (refText(d.by) ?? str(d.by)) : null
       decisions.push({ ...base, kind: "gesture", decision: d.decision, action: str(d.pullRequest) ?? str(d.path),

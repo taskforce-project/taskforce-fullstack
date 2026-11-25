@@ -2320,8 +2320,12 @@ export const CONSTANTS_EN = {
       erased: "{count} texts named by the chain are not in this file: erased, or not exported. The chain keeps their digest.",
       rules: "The rules bundle in this file is not the one the mission received.",
       rulesDiffer: "Judging the actions again with the rules of the mission does not give the decisions the record shows.",
-      cut: "{count} actions were judged on facts longer than the record keeps (cut at {max} characters): this page does not judge them again.",
-      cutOne: "1 action was judged on facts longer than the record keeps (cut at {max} characters): this page does not judge it again.",
+      notJudged: "{count} recorded decisions were not judged again by this page: {parts}.",
+      notJudgedOne: "1 recorded decision was not judged again by this page: {parts}.",
+      notJudgedCut: "{count} on facts longer than the record keeps (cut at {max} characters)",
+      notJudgedCutOne: "1 on a fact longer than the record keeps (cut at {max} characters)",
+      notJudgedNoFacts: "{count} without their facts",
+      notJudgedNoFactsOne: "1 without its facts",
       trusted: "Its seal is signed by a key this TaskForce lists as its own. That list comes from its own database: what anchors the key is the comment in the pull request.",
       witnessBroken: "The witness in the pull request names event {seq} with {root}, which is not in this record: it was rewritten after its head was written there.",
       trustedSameMachine: "Its seal is signed by a key of this TaskForce, but that key is on the computer where the agent works: the agent could have read it, so the seal does not prove that the record was not changed during the mission.",
@@ -2388,7 +2392,7 @@ export const CONSTANTS_EN = {
     changed: {
       finished: "The mission finished.",
       failed: "The mission did not finish. Its error, as it was reported: “{error}”",
-      capped: "TaskForce stopped the mission: its record reached {max} events, the most it keeps for one mission, and the agent can't go on without a record.",
+      capped: "TaskForce stopped the mission: its record reached {max} events, the most it keeps for one mission, and the agent can't go on without a record. What the agent did in its last seconds, before the runner stopped it, may not have been written.",
       summary: "What the agent says it did, in its own words. TaskForce did not check it.",
       files: "{count} files changed: {added} lines added, {removed} removed. Their names, as the agent wrote them:",
       oneFile: "1 file changed: {added} lines added, {removed} removed. Its name, as the agent wrote it:",
@@ -2473,6 +2477,7 @@ export const CONSTANTS_EN = {
         SIGNED: "{who} signed for {action}",
       },
       expired: "No one answered in time about {action}: refused",
+      tooLong: "The runner refused {action}: one part of it was longer than {max} characters, too long for TaskForce to have it approved, so no one was asked",
       gestures: {
         APPLY: "Applied by {who}",
         DISCARD: "Discarded by {who}",
@@ -2489,6 +2494,7 @@ export const CONSTANTS_EN = {
       where: {
         taskforce: "in TaskForce",
         github: "on GitHub",
+        runner: "by the runner, on the computer where the agent works",
       },
       actions: {
         WebSearch: "a web search for “{what}”",

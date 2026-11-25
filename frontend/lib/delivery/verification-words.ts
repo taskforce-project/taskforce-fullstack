@@ -223,9 +223,16 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   if (d.texts.absent.length > 0) lines.push({ text: fillText(v.erased, { count: d.texts.absent.length }), tone: "muted" })
   if (d.rules.present && !d.rules.digestHolds) lines.push({ text: v.rules, tone: "warn" })
   if (d.rules.differ.length > 0) lines.push({ text: v.rulesDiffer, tone: "warn" })
-  // Une décision prise sur un fait que le dossier n'a gardé qu'en partie ne se rejuge pas (second tour de #551, N2).
-  if (d.rules.cut > 0) {
-    lines.push({ text: fillText(d.rules.cut === 1 ? v.cutOne : v.cut, { count: d.rules.cut, max: MAX_FACT.toLocaleString("en-US") }), tone: "muted" })
+  // Les décisions que la page n'a pas pu rejuger : prises sur un fait que le dossier n'a gardé qu'en partie (second tour de
+  // #551, N2), ou sans leurs faits (troisième tour, c-b). La première ligne du vérificateur les compte, la page aussi.
+  const notJudged = d.rules.cut + d.rules.noFacts
+  if (notJudged > 0) {
+    const max = MAX_FACT.toLocaleString("en-US")
+    const parts = [
+      d.rules.cut > 0 ? fillText(d.rules.cut === 1 ? v.notJudgedCutOne : v.notJudgedCut, { count: d.rules.cut, max }) : null,
+      d.rules.noFacts > 0 ? fillText(d.rules.noFacts === 1 ? v.notJudgedNoFactsOne : v.notJudgedNoFacts, { count: d.rules.noFacts }) : null,
+    ].filter((part): part is string => part !== null).join(", ")
+    lines.push({ text: fillText(notJudged === 1 ? v.notJudgedOne : v.notJudged, { count: notJudged, parts }), tone: "muted" })
   }
   // La réserve d'abord : une clé que l'agent pouvait lire ne prouve rien du dossier (R198, R161 M5).
   const sameMachine = d.seal.custody !== "separate-machine"
@@ -456,6 +463,7 @@ function actionWords(d: PageDecision, t: Texts): string {
 function decisionWords(d: PageDecision, t: Texts): string {
   const who = whoWords(d.who, t)
   if (d.kind === "expired") return fillText(t.decisions.expired, { action: actionWords(d, t) })
+  if (d.kind === "tooLong") return fillText(t.decisions.tooLong, { action: actionWords(d, t), max: MAX_FACT.toLocaleString("en-US") })
   if (d.kind === "erased") return fillText(t.decisions.erased, { what: kindWords(d.erased, t), who })
   if (d.kind === "gesture") {
     const gestures = t.decisions.gestures as Record<string, string>
@@ -478,7 +486,8 @@ function decisions(page: VerificationPage, t: Texts): Line[] {
       const scopes = t.decisions.scope as Record<string, string>
       if (d.scope && scopes[d.scope]) lines.push({ text: scopes[d.scope], tone: "muted" })
     }
-    if (d.kind !== "expired") {
+    // Un refus du runner dit lui-même pourquoi ; une demande échue n'a pas de raison.
+    if (d.kind !== "expired" && d.kind !== "tooLong") {
       lines.push(d.reason ? { text: fillText(t.decisions.reason, { reason: d.reason }), tone: "muted" } : { text: t.decisions.noReason, tone: "muted" })
     }
   }

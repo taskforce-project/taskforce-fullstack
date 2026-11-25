@@ -263,7 +263,7 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
     expect(page.record.cap).toEqual({ seq: 2, max: 10000, stopped: true })
     const sections = verificationSections(page, t, context)
     expect(texts(sections, "changed")).toContain("TaskForce stopped the mission: its record reached 10,000 events, the most it keeps for one mission, "
-      + "and the agent can't go on without a record.")
+      + "and the agent can't go on without a record. What the agent did in its last seconds, before the runner stopped it, may not have been written.")
     expect(texts(sections, "changed").join(" ")).not.toContain("Its error, as it was reported")
     expect(texts(sections, "record")).toContain("The record reached its cap of 10,000 events at event 2: later events were not kept, "
       + "except the end, the people's decisions and the witness.")
@@ -386,8 +386,54 @@ describe("le reste du dossier, dit en clair", () => {
     const record = chained(events, { mission: file.mission, rules: file.rules, texts: file.texts })
     const page = verificationPage(record, await checkRecord(record, [], at))
     expect(page.check?.details?.rules).toMatchObject({ cut: 1, digestHolds: true, differ: [] })
-    expect(verdictLines(page, t).map((l) => l.text)).toContain(t.verdict.cutOne.replace("{max}", "4,000"))
-    expect(verdictLines(verificationPage(example(), await checkRecord(example(), [], at)), t).map((l) => l.text).join(" ")).not.toContain("cut at")
+    expect(verdictLines(page, t).map((l) => l.text)).toContain(
+      "1 recorded decision was not judged again by this page: 1 on a fact longer than the record keeps (cut at 4,000 characters).")
+    expect(verdictLines(verificationPage(example(), await checkRecord(example(), [], at)), t).map((l) => l.text).join(" ")).not.toContain("not judged again")
+  })
+
+  it("troisième tour de #551 : une décision des règles sans ses faits se compte aussi, avec celles d'un fait coupé", async () => {
+    const file = example()
+    const events = file.events.filter((e) => !(e.type === "note" && (e.data as { kind?: unknown } | null)?.kind === "witness")).map((e) => {
+      const d = (e.data ?? {}) as Record<string, unknown>
+      return e.seq === 7 ? { ...e, data: { ...d, facts: [] } } : e
+    })
+    const record = rechained(file, events)
+    const page = verificationPage(record, await checkRecord(record, [], at))
+    expect(page.check?.details?.rules.noFacts).toBe(1)
+    expect(verdictLines(page, t).map((l) => l.text)).toContain("1 recorded decision was not judged again by this page: 1 without its facts.")
+  })
+
+  it("C1 du troisième tour de #551 : une action trop longue pour être accordée se lit dans les décisions, en mots simples", () => {
+    const command = `psql -v pad=${"a".repeat(30)}`
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: "who:0" } },
+      { type: "action.decided", actor: { kind: "rule", id: "cap:fact-length" }, data: { kind: "decision", tool: "Bash", text: command, effect: "deny",
+        facts: [{ action: "shell", tool: "Bash", command }] } },
+      { type: "mission.ended", data: { status: "DONE" } },
+    ]))
+    const lines = texts(verificationSections(page, t, context), "decisions")
+    expect(lines.some((l) => l.startsWith(`The runner refused the command “${command}”, as the agent wrote it: one part of it was longer than 4,000 characters, too long for TaskForce to have it approved, so no one was asked,`))).toBe(true)
+    expect(lines.some((l) => l.endsWith("by the runner, on the computer where the agent works."))).toBe(true)
+    expect(lines).not.toContain(t.decisions.noReason)
+  })
+
+  it("c-c du troisième tour de #551 : l'arrêt au plafond dit que les dernières secondes ont pu ne pas s'écrire", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme" } },
+      { type: "limit.reached", data: { max: 10000, stopped: true } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Evidence cap reached: TaskForce stopped the mission." } },
+    ]))
+    expect(texts(verificationSections(page, t, context), "changed").join(" ")).toContain(
+      "What the agent did in its last seconds, before the runner stopped it, may not have been written.")
+  })
+
+  it("f34130dc : qui répond d'une règle, nommé par son `who:` et sa note ; `who:unknown`, par personne", () => {
+    const rules = (owner: string) => ({ format: "taskforce-rules/1", rules: [{ id: "search-web", class: "read", text: "Search the web", owner }] })
+    const decided = { type: "action.decided", actor: { kind: "rule", id: "search-web" }, data: { kind: "decision", tool: "WebSearch", effect: "allow",
+      facts: [{ action: "web.search", tool: "WebSearch", query: "q" }] } }
+    const unknown = verificationPage(chained([{ type: "mission.started", data: { mission: 7, workspace: "acme" } }, decided], { rules: rules("who:unknown") }))
+    expect(unknown.classOf.heaviest?.rule.owner).toEqual({ kind: "unnamed" })
+    expect(texts(verificationSections(unknown, t, context), "classification")).toContain("Answered for by someone the record does not name.")
   })
 
   it("une fusion sur GitHub nomme le compte par son texte ; une commande accordée se cite comme l'agent l'a écrite", () => {
