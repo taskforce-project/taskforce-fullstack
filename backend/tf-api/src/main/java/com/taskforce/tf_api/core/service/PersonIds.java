@@ -1,5 +1,7 @@
 package com.taskforce.tf_api.core.service;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -65,13 +67,51 @@ public class PersonIds {
 
     /**
      * Le propriétaire qu'une règle écrite avant la 1.18 nomme par son courriel, par son identifiant dans cet espace :
-     * {@link #UNKNOWN} quand aucun compte ne porte plus ce courriel (un compte purgé a perdu le sien).
+     * {@link #UNKNOWN} quand {@link #authorOf} ne retrouve pas son compte.
      */
-    public String ofEmail(Long workspaceId, String email) {
-        if (email == null || email.isBlank()) {
-            return UNKNOWN;
+    public String ofAuthor(Long workspaceId, Object addedBy, String email, LocalDateTime versionAt) {
+        return authorOf(addedBy, email, versionAt).map(user -> of(workspaceId, user.getId())).orElse(UNKNOWN);
+    }
+
+    /**
+     * Le compte qui a écrit une règle d'une version (R159 de #551, quatrième tour, d-c) : d'abord par son compte
+     * ({@code addedBy}, que chaque règle garde depuis le 11 novembre 2026), et un compte purgé ne nomme plus personne. Le
+     * courriel d'une règle plus ancienne ne sert qu'à défaut : sans tenir compte de la casse, et seulement pour un compte
+     * créé avant la version ({@code versionAt}). Un compte qui reprend le courriel d'un compte purgé n'hérite ainsi d'aucune
+     * règle ; sans la date de la version, le courriel ne nomme personne.
+     */
+    public Optional<User> authorOf(Object addedBy, String email, LocalDateTime versionAt) {
+        return authorOf(users, addedBy, email, versionAt);
+    }
+
+    /** Comme {@link #authorOf(Object, String, LocalDateTime)}, sur ce dépôt des comptes : la copie du dossier lit ainsi les siens. */
+    public static Optional<User> authorOf(UserRepository users, Object addedBy, String email, LocalDateTime versionAt) {
+        Long account = accountOf(addedBy);
+        if (account != null) {
+            return users.findById(account);
         }
-        return users.findByEmail(email.strip()).map(User::getId).map(id -> of(workspaceId, id)).orElse(UNKNOWN);
+        if (email == null || email.isBlank() || versionAt == null) {
+            return Optional.empty();
+        }
+        List<User> before = users.findAllByEmailIgnoreCase(email.strip()).stream()
+            .filter(user -> user.getCreatedAt() != null && !user.getCreatedAt().isAfter(versionAt))
+            .toList();
+        return before.size() == 1 ? Optional.of(before.getFirst()) : Optional.empty();
+    }
+
+    /** Le compte que {@code addedBy} désigne : un nombre, ou son texte ; null sinon. */
+    private static Long accountOf(Object addedBy) {
+        if (addedBy instanceof Number number) {
+            return number.longValue();
+        }
+        if (addedBy instanceof String text && !text.isBlank()) {
+            try {
+                return Long.valueOf(text.strip());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /** La personne qu'un identifiant de cet espace nomme, tant que son compte n'est pas purgé. */

@@ -60,6 +60,7 @@ import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierTextRepository;
 import com.taskforce.tf_api.core.repository.MissionPersonRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 
@@ -271,10 +272,18 @@ public class MissionEvidenceService {
      */
     ObjectNode recordCopy(RulesBundle rules, Long workspaceId, List<User> named, Set<String> rewritten) {
         ObjectNode copy = JSON.valueToTree(rules);
+        // La date de la version de chaque couche, qui borne les comptes qu'un courriel d'avant la 1.18 nomme encore (d-c).
+        Map<String, LocalDateTime> written = new HashMap<>();
+        for (JsonNode layer : copy.path("layers")) {
+            ruleSets.findByWorkspaceIdAndVersion(workspaceId, layer.path("version").asInt())
+                .ifPresent(set -> written.put(layer.path("scope").asText(""), set.getCreatedAt()));
+        }
         // La table de TaskForce nomme trente fois le même propriétaire : chaque identifiant n'est cherché qu'une fois.
         Set<String> presented = new HashSet<>();
         for (JsonNode rule : copy.path("rules")) {
-            if (rule instanceof ObjectNode object) pseudonymize(object, workspaceId, named, presented, rewritten);
+            if (rule instanceof ObjectNode object) {
+                pseudonymize(object, workspaceId, named, presented, rewritten, written.get(object.path("layer").asText("")));
+            }
         }
         for (JsonNode layer : copy.path("layers")) {
             if (!(layer instanceof ObjectNode object)) continue;
@@ -289,7 +298,9 @@ public class MissionEvidenceService {
             ruleSets.findByWorkspaceIdAndVersion(workspaceId, version).ifPresent(set -> {
                 JsonNode stored = JSON.valueToTree(set.getRules() == null ? List.of() : set.getRules());
                 for (JsonNode rule : stored) {
-                    if (rule instanceof ObjectNode one) pseudonymize(one, workspaceId, new ArrayList<>(), null, new TreeSet<>());
+                    if (rule instanceof ObjectNode one) {
+                        pseudonymize(one, workspaceId, new ArrayList<>(), null, new TreeSet<>(), set.getCreatedAt());
+                    }
                 }
                 object.put("digest", RulesDigest.of(stored));
             });
@@ -302,9 +313,12 @@ public class MissionEvidenceService {
      * Une règle nommée comme le dossier nomme les personnes : son propriétaire et ses approbateurs par leur
      * identifiant. Le propriétaire se lit comme le paquet le lit : son identifiant reste, présenté par sa note quand
      * {@code presented} n'est pas nul ; le repère {@code workspace-owner} reste ; un courriel d'avant la 1.18 devient
-     * l'identifiant de son compte ; tout autre texte ne nomme personne. Ce qu'elle récrit va dans {@code rewritten}.
+     * l'identifiant de son compte, lu d'abord par le compte qui a écrit la règle ({@code addedBy}), le courriel seulement à
+     * défaut, pour un compte créé avant sa version ({@code versionAt}, R159 de #551, quatrième tour, d-c) ; tout autre texte
+     * ne nomme personne. Ce qu'elle récrit va dans {@code rewritten}.
      */
-    private void pseudonymize(ObjectNode rule, Long workspaceId, List<User> named, Set<String> presented, Set<String> rewritten) {
+    private void pseudonymize(ObjectNode rule, Long workspaceId, List<User> named, Set<String> presented, Set<String> rewritten,
+                              LocalDateTime versionAt) {
         String owner = rule.path("owner").asText(null);
         if (owner != null && owner.startsWith(MissionPerson.PREFIX)) {
             if (presented != null && presented.add(owner)) {
@@ -313,7 +327,9 @@ public class MissionEvidenceService {
                     .ifPresent(user -> personIdOf(workspaceId, user, named));
             }
         } else if (owner != null && owner.contains("@")) {
-            rule.put("owner", users.findByEmail(owner.strip()).map(user -> personIdOf(workspaceId, user, named)).orElse(UNKNOWN_PERSON));
+            Object addedBy = rule.hasNonNull("addedBy") ? rule.get("addedBy").asText() : null;
+            rule.put("owner", PersonIds.authorOf(users, addedBy, owner, versionAt).map(user -> personIdOf(workspaceId, user, named))
+                .orElse(UNKNOWN_PERSON));
             rewritten.add(REWRITTEN_OWNERS);
         } else if (!HarnessRulesService.OWNER_PLACEHOLDER.equals(owner)) {
             rule.put("owner", UNKNOWN_PERSON);

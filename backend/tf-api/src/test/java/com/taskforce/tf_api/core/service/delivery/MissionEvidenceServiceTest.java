@@ -342,9 +342,9 @@ class MissionEvidenceServiceTest {
         @DisplayName("R159 second tour, N3 : la copie d'un paquet d'avant la 1.18 nomme chaque personne par son identifiant ; ses "
             + "empreintes se calculent sur elle")
         void the_rules_copy_names_people_by_their_id() throws Exception {
-            User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
-            lenient().when(users.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));
-            lenient().when(users.findByEmail("bob@taskforce.dev")).thenReturn(Optional.of(bob));
+            User bob = User.builder().id(8L).email("bob@taskforce.dev").createdAt(java.time.LocalDateTime.of(2026, 9, 1, 9, 0)).build();
+            lenient().when(users.findAllByEmailIgnoreCase("ada@taskforce.dev")).thenReturn(List.of(ada));
+            lenient().when(users.findAllByEmailIgnoreCase("bob@taskforce.dev")).thenReturn(List.of(bob));
             lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
             // La couche de Bob telle qu'elle est gardée : ses règles nomment leur propriétaire par son courriel.
             Map<String, Object> layerRule = new java.util.LinkedHashMap<>();
@@ -353,7 +353,7 @@ class MissionEvidenceServiceTest {
             layerRule.put("owner", "bob@taskforce.dev");
             layerRule.put("require", Map.of("approvers", List.of("person:8")));
             lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3)).thenReturn(Optional.of(HarnessRuleSet.builder().version(3)
-                .createdBy(bob).rules(List.of(layerRule)).build()));
+                .createdBy(bob).createdAt(java.time.LocalDateTime.of(2026, 10, 1, 9, 0)).rules(List.of(layerRule)).build()));
             RulesBundle.Rule table = new RulesBundle.Rule("read-files", new RulesBundle.Condition("file.read", null, null, null, null,
                 null, null, null), "reversible", "allow", null, "ada@taskforce.dev", "Reading changes nothing.", "2027-01-01");
             RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
@@ -370,7 +370,9 @@ class MissionEvidenceServiceTest {
             String ada7 = persons.get(7L).getPerson();
             String bob8 = persons.get(8L).getPerson();
             assertThat(copy.toString()).doesNotContain("@").doesNotContain("person:");
-            assertThat(copy.get("rules").get(0).get("owner").asText()).isEqualTo(ada7);
+            // Un courriel hors de toute version ne nomme personne : rien ne montre que le compte qui le porte l'avait déjà
+            // (R159 de #551, quatrième tour, d-c). Celui d'une règle de la couche de Bob, si : son compte est plus ancien.
+            assertThat(copy.get("rules").get(0).get("owner").asText()).isEqualTo("who:unknown").isNotEqualTo(ada7);
             assertThat(copy.get("rules").get(1).get("owner").asText()).isEqualTo(bob8);
             assertThat(copy.get("rules").get(1).get("require").get("approvers")).extracting(JsonNode::asText).containsExactly(bob8, "role:admin");
             assertThat(copy.get("layers").get(0).get("ref").asText()).isEqualTo(bob8);

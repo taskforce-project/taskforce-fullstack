@@ -22,6 +22,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
     /**
+     * Les comptes qui portent ce courriel, sans tenir compte de la casse : l'auteur d'une règle écrite avant la 1.18, que
+     * ses règles nommaient par son courriel (R159 de #551, quatrième tour, d-c).
+     */
+    List<User> findAllByEmailIgnoreCase(String email);
+
+    /**
      * Trouve un utilisateur par son ID Keycloak
      */
     Optional<User> findByKeycloakId(String keycloakId);

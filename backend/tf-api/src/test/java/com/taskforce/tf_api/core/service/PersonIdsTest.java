@@ -9,6 +9,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterEach;
@@ -118,15 +120,36 @@ class PersonIdsTest {
     }
 
     @Test
-    @DisplayName("un courriel d'avant la 1.18 donne l'identifiant de son compte ; sans compte, personne")
+    @DisplayName("un courriel d'avant la 1.18 donne l'identifiant de son compte, sans tenir compte de la casse ; sans compte, personne")
     void anEmailGivesTheIdOfItsAccount() {
-        lenient().when(users.findByEmail("ada@example.com"))
-            .thenReturn(Optional.of(User.builder().id(7L).email("ada@example.com").build()));
+        LocalDateTime version = LocalDateTime.of(2026, 10, 1, 9, 0);
+        lenient().when(users.findAllByEmailIgnoreCase("Ada@Example.com"))
+            .thenReturn(List.of(User.builder().id(7L).email("ada@example.com").createdAt(version.minusMonths(3)).build()));
         when(people.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.of(person(3L, 7L, "who:" + "3".repeat(32))));
 
-        assertThat(ids.ofEmail(3L, " ada@example.com ")).isEqualTo("who:" + "3".repeat(32));
-        assertThat(ids.ofEmail(3L, "gone@example.com")).isEqualTo(PersonIds.UNKNOWN);
-        assertThat(ids.ofEmail(3L, " ")).isEqualTo(PersonIds.UNKNOWN);
+        assertThat(ids.ofAuthor(3L, null, " Ada@Example.com ", version)).isEqualTo("who:" + "3".repeat(32));
+        assertThat(ids.ofAuthor(3L, null, "gone@example.com", version)).isEqualTo(PersonIds.UNKNOWN);
+        assertThat(ids.ofAuthor(3L, null, " ", version)).isEqualTo(PersonIds.UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, d-c : l'auteur se lit d'abord par son compte ; un compte neuf qui reprend son courriel n'hérite de rien")
+    void theAuthorIsReadByAccountFirst() {
+        LocalDateTime version = LocalDateTime.of(2026, 10, 1, 9, 0);
+        User ada = User.builder().id(7L).email("ada@example.com").createdAt(version.minusMonths(3)).build();
+        User newcomer = User.builder().id(12L).email("ada@example.com").createdAt(version.plusMonths(1)).build();
+        lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
+        lenient().when(users.findById(11L)).thenReturn(Optional.empty());
+        lenient().when(users.findAllByEmailIgnoreCase("ada@example.com")).thenReturn(List.of(newcomer));
+
+        // Par son compte, même quand un autre compte porte aujourd'hui le courriel de la règle.
+        assertThat(ids.authorOf(7L, "ada@example.com", version)).contains(ada);
+        assertThat(ids.authorOf("7", "ada@example.com", version)).contains(ada);
+        // Son compte purgé : personne, sans repli sur le courriel.
+        assertThat(ids.authorOf(11L, "ada@example.com", version)).isEmpty();
+        // Sans compte gardé, le courriel seul, et seulement pour un compte plus ancien que la version.
+        assertThat(ids.authorOf(null, "ada@example.com", version)).isEmpty();
+        assertThat(ids.authorOf(null, "ada@example.com", null)).isEmpty();
     }
 
     @Test

@@ -198,7 +198,7 @@ public class RulesService {
             throw new ResourceNotFoundException("This rule isn't in these rules any more.");
         }
         Map<LayerKey, LayerVersion> state = new LinkedHashMap<>(rulesService.currentLayers(ws.getId()));
-        state.put(key, new LayerVersion(key, Integer.MAX_VALUE, null, after));
+        state.put(key, new LayerVersion(key, Integer.MAX_VALUE, null, after, writtenSince(state.get(key))));
         List<RulesResponse.RuleCaseView> broken = replay(ws, context, state, null);
         if (!broken.isEmpty()) {
             throw new BusinessException("Removing this rule would change what other rules of your workspace do. "
@@ -299,7 +299,7 @@ public class RulesService {
         Map<LayerKey, LayerVersion> after = new LinkedHashMap<>(before);
         List<Map<String, Object>> layerRules = new ArrayList<>(existing(ws, key));
         layerRules.addAll(stored);
-        after.put(key, new LayerVersion(key, Integer.MAX_VALUE, null, layerRules));
+        after.put(key, new LayerVersion(key, Integer.MAX_VALUE, null, layerRules, writtenSince(before.get(key))));
         RulesBundle without = bundleIn(ws, context, key, before);
         RulesBundle with = bundleIn(ws, context, key, after);
 
@@ -455,6 +455,15 @@ public class RulesService {
     private List<Map<String, Object>> existing(Workspace ws, LayerKey key) {
         LayerVersion current = rulesService.currentLayers(ws.getId()).get(key);
         return current == null ? List.of() : current.rules();
+    }
+
+    /**
+     * La date qui borne les courriels des règles qu'une version à l'essai reprend de la version en vigueur : la sienne, pas
+     * celle de l'essai, sans quoi un compte créé depuis, qui reprendrait un de ces courriels, en hériterait (R159 de #551,
+     * quatrième tour, d-c).
+     */
+    private static LocalDateTime writtenSince(LayerVersion current) {
+        return current == null || current.createdAt() == null ? LocalDateTime.now() : current.createdAt();
     }
 
     // ------------------------------------------------------------------------------------------------- vues
