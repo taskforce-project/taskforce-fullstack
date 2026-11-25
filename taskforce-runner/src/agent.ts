@@ -416,6 +416,8 @@ export async function runAgent(
   const relay = opts.relay ?? new EventRelay(api, claim.runId);
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
+    // La mission s'arrête : le hook refuse toute action avant même que Claude Code ne s'arrête (R159, troisième tour, c-c).
+    stopped: opts.signal,
     rules: opts.rules,
     exposure: opts.exposure,
     allowedInAdvance: config.agent.extraAllowedTools,

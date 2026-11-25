@@ -64,6 +64,11 @@ export interface ApprovalServerOptions {
    * rapporte un contenu de dehors, une fois partie, s'y ajoute. Absent : aucun de ces faits.
    */
   exposure?: Exposure;
+  /**
+   * La mission s'arrête (R159 de #551, troisième tour, c-c) : dès que ce signal tombe, le hook refuse toute action, avant
+   * même que Claude Code ne soit arrêté ; rien ne tourne après le plafond sans être dit.
+   */
+  stopped?: AbortSignal;
   /** Attente maximale d'une décision ; au-delà, refus. */
   waitMs: number;
   /** Intervalle de lecture de la décision. */
@@ -72,6 +77,9 @@ export interface ApprovalServerOptions {
 
 const DENIED_BY_PERSON = "Denied in TaskForce: the person who delegated this task did not allow this action. Do not retry "
   + "it; find another way or explain in your summary what you needed.";
+
+const STOPPED = "Denied: TaskForce stopped this mission (its record is full, or the mission was closed). Stop here: no "
+  + "action runs any more.";
 
 /**
  * Le plafond des changements dans TaskForce (R110) : son nom dans la trace, et la portée d'un accord pour la mission
@@ -343,6 +351,14 @@ export class ApprovalServer {
     }
     const input = await readJson(req);
     const tool = typeof input.tool_name === "string" ? input.tool_name : "unknown tool";
+    // La mission s'arrête : plus rien ne passe, le temps que Claude Code s'arrête (c-c).
+    if (this.options.stopped?.aborted) {
+      log.info(`Denied, the mission is stopping: ${tool}`);
+      this.reply(res, 200, route === "/pre-tool-use"
+        ? { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: STOPPED } }
+        : hookDecision(false, STOPPED));
+      return;
+    }
     if (route === "/pre-tool-use") {
       const decision = this.judge(input);
       if (decision.effect !== "ask") {
