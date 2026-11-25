@@ -5,6 +5,8 @@
  * webapp revient sur `/auth/desktop` au lieu de l'accueil, pour l'accord.
  */
 
+import { returnPath } from "./return-path";
+
 const STORAGE_KEY = "tf.desktopSignIn";
 
 /** Au-delà, une demande oubliée dans l'onglet ne détourne plus une connexion ordinaire. */
@@ -70,7 +72,11 @@ export function clearDesktopRequest(): void {
   }
 }
 
-/** Où aller après une connexion réussie : l'accord à l'app desktop si une demande attend, sinon `fallback`. */
+/**
+ * Où aller après une connexion réussie : l'accord à l'app desktop si une demande attend ; sinon la page de vérification
+ * demandée avant la connexion (R161 M4 de #552), à la place de l'accueil mais jamais de l'onboarding ; sinon `fallback`.
+ */
 export function afterSignInPath(fallback: string): string {
-  return pendingDesktopRequest() ? DESKTOP_SIGN_IN_PATH : fallback;
+  if (pendingDesktopRequest()) return DESKTOP_SIGN_IN_PATH;
+  return fallback === "/" ? (returnPath() ?? fallback) : fallback;
 }

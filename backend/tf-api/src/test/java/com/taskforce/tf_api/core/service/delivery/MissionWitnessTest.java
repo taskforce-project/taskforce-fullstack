@@ -1,12 +1,17 @@
 package com.taskforce.tf_api.core.service.delivery;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.after;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +31,9 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.model.DeliveryRun;
@@ -36,7 +44,9 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.DeliveryRunEvidenceRepository;
 import com.taskforce.tf_api.core.repository.DeliveryRunRepository;
 import com.taskforce.tf_api.core.repository.MissionDossierSealRepository;
+import com.taskforce.tf_api.core.repository.WebhookDeliveryRepository;
 import com.taskforce.tf_api.core.service.GitHubPullRequests;
+import com.taskforce.tf_api.core.service.webhook.WebhookDispatcher;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 
 /**
@@ -205,7 +215,7 @@ class MissionWitnessTest {
         when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
         when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
             .thenReturn(Optional.of(MissionDossierSeal.builder().runId(100L).seq(31).root(ROOT).build()));
-        witness.sweep();
+        witness.pass();
 
         verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
         List<Map<String, Object>> notes = notes(2);
@@ -257,7 +267,8 @@ class MissionWitnessTest {
         when(evidence.appendToDossier(eq(100L), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.of(HASH));
         when(evidence.witnessNoted(100L)).thenReturn(false, true);
         BusinessException down = new GitHubPullRequests.Unanswered("GitHub can't be reached: nothing changed. Try again in a moment.");
-        when(pullRequests.login(1L)).thenThrow(down, down, down, down, down, down).thenReturn(LOGIN);
+        // Trois essais à la fin de la mission, puis un seul par passage (R159 de #551, quatrième tour, D1).
+        when(pullRequests.login(1L)).thenThrow(down, down, down, down).thenReturn(LOGIN);
         when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString()))
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-6"));
         when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L));
@@ -266,8 +277,8 @@ class MissionWitnessTest {
         MissionWitness witness = witness(URL, true);
 
         witness.write(new MissionSealed(100L, ROOT, 31));
-        witness.sweep();
-        witness.sweep();
+        witness.pass();
+        witness.pass();
 
         verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
         List<Map<String, Object>> notes = notes(2);
@@ -287,7 +298,7 @@ class MissionWitnessTest {
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         when(pullRequests.login(1L)).thenReturn(LOGIN);
 
-        witness(URL, true).sweep();
+        witness(URL, true).pass();
 
         verify(pullRequests).findComment(1L, "acme/website", 212, List.of(ROOT), LOGIN);
         verify(pullRequests, never()).comment(anyLong(), anyString(), anyInt(), anyString());
@@ -307,7 +318,7 @@ class MissionWitnessTest {
         when(pullRequests.findComment(1L, "acme/website", 212, List.of(ROOT), LOGIN))
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-7"));
 
-        witness(URL, true).sweep();
+        witness(URL, true).pass();
 
         verify(pullRequests, never()).comment(anyLong(), anyString(), anyInt(), anyString());
         assertThat(noted()).containsEntry("written", true).containsEntry("comment", "https://github.com/acme/website/pull/212#issuecomment-7");
@@ -370,9 +381,9 @@ class MissionWitnessTest {
             .thenReturn(Optional.of("https://github.com/acme/website/pull/212#issuecomment-4"));
         MissionWitness witness = witness(URL, true);
 
-        witness.sweep();
-        witness.sweep();
-        witness.sweep();
+        witness.pass();
+        witness.pass();
+        witness.pass();
 
         verify(pullRequests, times(1)).comment(anyLong(), anyString(), anyInt(), anyString());
         verify(evidence, times(3)).witnessed(100L);
@@ -411,10 +422,71 @@ class MissionWitnessTest {
         when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         when(pullRequests.comment(eq(1L), eq("acme/website"), eq(212), anyString())).thenReturn(Optional.empty());
 
-        witness(URL, true).sweep();
+        witness(URL, true).pass();
 
         assertThat(written()).startsWith("TaskForce evidence of this pull request: `" + ROOT + "` (event 31 of its record), sealed with the key");
         assertThat(noted()).containsEntry("written", true).containsEntry("root", ROOT).containsEntry("seq", 31);
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, D1 : GitHub ne répond pas, cent missions attendent ; WebhookDispatcher passe quand même, et le passage s'arrête au premier délai")
+    void a_github_that_does_not_answer_holds_neither_the_scheduler_nor_the_whole_pass() {
+        when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(LongStream.rangeClosed(1, 100).boxed().toList());
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(anyLong()))
+            .thenAnswer(call -> Optional.of(MissionDossierSeal.builder().runId(call.getArgument(0)).seq(31).root(ROOT).build()));
+        when(runRepository.findById(anyLong())).thenReturn(Optional.of(run));
+        when(evidence.appendToDossier(anyLong(), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.of(HASH));
+        // GitHub ne répond pas : chaque appel attend son délai, puis le client le dit.
+        when(pullRequests.login(1L)).thenAnswer(call -> {
+            Thread.sleep(300);
+            throw new GitHubPullRequests.Unanswered("GitHub can't be reached: nothing changed. Try again in a moment.");
+        });
+        WebhookDeliveryRepository deliveries = mock(WebhookDeliveryRepository.class);
+        WebhookDispatcher webhooks = new WebhookDispatcher(deliveries, new TransactionTemplate(transactionManager), 1000, false);
+        MissionWitness witness = witness(URL, true);
+        // Le planificateur du serveur : un seul fil, celui que donne @EnableScheduling sans réglage.
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.initialize();
+        try {
+            scheduler.scheduleWithFixedDelay(witness::sweep, Duration.ofMinutes(15));
+            scheduler.scheduleWithFixedDelay(webhooks::dispatchDue, Duration.ofMillis(20));
+
+            // Les webhooks partent pendant que le témoin attend GitHub.
+            verify(deliveries, timeout(3000).atLeast(20)).lockDue(any(), anyInt());
+            // Le premier délai arrête le passage : une mission essayée, une seule fois ; le passage suivant reprendra.
+            verify(evidence, timeout(3000)).witnessTried(1L);
+            verify(pullRequests, after(1000).times(1)).login(1L);
+            verify(runRepository, never()).findById(2L);
+        } finally {
+            scheduler.shutdown();
+            witness.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, D1 : au passage régulier, un seul essai par mission et sans pause, quand GitHub refuse")
+    void the_sweep_tries_each_mission_once_without_a_pause() {
+        when(evidenceRepository.findUnwitnessed(any(), any())).thenReturn(List.of(100L, 101L));
+        when(sealRepository.findTopByRunIdOrderBySeqDesc(anyLong()))
+            .thenAnswer(call -> Optional.of(MissionDossierSeal.builder().runId(call.getArgument(0)).seq(31).root(ROOT).build()));
+        when(runRepository.findById(anyLong())).thenReturn(Optional.of(run));
+        when(evidence.appendToDossier(anyLong(), eq("note"), eq(MissionEvidenceService.Actor.SERVER), any())).thenReturn(Optional.of(HASH));
+        // GitHub répond, et refuse : le passage passe à la mission suivante.
+        when(pullRequests.login(1L)).thenThrow(new BusinessException("Reconnect GitHub in Settings > Integrations."));
+        // Une minute de pause entre deux essais, à la fin d'une mission : le passage n'en fait aucune.
+        MissionWitness witness = new MissionWitness(runRepository, evidenceRepository, sealRepository, pullRequests, evidence,
+            transactionManager, URL, true, List.of(Duration.ofMinutes(1)));
+        try {
+            assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+                witness.sweep();
+                verify(evidence, timeout(5000)).witnessTried(101L);
+            });
+
+            verify(pullRequests, times(2)).login(1L);
+            verify(evidence).witnessTried(100L);
+        } finally {
+            witness.stop();
+        }
     }
 
     @Test

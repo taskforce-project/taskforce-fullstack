@@ -192,6 +192,9 @@ class EvidenceExampleContractTest {
                 persons.put(person.getUserId(), person);
                 return person;
             });
+            lenient().when(people.drawIfAbsent(anyLong(), anyLong(), anyString(), any())).thenAnswer(inv -> persons.putIfAbsent(
+                inv.getArgument(1), MissionPerson.builder().workspaceId(inv.getArgument(0)).userId(inv.getArgument(1))
+                    .person(inv.getArgument(2)).createdAt(inv.getArgument(3)).build()) == null ? 1 : 0);
             lenient().when(people.findByWorkspaceIdAndPerson(anyLong(), anyString()))
                 .thenAnswer(inv -> persons.values().stream().filter(p -> p.getPerson().equals(inv.getArgument(1))).findFirst());
             DeliveryRunEvidenceRepository repository = mock(DeliveryRunEvidenceRepository.class);

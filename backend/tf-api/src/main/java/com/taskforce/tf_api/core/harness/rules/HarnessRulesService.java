@@ -3,11 +3,13 @@ package com.taskforce.tf_api.core.harness.rules;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -95,8 +97,11 @@ public class HarnessRulesService {
         }
     }
 
-    /** Une version de couche telle que le paquet la lit : ses règles, son numéro, son empreinte. */
-    public record LayerVersion(LayerKey key, int version, String digest, List<Map<String, Object>> rules) {
+    /**
+     * Une version de couche telle que le paquet la lit : ses règles, son numéro, son empreinte, et sa date, qui borne qui
+     * un courriel d'avant la 1.18 peut encore nommer (R159 de #551, quatrième tour, d-c).
+     */
+    public record LayerVersion(LayerKey key, int version, String digest, List<Map<String, Object>> rules, LocalDateTime createdAt) {
     }
 
     public HarnessRulesService(HarnessRuleSetRepository repository, WorkspaceMemberRepository members,
@@ -125,7 +130,7 @@ public class HarnessRulesService {
         Map<LayerKey, LayerVersion> current = new LinkedHashMap<>();
         for (HarnessRuleSet set : repository.findByWorkspaceIdOrderByVersionDesc(workspaceId)) {
             LayerKey key = LayerKey.of(set);
-            current.putIfAbsent(key, new LayerVersion(key, set.getVersion(), set.getDigest(), set.getRules()));
+            current.putIfAbsent(key, new LayerVersion(key, set.getVersion(), set.getDigest(), set.getRules(), set.getCreatedAt()));
         }
         return current;
     }
@@ -159,7 +164,7 @@ public class HarnessRulesService {
         int version = 1;
         for (LayerVersion layer : applicable(work, role, layers)) {
             version = Math.max(version, layer.version());
-            List<Map<String, Object>> named = owners.name(layer.rules());
+            List<Map<String, Object>> named = owners.name(layer.rules(), layer.createdAt());
             ObjectNode descriptor = applied.addObject();
             descriptor.put("scope", layer.key().scope().layer());
             if (layer.key().ref() != null) {
@@ -273,7 +278,7 @@ public class HarnessRulesService {
     private final class Owners {
 
         private final Workspace workspace;
-        private final Map<String, String> byEmail = new HashMap<>();
+        private final Map<String, String> byAuthor = new HashMap<>();
         private String ofWorkspace;
 
         Owners(Workspace workspace) {
@@ -290,25 +295,32 @@ public class HarnessRulesService {
             return ofWorkspace;
         }
 
-        /** Le propriétaire qu'écrit une règle d'une couche : son identifiant, le repère, ou un courriel d'avant. */
-        String of(Object stored) {
+        /**
+         * Le propriétaire qu'écrit une règle d'une version : son identifiant, le repère, ou un courriel d'avant la 1.18, lu
+         * d'abord par le compte qui a écrit la règle ({@code addedBy}), le courriel seulement à défaut, pour un compte créé
+         * avant la version (R159 de #551, quatrième tour, d-c).
+         */
+        String of(Map<String, Object> rule, LocalDateTime versionAt) {
+            Object stored = rule.get("owner");
             String owner = stored == null ? "" : stored.toString();
             if (owner.startsWith(MissionPerson.PREFIX) || OWNER_PLACEHOLDER.equals(owner)) {
                 return owner;
             }
             if (owner.contains("@")) {
-                return byEmail.computeIfAbsent(owner,
-                    email -> Objects.requireNonNullElse(personIds.ofEmail(workspace.getId(), email), PersonIds.UNKNOWN));
+                Object addedBy = rule.get("addedBy");
+                String key = addedBy != null ? "account:" + addedBy : owner.strip().toLowerCase(Locale.ROOT) + " before " + versionAt;
+                return byAuthor.computeIfAbsent(key, k -> Objects.requireNonNullElse(
+                    personIds.ofAuthor(workspace.getId(), addedBy, owner, versionAt), PersonIds.UNKNOWN));
             }
             return PersonIds.UNKNOWN;
         }
 
         /** Les règles d'une version, chacune avec son propriétaire nommé ainsi ; la même liste quand rien ne change. */
-        List<Map<String, Object>> name(List<Map<String, Object>> stored) {
+        List<Map<String, Object>> name(List<Map<String, Object>> stored, LocalDateTime versionAt) {
             List<Map<String, Object>> out = null;
             for (int i = 0; i < stored.size(); i++) {
                 Map<String, Object> rule = stored.get(i);
-                String owner = of(rule.get("owner"));
+                String owner = of(rule, versionAt);
                 if (!owner.equals(rule.get("owner"))) {
                     if (out == null) {
                         out = new ArrayList<>(stored);
@@ -320,6 +332,17 @@ public class HarnessRulesService {
             }
             return out == null ? stored : out;
         }
+    }
+
+    /**
+     * L'empreinte d'une version telle que le paquet la donne (R159 de #551, quatrième tour, d-d) : celle de ses règles
+     * nommées par leur identifiant. Une version d'avant la 1.18 garde une empreinte calculée avec le courriel de son auteur :
+     * après la purge de son compte, elle confirmerait un courriel deviné, à qui connaît le reste de la version.
+     */
+    public String digestAsNamed(Workspace workspace, HarnessRuleSet set) {
+        List<Map<String, Object>> rules = set.getRules() == null ? List.of() : set.getRules();
+        List<Map<String, Object>> named = new Owners(workspace).name(rules, set.getCreatedAt());
+        return named == rules && set.getDigest() != null ? set.getDigest() : digestOf(named);
     }
 
     /** La table de TaskForce, dont la personne propriétaire de l'espace répond : {@code owner} est son identifiant. */

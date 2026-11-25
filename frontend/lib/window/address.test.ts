@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest"
 
 import {
   closeIssueHref, conversationOf, hrefWith, issueHref, issueOf, issueRefOfUrl, missionOf, missionPath, previousAddress,
-  replaceQuery, sameAddress, screenUnder, withConversation, workflowProjectOf,
+  replaceQuery, sameAddress, screenUnder, verificationPath, withConversation, workflowProjectOf,
 } from "./address"
 
 const params = (query: string) => new URLSearchParams(query)
@@ -84,6 +84,9 @@ describe("les adresses autour de l'issue et de la conversation", () => {
     expect(missionOf("/acme/missions")).toBeNull()
     expect(missionOf("/acme/missions/abc")).toBeNull()
     expect(missionOf(undefined)).toBeNull()
+    // La page de vérification (R212) est une page à elle, sous sa mission : le lien de la pull request la nomme.
+    expect(verificationPath("acme", 42)).toBe("/acme/missions/42/verification")
+    expect(missionOf(verificationPath("acme", 42))).toBeNull()
   })
 
   it("lit la conversation de l'adresse", () => {

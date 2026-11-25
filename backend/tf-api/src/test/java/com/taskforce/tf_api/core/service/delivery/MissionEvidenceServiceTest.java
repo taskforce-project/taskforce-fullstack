@@ -166,6 +166,10 @@ class MissionEvidenceServiceTest {
             persons.put(person.getUserId(), person);
             return person;
         });
+        // Comme INSERT ... ON CONFLICT DO NOTHING : un identifiant déjà tiré reste (R159 de #551, quatrième tour, d-b).
+        lenient().when(people.drawIfAbsent(anyLong(), anyLong(), anyString(), any())).thenAnswer(inv -> persons.putIfAbsent(
+            inv.getArgument(1), MissionPerson.builder().workspaceId(inv.getArgument(0)).userId(inv.getArgument(1))
+                .person(inv.getArgument(2)).createdAt(inv.getArgument(3)).build()) == null ? 1 : 0);
         lenient().doAnswer(inv -> {
             inv.<List<MissionPerson>>getArgument(0).forEach(p -> persons.remove(p.getUserId()));
             return null;
@@ -300,6 +304,9 @@ class MissionEvidenceServiceTest {
             // Le même paquet, membre pour membre : la copie ne réécrit rien.
             assertThat(CanonicalJson.of(copy)).isEqualTo(CanonicalJson.of(JSON.valueToTree(live)));
             assertThat(copy.get("digest").asText()).isEqualTo(digest).isEqualTo(data(0).get("rules").get("digest").asText());
+            // Rien de récrit : une seule empreinte, celle du runner (d-a).
+            assertThat(data(0).get("rules").has("issuedDigest")).isFalse();
+            assertThat(data(0).get("rules").has("rewritten")).isFalse();
             assertThat(copy.get("layers").get(0).get("digest").asText()).isEqualTo(layerDigest);
             // Ada a délégué, Bob a écrit l'issue, Carol répond d'une règle : chacun est présenté par sa note, une fois.
             assertThat(stored.stream().filter(e -> e.getData().contains("\"kind\":\"person\"")).map(e -> e.getData()))
@@ -307,12 +314,37 @@ class MissionEvidenceServiceTest {
         }
 
         @Test
+        @DisplayName("R159 de #551, quatrième tour, d-a : un paquet d'aujourd'hui dont une règle nomme un approbateur par son compte ; "
+            + "le dossier le récrit, garde l'empreinte que le runner a vérifiée, et dit ce qu'il a récrit")
+        void a_rewritten_bundle_keeps_the_runner_s_digest() throws Exception {
+            User carol = User.builder().id(9L).email("carol@taskforce.dev").displayName("Carol").build();
+            lenient().when(users.findById(9L)).thenReturn(Optional.of(carol));
+            String carol9 = service.personId(3L, carol);
+            RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
+                null, null, null, null), "reversible-exit", "ask", null, carol9, "Ask Carol first.", "2027-01-01", "workspace",
+                "Ask Carol first.", new RulesBundle.Require(List.of("person:9"), 1, false));
+            RulesBundle unsigned = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, null, null, List.of(ledger), null, null);
+            String digest = com.taskforce.tf_api.core.harness.rules.RulesDigest.of(JSON.valueToTree(unsigned));
+            RulesBundle live = new RulesBundle("taskforce-rules/1", "acme", 12L, 3, digest, null, List.of(ledger), null, null);
+
+            service.open(run, live, "tf-runner-ada", Map.of());
+
+            JsonNode copy = JSON.readTree(rows.get(100L).getRulesBundle());
+            JsonNode rules = data(0).get("rules");
+            assertThat(copy.get("rules").get(0).get("require").get("approvers")).extracting(JsonNode::asText).containsExactly(carol9);
+            assertThat(rules.get("digest").asText()).isEqualTo(copy.get("digest").asText()).isNotEqualTo(digest);
+            // L'empreinte que le runner a vérifiée n'était nulle part : elle reste, avec ce qui a été récrit.
+            assertThat(rules.get("issuedDigest").asText()).isEqualTo(digest);
+            assertThat(rules.get("rewritten")).extracting(JsonNode::asText).containsExactly("approvers");
+        }
+
+        @Test
         @DisplayName("R159 second tour, N3 : la copie d'un paquet d'avant la 1.18 nomme chaque personne par son identifiant ; ses "
             + "empreintes se calculent sur elle")
         void the_rules_copy_names_people_by_their_id() throws Exception {
-            User bob = User.builder().id(8L).email("bob@taskforce.dev").build();
-            lenient().when(users.findByEmail("ada@taskforce.dev")).thenReturn(Optional.of(ada));
-            lenient().when(users.findByEmail("bob@taskforce.dev")).thenReturn(Optional.of(bob));
+            User bob = User.builder().id(8L).email("bob@taskforce.dev").createdAt(java.time.LocalDateTime.of(2026, 9, 1, 9, 0)).build();
+            lenient().when(users.findAllByEmailIgnoreCase("ada@taskforce.dev")).thenReturn(List.of(ada));
+            lenient().when(users.findAllByEmailIgnoreCase("bob@taskforce.dev")).thenReturn(List.of(bob));
             lenient().when(users.findById(8L)).thenReturn(Optional.of(bob));
             // La couche de Bob telle qu'elle est gardée : ses règles nomment leur propriétaire par son courriel.
             Map<String, Object> layerRule = new java.util.LinkedHashMap<>();
@@ -321,7 +353,7 @@ class MissionEvidenceServiceTest {
             layerRule.put("owner", "bob@taskforce.dev");
             layerRule.put("require", Map.of("approvers", List.of("person:8")));
             lenient().when(ruleSets.findByWorkspaceIdAndVersion(3L, 3)).thenReturn(Optional.of(HarnessRuleSet.builder().version(3)
-                .createdBy(bob).rules(List.of(layerRule)).build()));
+                .createdBy(bob).createdAt(java.time.LocalDateTime.of(2026, 10, 1, 9, 0)).rules(List.of(layerRule)).build()));
             RulesBundle.Rule table = new RulesBundle.Rule("read-files", new RulesBundle.Condition("file.read", null, null, null, null,
                 null, null, null), "reversible", "allow", null, "ada@taskforce.dev", "Reading changes nothing.", "2027-01-01");
             RulesBundle.Rule ledger = new RulesBundle.Rule("ledger", new RulesBundle.Condition("file.write", null, null, "**/ledger/**",
@@ -338,7 +370,9 @@ class MissionEvidenceServiceTest {
             String ada7 = persons.get(7L).getPerson();
             String bob8 = persons.get(8L).getPerson();
             assertThat(copy.toString()).doesNotContain("@").doesNotContain("person:");
-            assertThat(copy.get("rules").get(0).get("owner").asText()).isEqualTo(ada7);
+            // Un courriel hors de toute version ne nomme personne : rien ne montre que le compte qui le porte l'avait déjà
+            // (R159 de #551, quatrième tour, d-c). Celui d'une règle de la couche de Bob, si : son compte est plus ancien.
+            assertThat(copy.get("rules").get(0).get("owner").asText()).isEqualTo("who:unknown").isNotEqualTo(ada7);
             assertThat(copy.get("rules").get(1).get("owner").asText()).isEqualTo(bob8);
             assertThat(copy.get("rules").get(1).get("require").get("approvers")).extracting(JsonNode::asText).containsExactly(bob8, "role:admin");
             assertThat(copy.get("layers").get(0).get("ref").asText()).isEqualTo(bob8);
@@ -346,6 +380,10 @@ class MissionEvidenceServiceTest {
             // règles nommées comme le dossier les nomme : aucune ne confirme un courriel une fois effacé.
             assertThat(copy.get("digest").asText()).isEqualTo(com.taskforce.tf_api.core.harness.rules.RulesDigest.of(copy))
                 .isNotEqualTo(DIGEST).isEqualTo(data(0).get("rules").get("digest").asText());
+            // L'empreinte que le runner a vérifiée reste dans la chaîne, avec ce qui a été récrit (R159 de #551, d-a).
+            assertThat(data(0).get("rules").get("issuedDigest").asText()).isEqualTo(DIGEST);
+            assertThat(data(0).get("rules").get("rewritten")).extracting(JsonNode::asText)
+                .containsExactly("approvers", "owners", "person-layer");
             String layerDigest = copy.get("layers").get(0).get("digest").asText();
             assertThat(layerDigest).isNotEqualTo(liveLayerDigest).isEqualTo(data(0).get("rules").get("layers").get(0).get("digest").asText());
             assertThat(data(0).get("rules").get("layers").get(0).get("ref").asText()).isEqualTo(bob8);
@@ -676,6 +714,25 @@ class MissionEvidenceServiceTest {
             assertThat(service.dossierMarkdown(100L).orElseThrow())
                 .contains("- Seal: event " + seals.getLast().getSeq() + ", signed late by key `")
                 .contains(": a late seal proves the chain as it was on that date, not what happened before.");
+        }
+
+        @Test
+        @DisplayName("R159 de #551, quatrième tour, d-e : un dossier scellé tard sort du passage du témoin, et sa note dit qu'aucun commentaire n'est écrit pour lui")
+        void a_late_seal_leaves_the_witness_pass() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            lenient().when(runRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(run));
+            lenient().when(dossiers.findByIdForUpdate(100L)).thenAnswer(inv -> Optional.ofNullable(rows.get(100L)));
+            lenient().when(sealRepository.findTopByRunIdOrderBySeqDesc(100L))
+                .thenAnswer(inv -> seals.isEmpty() ? Optional.empty() : Optional.of(seals.getLast()));
+
+            assertThat(service.sealLate(100L)).isTrue();
+
+            assertThat(data(stored.size() - 1).get("text").asText()).contains(", after its mission had ended: ")
+                .endsWith(" No comment is written in a pull request for it.");
+            assertThat(seals.getLast().isLate()).isTrue();
+            // Aucun témoin par décision : le passage régulier ne le relit plus.
+            verify(dossiers).markWitnessed(100L);
+            verify(publisher, never()).publishEvent(any(MissionSealed.class));
         }
     }
 

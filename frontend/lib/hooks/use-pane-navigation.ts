@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 
 import {
-  closeIssueHref, hrefWith, issueHref, missionPath, previousAddress, sameAddress, withConversation, type IssueRef,
+  closeIssueHref, hrefWith, issueHref, missionPath, previousAddress, sameAddress, verificationPath, withConversation, type IssueRef,
 } from "@/lib/window/address"
 import { boardPath, homePath, waitingPath, workflowPath } from "@/lib/window/pane"
 
@@ -20,6 +20,8 @@ export interface PaneNavigation {
   closeIssue: () => void
   /** Ouvre la vue du travail d'une mission. */
   openMission: (runId: number) => void
+  /** Ouvre la page de vérification d'une mission (R212). */
+  openVerification: (runId: number) => void
   /** Ouvre le tableau d'un projet. */
   openBoard: (projectId: number) => void
   /** Ouvre le workflow d'un projet, sur un nœud choisi quand il est donné (`issue-{id}`, séance n°25). */
@@ -55,6 +57,7 @@ export function usePaneNavigation(): PaneNavigation {
         else go(under)
       },
       openMission: (runId) => go(withConversation(missionPath(slug, runId), here().search)),
+      openVerification: (runId) => go(withConversation(verificationPath(slug, runId), here().search)),
       openBoard: (projectId) => go(withConversation(boardPath(slug, projectId), here().search)),
       openWorkflow: (projectId, node) => go(hrefWith(workflowPath(slug, projectId), null, {
         c: new URLSearchParams(here().search).get("c"), node: node ?? null,

@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/contexts/auth-context"
 import type { AuthResponse } from "@/lib/api/auth-service"
 import { afterSignInPath } from "@/lib/auth/desktop-handoff"
 import { passkeyAutofillAvailable, passkeysSupported } from "@/lib/auth/passkeys"
+import { returnPath } from "@/lib/auth/return-path"
 import { sanitizeInput, globalRateLimiter } from "@/lib/utils/validation"
 import { loginSchema, firstZodError } from "@/lib/validation/auth-schemas"
 import { KeyRound, Loader2 } from "lucide-react"
@@ -45,6 +46,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [code, setCode] = useState("")
   // Lu après l'hydratation : le serveur ne connaît pas le navigateur.
   const passkeys = useSyncExternalStore(noSubscription, passkeysSupported, () => false)
+  // Venue d'un lien de vérification, celui d'une pull request : l'écran dit quelle page la connexion ouvrira, sans quoi
+  // la personne ne sait ni ce qu'elle ouvre ni qu'elle y reviendra (R161 N12 de #552). Lu après l'hydratation, lui aussi.
+  const returning = useSyncExternalStore(noSubscription, () => returnPath() !== null, () => false)
   const [passkeyBusy, setPasskeyBusy] = useState(false)
   const autofill = useRef<AbortController | null>(null)
 
@@ -179,6 +183,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     <div className={cn("auth-panel", className)} {...props}>
       <h1 className="auth-title">{totpStep ? t.auth.ui.twoFactorTitle : t.auth.ui.loginTitle}</h1>
       <p className="auth-subtitle">{totpStep ? t.auth.ui.twoFactorSubtitle : t.auth.ui.loginSubtitle}</p>
+      {returning && (
+        <p className="mt-4 rounded-md border px-3 py-2 text-xs leading-relaxed"
+          style={{ color: "var(--label-secondary)", borderColor: "var(--separator)" }}>
+          {t.auth.ui.returnToVerification}
+        </p>
+      )}
 
       {totpStep ? (
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">

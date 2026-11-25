@@ -56,8 +56,11 @@ class HarnessRulesServiceTest {
     void setUp() {
         personIds = TestPersonIds.inMemory(users);
         service = new HarnessRulesService(repository, members, personIds);
-        pierre = User.builder().id(7L).email("pierre@acme.dev").build();
+        pierre = User.builder().id(7L).email("pierre@acme.dev").createdAt(LocalDateTime.of(2026, 1, 5, 9, 0)).build();
         workspace = Workspace.builder().id(9L).slug("acme").owner(pierre).build();
+        // L'auteur d'une règle se lit d'abord par son compte (R159 de #551, quatrième tour, d-c).
+        lenient().when(users.findById(7L)).thenReturn(Optional.of(pierre));
+        lenient().when(users.findAllByEmailIgnoreCase("pierre@acme.dev")).thenReturn(List.of(pierre));
         lenient().when(repository.findByWorkspaceIdOrderByVersionDesc(9L)).thenAnswer(inv -> rows.stream()
             .sorted((a, b) -> Integer.compare(b.getVersion(), a.getVersion())).toList());
         lenient().when(members.findByWorkspaceIdAndUserId(eq(9L), anyLong())).thenReturn(Optional.empty());
@@ -288,6 +291,8 @@ class HarnessRulesServiceTest {
     void anOwnerNoOneHasIsUnknown() {
         Map<String, Object> gone = rule("ws-ask-comments", "comment.create", "ask");
         gone.put("owner", "someone-gone@acme.dev");
+        // Une règle d'avant le 11 novembre, sans le compte qui l'a écrite : son courriel seul, que plus aucun compte ne porte.
+        gone.remove("addedBy");
         Map<String, Object> typed = rule("ws-no-delete", "issue.delete", "deny");
         typed.put("owner", "Pierre Michel");
         add(row(RuleScope.WORKSPACE, 2, List.of(gone, typed)));
@@ -298,6 +303,38 @@ class HarnessRulesServiceTest {
             .containsExactly(PersonIds.UNKNOWN, PersonIds.UNKNOWN);
         assertThat(bundle.rules()).allSatisfy(r -> assertThat(r.owner()).matches(OWNER));
         assertThat(new ObjectMapper().valueToTree(bundle).toString()).doesNotContain("@").doesNotContain("Pierre Michel");
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, d-c : l'auteur se lit par son compte ; un compte qui reprend le courriel d'un compte purgé n'hérite d'aucune règle")
+    void anAccountThatTakesOverAnEmailInheritsNoRule() {
+        // Ada a écrit deux règles avant la 1.18, puis son compte a été purgé ; un compte neuf porte aujourd'hui son courriel.
+        User newcomer = User.builder().id(12L).email("ada@acme.dev").createdAt(LocalDateTime.now()).build();
+        lenient().when(users.findById(11L)).thenReturn(Optional.empty());
+        // La base cherche sans tenir compte de la casse : le compte neuf répond aux deux écritures, et à la recherche exacte.
+        lenient().when(users.findAllByEmailIgnoreCase("ada@acme.dev")).thenReturn(List.of(newcomer));
+        lenient().when(users.findAllByEmailIgnoreCase("ADA@acme.dev")).thenReturn(List.of(newcomer));
+        lenient().when(users.findByEmail("ada@acme.dev")).thenReturn(Optional.of(newcomer));
+        Map<String, Object> byAccount = rule("ws-ask-comments", "comment.create", "ask");
+        byAccount.put("owner", "ada@acme.dev");
+        byAccount.put("addedBy", 11);
+        Map<String, Object> byEmail = rule("ws-no-delete", "issue.delete", "deny");
+        byEmail.put("owner", "ADA@acme.dev");
+        byEmail.remove("addedBy");
+        // Pierre, lui, porte encore le courriel qu'une règle plus ancienne écrit avec une autre casse.
+        Map<String, Object> pierreByEmail = rule("ws-ask-pushes", "git.push", "ask");
+        pierreByEmail.put("owner", "Pierre@Acme.dev");
+        pierreByEmail.remove("addedBy");
+        lenient().when(users.findAllByEmailIgnoreCase("Pierre@Acme.dev")).thenReturn(List.of(pierre));
+        HarnessRuleSet version = row(RuleScope.WORKSPACE, 2, List.of(byAccount, byEmail, pierreByEmail));
+        version.setCreatedAt(LocalDateTime.of(2026, 10, 1, 9, 0));
+        add(version);
+
+        RulesBundle bundle = service.bundleFor(workspace);
+
+        // Le compte purgé ne nomme plus personne, le compte neuf, créé après la version, n'hérite de rien ; Pierre reste.
+        assertThat(bundle.rules()).filteredOn(r -> r.layer() != null).extracting(RulesBundle.Rule::owner)
+            .containsExactly(PersonIds.UNKNOWN, PersonIds.UNKNOWN, personIds.of(9L, 7L));
     }
 
     @Test

@@ -125,8 +125,10 @@ until their name is erased; then the `erased` note says when.
   the bundle the runner received, member for member: its digest is the one the runner checked at claim time, the one
   the mission notes, and the one `mission.started` holds. Otherwise the copy names those members by their id, and its
   digest, the one `mission.started` holds, is computed on the copy, as is each layer's, on that layer's rules named
-  the same way: none confirms an email or an account once erased. Anyone judges each `action.decided` of kind
-  `decision` again with the `facts` it keeps.
+  the same way: none confirms an email or an account once erased. `mission.started.rules` then also keeps the digest
+  the runner checked, `issuedDigest`, and what the copy rewrote, `rewritten`: `approvers` (members named by their
+  account), `person-layer` (a person's layer) or `owners` (owners named by their email, before 1.18). Anyone judges
+  each `action.decided` of kind `decision` again with the `facts` it keeps.
 - `texts`: the texts kept beside the chain, by their hash, each as `{ "salt": ..., "text": ... }`. The hash is `sha256:`
   and the SHA-256 of the UTF-8 bytes of the salt (32 hex digits, drawn for this text) followed by the text: a short
   text, erased, cannot be confirmed by guessing it. The chain holds only `{ "sha256": ..., "chars": ... }` for the

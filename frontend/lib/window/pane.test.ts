@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
-import { PROGRESS, boardPath, homePath, issuePath, paneOf, paneTitle, progressPath, workflowPath } from "./pane"
+import { CONSTANTS_EN } from "@/lib/constants_en"
+
+import { PROGRESS, VERIFICATION, boardPath, homePath, issuePath, paneOf, paneTitle, progressPath, workflowPath } from "./pane"
 
 const SCREENS = { dashboard: "Dashboard", inbox: "Waiting for you", "my-work": "My work", project: "Project" }
 const PROJECTS = [{ id: 3, name: "Website" }]
@@ -45,6 +47,15 @@ describe("les adresses de la fenêtre", () => {
     expect(homePath("acme")).toBe("/acme")
     expect(boardPath("acme", 3)).toBe("/acme/projects/3")
     expect(issuePath("acme", 3, 34)).toBe("/acme/projects/3?issue=34")
+  })
+
+  it("R161 M7 : la page de vérification a le nom de la page, pas « Work view »", () => {
+    const screens = { ...CONSTANTS_EN.window.screens }
+    expect(paneOf("/acme/missions/42/verification")).toEqual({ section: VERIFICATION, projectId: null })
+    // Le lien du témoin (second tour de #551, M-b) s'ouvre sous le même nom, le temps de savoir où il mène.
+    expect(paneOf(`/verify/${"a".repeat(32)}`)).toEqual({ section: VERIFICATION, projectId: null })
+    expect(paneTitle({ section: VERIFICATION, projectId: null }, PROJECTS, screens)).toBe("Verification")
+    expect(paneTitle(paneOf("/acme/missions/42") ?? { section: "", projectId: null }, PROJECTS, screens)).toBe("Work view")
   })
 
   it("ouvre « Progress » dans le volet, avec son titre (R125)", () => {

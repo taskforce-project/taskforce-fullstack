@@ -27,6 +27,7 @@ const SEAL_WORDS: Record<SealState, string> = {
   self: "Signed by a key the file carries itself: anyone can make this seal. Check it with --key and the key the operator publishes.",
   none: "Not sealed.",
   broken: "The seal does not hold.",
+  unchecked: "The seal was not checked: this platform has no Ed25519.",
 };
 
 /**
@@ -39,14 +40,16 @@ const lateWords = (seal: SealState, on: string): string => seal === "trusted"
 
 /**
  * Ce que la première ligne dit des décisions qu'elle n'a pas pu rejuger (R159, troisième tour, c-b) : prises sur un fait
- * coupé pour tenir au dossier, ou sans leurs faits. Rien quand il n'y en a pas.
+ * coupé pour tenir au dossier, ou sans leurs faits ; et celles que le runner prend lui-même, qu'aucune règle du paquet ne
+ * juge (quatrième tour, d-f). Rien quand il n'y en a pas.
  */
-function notJudgedWords({ cut, noFacts }: { cut: number; noFacts: number }): string {
-  const total = cut + noFacts;
+function notJudgedWords({ cut, noFacts, runner }: { cut: number; noFacts: number; runner: number }): string {
+  const total = cut + noFacts + runner;
   if (total === 0) return "";
   const parts = [
     cut > 0 ? `${cut} on ${cut === 1 ? "a fact" : "facts"} cut to fit the record` : null,
     noFacts > 0 ? `${noFacts} without ${noFacts === 1 ? "its facts" : "their facts"}` : null,
+    runner > 0 ? `${runner} made by the runner itself, which no rule judges` : null,
   ].filter((part): part is string => part !== null);
   return ` ${total === 1 ? "1 recorded decision was" : `${total} recorded decisions were`} not judged again: ${parts.join(", ")}.`;
 }

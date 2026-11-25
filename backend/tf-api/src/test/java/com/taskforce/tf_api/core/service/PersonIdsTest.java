@@ -3,11 +3,14 @@ package com.taskforce.tf_api.core.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.AfterEach;
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -60,12 +64,27 @@ class PersonIdsTest {
     @Test
     @DisplayName("la première fois, l'identifiant se tire dans la transaction en cours : 128 bits, jamais le courriel")
     void theFirstTimeItIsDrawn() {
-        when(people.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        ArgumentCaptor<String> drawn = ArgumentCaptor.forClass(String.class);
+        when(people.drawIfAbsent(eq(3L), eq(7L), drawn.capture(), any())).thenReturn(1);
+        when(people.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty())
+            .thenAnswer(inv -> Optional.of(person(3L, 7L, drawn.getValue())));
 
         String id = ids.of(3L, 7L);
 
-        assertThat(id).matches("who:[0-9a-f]{32}");
+        assertThat(id).matches("who:[0-9a-f]{32}").isEqualTo(drawn.getValue());
         verify(transactions, never()).getTransaction(any());
+        verify(people, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, d-b : une autre transaction en écriture l'a tiré en même temps ; rien n'échoue, celui qui est resté revient")
+    void aRaceBetweenTwoWritersKeepsTheFirstId() {
+        when(people.drawIfAbsent(eq(3L), eq(7L), any(), any())).thenReturn(0);
+        when(people.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty(),
+            Optional.of(person(3L, 7L, "who:" + "5".repeat(32))));
+
+        assertThat(ids.of(3L, 7L)).isEqualTo("who:" + "5".repeat(32));
+        verify(people, never()).saveAndFlush(any());
     }
 
     @Test
@@ -101,15 +120,36 @@ class PersonIdsTest {
     }
 
     @Test
-    @DisplayName("un courriel d'avant la 1.18 donne l'identifiant de son compte ; sans compte, personne")
+    @DisplayName("un courriel d'avant la 1.18 donne l'identifiant de son compte, sans tenir compte de la casse ; sans compte, personne")
     void anEmailGivesTheIdOfItsAccount() {
-        lenient().when(users.findByEmail("ada@example.com"))
-            .thenReturn(Optional.of(User.builder().id(7L).email("ada@example.com").build()));
+        LocalDateTime version = LocalDateTime.of(2026, 10, 1, 9, 0);
+        lenient().when(users.findAllByEmailIgnoreCase("Ada@Example.com"))
+            .thenReturn(List.of(User.builder().id(7L).email("ada@example.com").createdAt(version.minusMonths(3)).build()));
         when(people.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.of(person(3L, 7L, "who:" + "3".repeat(32))));
 
-        assertThat(ids.ofEmail(3L, " ada@example.com ")).isEqualTo("who:" + "3".repeat(32));
-        assertThat(ids.ofEmail(3L, "gone@example.com")).isEqualTo(PersonIds.UNKNOWN);
-        assertThat(ids.ofEmail(3L, " ")).isEqualTo(PersonIds.UNKNOWN);
+        assertThat(ids.ofAuthor(3L, null, " Ada@Example.com ", version)).isEqualTo("who:" + "3".repeat(32));
+        assertThat(ids.ofAuthor(3L, null, "gone@example.com", version)).isEqualTo(PersonIds.UNKNOWN);
+        assertThat(ids.ofAuthor(3L, null, " ", version)).isEqualTo(PersonIds.UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, d-c : l'auteur se lit d'abord par son compte ; un compte neuf qui reprend son courriel n'hérite de rien")
+    void theAuthorIsReadByAccountFirst() {
+        LocalDateTime version = LocalDateTime.of(2026, 10, 1, 9, 0);
+        User ada = User.builder().id(7L).email("ada@example.com").createdAt(version.minusMonths(3)).build();
+        User newcomer = User.builder().id(12L).email("ada@example.com").createdAt(version.plusMonths(1)).build();
+        lenient().when(users.findById(7L)).thenReturn(Optional.of(ada));
+        lenient().when(users.findById(11L)).thenReturn(Optional.empty());
+        lenient().when(users.findAllByEmailIgnoreCase("ada@example.com")).thenReturn(List.of(newcomer));
+
+        // Par son compte, même quand un autre compte porte aujourd'hui le courriel de la règle.
+        assertThat(ids.authorOf(7L, "ada@example.com", version)).contains(ada);
+        assertThat(ids.authorOf("7", "ada@example.com", version)).contains(ada);
+        // Son compte purgé : personne, sans repli sur le courriel.
+        assertThat(ids.authorOf(11L, "ada@example.com", version)).isEmpty();
+        // Sans compte gardé, le courriel seul, et seulement pour un compte plus ancien que la version.
+        assertThat(ids.authorOf(null, "ada@example.com", version)).isEmpty();
+        assertThat(ids.authorOf(null, "ada@example.com", null)).isEmpty();
     }
 
     @Test
