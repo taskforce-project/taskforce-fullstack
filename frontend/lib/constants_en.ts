@@ -2306,6 +2306,8 @@ export const CONSTANTS_EN = {
     verdict: {
       holds: "Checked in this app on {date}: every digest of the chain holds ({events} events), the header comes from the chain, and the {texts} texts kept beside it match their digests.",
       holdsNoTexts: "Checked in this app on {date}: every digest of the chain holds ({events} events) and the header comes from the chain.",
+      holdsTextsOnly: "Checked in this app on {date}: every digest of the chain holds ({events} events), and the {texts} texts kept beside it match their digests.",
+      holdsChainOnly: "Checked in this app on {date}: every digest of the chain holds ({events} events).",
       holdsOlder: "Checked in this app on {date}: every digest of the chain holds ({events} events). The chain does not cover the header: the mission started before TaskForce 1.18.",
       legacy: "Its chain names people by their email, as records did before TaskForce 1.18: this page hides each of them.",
       link: "Checked in this app on {date}: this record was changed after it was written. Its chain breaks at event {event}, so nothing below can be trusted.",
@@ -2538,6 +2540,8 @@ export const CONSTANTS_EN = {
       sealedAt: "The seal covers the record up to event {seq}, signed on {date} with the key {key}.",
       sealedLate: "The seal covers the record up to event {seq}, signed late, on {date}, with the key {key}: TaskForce sealed this record after its mission had ended, so the seal proves nothing of what came before.",
       notAll: "Events {from} to {to} came after the seal: no signature covers them.",
+      sealBroken: "The seal in this file does not hold for it: it was not made over this record as it is.",
+      sealUnchecked: "The seal was not checked: the chain does not hold.",
       custody: {
         "same-machine": "The signing key is on the same computer as the agent: the agent could have read it, so the seal does not prove that the record was not changed during the mission.",
         "separate-machine": "The operator declares that the signing key is kept on a computer where no agent runs. TaskForce cannot check this.",

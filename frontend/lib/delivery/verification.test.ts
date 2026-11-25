@@ -113,11 +113,14 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(leftOut("something-new")).toContain(t.record.pageLeftOut.other)
   })
 
-  it("R161 M6 : la consigne nomme le bon fichier, et ne demande pas une clé que l'instance ne garde pas", () => {
+  it("R161 M6 : la consigne nomme le bon fichier, et ne demande pas une clé que l'instance ne garde pas", async () => {
+    // La clé du sceau tel que la page l'a vérifié (R159 de #552, second tour, V2).
+    const page = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
     const lines = texts(verificationSections(page, t, context), "record")
     expect(lines).toContain("Download the record (JSON) below, then, in taskforce-runner: npm run verify -- evidence-run-42.json")
     expect(lines).toContain(t.record.verifyNoKeyMeans)
-    const kept = { ...page, record: { ...page.record, seal: page.record.seal ? { ...page.record.seal, kept: true } : null } }
+    const details = page.check?.details
+    const kept = details ? { ...page, check: page.check ? { ...page.check, details: { ...details, seal: { ...details.seal, kept: true } } } : null } : page
     expect(texts(verificationSections(kept, t, context), "record").join(" ")).toMatch(/--key sha256:[0-9a-f]{64}/)
     expect(texts(verificationSections(kept, t, { runId: 42, desktop: true }), "record").join(" ")).not.toContain("--key")
     const noId = verificationPage(chained([{ type: "mission.started", data: {} }]))
@@ -465,6 +468,45 @@ describe("R161 N1 et R159 V1, second tour de #552 : un dossier changé se voit d
   it("un dossier qui tient, et ses réserves ordinaires (la clé, le runner) : aucune alerte", async () => {
     expect(await alertOf(example())).toEqual([])
     expect(await alertOf(tamperedTitle().file)).toEqual([])
+  })
+})
+
+describe("R159 de #552, second tour : la ligne du sceau et la première ligne suivent ce qui a été vérifié (V2, V3)", () => {
+  const recordOf = async (file: ReturnType<typeof example>) =>
+    texts(verificationSections(verificationPage(file, await checkRecord(file, [exampleKey()], at)), t, context), "record")
+
+  it("V2 : un sceau qui ne tient pas ne « couvre » rien, et jamais « Events 26 to 24 »", async () => {
+    const signature = example()
+    const envelope = signature.seal as { signatures: Array<{ keyid: string; sig: string }> }
+    envelope.signatures = envelope.signatures.map((s) => ({ ...s, sig: `${s.sig.slice(0, -4)}AAA=` }))
+    const broken = await recordOf(signature)
+    expect(broken).toContain(t.record.sealBroken)
+    expect(broken.join(" ")).not.toContain("The seal covers")
+    // Le dernier événement retiré, la racine refaite : le sceau nomme un événement que le dossier n'a plus.
+    const shorter = example()
+    shorter.events = shorter.events.slice(0, -1)
+    shorter.root = shorter.events.at(-1)?.hash ?? ""
+    const head = await recordOf(shorter)
+    expect(head).toContain(t.record.sealBroken)
+    expect(head.join(" ")).not.toMatch(/Events \d+ to \d+ came after the seal/)
+    // Un sceau qui tient : sa ligne vient de ce que la page a vérifié.
+    expect((await recordOf(example())).some((l) => /^The seal covers the record up to event 25, signed on 2026-11-24 13:32 UTC with the key sha256:4e5afb8a11bc\.$/.test(l))).toBe(true)
+  })
+
+  it("V2 : sans chaîne qui tienne, le sceau n'est pas vérifié, et la page le dit", async () => {
+    const lines = await recordOf(brokenChain().file)
+    expect(lines).toContain(t.record.sealUnchecked)
+    expect(lines.join(" ")).not.toContain("The seal covers")
+  })
+
+  it("V3 : la première ligne ne dit l'en-tête tiré de la chaîne que s'il l'est", async () => {
+    const header = example()
+    header.mission = { ...(header.mission ?? {}), requestedBy: "who:00000000000000000000000000000000" }
+    const first = verdictLines(verificationPage(header, await checkRecord(header, [exampleKey()], at)), t)[0]?.text ?? ""
+    expect(first).toMatch(/^Checked in this app on .+: every digest of the chain holds \(25 events\), and the 11 texts kept beside it match their digests\.$/)
+    expect(first).not.toContain("the header comes from the chain")
+    const sound = verdictLines(verificationPage(example(), await checkRecord(example(), [exampleKey()], at)), t)[0]?.text ?? ""
+    expect(sound).toContain("the header comes from the chain")
   })
 })
 

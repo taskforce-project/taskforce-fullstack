@@ -205,11 +205,14 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   const d = c.details
   const changed = d.texts.changed.length
   const lines: Line[] = []
-  const clean = d.header.differs.length === 0 && d.header.missing.length === 0 && changed === 0 && d.texts.unnamed.length === 0
+  const headerHolds = d.header.differs.length === 0 && d.header.missing.length === 0
+  const textsHold = d.texts.referenced > 0 && changed === 0
+  const clean = headerHolds && changed === 0 && d.texts.unnamed.length === 0
+  // La première ligne ne dit que ce qui a été vérifié : l'en-tête tiré de la chaîne seulement quand il l'est (R159 de #552,
+  // second tour, V3).
+  const first = headerHolds ? (textsHold ? v.holds : v.holdsNoTexts) : (textsHold ? v.holdsTextsOnly : v.holdsChainOnly)
   if (page.older) lines.push({ text: fillText(v.holdsOlder, { date, events: page.record.events }), tone: "ok" })
-  else lines.push({ text: d.texts.referenced > 0 && changed === 0
-    ? fillText(v.holds, { date, events: page.record.events, texts: d.texts.matches.length })
-    : fillText(v.holdsNoTexts, { date, events: page.record.events }), tone: clean ? "ok" : undefined })
+  else lines.push({ text: fillText(first, { date, events: page.record.events, texts: d.texts.matches.length }), tone: clean ? "ok" : undefined })
   // Une chaîne d'avant la 1.18 nomme les personnes par leur courriel : la page le dit avant d'en masquer un (N4).
   if (page.legacy) lines.push({ text: v.legacy, tone: "muted" })
   if (d.header.differs.length > 0 || d.header.missing.length > 0) {
@@ -525,13 +528,22 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   for (const erasure of r.legacyErasures) {
     lines.push({ text: fillText(rec.legacyErased, { date: when(erasure.at), events: erasure.events.join(", ") || "?" }), tone: "muted" })
   }
-  if (r.seal) {
+  // Le sceau tel que la page l'a vérifié, jamais l'enveloppe telle qu'elle se lit (R159 de #552, second tour, V2).
+  const s = page.check?.details?.seal ?? null
+  const sealHolds = s !== null && (s.state === "trusted" || s.state === "self") && s.seq !== null
+  if (r.seal && !page.check?.details) {
+    lines.push({ text: rec.sealUnchecked, tone: "warn" })
+  } else if (s && s.state === "broken") {
+    lines.push({ text: rec.sealBroken, tone: "warn" })
+  } else if (s && sealHolds) {
+    const custody = s.custody === "separate-machine" ? "separate-machine" : "same-machine"
     // La garde de la clé d'abord : « scellé » n'est pas une garantie quand l'agent pouvait lire la clé (R161 M5).
-    lines.push({ text: rec.custody[r.seal.custody], tone: r.seal.custody === "same-machine" ? "warn" : "muted" })
-    lines.push({ text: fillText(r.seal.late ? rec.sealedLate : rec.sealedAt, { seq: r.seal.seq, date: when(r.seal.sealedAt), key: short(r.seal.keyId) }),
-      tone: r.seal.late ? "warn" : "muted" })
-    if (!r.seal.coversAll) lines.push({ text: fillText(rec.notAll, { from: r.seal.seq + 1, to: r.events }), tone: "warn" })
-    if (!r.seal.kept) lines.push({ text: rec.notKept, tone: "warn" })
+    lines.push({ text: rec.custody[custody], tone: custody === "same-machine" ? "warn" : "muted" })
+    lines.push({ text: fillText(s.late ? rec.sealedLate : rec.sealedAt, { seq: s.seq ?? "?", date: when(s.sealedAt), key: short(s.keyId) }),
+      tone: s.late ? "warn" : "muted" })
+    // Seulement des événements venus après le sceau, jamais « 26 à 24 » d'un sceau qui nomme un événement disparu.
+    if (s.after > 0 && s.seq !== null) lines.push({ text: fillText(rec.notAll, { from: s.seq + 1, to: r.events }), tone: "warn" })
+    if (s.kept === false) lines.push({ text: rec.notKept, tone: "warn" })
   }
   if (r.witness?.written && r.witness.holds !== true) {
     // Il ne tient pas, ou la page n'a pas pu le comparer : jamais montré comme s'il tenait (R159 de #552, second tour, V1).
@@ -564,10 +576,10 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   }
   // La consigne de vérification : le bon fichier, et `--key` seulement quand la clé peut se publier (R161 M6).
   const id = page.mission.id ?? context.runId
-  const publishable = r.seal !== null && r.seal.kept && !context.desktop && r.seal.keyId !== null
+  const publishable = sealHolds && s?.kept !== false && !context.desktop && s?.keyId !== null && s?.keyId !== undefined
   lines.push({ text: rec.verifyIntro, tone: "muted" })
-  lines.push({ text: publishable ? fillText(rec.verifyJson, { id, key: r.seal?.keyId ?? "" }) : fillText(rec.verifyNoKey, { id }), tone: "muted" })
-  if (!publishable && r.seal) lines.push({ text: rec.verifyNoKeyMeans, tone: "muted" })
+  lines.push({ text: publishable ? fillText(rec.verifyJson, { id, key: s?.keyId ?? "" }) : fillText(rec.verifyNoKey, { id }), tone: "muted" })
+  if (!publishable && sealHolds) lines.push({ text: rec.verifyNoKeyMeans, tone: "muted" })
   lines.push({ text: rec.verifyOpenSsl, tone: "muted" })
   return lines
 }
@@ -605,7 +617,9 @@ export function pageTitle(page: VerificationPage, t: Texts): string {
 export function exportHowTo(page: VerificationPage, t: Texts, context: WordsContext): string {
   const id = page.mission.id ?? context.runId
   if (page.legacy) return fillText(t.export.howToLegacy, { id })
-  const seal = page.record.seal
-  const key = seal && seal.kept && !context.desktop && seal.keyId ? fillText(t.export.key, { key: seal.keyId }) : ""
+  // La clé du sceau tel que la page l'a vérifié, pas celle que l'enveloppe annonce (R159 de #552, second tour, V2).
+  const seal = page.check?.details?.seal ?? null
+  const holds = seal !== null && (seal.state === "trusted" || seal.state === "self")
+  const key = holds && seal.kept !== false && !context.desktop && seal.keyId ? fillText(t.export.key, { key: seal.keyId }) : ""
   return fillText(t.export.howTo, { id, key })
 }
