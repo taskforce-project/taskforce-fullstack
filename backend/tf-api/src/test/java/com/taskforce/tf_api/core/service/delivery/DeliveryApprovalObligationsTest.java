@@ -53,6 +53,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.service.NotificationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -95,7 +96,7 @@ class DeliveryApprovalObligationsTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
-            visibilityGuard, access, notificationService, settings, evidenceService, new HarnessRulesService(ruleSets, members),
+            visibilityGuard, access, notificationService, settings, evidenceService, new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()),
             new RuleApprovers(members, projectMembers), signatures, members, feed);
         delegator = User.builder().id(7L).email("ada@example.com").displayName("Ada").build();
         finance = User.builder().id(42L).email("marie@example.com").displayName("Marie Martin").build();
@@ -128,6 +129,11 @@ class DeliveryApprovalObligationsTest {
         lenient().when(signatures.findByApprovalIdOrderBySignedAtAsc(anyLong())).thenAnswer(inv -> List.copyOf(signed));
         lenient().when(signatures.existsByApprovalIdAndUserId(anyLong(), anyLong())).thenAnswer(inv ->
             signed.stream().anyMatch(s -> s.getUser().getId().equals(inv.getArgument(1))));
+        // Le dossier nomme une personne par son identifiant opaque (R159, M6 ; le détail, MissionEvidenceServiceTest).
+        lenient().when(evidenceService.person(any(), any())).thenAnswer(inv -> {
+            User user = inv.getArgument(1);
+            return new MissionEvidenceService.Actor("person", user == null ? "unknown" : "person:" + user.getId());
+        });
     }
 
     /** La couche de l'organisation, avec une règle de l'entreprise. */

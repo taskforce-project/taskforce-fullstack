@@ -1,0 +1,77 @@
+import { chainOf, readDossier, type Line, type SealState } from "./dossier.js";
+
+/**
+ * Vérifie un dossier de preuve exporté (`taskforce-evidence/1`, contracts/evidence) sans TaskForce : chaque empreinte
+ * est recalculée et la racine doit être celle du dernier événement ; puis l'en-tête, les textes, le paquet de règles et
+ * chaque décision rejugée, les trous, le sceau et le témoin ({@link readDossier}). Un verdict, jamais d'exception : la
+ * première ligne dit si la chaîne tient et ce que vaut le sceau, les suivantes ce que le reste prouve ou ne prouve pas.
+ */
+export interface Verdict {
+  ok: boolean;
+  message: string;
+  lines: Line[];
+  /** Ce que vaut le sceau ; `none` aussi quand la chaîne ne tient pas. */
+  seal: SealState;
+}
+
+export interface VerifyOptions {
+  /** La clé que l'on croit : son identifiant `sha256:...`, ou sa clé publique. */
+  key?: string;
+}
+
+const MARK: Record<Line["level"], string> = { ok: "[ok]", info: "[--]", warn: "[!!]", fail: "[KO]" };
+
+/** Ce que la première ligne dit du sceau. */
+const SEAL_WORDS: Record<SealState, string> = {
+  trusted: "Sealed by the key you trust.",
+  self: "Signed by a key the file carries itself: anyone can make this seal. Check it with --key and the key the operator publishes.",
+  none: "Not sealed.",
+  broken: "The seal does not hold.",
+};
+
+/**
+ * Ce qu'elle en dit quand il a été posé tard (R159, second tour, N5) : sur un dossier fini avant que TaskForce ne scelle,
+ * il ne prouve que la chaîne telle qu'elle était ce jour-là.
+ */
+const lateWords = (seal: SealState, on: string): string => seal === "trusted"
+  ? `Sealed late, on ${on}, by the key you trust: it proves the chain as it was on that date, not what happened before.`
+  : `Sealed late, on ${on}, by a key the file carries itself: anyone can make this seal. Check it with --key and the key the operator publishes.`;
+
+/**
+ * Ce que la première ligne dit des décisions qu'elle n'a pas pu rejuger (R159, troisième tour, c-b) : prises sur un fait
+ * coupé pour tenir au dossier, ou sans leurs faits. Rien quand il n'y en a pas.
+ */
+function notJudgedWords({ cut, noFacts }: { cut: number; noFacts: number }): string {
+  const total = cut + noFacts;
+  if (total === 0) return "";
+  const parts = [
+    cut > 0 ? `${cut} on ${cut === 1 ? "a fact" : "facts"} cut to fit the record` : null,
+    noFacts > 0 ? `${noFacts} without ${noFacts === 1 ? "its facts" : "their facts"}` : null,
+  ].filter((part): part is string => part !== null);
+  return ` ${total === 1 ? "1 recorded decision was" : `${total} recorded decisions were`} not judged again: ${parts.join(", ")}.`;
+}
+
+export async function verifyEvidence(text: string, options: VerifyOptions = {}): Promise<Verdict> {
+  let file: unknown;
+  try {
+    file = JSON.parse(text);
+  } catch {
+    return { ok: false, message: "Not a JSON file.", lines: [], seal: "none" };
+  }
+  if (!file || typeof file !== "object" || Array.isArray(file)) {
+    return { ok: false, message: "Not a TaskForce evidence file (taskforce-evidence/1) with events.", lines: [], seal: "none" };
+  }
+  const record = file as Record<string, unknown>;
+  const chain = chainOf(record);
+  if (!chain.ok) return { ok: false, message: chain.message, lines: [], seal: "none" };
+  const { lines, seal, lateOn, notJudged } = await readDossier(record, options);
+  const head = `Every hash holds: ${chain.events.length} events, root ${String(record.root)}. ${lateOn ? lateWords(seal, lateOn) : SEAL_WORDS[seal]}`
+    + notJudgedWords(notJudged);
+  const ok = lines.every((line) => line.level !== "fail");
+  return {
+    ok,
+    message: [head, ...lines.map((line) => `${MARK[line.level]} ${line.text}`)].join("\n"),
+    lines,
+    seal,
+  };
+}

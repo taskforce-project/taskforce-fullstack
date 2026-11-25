@@ -5263,6 +5263,15 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionReasonRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -5302,6 +5311,15 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionReasonRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -11182,6 +11200,36 @@
         }
       }
     },
+    "/api/workspaces/{slug}/delivery/evidence/key": {
+      "get": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "evidenceKey",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEvidenceKeysResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{slug}/delivery/approvals/open": {
       "get": {
         "tags": [
@@ -12122,6 +12170,37 @@
         }
       }
     },
+    "/api/evidence/links/{id}": {
+      "get": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "link",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "[0-9a-f]{32}"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseEvidenceLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/oauth/{provider}/authorize": {
       "get": {
         "tags": [
@@ -13004,6 +13083,54 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{slug}/delivery/runs/{runId}/evidence/texts/{hash}": {
+      "delete": {
+        "tags": [
+          "Coding agents"
+        ],
+        "operationId": "eraseEvidenceText",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "sha256:[0-9a-f]{64}"
             }
           }
         ],
@@ -18730,6 +18857,16 @@
           "comments"
         ]
       },
+      "MissionReasonRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
+          }
+        }
+      },
       "MissionCorrectionRequest": {
         "type": "object",
         "properties": {
@@ -19317,20 +19454,6 @@
           }
         }
       },
-      "AssistantWhere": {
-        "type": "object",
-        "properties": {
-          "system": {
-            "type": "string"
-          },
-          "workspace": {
-            "type": "string"
-          },
-          "asked": {
-            "type": "string"
-          }
-        }
-      },
       "AssistantUsage": {
         "type": "object",
         "properties": {
@@ -19356,6 +19479,20 @@
           },
           "contextEstimated": {
             "type": "boolean"
+          }
+        }
+      },
+      "AssistantWhere": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "type": "string"
+          },
+          "workspace": {
+            "type": "string"
+          },
+          "asked": {
+            "type": "string"
           }
         }
       },
@@ -20667,13 +20804,69 @@
           }
         }
       },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "session": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "configured": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 0
+          },
+          "served": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 120,
+              "minLength": 0
+            },
+            "maxItems": 10,
+            "minItems": 0
+          },
+          "providerFrom": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 0
+          },
+          "providerUnread": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 40,
+              "minLength": 0,
+              "pattern": "[a-z-]+"
+            },
+            "maxItems": 4,
+            "minItems": 0
+          }
+        }
+      },
       "Event": {
         "type": "object",
         "properties": {
           "kind": {
             "type": "string",
             "minLength": 1,
-            "pattern": "start|text|tool|error|denied|decision|exit|limit|test"
+            "pattern": "start|text|tool|error|denied|decision|exit|limit|test|brief|agent"
           },
           "tool": {
             "type": "string",
@@ -20693,11 +20886,128 @@
             "type": "string",
             "maxLength": 80,
             "minLength": 0
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "maxItems": 20,
+            "minItems": 0
+          },
+          "input": {
+            "type": "string",
+            "pattern": "sha256:[0-9a-f]{64}"
+          },
+          "written": {
+            "$ref": "#/components/schemas/Written"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 200000,
+            "minLength": 0
+          },
+          "agent": {
+            "$ref": "#/components/schemas/Agent"
+          },
+          "test": {
+            "$ref": "#/components/schemas/Test"
           }
         },
         "required": [
           "kind",
           "text"
+        ]
+      },
+      "Test": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "ran": {
+            "type": "boolean"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "passedCount": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "output": {
+            "type": "string",
+            "pattern": "sha256:[0-9a-f]{64}"
+          },
+          "outputBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "definitionChanged": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 0
+            },
+            "maxItems": 20,
+            "minItems": 0
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 0
+            },
+            "maxItems": 20,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "Written": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "sha256:[0-9a-f]{64}"
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "path"
         ]
       },
       "File": {
@@ -20742,6 +21052,10 @@
             "type": "string",
             "maxLength": 70000,
             "minLength": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "sha256:[0-9a-f]{64}"
           }
         },
         "required": [
@@ -24256,6 +24570,68 @@
           }
         }
       },
+      "ApiResponseEvidenceKeysResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EvidenceKeysResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EvidenceKeyResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "algorithm": {
+            "type": "string"
+          },
+          "publicKey": {
+            "type": "string"
+          },
+          "custody": {
+            "type": "string"
+          },
+          "kept": {
+            "type": "boolean"
+          },
+          "firstUsed": {
+            "type": "string"
+          },
+          "lastUsed": {
+            "type": "string"
+          },
+          "seals": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "EvidenceKeysResponse": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/EvidenceKeyResponse"
+          },
+          "used": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceKeyResponse"
+            }
+          }
+        }
+      },
       "ApiResponseListDeliveryOpenApprovalResponse": {
         "type": "object",
         "properties": {
@@ -25407,6 +25783,36 @@
           },
           "projectName": {
             "type": "string"
+          }
+        }
+      },
+      "ApiResponseEvidenceLinkResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EvidenceLinkResponse"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EvidenceLinkResponse": {
+        "type": "object",
+        "properties": {
+          "workspace": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },

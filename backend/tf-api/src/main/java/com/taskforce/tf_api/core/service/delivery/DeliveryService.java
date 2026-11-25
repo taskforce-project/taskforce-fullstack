@@ -52,11 +52,36 @@ public class DeliveryService {
     private final ProjectDeliveryFeed feed;
 
     /**
-     * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
-     * l'issue (LEAD/ADMIN/OWNER). Le contrôleur déclenche l'exécution après le commit.
+     * D'où vient une mission (R212, rubrique 1), pour son dossier : l'app ({@code app}), la conversation avec Cortex
+     * ({@code conversation}), un client du serveur MCP de TaskForce comme Claude Code ({@code mcp}), une relance
+     * ({@code retry}) ou une reprise ({@code follow-up}) d'une mission d'avant.
      */
+    public record Origin(String channel, Long run) {
+        public static final Origin APP = new Origin("app", null);
+        public static final Origin CONVERSATION = new Origin("conversation", null);
+        public static final Origin MCP = new Origin("mcp", null);
+
+        public static Origin retry(Long run) {
+            return new Origin("retry", run);
+        }
+
+        public static Origin followUp(Long run) {
+            return new Origin("follow-up", run);
+        }
+    }
+
+    /** Une délégation depuis l'app. */
     @Transactional
     public DeliveryRunResponse delegate(String slug, Long issueId, String providerKey, String model, Long userId) {
+        return delegate(slug, issueId, providerKey, model, userId, Origin.APP);
+    }
+
+    /**
+     * Crée un run de délégation (QUEUED) pour une issue vers un provider disponible. Écriture sur
+     * l'issue (LEAD/ADMIN/OWNER). Le contrôleur déclenche l'exécution après le commit. La mission garde d'où elle vient.
+     */
+    @Transactional
+    public DeliveryRunResponse delegate(String slug, Long issueId, String providerKey, String model, Long userId, Origin origin) {
         Issue issue = scopedIssue(slug, issueId);
         visibilityGuard.assertCanWrite(issue.getProject(), userId);
 
@@ -78,12 +103,15 @@ public class DeliveryService {
             : (provider.models().isEmpty() ? null : provider.models().get(0));
 
         User startedBy = userRepository.findById(userId).orElse(null);
+        Origin from = origin == null ? Origin.APP : origin;
         DeliveryRun run = DeliveryRun.builder()
             .issue(issue)
             .providerKey(provider.key())
             .model(resolvedModel)
             .status(DeliveryRunStatus.QUEUED)
             .startedBy(startedBy)
+            .origin(from.channel())
+            .originRunId(from.run())
             .build();
         run = runRepository.save(run);
         // J4 : la délégation se voit, la personne d'abord ; une issue sans assigné prend pour assigné qui délègue.

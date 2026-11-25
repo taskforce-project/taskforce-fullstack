@@ -234,6 +234,16 @@ describe("agent : frontière de sécurité de l'exécution locale", () => {
     assert.equal(env.TF_HOOK_TOKEN, undefined);
   });
 
+  it("L9 (R159) : rien du runner ne descend chez l'agent, ni son dossier, ni son adresse", () => {
+    const env = agentEnv(config(), {
+      PATH: "/bin", TASKFORCE_RUNNER_HOME: "C:/Users/ada/AppData/Roaming/TaskForce/runner",
+      TASKFORCE_RUNNER_API_URL: "http://127.0.0.1:8080/api", TASKFORCE_RUNNER_REPOS: "acme/website=C:/src/website",
+    });
+    assert.equal(env.TASKFORCE_RUNNER_HOME, undefined);
+    assert.deepEqual(Object.keys(env).filter((name) => name.startsWith("TASKFORCE_RUNNER_")), []);
+    assert.equal(env.PATH, "/bin");
+  });
+
   it("le jeton du serveur local de validations passe par l'environnement, jamais par un fichier", () => {
     assert.equal(agentEnv(config(), { TF_HOOK_TOKEN: "stale" }, "fresh").TF_HOOK_TOKEN, "fresh");
     assert.equal(agentEnv(config(), { TF_HOOK_TOKEN: "stale" }).TF_HOOK_TOKEN, undefined);

@@ -52,6 +52,20 @@ public final class DelegatedAgent {
         }
     }
 
+    /**
+     * La mission dont la requête en cours emprunte la session déléguée (ADR-013), ou vide : ce que l'agent d'une mission
+     * fait dans TaskForce entre au dossier de cette mission (TF-J2-7). Cortex n'en a pas.
+     */
+    public static Optional<Long> missionRun() {
+        if (!(SecurityContextHolder.getContext().getAuthentication() instanceof JwtAuthenticationToken token)) {
+            return Optional.empty();
+        }
+        Object run = token.getToken().getClaims().get(DeliverySessionFilter.RUN_CLAIM);
+        if (run instanceof Number number) return Optional.of(number.longValue());
+        if (run instanceof String text && text.matches("\\d{1,18}")) return Optional.of(Long.parseLong(text));
+        return Optional.empty();
+    }
+
     /** Le modèle qui fait parler l'agent de ce fil (Cortex : celui qui a répondu à la personne), ou vide. */
     public static Optional<String> model() {
         String model = MODEL.get();

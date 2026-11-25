@@ -153,7 +153,7 @@ public class MissionChangesService {
         data.put("decision", "REVERT_FILE");
         data.put("path", path);
         data.put("command", command.getId());
-        evidenceService.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), data);
+        evidenceService.appendAfterEnd(run, "human.decision", evidenceService.person(run, run.getStartedBy()), data);
         log.info("Run {} : retour en arrière demandé sur {} par {}", runId, path, userId);
     }
 
@@ -173,7 +173,7 @@ public class MissionChangesService {
         data.put("decision", "CORRECTION");
         data.put("text", command.getText());
         data.put("command", command.getId());
-        evidenceService.append(run, "human.decision", new MissionEvidenceService.Actor("person", run.getStartedBy().getEmail()), data);
+        evidenceService.append(run, "human.decision", evidenceService.person(run, run.getStartedBy()), data);
     }
 
     /** Vrai si un ordre attend ou tourne encore : le résultat ne se tranche pas sous ses pieds. */
@@ -319,7 +319,10 @@ public class MissionChangesService {
             && row.binary() == file.binary() && row.truncated() == file.truncated() && row.withheld() == file.withheld();
     }
 
-    /** Ce que le dossier garde d'un relevé : chaque fichier, ses lignes et son empreinte, jamais son texte. */
+    /**
+     * Ce que le dossier garde d'un relevé : chaque fichier, ses lignes et son empreinte, jamais son texte. L'empreinte du
+     * contenu qui reste ({@code sha256}) retrouve l'écriture jugée par les règles qui l'a laissé (TF-J2-7, R198).
+     */
     private static Map<String, Object> snapshotData(RunnerChangesRequest request) {
         List<Map<String, Object>> files = new ArrayList<>();
         for (RunnerChangesRequest.File file : request.files()) {
@@ -329,6 +332,7 @@ public class MissionChangesService {
             entry.put("added", file.added());
             entry.put("removed", file.removed());
             entry.put("revision", file.revision());
+            if (file.sha256() != null) entry.put("sha256", file.sha256());
             files.add(entry);
         }
         Map<String, Object> data = new LinkedHashMap<>();

@@ -14,6 +14,7 @@ import {
   changesTaskForce, INTERNAL_TOOLS, splitCommand, TASKFORCE_CHANGES, TASKFORCE_TOOLS, toolFacts,
 } from "../src/harness/facts.js";
 import { verifiedBundle, verifyEvidence } from "../src/harness/verify.js";
+import { headerOf } from "../src/harness/verifier/dossier.js";
 
 // Tests de contrat (R16) : les cas partagés de contracts/, rejoués ici contre le moteur du serveur compilé en
 // JavaScript (src/harness/engine/rules-engine.js), comme le serveur les rejoue en Java.
@@ -21,6 +22,7 @@ const contract = <T>(path: string): T => JSON.parse(readFileSync(new URL(`../../
 
 interface RuleCases {
   digest: { expected: string };
+  issued: { bundle: RulesBundle; expected: string };
   globs: Array<{ pattern: string; value: string; match: boolean }>;
   decisions: Array<{ name: string; facts: Facts; expect: { effect: string; rule: string | null } }>;
 }
@@ -88,6 +90,16 @@ describe("contrat des règles : empreinte du paquet", () => {
   it("accepte un paquet dont l'empreinte tient", () => {
     const signed = { ...defaults, digest: bundleDigest(defaults) };
     assert.equal(verifiedBundle(signed).version, defaults.version);
+  });
+
+  it("un paquet tel que le serveur l'émet, chaque propriétaire par son identifiant, a l'empreinte du serveur", () => {
+    const { bundle, expected } = ruleCases.issued;
+    assert.equal(bundleDigest(bundle), expected);
+    const noisy = { ...bundle, digest: `sha256:${"f".repeat(64)}`, issuedAt: null, process: null } as unknown as RulesBundle;
+    assert.equal(bundleDigest(noisy), expected);
+    // La réclamation l'accepte, et aucun propriétaire n'y est un courriel (R159, M6).
+    assert.equal(verifiedBundle({ ...bundle, digest: expected }).version, bundle.version);
+    for (const rule of bundle.rules) assert.match(rule.owner, /^(who:([0-9a-f]{32}|unknown)|workspace-owner)$/);
   });
 
   it("un paquet tel que le serveur l'envoie, conditions vides à null, juge comme le contrat", () => {
@@ -390,8 +402,9 @@ describe("contrat de la preuve : chaîne d'empreintes", () => {
 
 describe("dossier exporté, vérifié sans TaskForce", () => {
   const chained = chain(chainCases.chain.events);
+  // L'en-tête tel que la chaîne le donne : un en-tête vidé de ce qu'elle couvre ne tient pas (R159, L2).
   const file = (events: unknown[], root: unknown = chained.at(-1)?.hash) =>
-    JSON.stringify({ format: "taskforce-evidence/1", mission: {}, events, root });
+    JSON.stringify({ format: "taskforce-evidence/1", mission: headerOf(chained).header, events, root });
   const changed = chained.map((e, i) => (i === 1 ? { ...e, data: { ...e.data, tampered: true } } : e));
   const decimal = chained.map((e, i) => (i === 0 ? { ...e, data: { ...e.data, score: 0.5 } } : e));
   const cases: Array<[string, string, boolean, RegExp]> = [
@@ -404,8 +417,8 @@ describe("dossier exporté, vérifié sans TaskForce", () => {
     ["un autre format", JSON.stringify({ format: "x", events: [] }), false, /Not a TaskForce evidence file/],
   ];
   for (const [label, text, ok, message] of cases) {
-    it(`${label} -> ${ok ? "tient" : "ne tient pas"}`, () => {
-      const verdict = verifyEvidence(text);
+    it(`${label} -> ${ok ? "tient" : "ne tient pas"}`, async () => {
+      const verdict = await verifyEvidence(text);
       assert.equal(verdict.ok, ok);
       assert.match(verdict.message, message);
     });

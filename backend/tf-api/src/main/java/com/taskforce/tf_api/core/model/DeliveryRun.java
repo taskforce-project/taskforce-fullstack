@@ -122,6 +122,25 @@ public class DeliveryRun extends AuditableEntity {
     @Column(name = "evidence_root", length = 71)
     private String evidenceRoot;
 
+    /**
+     * Le numéro du dernier événement reçu du runner (TF-J2-7) : un lot perdu laisse un trou que le dossier marque. Zéro
+     * tant que rien n'est arrivé, ou pour un runner qui ne numérote pas.
+     */
+    @Column(name = "evidence_runner_seq", nullable = false)
+    @Builder.Default
+    private int evidenceRunnerSeq = 0;
+
+    /**
+     * D'où vient la mission (R212, rubrique 1) : {@code app}, {@code conversation}, {@code mcp}, {@code retry} ou
+     * {@code follow-up} ; vide pour une mission d'avant la 1.18.
+     */
+    @Column(length = 16)
+    private String origin;
+
+    /** La mission qu'une relance ou une reprise continue ; un numéro, pas une relation : elle peut avoir disparu. */
+    @Column(name = "origin_run_id")
+    private Long originRunId;
+
     // --- Ce que le runner rapporte de la mission, pour la carte de résultat (R78) : des faits, pas le résumé de l'agent.
 
     /** La branche de l'agent, et ses commits. */

@@ -721,7 +721,8 @@ public class IssueService {
         if (request.getContent() != null && !request.getContent().isBlank()) {
             item.setContent(request.getContent().trim());
         }
-        if (request.getDone() != null && request.getDone() != item.isDone()) {
+        boolean toggled = request.getDone() != null && request.getDone() != item.isDone();
+        if (toggled) {
             item.setDone(request.getDone());
             logActivity(issue, resolveUser(userId),
                 request.getDone() ? IssueActivityType.CHECKLIST_CHECKED : IssueActivityType.CHECKLIST_UNCHECKED,
@@ -730,7 +731,17 @@ public class IssueService {
         if (request.getPosition() != null) {
             item.setPosition(request.getPosition());
         }
-        return ChecklistItemResponse.from(checklistRepository.save(item));
+        IssueChecklistItem saved = checklistRepository.save(item);
+        // L'agent d'une mission coche ce qu'il dit avoir fait : il le déclare, et le dossier de la mission le garde comme
+        // tel, à distinguer de ce qu'une personne coche (R212, point 8 de la séance n°30).
+        if (toggled) {
+            DelegatedAgent.missionRun().ifPresent(runId -> events.publishEvent(new ChecklistDeclared(runId, saved)));
+        }
+        return ChecklistItemResponse.from(saved);
+    }
+
+    /** Une ligne de la liste cochée, ou décochée, par l'agent d'une mission, dans la session déléguée de cette mission. */
+    public record ChecklistDeclared(Long runId, IssueChecklistItem item) {
     }
 
     @Transactional

@@ -651,7 +651,9 @@ class IssueGesturesTest {
         stubIssue(issue());
         DeliveryAgentProvider claude = claude();
         when(providers.all()).thenReturn(List.of(claude));
-        when(deliveryService.delegate("acme", 5L, "claude-code", null, ME)).thenReturn(run("QUEUED", null, false, null));
+        // Un client du serveur MCP (Claude Code, son plugin) : la mission le garde comme origine (TF-J2-7).
+        when(deliveryService.delegate("acme", 5L, "claude-code", null, ME, DeliveryService.Origin.MCP))
+            .thenReturn(run("QUEUED", null, false, null));
 
         IssueGestures.Gesture gesture = gestures.delegate("acme", ME,
             args("{\"projectId\": 12, \"issueId\": 5" + (agent.isEmpty() ? "" : ", \"agent\": \"" + agent + "\"") + "}"));
@@ -672,7 +674,26 @@ class IssueGesturesTest {
 
         assertThatThrownBy(() -> gestures.delegate("acme", ME, args("{\"projectId\": 12, \"issueId\": 5}")))
             .isInstanceOf(BusinessException.class).hasMessageContaining("already has a mission at work");
-        verify(deliveryService, never()).delegate(any(), any(), any(), any(), any());
+        verify(deliveryService, never()).delegate(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void cortex_delegating_in_the_conversation_is_the_mission_s_origin() throws Exception {
+        stubIssue(issue());
+        DeliveryAgentProvider claude = claude();
+        when(providers.all()).thenReturn(List.of(claude));
+        when(deliveryService.delegate("acme", 5L, "claude-code", null, ME, DeliveryService.Origin.CONVERSATION))
+            .thenReturn(run("QUEUED", null, false, null));
+
+        com.taskforce.tf_api.core.security.DelegatedAgent.actingAs(IssueGestures.CORTEX, () -> {
+            try {
+                return gestures.delegate("acme", ME, args("{\"projectId\": 12, \"issueId\": 5}"));
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        verify(deliveryRunner).execute(100L);
     }
 
     @Test
@@ -682,7 +703,7 @@ class IssueGesturesTest {
 
         assertThatThrownBy(() -> gestures.delegate("acme", ME, args("{\"projectId\": 12, \"issueId\": 5, \"agent\": \"Devin\"}")))
             .hasMessage("There is no agent \"Devin\". The agents are: Claude Code.");
-        verify(deliveryService, never()).delegate(any(), any(), any(), any(), any());
+        verify(deliveryService, never()).delegate(any(), any(), any(), any(), any(), any());
     }
 
     @ParameterizedTest(name = "{0}")

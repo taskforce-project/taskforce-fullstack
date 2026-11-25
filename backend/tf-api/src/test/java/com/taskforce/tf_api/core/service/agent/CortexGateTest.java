@@ -29,6 +29,7 @@ import com.taskforce.tf_api.core.repository.IssueRepository;
 import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.mcp.ExternalMcpTool;
 import com.taskforce.tf_api.core.service.mcp.McpClient;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -58,7 +59,7 @@ class CortexGateTest {
 
     @BeforeEach
     void defaultRules() {
-        gate = new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projects, issues, json);
+        gate = new CortexGate(new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()), workspaces, projects, issues, json);
         Workspace ws = Workspace.builder().id(1L).slug("acme").name("Acme")
             .owner(User.builder().email("owner@acme.test").build()).build();
         when(workspaces.findById(1L)).thenReturn(Optional.of(ws));

@@ -956,5 +956,83 @@
   "digest": {
     "description": "The digest of default.rules.json as it is, with or without null members and its own digest field.",
     "expected": "sha256:ab1ddc2e5e3a0b2b0edb7788ef9c334eedb4d8a194f2faf56592b9ebc0807b3d"
+  },
+  "issued": {
+    "description": "A bundle in the form the server issues it: each rule's owner is the opaque id, in the workspace, of the person who answers for it (who: and 32 hex digits, or who:unknown), never their email; a company layer comes first, with its version and the digest of its stored rules. The runner recomputes this digest at claim time with the engine compiled from the server's, and refuses the bundle if it differs.",
+    "bundle": {
+      "format": "taskforce-rules/1",
+      "workspace": "acme",
+      "project": 12,
+      "version": 4,
+      "rules": [
+        {
+          "id": "ws-ask-comments",
+          "when": {
+            "action": "comment.create"
+          },
+          "class": "reversible-exit",
+          "effect": "ask",
+          "inverse": null,
+          "owner": "who:7c2e4a6b8d0f1e3a5c7b9d2f4a6c8e0b",
+          "reason": "Comments wait for a person here.",
+          "review": "2027-05-11",
+          "layer": "workspace",
+          "text": "Comments wait for a person here.",
+          "require": {
+            "approvers": [
+              "role:admin"
+            ],
+            "signatures": 1
+          }
+        },
+        {
+          "id": "ws-no-delete",
+          "when": {
+            "action": "issue.delete"
+          },
+          "class": "irreversible",
+          "effect": "deny",
+          "inverse": null,
+          "owner": "who:unknown",
+          "reason": "Nothing is deleted here.",
+          "review": "2027-05-11",
+          "layer": "workspace",
+          "text": "Nothing is deleted here."
+        },
+        {
+          "id": "read-files",
+          "when": {
+            "action": "file.read"
+          },
+          "class": "read",
+          "effect": "allow",
+          "inverse": null,
+          "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e",
+          "reason": "Reading leaves a trace and changes nothing (R7').",
+          "review": "2027-01-31"
+        },
+        {
+          "id": "push-public-repo",
+          "when": {
+            "action": "git.push",
+            "repoVisibility": "public"
+          },
+          "class": "irreversible",
+          "effect": "ask",
+          "inverse": null,
+          "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e",
+          "reason": "Pushing to a public repository exposes the code; it cannot be taken back.",
+          "review": "2027-01-31"
+        }
+      ],
+      "layers": [
+        {
+          "scope": "workspace",
+          "version": 4,
+          "digest": "sha256:5d1a0f3c9e7b2a4d6f8c0e1b3a5d7f9c2e4b6a8d0f1c3e5a7b9d2f4c6e8a0b1d"
+        }
+      ]
+    },
+    "expected": "sha256:864e0cfe0a719fd9b81cffeef7961c90cbca1d1e089be551ea16327972ec85e1"
   }
 }

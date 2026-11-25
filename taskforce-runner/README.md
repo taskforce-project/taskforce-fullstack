@@ -165,8 +165,27 @@ judged it, every decision asked of you and your answer, what left the computer. 
 recomputing every hash:
 
 ```bash
-npm run verify -- evidence-run-42.json
+npm run verify -- evidence-run-42.json --key sha256:<the key id the operator publishes>
 ```
+
+Always give `--key`. The file carries the public key of its seal, so without `--key` the verifier can only say that
+the seal matches the key in the file, and anyone who rewrites a record can sign it again with a key of their own: the
+first line of the output then says "Signed by a key the file carries itself: anyone can make this seal", and the seal
+is only a warning. With `--key`, a record that has no seal, or a seal by another key, fails. Get the key id from the
+operator of the instance, or from `GET /api/workspaces/{slug}/delivery/evidence/key` as a member of the workspace: it
+gives the key that seals today and the keys that sealed the workspace's records before, with the dates they were used.
+`--key` also takes the public key itself, as a PEM file or in base64.
+
+Offline, it checks every hash, the header against the chain, each text kept beside the chain, the rules bundle and
+each decision judged again with it, the gaps, the seal (its Ed25519 signature, its subject, the head and header it
+names, its key, and where the key lives), and the witness written in the pull request. Each line says what holds
+(`[ok]`), what the record does not prove (`[!!]`) and what fails (`[KO]`). The same verifier, without anything of
+Node, is copied into the app (`npm run share:app`, under `frontend/lib/evidence`), which checks a record with it.
+
+The runner numbers every event of a run and sends a batch again until it gets through: a batch that never arrives
+leaves a gap the record marks. What the record holds only by its hash stays on your computer, in
+`~/.taskforce-runner/evidence/run-<id>/`: the agent's raw session (`session.jsonl`) and the whole output of the
+project's tests (`tests.log`).
 
 ## The rules engine
 

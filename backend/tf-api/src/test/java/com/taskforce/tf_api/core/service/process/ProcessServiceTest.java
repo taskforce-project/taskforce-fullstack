@@ -59,6 +59,7 @@ import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.exception.ForbiddenException;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
@@ -161,7 +162,7 @@ class ProcessServiceTest {
             .toList());
         lenient().when(ruleSets.findByWorkspaceIdOrderByVersionDesc(1L)).thenReturn(List.of());
         service = new ProcessService(workspaces, workspaceMembers, projects, projectMembers, visibility, definitions,
-            versions, users, new ProcessDefaults(), new HarnessRulesService(ruleSets, workspaceMembers), audit);
+            versions, users, new ProcessDefaults(), new HarnessRulesService(ruleSets, workspaceMembers, TestPersonIds.inMemory()), audit);
     }
 
     /** Le workflow par défaut d'E20, dérivé pour ce projet. */

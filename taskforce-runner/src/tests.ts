@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { runShell, type ProcOptions, type ProcResult } from "./proc.js";
+import { cutEnd } from "./text.js";
 
 /**
  * Les tests du projet, lancés par le runner après le travail de l'agent (niveau S1, décidé le 28/10/2026, R32) : la
@@ -23,6 +25,11 @@ export interface TestRun {
   tail: string;
   /** Combien ont passé, sur combien, quand la sortie le dit (carte de résultat, R78). */
   counts?: TestCounts;
+  /**
+   * La preuve : l'empreinte de la sortie entière (stdout, une ligne, stderr), que le runner garde sur ce poste ; le
+   * dossier la porte (R212, rubrique 4). Absente quand les tests n'ont pas tourné.
+   */
+  output?: { sha256: string; bytes: number };
 }
 
 export interface TestCounts {
@@ -75,10 +82,9 @@ export function testCounts(output: string): TestCounts | null {
   return null;
 }
 
-/** Le dernier morceau de la sortie, borné : la fin dit le plus souvent ce qui a échoué. */
+/** Le dernier morceau de la sortie, borné : la fin dit le plus souvent ce qui a échoué. La coupe se dit (R159, L4). */
 export function outputTail(result: Pick<ProcResult, "stdout" | "stderr">, max = 3000): string {
-  const text = `${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`.trim();
-  return text.length > max ? `...${text.slice(text.length - max)}` : text;
+  return cutEnd(`${result.stdout}${result.stderr ? `\n${result.stderr}` : ""}`.trim(), max);
 }
 
 export function seconds(ms: number): string {
@@ -122,6 +128,13 @@ export interface TestDeps {
   approved: ApprovedTests;
   /** Lance la ligne de commande (le shell du système, ou un faux dans les tests). */
   shell?: (commandLine: string, options: ProcOptions) => Promise<ProcResult>;
+  /** Où garder la sortie entière sur ce poste ; le dossier n'en porte que l'empreinte. */
+  outputFile?: string;
+}
+
+/** La sortie entière telle que le dossier l'empreinte : stdout, un saut de ligne, stderr. */
+export function fullOutput(result: Pick<ProcResult, "stdout" | "stderr">): string {
+  return `${result.stdout}\n${result.stderr}`;
 }
 
 /** Lance la commande de test déclarée dans la copie, après accord pour une commande nouvelle sur ce poste. */
@@ -141,15 +154,27 @@ export async function runProjectTests(
   const result = await (deps.shell ?? runShell)(command, { cwd, timeoutMs, signal });
   const took = seconds(Date.now() - started);
   const tail = outputTail(result);
+  const all = fullOutput(result);
+  const bytes = Buffer.from(all, "utf8");
+  const output = { sha256: `sha256:${createHash("sha256").update(bytes).digest("hex")}`, bytes: bytes.length };
+  if (deps.outputFile) {
+    try {
+      mkdirSync(dirname(deps.outputFile), { recursive: true });
+      writeFileSync(deps.outputFile, bytes, { mode: 0o600 });
+    } catch {
+      // la sortie ne se garde pas : son empreinte reste au dossier
+    }
+  }
   if (result.timedOut) {
-    return { command, ran: true, passed: false, summary: `Tests stopped after ${took}: \`${command}\` took too long.`, tail };
+    return { command, ran: true, passed: false, summary: `Tests stopped after ${took}: \`${command}\` took too long.`, tail, output };
   }
   const passed = result.code === 0;
-  const counts = testCounts(`${result.stdout}\n${result.stderr}`);
+  const counts = testCounts(all);
   return {
     command, ran: true, passed,
     summary: passed ? `Tests passed: \`${command}\` (${took}).` : `Tests failed: \`${command}\` exited with code ${result.code} (${took}).`,
     tail,
     ...(counts ? { counts } : {}),
+    output,
   };
 }

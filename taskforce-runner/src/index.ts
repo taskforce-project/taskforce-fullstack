@@ -12,16 +12,17 @@
  *
  * Options : `--check` (vérifie l'installation, ne réclame rien), `--once` (traite au plus un run puis sort).
  */
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { runAgent, type AgentOutcome } from "./agent.js";
 import { ApiError, TaskforceApi, type Claim, type RunResult } from "./api.js";
 import { askInTaskForce } from "./approvals.js";
-import { ChangeTracker, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges } from "./changes.js";
+import { ChangeTracker, changedPaths, liveIndexPath, removeLiveIndex, repoChanges, scratchChanges, trackedFiles } from "./changes.js";
 import { LiveMissions, pollCommands } from "./commands.js";
 import { loadConfig, type RepoConfig, type RunnerConfig } from "./config.js";
+import { EventRelay } from "./events.js";
 import { exitFacts, judgeExit, type ExitVerdict } from "./exits.js";
 import { finalizeCommits, openPullRequest, prepareWorktree, pushBranch, removeWorktree, reopenWorktree, repoVisibility, resolveRepo, runSetup, type Worktree } from "./git.js";
 import { Exposure } from "./harness/exposure.js";
@@ -30,7 +31,9 @@ import { startHeartbeat } from "./heartbeat.js";
 import { log } from "./log.js";
 import { resolveCommand, run } from "./proc.js";
 import { agentProblem, PROBLEM_TEXT, Readiness, signedIn, type AgentProblem } from "./readiness.js";
+import { definitionFiles, scriptFiles, testDefinitions } from "./test-definitions.js";
 import { ApprovedTests, runProjectTests } from "./tests.js";
+import { cut, cutEnd } from "./text.js";
 import { MIN_CLAUDE_CODE, supportsApprovals } from "./version.js";
 
 // Lancé par l'app desktop avec le Node d'Electron (ELECTRON_RUN_AS_NODE) : ni git, ni gh, ni Claude Code ne doivent
@@ -85,11 +88,24 @@ const TEST_TIMEOUT_MS = 15 * 60_000;
 
 /**
  * Une décision du runner pour la chronologie et le dossier de preuve : une sortie (`exit`), faite ou non, ou le
- * démarrage de la mission (`decision`, au seul dossier). Un échec d'envoi n'arrête rien.
+ * démarrage de la mission (`decision`, au seul dossier), numérotée à la suite de celles de l'agent. Elle part avant la
+ * suite (l'ordre du dossier est celui du run) ; un échec d'envoi n'arrête rien, le lot repart, ou le dossier marque le trou.
  */
-async function traceExit(api: TaskforceApi, runId: number, tool: string, verdict: ExitVerdict, kind: "exit" | "decision" = "exit"): Promise<void> {
-  await api.events(runId, [{ kind, tool, text: verdict.why, effect: verdict.go ? "allow" : "deny", ...(verdict.rule ? { rule: verdict.rule } : {}) }])
-    .catch((e: unknown) => log.warn(`Decision not traced in TaskForce: ${(e as Error).message}`));
+async function traceExit(relay: EventRelay, tool: string, verdict: ExitVerdict, kind: "exit" | "decision" = "exit"): Promise<void> {
+  relay.push([{ kind, tool, text: verdict.why, effect: verdict.go ? "allow" : "deny", ...(verdict.rule ? { rule: verdict.rule } : {}) }]);
+  await relay.flush();
+}
+
+/** Ce que le runner garde d'une mission sur ce poste, à part : la session brute de l'agent, la sortie des tests. */
+function evidenceDir(home: string, runId: number): string {
+  return join(home, "evidence", `run-${runId}`);
+}
+
+/** Le dernier commit de la branche de l'agent ; absent s'il ne se lit pas. */
+async function headOf(dir: string): Promise<string | undefined> {
+  const probe = await run("git", ["-C", dir, "rev-parse", "HEAD"]).catch(() => null);
+  const sha = probe?.code === 0 ? probe.stdout.trim() : "";
+  return /^[0-9a-f]{40,64}$/.test(sha) ? sha : undefined;
 }
 
 function logOutcome(outcome: AgentOutcome): void {
@@ -102,14 +118,31 @@ function logOutcome(outcome: AgentOutcome): void {
 async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim, live: LiveMissions, shutdown?: AbortSignal): Promise<void> {
   log.info(`Run #${claim.runId} claimed: ${claim.issueKey} - ${claim.title}`);
   const heartbeat = startHeartbeat(api, claim.runId, HEARTBEAT_MS);
-  // L'agent s'arrête si le runner s'arrête, ou si la personne a arrêté la mission dans TaskForce (R138).
-  const signal = shutdown ? AbortSignal.any([shutdown, heartbeat.closed]) : heartbeat.closed;
+  // TaskForce arrête la mission par la réponse à ses événements : le dossier a atteint son plafond, ou la mission n'est
+  // plus à ce runner (R159 de #551, troisième tour, c-c). Sans attendre le prochain signe de vie.
+  const stopped = new AbortController();
+  // L'agent s'arrête si le runner s'arrête, ou si la personne a arrêté la mission dans TaskForce (R138), ou si TaskForce
+  // l'arrête au plafond du dossier.
+  const signal = AbortSignal.any([...(shutdown ? [shutdown] : []), heartbeat.closed, stopped.signal]);
 
   let result: RunResult;
   let worktree: Worktree | null = null;
   let repo: RepoConfig | null = null;
   let scratch: string | null = null;
   const liveIndex = liveIndexPath(config.home, claim.runId);
+  // La chronologie de la mission, numérotée d'un bout à l'autre du run : un lot perdu laisse un trou que le dossier marque.
+  const relay = new EventRelay(api, claim.runId, {
+    onStop: (why) => {
+      if (stopped.signal.aborted) return;
+      log.info(why === "cap"
+        ? `Run #${claim.runId}: its record reached its cap in TaskForce, which stops the mission: the agent stops.`
+        : `Run #${claim.runId} ended in TaskForce: the agent stops.`);
+      stopped.abort();
+    },
+  });
+  const kept = evidenceDir(config.home, claim.runId);
+  let session: RunResult["session"];
+  let head: string | undefined;
   const onConversation = (tell: ((text: string) => boolean) | null): void => {
     if (tell) live.attach(claim.runId, tell);
     else live.detach(claim.runId);
@@ -127,7 +160,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     const exposure = Exposure.forMission(claim.repoFullName, visibility);
     const start = await judgeExit(rules, { action: "mission.start", ...(visibility ? { repoVisibility: visibility } : {}), ...exposure.facts() },
       "Start the mission", `Start ${claim.issueKey} on ${claim.repoFullName ?? "a scratch folder"} (${visibility ?? "no repository"})`, ask);
-    await traceExit(api, claim.runId, "mission.start", start, "decision");
+    await traceExit(relay, "mission.start", start, "decision");
     if (!start.go) throw new MissionNotStarted(start.reason ? `${start.reason}.` : `This mission does not start: ${start.why}.`);
     if (claim.repoFullName) {
       repo = await resolveRepo(config.repos, config.autoClone, config.home, claim.repoFullName);
@@ -147,7 +180,9 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       log.info("Claude Code at work (follow it live in TaskForce)...");
       const outcome = await runAgent(agentConfig, claim, worktree.path, token, {
         mode: "repo", branch: worktree.branch, signal, rules, exposure, onWrite: () => changes.touch(), onConversation,
+        relay, sessionFile: join(kept, "session.jsonl"),
       }, api);
+      session = outcome.session;
       logOutcome(outcome);
       // Même en échec, ce que l'agent a écrit se voit : le dossier de travail est gardé.
       if (!outcome.ok) {
@@ -156,6 +191,7 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       }
 
       const commits = await finalizeCommits(worktree, claim);
+      if (commits > 0) head = await headOf(worktree.path);
       // L'état final, relu dans les commits : ce que les tests écriront ensuite ne compte pas.
       await changes.finish(() => repoChanges(open.path, open.baseSha));
       // S1 (R32) : les tests du projet, lancés par le runner sur le travail de l'agent, jamais par l'agent. Après les
@@ -167,10 +203,37 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       let testFacts: RunResult["tests"];
       if (commits > 0 && claim.testCommand) {
         const tests = await runProjectTests(claim.testCommand, claim.repoFullName, worktree.path, TEST_TIMEOUT_MS,
-          { ask, approved: ApprovedTests.in(config.home) }, signal);
+          { ask, approved: ApprovedTests.in(config.home), outputFile: join(kept, "tests.log") }, signal);
         log.info(tests.summary);
-        await api.events(claim.runId, [{ kind: "test", tool: tests.command.slice(0, 120), text: `${tests.summary}${tests.tail ? `\n${tests.tail.slice(-1500)}` : ""}` }])
-          .catch((e: unknown) => log.warn(`Test result not traced in TaskForce: ${(e as Error).message}`));
+        // La branche a changé ce qui dit comment les tests tournent : le résultat ne vaut que pour sa version (R159, M5).
+        // Le dossier dit aussi ce que le runner a regardé : une liste, pas la preuve que les tests sont les mêmes (L-b).
+        const dir = worktree.path;
+        const files = await trackedFiles(dir);
+        const scripts = files.filter((path) => /(^|\/)package\.json$/.test(path)).slice(0, 20).flatMap((path) => {
+          try {
+            return scriptFiles(path, readFileSync(join(dir, path), "utf8"));
+          } catch {
+            return [];
+          }
+        });
+        const definitions = definitionFiles(files, claim.testCommand, scripts);
+        const definitionChanged = testDefinitions(await changedPaths(worktree.path, open.baseSha), claim.testCommand, scripts);
+        if (definitionChanged.length > 0) {
+          log.warn(`The branch changes how the tests run (${definitionChanged.join(", ")}): the evidence will say so.`);
+        }
+        // Les tests au dossier : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière, la preuve,
+        // que ce poste garde (R212, rubrique 4). Une coupe se dit, entre deux caractères (R159, L4).
+        relay.push([{
+          kind: "test", tool: cut(tests.command, 120), text: `${tests.summary}${tests.tail ? `\n${cutEnd(tests.tail, 1500)}` : ""}`,
+          test: {
+            command: cut(tests.command, 500), ran: tests.ran, passed: tests.passed,
+            ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
+            ...(tests.output ? { output: tests.output.sha256, outputBytes: tests.output.bytes } : {}),
+            ...(definitions.length > 0 ? { definitions } : {}),
+            ...(definitionChanged.length > 0 ? { definitionChanged } : {}),
+          },
+        }]);
+        await relay.flush();
         report = `${outcome.text}\n\n${tests.summary}`;
         testsFact = tests.summary;
         testOutput = tests.tail || undefined;
@@ -178,15 +241,19 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
           command: tests.command, ran: tests.ran, passed: tests.passed,
           ...(tests.counts ? { passedCount: tests.counts.passed, total: tests.counts.total } : {}),
         };
+      } else if (commits > 0) {
+        // Rien n'est testé : le dossier le dit, pour que la page le dise (R212, rubrique 5 : « aucun test n'est configuré »).
+        relay.push([{ kind: "test", tool: "tests", text: testsFact, test: { command: "none", ran: false, passed: false, configured: false } }]);
+        await relay.flush();
       }
       // Arrêtée pendant ses tests : rien ne sort du poste.
       signal.throwIfAborted();
       if (commits === 0) {
-        result = { status: "DONE", summary: `No code change was needed.\n\n${outcome.text}`.slice(0, 7900) };
+        result = { status: "DONE", summary: cut(`No code change was needed.\n\n${outcome.text}`, 7900) };
       } else if (!config.push) {
         result = {
           status: "DONE",
-          summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`.slice(0, 7900),
+          summary: cut(`${report}\n\n${commits} commit(s) on local branch ${worktree.branch} (push disabled on this runner).`, 7900),
         };
       } else {
         // Les sorties suivent les règles de la mission (§8.4) : ce qui est demandé attend la personne qui a délégué.
@@ -194,11 +261,11 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
         const push = await judgeExit(rules, { ...exitFacts("git.push", worktree.branch, visibility), ...exposure.facts() }, "git push",
           `Push the branch ${worktree.branch} to ${where}`, ask);
         log.info(`Push: ${push.why}`);
-        await traceExit(api, claim.runId, "git push", push);
+        await traceExit(relay, "git push", push);
         if (!push.go) {
           result = {
             status: "DONE",
-            summary: `${report}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`.slice(0, 7900),
+            summary: cut(`${report}\n\n${commits} commit(s) on local branch ${worktree.branch}, not pushed: ${push.why}.`, 7900),
           };
         } else {
           await pushBranch(worktree, repo);
@@ -210,14 +277,14 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
             const pr = await judgeExit(rules, { ...exitFacts("pr.open", worktree.branch, visibility), ...exposure.facts() }, "gh pr create",
               `Open a pull request from ${worktree.branch} on ${where}`, ask);
             log.info(`Pull request: ${pr.why}`);
-            await traceExit(api, claim.runId, "gh pr create", pr);
+            await traceExit(relay, "gh pr create", pr);
             if (pr.go) {
               const facts = [pushed, `Opened this pull request: ${pr.why}.`, testsFact];
               url = await openPullRequest(worktree, repo, claim, { facts, summary: outcome.text, testOutput }, config.home);
             }
             else note = `\n\nBranch ${worktree.branch} pushed, no pull request: ${pr.why}.`;
           }
-          result = { status: "DONE", summary: `${report}${note}`.slice(0, 7900), resultUrl: url };
+          result = { status: "DONE", summary: cut(`${report}${note}`, 7900), resultUrl: url };
           log.info(url ? `Pull request opened: ${url}` : `Branch pushed: ${worktree.branch}`);
         }
       }
@@ -241,20 +308,22 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
       log.info("Claude Code at work on a repo-less task (follow it live in TaskForce)...");
       const outcome = await runAgent(agentConfig, claim, scratch, token, {
         mode: "repoless", signal, rules, exposure, onWrite: () => changes.touch(), onConversation,
+        relay, sessionFile: join(kept, "session.jsonl"),
       }, api);
+      session = outcome.session;
       logOutcome(outcome);
       await changes.finish();
       if (!outcome.ok) throw new Error(outcome.text);
-      result = { status: "DONE", summary: outcome.text.slice(0, 7900) };
+      result = { status: "DONE", summary: cut(outcome.text, 7900) };
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (e instanceof MissionNotStarted) {
       log.warn(`Run #${claim.runId} not started: ${message}`);
-      result = { status: "FAILED", error: message.slice(0, 3900), refused: true };
+      result = { status: "FAILED", error: cut(message, 3900), refused: true };
     } else {
       log.error(`Run #${claim.runId} failed: ${message}`);
-      result = { status: "FAILED", error: message.slice(0, 3900) };
+      result = { status: "FAILED", error: cut(message, 3900) };
     }
   } finally {
     heartbeat.stop();
@@ -262,11 +331,18 @@ async function processRun(config: RunnerConfig, api: TaskforceApi, claim: Claim,
     removeLiveIndex(liveIndex);
   }
 
-  // Close dans TaskForce : le serveur a déjà sa fin, et son dossier est scellé.
-  if (heartbeat.closed.aborted) {
+  // Close dans TaskForce, ou arrêtée par lui au plafond du dossier : le serveur a déjà sa fin, et son dossier est scellé.
+  if (heartbeat.closed.aborted || stopped.signal.aborted) {
+    await relay.close();
     log.info(`Run #${claim.runId}: stopped in TaskForce, nothing more is sent.`);
     return;
   }
+
+  // La chronologie part en entier avant le résultat, qui dit combien d'événements elle compte : le dossier marque ceux
+  // qui ne sont pas arrivés. La session brute de l'agent reste sur ce poste ; le dossier la référence par son empreinte.
+  await relay.close();
+  result = { ...result, events: relay.count, ...(session ? { session } : {}), ...(head ? { head } : {}) };
+  if (session) log.info(`Agent session kept in ${join(kept, "session.jsonl")} (${session.sha256.slice(0, 19)}...)`);
 
   try {
     await api.result(claim.runId, result);

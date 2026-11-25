@@ -288,6 +288,18 @@ describe('delivery-service : les gestes de la carte de résultat (R78)', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/api/workspaces/acme/delivery/runs/100/done', {});
   });
 
+  it('discardRun et markRunDone : la raison du geste part sans ses blancs, rien sans elle (TF-J2-7)', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue(envelope(null));
+
+    await discardRun(SLUG, 100, '  Wrong approach  ');
+    await markRunDone(SLUG, 100, 'Already fixed');
+    await discardRun(SLUG, 101, '   ');
+
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DISCARD(SLUG, 100), { reason: 'Wrong approach' });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DONE(SLUG, 100), { reason: 'Already fixed' });
+    expect(apiClient.post).toHaveBeenCalledWith(DELIVERY_ROUTES.DISCARD(SLUG, 101), {});
+  });
+
   it.each([
     ['  Keep the Privacy link  ', { note: 'Keep the Privacy link' }],
     ['   ', {}],

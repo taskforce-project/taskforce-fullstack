@@ -1,8 +1,10 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
-import type { Claim } from "./api.js";
-import { ApprovalServer, type ApprovalApi } from "./approvals.js";
+import type { Claim, RunnerEvent } from "./api.js";
+import { ApprovalServer, exactAction, type ApprovalApi } from "./approvals.js";
 import type { RunnerConfig } from "./config.js";
 import { EventRelay, type EventSink } from "./events.js";
 import type { RulesBundle } from "./harness/engine/rules-engine.js";
@@ -10,7 +12,8 @@ import type { Exposure } from "./harness/exposure.js";
 import { log } from "./log.js";
 import { run, type StdinChannel } from "./proc.js";
 import { buildFollowUpPrompt, buildPrompt, buildReplyPrompt } from "./prompt.js";
-import { describeToolInput, parseAgentOutput, toEvents, toolLabel, WriteWatcher, type AgentOutcome } from "./stream.js";
+import { agentInfo, describeToolInput, parseAgentOutput, toEvents, toolLabel, WriteWatcher, type AgentOutcome } from "./stream.js";
+import { cut } from "./text.js";
 
 export type { AgentOutcome } from "./stream.js";
 export { parseAgentOutput } from "./stream.js";
@@ -157,9 +160,10 @@ export function agentEnv(config: RunnerConfig, base: NodeJS.ProcessEnv = process
   } else if (!env.ANTHROPIC_API_KEY) {
     throw new Error('agent.auth is "api-key" but ANTHROPIC_API_KEY is not set in the environment');
   }
-  // Les identifiants machine du runner ne descendent jamais dans le processus de l'agent.
-  delete env.TASKFORCE_RUNNER_CLIENT_ID;
-  delete env.TASKFORCE_RUNNER_CLIENT_SECRET;
+  // Rien du runner ne descend dans le processus de l'agent : ni ses identifiants machine, ni son dossier (R159, L9).
+  for (const name of Object.keys(env)) {
+    if (name.startsWith("TASKFORCE_RUNNER_")) delete env[name];
+  }
   if (hookToken) env[HOOK_TOKEN_ENV] = hookToken;
   else delete env[HOOK_TOKEN_ENV];
   return env;
@@ -235,6 +239,162 @@ export interface AgentRunOptions {
   onWrite?: () => void;
   /** Le moyen de parler à l'agent pendant son travail, le temps qu'il tourne (R140). */
   onConversation?: (tell: ((text: string) => boolean) | null) => void;
+  /**
+   * La chronologie de la mission, numérotée d'un bout à l'autre du run (TF-J2-7) : le runner la tient, l'agent y ajoute.
+   * Absente, l'agent a la sienne, fermée à sa fin.
+   */
+  relay?: EventRelay;
+  /** Où garder la session brute de l'agent sur ce poste ; le dossier la référence par son empreinte (R212). */
+  sessionFile?: string;
+}
+
+/** Le plus long brief que le dossier garde à côté de sa chaîne. */
+const MAX_BRIEF = 200_000;
+
+const truthy = (value: string | undefined): boolean => value !== undefined && /^(1|true|yes|on)$/i.test(value.trim());
+
+/**
+ * Qui sert le modèle, lu dans l'environnement que Claude Code reçoit (R159, L5) : Amazon Bedrock, Google Vertex, une
+ * autre adresse que celle d'Anthropic (une passerelle, un modèle local : son adresse n'entre pas au dossier), ou
+ * Anthropic.
+ */
+export function providerOf(env: NodeJS.ProcessEnv): string {
+  if (truthy(env.CLAUDE_CODE_USE_BEDROCK)) return "amazon-bedrock";
+  if (truthy(env.CLAUDE_CODE_USE_VERTEX)) return "google-vertex";
+  const base = env.ANTHROPIC_BASE_URL?.trim();
+  if (base) {
+    try {
+      if (new URL(base).hostname !== "api.anthropic.com") return "another-endpoint";
+    } catch {
+      return "another-endpoint";
+    }
+  }
+  return "anthropic";
+}
+
+/**
+ * Le dossier des réglages gérés par l'organisation, que Claude Code lit toujours, selon le système (R159 de #551,
+ * troisième tour, c-a), d'après https://code.claude.com/docs/en/managed-settings : `managed-settings.json` et les
+ * `*.json` de `managed-settings.d/` à côté. Sous Windows, Claude Code ne lit plus l'ancien chemin sous `ProgramData`.
+ */
+export function managedSettingsDir(platform: NodeJS.Platform = process.platform): string {
+  if (platform === "win32") return "C:\\Program Files\\ClaudeCode";
+  if (platform === "darwin") return "/Library/Application Support/ClaudeCode";
+  return "/etc/claude-code";
+}
+
+/**
+ * Ce que le runner ne lit pas des réglages gérés, et que le dossier dit (c-a) : les réglages poussés par le serveur
+ * d'Anthropic, et ceux du système, le registre de Windows ou le profil géré de macOS.
+ */
+export function providerUnread(platform: NodeJS.Platform = process.platform): string[] {
+  if (platform === "win32") return ["windows-registry", "server-managed-settings"];
+  if (platform === "darwin") return ["macos-managed-preferences", "server-managed-settings"];
+  return ["server-managed-settings"];
+}
+
+/** L'`env` d'un fichier de réglages de Claude Code ; vide s'il manque ou ne se lit pas. */
+function settingsEnv(path: string): Record<string, string> {
+  try {
+    const env = (JSON.parse(readFileSync(path, "utf8")) as { env?: unknown }).env;
+    if (!env || typeof env !== "object" || Array.isArray(env)) return {};
+    return Object.fromEntries(Object.entries(env as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * L'`env` des réglages gérés, comme Claude Code le fusionne : `managed-settings.json` d'abord, puis chaque `*.json` de
+ * `managed-settings.d/` par ordre alphabétique, les fichiers cachés écartés ; variable par variable, le dernier l'emporte.
+ */
+function managedEnv(dir: string): Record<string, string> {
+  let dropIns: string[] = [];
+  try {
+    dropIns = readdirSync(join(dir, "managed-settings.d")).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort();
+  } catch {
+    dropIns = [];
+  }
+  return Object.assign({}, settingsEnv(join(dir, "managed-settings.json")),
+    ...dropIns.map((name) => settingsEnv(join(dir, "managed-settings.d", name))));
+}
+
+/**
+ * L'environnement qui choisit le fournisseur au lancement de Claude Code (R159, second tour, L-c) : celui que le runner
+ * lui passe, puis l'`env` des réglages qu'il charge, dans l'ordre où ils l'emportent : ceux de l'utilisateur
+ * (`CLAUDE_CONFIG_DIR`, sinon `~/.claude`), puis ceux de l'organisation. Ceux du dépôt n'y sont pas : le runner lance
+ * Claude Code avec `--setting-sources user` (voir {@link agentArgs}), qui ne les lit pas. Un script de l'agent peut récrire
+ * les réglages de l'utilisateur pour les missions suivantes : le dossier dit que c'est la configuration du lancement.
+ */
+export function launchEnv(env: NodeJS.ProcessEnv, home: string = homedir(), managed: string = managedSettingsDir()): NodeJS.ProcessEnv {
+  const configDir = env.CLAUDE_CONFIG_DIR?.trim() || join(home, ".claude");
+  return { ...env, ...settingsEnv(join(configDir, "settings.json")), ...managedEnv(managed) };
+}
+
+/** Le modèle qui a réellement répondu, tel qu'une réponse de l'agent le nomme ; null pour les autres lignes. */
+export function servedModel(message: unknown): string | null {
+  if (!message || typeof message !== "object") return null;
+  const line = message as { type?: unknown; message?: { model?: unknown } };
+  const model = line.type === "assistant" ? line.message?.model : undefined;
+  return typeof model === "string" && model.trim() && !model.startsWith("<") ? model.trim().slice(0, 120) : null;
+}
+
+/**
+ * Le dernier mot du runner sur l'agent : sa version, le modèle de la configuration, ceux que les réponses ont nommés, le
+ * premier d'entre eux comme modèle de la mission, et qui l'a servi. Le dernier événement `agent` fait l'en-tête du dossier.
+ */
+export function agentEvent(info: { version?: string; model?: string; session?: string }, served: readonly string[],
+  provider: string): RunnerEvent {
+  const model = served[0] ?? info.model;
+  return {
+    kind: "agent",
+    text: `Claude Code ${info.version ?? ""} with ${model ?? "its default model"}`.replace(/\s+/g, " "),
+    agent: {
+      ...(info.version ? { version: info.version } : {}),
+      ...(model ? { model } : {}),
+      ...(info.model ? { configured: info.model } : {}),
+      served: [...served],
+      ...(info.session ? { session: info.session } : {}),
+      provider,
+      // Le fournisseur tel que la configuration le disait au lancement (R159, second tour, L-c), et ce qui n'en est pas
+      // lu : le registre ou le profil géré du système, les réglages du serveur (troisième tour, c-a).
+      providerFrom: "launch-configuration",
+      providerUnread: providerUnread(),
+    },
+  };
+}
+
+/**
+ * La session brute de l'agent telle que le runner la lit (sa sortie `stream-json`, ligne à ligne) : gardée sur ce poste,
+ * à part, et référencée au dossier par son empreinte (R212). Elle sert à l'enquête, pas à la lecture.
+ */
+export class SessionRecord {
+  private readonly hash = createHash("sha256");
+  private bytes = 0;
+
+  constructor(private readonly file?: string) {
+    if (file) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "", { encoding: "utf8", mode: 0o600 });
+    }
+  }
+
+  line(text: string): void {
+    const data = `${text}\n`;
+    this.hash.update(data, "utf8");
+    this.bytes += Buffer.byteLength(data, "utf8");
+    if (this.file) {
+      try {
+        appendFileSync(this.file, data, "utf8");
+      } catch {
+        // le disque plein ne coûte pas la mission : l'empreinte dit encore ce qui a été lu
+      }
+    }
+  }
+
+  digest(): { sha256: string; bytes: number } {
+    return { sha256: `sha256:${this.hash.copy().digest("hex")}`, bytes: this.bytes };
+  }
 }
 
 /**
@@ -253,28 +413,33 @@ export async function runAgent(
   const mcpConfigPath = join(tmp, `run-${claim.runId}-mcp.json`);
   const settingsPath = join(tmp, `run-${claim.runId}-settings.json`);
 
-  const relay = new EventRelay(api, claim.runId);
+  const relay = opts.relay ?? new EventRelay(api, claim.runId);
   const approvals = new ApprovalServer(api, claim.runId, workDir, {
     waitMs: config.agent.approvalTimeoutMinutes * 60_000,
+    // La mission s'arrête : le hook refuse toute action avant même que Claude Code ne s'arrête (R159, troisième tour, c-c).
+    stopped: opts.signal,
     rules: opts.rules,
     exposure: opts.exposure,
     allowedInAdvance: config.agent.extraAllowedTools,
     // Au-delà de ce nombre de changements dans TaskForce sur la mission, chacun se demande (R110).
     maxTaskForceChanges: config.agent.maxTaskForceChanges,
-    // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie).
-    onDecision: (tool, d, input) => {
+    // Chaque décision des règles va au dossier de preuve de la mission (le serveur ne l'affiche pas dans la chronologie),
+    // avec les faits jugés et l'action exacte : un tiers la rejuge avec le paquet exporté (TF-J2-7).
+    onDecision: (tool, d, input, facts) => {
       log.info(`Rule decision: ${tool} ${d.effect}${d.rule ? ` (${d.rule.id})` : ""}`);
       relay.push([{
         kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
         effect: d.effect, ...(d.rule ? { rule: d.rule.id } : {}),
+        ...(facts.length > 0 ? { facts } : {}), ...exactAction(tool, input, workDir),
       }]);
     },
     beforeAsk: () => relay.flush(),
     // Déjà autorisée pour toute la mission (R46) : la décision de la personne s'applique encore, et le dossier le garde.
     onMissionAllowed: (tool, scope, input) => {
+      const rule = `allowed for this mission (${scope})`;
       relay.push([{
         kind: "decision", tool: toolLabel(tool), text: describeToolInput(tool, input, workDir) || "(no details)",
-        effect: "allow", rule: `allowed for this mission (${scope})`,
+        effect: "allow", rule: rule.length > 80 ? `${rule.slice(0, 78)}.)` : rule, ...exactAction(tool, input, workDir),
       }]);
     },
   });
@@ -286,6 +451,16 @@ export async function runAgent(
   const prompt = opts.mode === "repoless" ? buildReplyPrompt(claim)
     : claim.followUp ? buildFollowUpPrompt(claim, opts.branch ?? "", claim.followUp.comments)
     : buildPrompt(claim, opts.branch ?? "");
+  // Le brief tel qu'il part à l'agent entre au dossier par son empreinte, son texte à côté de la chaîne (R198) ; trop
+  // long, il est coupé entre deux caractères, et la coupe se dit (R159, L4).
+  relay.push([{ kind: "brief", text: "The brief given to Claude Code", body: cut(prompt, MAX_BRIEF) }]);
+  const session = new SessionRecord(opts.sessionFile);
+  // agentEnv ne touche pas à ce qui choisit le fournisseur (Bedrock, Vertex, l'adresse de l'API) : il se lit ici, avec
+  // les réglages que Claude Code charge au lancement (R159, second tour, L-c).
+  const provider = providerOf(launchEnv(process.env));
+  // Ce que Claude Code dit de lui au démarrage, et chaque modèle que ses réponses nomment (R159, L5).
+  let started: { version?: string; model?: string; session?: string } | null = null;
+  const served: string[] = [];
 
   /** Un passage de l'agent ; `resume` : la session à continuer. */
   const attempt = async (resume: string | null): Promise<AgentOutcome> => {
@@ -303,8 +478,18 @@ export async function runAgent(
           opts.onConversation?.((text) => conversation?.tell(text) ?? false);
         },
         onStdoutLine: (line) => {
+          session.line(line);
           try {
             const message: unknown = JSON.parse(line);
+            // L'agent réellement lancé, tel qu'il se présente : sa version, son modèle, sa session (R198) ; puis chaque
+            // modèle qui a réellement répondu.
+            const info = agentInfo(message);
+            if (info) {
+              started = { ...(started ?? {}), ...info };
+              relay.push([agentEvent(started, served, provider)]);
+            }
+            const model = servedModel(message);
+            if (model && !served.includes(model)) served.push(model);
             relay.push(toEvents(message, workDir));
             if (watcher.wrote(message)) opts.onWrite?.();
             (conversation as AgentConversation | null)?.heard(message);
@@ -327,16 +512,24 @@ export async function runAgent(
   };
 
   try {
-    const session = claim.followUp?.sessionId ?? null;
-    const outcome = await attempt(session);
-    if (session && outcome.sessionLost) {
+    const resumed = claim.followUp?.sessionId ?? null;
+    let outcome = await attempt(resumed);
+    if (resumed && outcome.sessionLost) {
       // Le brief d'une reprise se suffit à lui-même : l'agent repart de lui, sans sa conversation d'avant.
       log.warn("The agent's session is no longer on this computer: it starts again from the comments alone.");
-      return await attempt(null);
+      outcome = await attempt(null);
     }
-    return outcome;
+    if (!started && served.length === 0) {
+      log.warn("Claude Code did not say which model it ran: the evidence will say so.");
+    } else {
+      // Le dernier mot sur l'agent : le modèle que ses réponses ont nommé, plus seulement celui de sa configuration.
+      relay.push([agentEvent(started ?? {}, served, provider)]);
+    }
+    return { ...outcome, session: { ...(outcome.sessionId ? { id: outcome.sessionId } : {}), ...session.digest() } };
   } finally {
-    await relay.close().catch((e: unknown) => log.warn(`Live timeline: ${(e as Error).message}`));
+    // La chronologie du runner continue après l'agent (les sorties, les tests) : il la ferme lui-même.
+    const done = opts.relay ? relay.flush() : relay.close();
+    await done.catch((e: unknown) => log.warn(`Live timeline: ${(e as Error).message}`));
     await approvals.stop();
     rmSync(mcpConfigPath, { force: true });
     rmSync(settingsPath, { force: true });

@@ -21,6 +21,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
@@ -93,7 +94,7 @@ class SaveDocumentToolTest {
         WorkspaceRepository workspaces = Mockito.mock(WorkspaceRepository.class);
         when(workspaces.findById(WS)).thenReturn(Optional.of(Workspace.builder().id(WS).slug("acme").build()));
         CortexGate gate = new CortexGate(new HarnessRulesService(Mockito.mock(HarnessRuleSetRepository.class),
-            Mockito.mock(WorkspaceMemberRepository.class)), workspaces, projects, Mockito.mock(IssueRepository.class),
+            Mockito.mock(WorkspaceMemberRepository.class), TestPersonIds.inMemory()), workspaces, projects, Mockito.mock(IssueRepository.class),
             new ObjectMapper());
         CortexGate.Verdict verdict = gate.judge(gate.rulesFor(ctx), tool, "{\"title\":\"r\",\"content\":\"c\"}",
             CortexGate.Exposure.none());
@@ -133,7 +134,7 @@ class SaveDocumentToolTest {
         WorkspaceRepository workspaces = Mockito.mock(WorkspaceRepository.class);
         when(workspaces.findById(WS)).thenReturn(Optional.of(Workspace.builder().id(WS).slug("acme").build()));
         CortexGate gate = new CortexGate(new HarnessRulesService(Mockito.mock(HarnessRuleSetRepository.class),
-            Mockito.mock(WorkspaceMemberRepository.class)), workspaces, projects, Mockito.mock(IssueRepository.class),
+            Mockito.mock(WorkspaceMemberRepository.class), TestPersonIds.inMemory()), workspaces, projects, Mockito.mock(IssueRepository.class),
             new ObjectMapper());
         String args = "{\"title\":\"r\",\"content\":\"c\"}";
 

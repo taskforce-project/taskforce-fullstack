@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,23 +22,32 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.taskforce.tf_api.core.enums.RuleScope;
 import com.taskforce.tf_api.core.model.HarnessRuleSet;
+import com.taskforce.tf_api.core.model.MissionPerson;
+import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.PersonIds;
 
 /**
  * Le paquet de règles d'un travail (spécification de la v2, §6.4 ; R157) : la table de TaskForce, dont chaque règle a
- * pour propriétaire celui de l'espace (invariant 8), et au-dessus, la version en vigueur de chaque couche de l'entreprise
- * qui s'applique au travail : celle de la personne, de son rôle, du processus, du projet, puis de l'organisation. Une
- * couche ne porte dans le paquet que ce qui durcit (demander, refuser) : même un moteur d'avant les couches n'en tire
- * rien de plus permissif. Son empreinte ({@link RulesDigest}) se recalcule chez le runner, qui refuse un paquet qui ne
- * s'y accorde pas.
+ * pour propriétaire celui de l'espace (invariant 8), et au-dessus, la version en vigueur de chaque couche de
+ * l'entreprise qui s'applique au travail : celle de la personne, de son rôle, du processus, du projet, puis de
+ * l'organisation. Une couche ne porte dans le paquet que ce qui durcit (demander, refuser) : même un moteur d'avant les
+ * couches n'en tire rien de plus permissif. Son empreinte ({@link RulesDigest}) se recalcule chez le runner, qui refuse
+ * un paquet qui ne s'y accorde pas.
+ *
+ * <p>Le propriétaire d'une règle est une personne nommée (R2, invariant 8 ; la séance n°5 a fait remplacer le
+ * {@code workspace-owner} générique par une personne, R32) : le paquet la nomme par son identifiant opaque dans
+ * l'espace ({@link PersonIds}), comme le dossier, jamais par son courriel. Le dossier garde donc le paquet tel que le
+ * runner l'a reçu, avec la même empreinte, et la purge d'un compte n'y laisse aucun courriel (R159, M6).</p>
  */
 @Service
 public class HarnessRulesService {
 
     static final String DEFAULT_RESOURCE = "harness/default.rules.json";
-    static final String OWNER_PLACEHOLDER = "workspace-owner";
+    /** Le repère de default.rules.json, que le paquet remplace par l'identifiant du propriétaire de l'espace. */
+    public static final String OWNER_PLACEHOLDER = "workspace-owner";
     /** Les rôles de l'espace qu'une couche de rôle vise : celle d'ADMIN vaut aussi pour OWNER. */
     static final String OWNER_ROLE = "OWNER";
     static final String ADMIN_ROLE = "ADMIN";
@@ -57,6 +67,7 @@ public class HarnessRulesService {
 
     private final HarnessRuleSetRepository repository;
     private final WorkspaceMemberRepository members;
+    private final PersonIds personIds;
     private final ArrayNode defaultRules;
 
     /**
@@ -88,9 +99,11 @@ public class HarnessRulesService {
     public record LayerVersion(LayerKey key, int version, String digest, List<Map<String, Object>> rules) {
     }
 
-    public HarnessRulesService(HarnessRuleSetRepository repository, WorkspaceMemberRepository members) {
+    public HarnessRulesService(HarnessRuleSetRepository repository, WorkspaceMemberRepository members,
+                               PersonIds personIds) {
         this.repository = repository;
         this.members = members;
+        this.personIds = personIds;
         this.defaultRules = loadDefaultRules();
     }
 
@@ -131,6 +144,7 @@ public class HarnessRulesService {
      * vigueur comme à l'essai d'une règle avant qu'elle entre (ses cas, R98).
      */
     public RulesBundle build(Workspace workspace, Work work, String role, Map<LayerKey, LayerVersion> layers) {
+        Owners owners = new Owners(workspace);
         ObjectNode bundle = JSON.createObjectNode();
         bundle.put("format", RulesBundle.FORMAT);
         bundle.put("workspace", workspace.getSlug());
@@ -145,21 +159,26 @@ public class HarnessRulesService {
         int version = 1;
         for (LayerVersion layer : applicable(work, role, layers)) {
             version = Math.max(version, layer.version());
+            List<Map<String, Object>> named = owners.name(layer.rules());
             ObjectNode descriptor = applied.addObject();
             descriptor.put("scope", layer.key().scope().layer());
             if (layer.key().ref() != null) {
                 descriptor.put("ref", layer.key().ref());
             }
             descriptor.put("version", layer.version());
-            descriptor.put("digest", layer.digest() != null ? layer.digest() : digestOf(layer.rules()));
-            for (Map<String, Object> rule : layer.rules()) {
+            // L'empreinte de la couche est celle de ses règles telles que le paquet les nomme : celle que la version
+            // garde, sauf pour une version d'avant la 1.18, qui nommait son auteur par son courriel et ne doit pas le
+            // confirmer.
+            descriptor.put("digest", named == layer.rules() && layer.digest() != null
+                ? layer.digest() : digestOf(named));
+            for (Map<String, Object> rule : named) {
                 ObjectNode engine = engineRule(rule, layer.key().scope());
                 if (engine != null) {
                     rules.add(engine);
                 }
             }
         }
-        rules.addAll(ownedBy(workspace.getOwner() == null ? null : workspace.getOwner().getEmail()));
+        rules.addAll(ownedBy(owners.ofWorkspace()));
         bundle.put("version", version);
         if (work.process() != null) {
             bundle.put("process", work.process());
@@ -243,7 +262,67 @@ public class HarnessRulesService {
         return out;
     }
 
-    /** La table de TaskForce, dont la personne propriétaire de l'espace répond. */
+    /**
+     * Qui répond de chaque règle, nommé comme le paquet nomme les personnes : par son identifiant opaque dans l'espace
+     * (un par paquet construit, qui ne cherche chaque personne qu'une fois). Une règle d'une couche le garde ainsi
+     * depuis la 1.18 ; une version d'avant nomme son auteur par son courriel, que le paquet remplace par son
+     * identifiant. Ce que TaskForce ne retrouve pas (un compte purgé, un nom tapé) devient {@link PersonIds#UNKNOWN} :
+     * le paquet ne nomme jamais une personne autrement. La copie du dossier lit les propriétaires de la même façon
+     * ({@code MissionEvidenceService.recordCopy}).
+     */
+    private final class Owners {
+
+        private final Workspace workspace;
+        private final Map<String, String> byEmail = new HashMap<>();
+        private String ofWorkspace;
+
+        Owners(Workspace workspace) {
+            this.workspace = workspace;
+        }
+
+        /** Le propriétaire de l'espace, qui répond de la table de TaskForce ; sans lui, le repère du contrat. */
+        String ofWorkspace() {
+            if (ofWorkspace == null) {
+                User owner = workspace.getOwner();
+                String id = owner == null ? null : personIds.of(workspace.getId(), owner.getId());
+                ofWorkspace = id == null ? OWNER_PLACEHOLDER : id;
+            }
+            return ofWorkspace;
+        }
+
+        /** Le propriétaire qu'écrit une règle d'une couche : son identifiant, le repère, ou un courriel d'avant. */
+        String of(Object stored) {
+            String owner = stored == null ? "" : stored.toString();
+            if (owner.startsWith(MissionPerson.PREFIX) || OWNER_PLACEHOLDER.equals(owner)) {
+                return owner;
+            }
+            if (owner.contains("@")) {
+                return byEmail.computeIfAbsent(owner,
+                    email -> Objects.requireNonNullElse(personIds.ofEmail(workspace.getId(), email), PersonIds.UNKNOWN));
+            }
+            return PersonIds.UNKNOWN;
+        }
+
+        /** Les règles d'une version, chacune avec son propriétaire nommé ainsi ; la même liste quand rien ne change. */
+        List<Map<String, Object>> name(List<Map<String, Object>> stored) {
+            List<Map<String, Object>> out = null;
+            for (int i = 0; i < stored.size(); i++) {
+                Map<String, Object> rule = stored.get(i);
+                String owner = of(rule.get("owner"));
+                if (!owner.equals(rule.get("owner"))) {
+                    if (out == null) {
+                        out = new ArrayList<>(stored);
+                    }
+                    Map<String, Object> named = new LinkedHashMap<>(rule);
+                    named.put("owner", owner);
+                    out.set(i, named);
+                }
+            }
+            return out == null ? stored : out;
+        }
+    }
+
+    /** La table de TaskForce, dont la personne propriétaire de l'espace répond : {@code owner} est son identifiant. */
     public ArrayNode ownedBy(String owner) {
         ArrayNode rules = defaultRules.deepCopy();
         for (JsonNode rule : rules) {

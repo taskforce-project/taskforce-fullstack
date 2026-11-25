@@ -131,11 +131,14 @@ interface DeliveryState {
    * encore, run de la v1) ou en cas d'erreur, où le dossier lu d'avant reste.
    */
   fetchEvidence: (slug: string, runId: number) => Promise<MissionEvidence | null>;
-  /** Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. */
+  /**
+   * Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. `reason` :
+   * pourquoi, si la personne le dit ; elle entre au dossier de la mission avec le geste (TF-J2-7).
+   */
   applyRun: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
-  discardRun: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  discardRun: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
   /** Une mission qui n'a rien changé : l'issue se termine (rejeu de la 1.8.0). */
-  markRunDone: (slug: string, issueId: number, runId: number) => Promise<boolean>;
+  markRunDone: (slug: string, issueId: number, runId: number, reason?: string) => Promise<boolean>;
   retryRun: (slug: string, issueId: number, runId: number, note: string) => Promise<DeliveryRun | null>;
   /** Relit les fichiers de la mission ; `null` en cas d'échec, où la liste d'avant reste. */
   fetchMissionChanges: (slug: string, runId: number) => Promise<MissionChanges | null>;
@@ -589,9 +592,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
-  discardRun: async (slug, issueId, runId) => {
+  discardRun: async (slug, issueId, runId, reason) => {
     try {
-      await discardRunApi(slug, runId);
+      await discardRunApi(slug, runId, reason);
       set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
       await get().fetchRun(slug, issueId);
       return true;
@@ -601,9 +604,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
     }
   },
 
-  markRunDone: async (slug, issueId, runId) => {
+  markRunDone: async (slug, issueId, runId, reason) => {
     try {
-      await markRunDoneApi(slug, runId);
+      await markRunDoneApi(slug, runId, reason);
       set((state) => ({ resultErrors: withoutError(state.resultErrors, runId) }));
       await get().fetchRun(slug, issueId);
       return true;

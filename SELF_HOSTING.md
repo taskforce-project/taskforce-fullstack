@@ -114,6 +114,51 @@ Each person can delegate issues to Claude Code running on their own computer: Se
 runner", then follow the steps shown (see [`taskforce-runner`](./taskforce-runner/README.md)). The runner only
 talks to the API, at `TF_API_URL`.
 
+Each mission keeps an evidence file, signed when the mission ends. On its first start, the server creates its signing
+key in the `backend_data` volume (`/var/lib/taskforce/evidence/signing-key.pem`) and keeps it from then on: back that
+volume up with your database, since a seal can only be compared with the key that made it. To use a key of your own
+instead, generate one and put the line it prints (the key, in base64) in `DELIVERY_EVIDENCE_SIGNING_KEY` in `.env`:
+
+```bash
+openssl genpkey -algorithm ed25519 | sed -n 2p
+```
+
+Records of missions that ended before TaskForce sealed records are sealed once, when the server starts: the seal says
+it was made late, with its date, and proves the chain as it was then, nothing before.
+
+If the server can neither read nor create its key file, it draws a key at each start, says so in its log, and a seal
+can no longer be compared with a key you publish. If no coding agent runs on the machine of the server, set
+`DELIVERY_EVIDENCE_KEY_CUSTODY=separate-machine`: each seal, and each verification page, says where the key lives.
+TaskForce cannot check this; leave the default (`same-machine`) when in doubt. The custody covers the key only: what a
+runner reports (its tests, the agent and its model, the numbers of its events) comes from the computer where the agent
+works, and each record says so.
+
+Anyone can check an exported file without TaskForce, with `npm run verify -- evidence-run-42.json --key <key id>` in
+`taskforce-runner`. Publish your key id where the people who check your records can find it: a member of a workspace
+also reads it at `GET /api/workspaces/{slug}/delivery/evidence/key`, with the keys that sealed the workspace's records
+before and when each was used. The file carries its own public key, so a check without `--key` only says that the seal
+matches the key in the file, which anyone can make. That list comes from your own database: what anchors a key is a
+place you do not hold alone. When a mission ends, its head is written in its pull request on GitHub, with the id of the
+key that sealed it; GitHub dates the comment. Compare the key id you are given with the one in the comment.
+
+On a private repository, the comment also links the record's verification page: `<TF_APP_URL>/verify/<id>`, with an
+opaque id of the record, never the workspace or the mission number, and the page asks for a sign-in. If a private
+repository may become public, set `DELIVERY_EVIDENCE_WITNESS_LINK=false` in `.env`: the comment then carries the head
+and the key only.
+
+When an account is purged, TaskForce erases the person's email and name from every record, and the GitHub login that
+merged a pull request when it knows that login: the one of a GitHub connection the account made. Two things stay. The
+free texts of a mission (its title, description and summary, the lines of its checklist) may name someone, and are
+kept as written. The saved versions of the live rules keep who wrote each one.
+
+Records written before TaskForce 1.18 name people by their email in their chain: who delegated, who was asked, who
+answered. These events cannot change without breaking the chain, so purging an account cannot remove the email from
+them. TaskForce adds a note to each such record, saying the date and which events keep the email, seals it again, and
+hides these emails wherever it shows the record; only owners and admins of the workspace can export it as JSON. The
+purge looks for the account's current email in these records, whatever its case: an email the account had before is
+not looked for. Whether to keep these records, and for how long, is your decision as the operator: TaskForce keeps
+them until their workspace is deleted.
+
 ## Integrations
 
 GitHub and Slack need an OAuth app of your own; `.env.selfhost.example` lists the callback URLs and the Slack scopes.

@@ -18,6 +18,7 @@ import com.taskforce.tf_api.core.dto.request.RunnerReadinessRequest;
 import com.taskforce.tf_api.core.dto.request.RunnerResultRequest;
 import com.taskforce.tf_api.core.dto.response.RunnerApprovalResponse;
 import com.taskforce.tf_api.core.dto.response.RunnerClaimResponse;
+import com.taskforce.tf_api.core.dto.response.RunnerEventsResponse;
 import com.taskforce.tf_api.core.enums.DeliveryRunStatus;
 import com.taskforce.tf_api.core.harness.rules.HarnessRulesService;
 import com.taskforce.tf_api.core.harness.rules.RulesBundle;
@@ -153,22 +154,14 @@ public class LocalRunnerService {
                 DeliveryRunStatus.QUEUED, DeliveryRunStatus.RUNNING);
             if (won == 1) {
                 runRepository.recordRules(runId, rules.version(), rules.digest());
-                Map<String, Object> agent = new LinkedHashMap<>();
-                agent.put("kind", ClaudeCodeProvider.KEY);
-                agent.put("model", claim.model());
-                Map<String, Object> started = new LinkedHashMap<>();
-                started.put("issue", claim.issueKey());
-                started.put("requestedBy", owner.getEmail());
-                started.put("agent", agent);
-                started.put("rules", Map.of("version", rules.version(), "digest", rules.digest()));
-                started.put("runner", runner.clientId());
                 // Une reprise se raccroche à la mission qu'elle continue : son dossier et les commentaires qui la lancent.
+                Map<String, Object> extras = new LinkedHashMap<>();
                 if (followUp != null) {
-                    started.put("followUpOf", followUp.parentRunId());
-                    started.put("comments", followUp.comments().size());
+                    extras.put("followUpOf", followUp.parentRunId());
+                    extras.put("comments", followUp.comments().size());
                 }
-                runRepository.findById(runId).ifPresent(run ->
-                    evidenceService.append(run, "mission.started", MissionEvidenceService.Actor.SERVER, started));
+                // Le dossier s'ouvre avec la demande telle qu'elle part, et le paquet de règles remis au runner (TF-J2-7).
+                runRepository.findById(runId).ifPresent(run -> evidenceService.open(run, rules, runner.clientId(), extras));
                 // La mise à jour en masse a détaché les entités : les identifiants lus plus haut suffisent à l'annonce.
                 feed.run(project.getId(), runId, issue.getId(), DeliveryRunStatus.RUNNING);
                 log.info("Run {} réclamé par le runner {} (issue {}, pour {})",
@@ -230,6 +223,9 @@ public class LocalRunnerService {
         // Les faits de la carte de résultat (R78) : la fin, et pour un travail rendu la branche, les commits, les tests.
         run.setEndedAt(LocalDateTime.now());
         if (done) recordFacts(run, result);
+        // Ce que le runner dit à la fin entre au dossier avant sa clôture : combien d'événements il a numérotés (un trou se
+        // marque), la session brute de l'agent par son empreinte, le dernier commit (TF-J2-7).
+        evidenceService.runnerReport(run, result);
         // DeliveryRunner clôt le dossier de preuve et les demandes sans réponse, quelle que soit la fin de la mission.
         deliveryRunner.complete(runId, poll);
     }
@@ -250,11 +246,14 @@ public class LocalRunnerService {
 
     /** Chronologie en direct (OSS-5.3) : le run est verrouillé, les numéros d'ordre restent continus. */
     @Transactional
-    public void appendEvents(Long runId, RunnerIdentity runner, RunnerEventsRequest request) {
+    public RunnerEventsResponse appendEvents(Long runId, RunnerIdentity runner, RunnerEventsRequest request) {
         DeliveryRun run = runRepository.findByIdForUpdate(runId)
             .orElseThrow(() -> new ForbiddenException(REFUSED));
         assertHeldBy(run, runner);
         activityService.appendEvents(run, request.events());
+        // Le lot qui atteint le plafond du dossier, et ceux qui le suivent encore, portent la consigne d'arrêt : rien ne
+        // tourne après le plafond sans être dit (R159 de #551, troisième tour, c-c).
+        return new RunnerEventsResponse(evidenceService.capped(runId));
     }
 
     /** Ouvre une demande de validation d'une action de l'agent (OSS-5.4). */

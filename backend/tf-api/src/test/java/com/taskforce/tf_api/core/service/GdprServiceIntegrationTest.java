@@ -17,6 +17,7 @@ import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
+import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.shared.exception.ResourceNotFoundException;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
@@ -43,6 +44,8 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
 
     @MockitoBean private KeycloakService keycloakService;
     @MockitoBean private AuditService auditService;
+    /** Ce que la purge efface des dossiers des missions : MissionDossierIntegrationTest, contre la même base. */
+    @MockitoBean private MissionEvidenceService missionEvidence;
 
     private User user;
 
@@ -109,6 +112,10 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
         // Identifiants Stripe hérités de l'ancienne facturation hébergée : colonnes gardées, la purge les efface.
         jdbcTemplate.update("UPDATE users SET stripe_customer_id = 'cus_legacy', stripe_subscription_id = 'sub_legacy' WHERE id = ?",
             user.getId());
+        // R159 de #551, troisième tour, c-g : la connexion GitHub que ce compte a faite dit son login.
+        jdbcTemplate.update("INSERT INTO integrations (workspace_id, provider, access_token, meta, installed_by, connected_at) "
+            + "VALUES (?, 'GITHUB', 'not-a-token', CAST(? AS jsonb), ?, now())",
+            workspaceRepository.findBySlug("ws-gdpr").orElseThrow().getId(), "{\"login\":\"gdpr-gh\",\"avatarUrl\":\"\"}", user.getId());
         gdprService.deleteMyAccount(user.getId()); // planifie (sinon purge = no-op)
         gdprService.purgeAccount(user.getId());
 
@@ -123,5 +130,8 @@ class GdprServiceIntegrationTest extends AbstractIntegrationTest {
         // Workspace solo (aucun autre membre) → supprimé ; appartenances nettoyées.
         assertThat(workspaceRepository.findBySlug("ws-gdpr")).isEmpty();
         assertThat(workspaceMemberRepository.findByUserId(user.getId())).isEmpty();
+        // R159, M6 : la purge efface aussi ce que les dossiers des missions gardent de la personne, et le login GitHub de
+        // ses fusions, lu avant que l'espace ne parte (troisième tour, c-g).
+        verify(missionEvidence).forgetPerson(user.getId(), java.util.List.of("gdpr-gh"));
     }
 }

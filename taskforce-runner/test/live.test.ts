@@ -9,6 +9,7 @@ import {
 } from "../src/approvals.js";
 import { EventRelay } from "../src/events.js";
 import type { RulesBundle } from "../src/harness/engine/rules-engine.js";
+import { inputHash } from "../src/harness/written.js";
 import { describeToolInput, toEvents, toolLabel } from "../src/stream.js";
 import { supportsApprovals } from "../src/version.js";
 
@@ -84,9 +85,12 @@ describe("relais de la chronologie", () => {
   });
 
   it("un échec d'envoi n'interrompt rien", async () => {
-    const relay = new EventRelay({ events: async () => { throw new Error("down"); } }, 42, { flushMs: 10_000 });
+    const relay = new EventRelay({ events: async () => { throw new Error("down"); } }, 42, { flushMs: 10_000, retryMs: 1 });
     relay.push([{ kind: "text", text: "a" }]);
     await relay.close();
+    // Ce qui n'est pas parti reste compté : le dossier en marquera le trou (TF-J2-7).
+    assert.equal(relay.count, 1);
+    assert.equal(relay.pending, 1);
   });
 });
 
@@ -465,9 +469,10 @@ describe("Accorder (R78) : la demande dit sa règle, et un accord peut valoir po
     try {
       await askHook(url, server.token, SEARCH);
       const rule = DEFAULT_RULES.rules.find((r) => r.id === "search-web");
+      // L'action exacte que la personne accorde : l'empreinte de l'entrée de l'outil (TF-J2-7).
       assert.deepEqual(asked, [{ tool: "WebSearch", ruling: {
         action: "web.search", rule: "search-web", reason: rule?.reason,
-        facts: [{ action: "web.search", tool: "WebSearch" }],
+        facts: [{ action: "web.search", tool: "WebSearch" }], input: inputHash(SEARCH.tool_input),
       } }]);
     } finally {
       await server.stop();
@@ -634,6 +639,7 @@ describe("plafond des changements dans TaskForce (R110, séance n°16) : au-del�
     assert.deepEqual(asked, [{ tool: "taskforce: add_comment", ruling: {
       action: "comment.create", rule: CHANGES_CAP,
       reason: "Claude Code has already made 2 changes to TaskForce in this mission. Past 2, it asks before each one.",
+      input: inputHash({ projectId: 12, issueId: 55, content: "Done." }),
     } }]);
   });
 

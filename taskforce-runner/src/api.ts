@@ -1,5 +1,20 @@
 import type { RunnerConfig } from "./config.js";
 import type { Facts } from "./harness/engine/rules-engine.js";
+import { cut } from "./text.js";
+
+/**
+ * Ce que TaskForce garde d'un fait jugé : 4 000 unités (`RunnerEventsRequest`, `RunnerApprovalRequest`). Au-delà, le fait
+ * part coupé, d'une coupe marquée (R159, L4), plutôt que de faire refuser tout le lot : un lot refusé laisse un trou, et
+ * un agent qui le voudrait en ferait autant de trous que de commandes trop longues (R159, second tour, N2). Les règles,
+ * elles, ont jugé le fait entier : un fait coupé ne se rejuge pas, et le vérificateur le dit.
+ */
+export const MAX_FACT = 4000;
+
+/** Les faits tels qu'ils partent à TaskForce : chaque valeur au plus {@link MAX_FACT} unités. */
+export function reportedFacts(facts: readonly Facts[]): Facts[] {
+  return facts.map((part) => Object.fromEntries(Object.entries(part)
+    .map(([key, value]) => [key, typeof value === "string" ? cut(value, MAX_FACT) : value])) as Facts);
+}
 
 /** Tâche remise par `POST /delivery/runner/claim` (miroir de `RunnerClaimResponse` côté backend). */
 export interface Claim {
@@ -61,6 +76,11 @@ export interface RunnerFileChange {
   revision: string;
   /** Le patch (dépôt) ou le contenu (dossier jetable) ; absent quand il n'a pas changé. */
   body?: string | null;
+  /**
+   * L'empreinte du contenu du fichier tel qu'il reste (`sha256:`) : une écriture jugée par les règles porte la même
+   * quand c'est elle qui l'a écrit (TF-J2-7). Absente d'un fichier supprimé ou sensible.
+   */
+  sha256?: string;
 }
 
 /** Ce que la mission a changé, relevé par le runner (miroir de `RunnerChangesRequest` côté backend). */
@@ -134,6 +154,19 @@ export interface RunResult {
     passedCount?: number;
     total?: number;
   };
+  /** Combien d'événements le runner a numérotés pour ce run : TaskForce marque ceux qui ne sont pas arrivés (TF-J2-7). */
+  events?: number;
+  /** La session brute de l'agent, gardée sur ce poste : le dossier la référence par son empreinte (R212). */
+  session?: { id?: string; sha256: string; bytes: number };
+  /** Le dernier commit de la branche de l'agent. */
+  head?: string;
+}
+
+/** L'écriture d'un fichier jugée par les règles : le chemin, et l'empreinte de ce que le fichier contiendra. */
+export interface WrittenFile {
+  path: string;
+  sha256?: string;
+  bytes?: number;
 }
 
 /** Événement de la chronologie d'un run (miroir de `RunnerEventsRequest` côté backend). */
@@ -145,6 +178,45 @@ export interface RunnerEvent {
   effect?: "allow" | "ask" | "deny";
   /** `decision` : la règle qui l'a donnée, absente quand aucune ne s'applique. */
   rule?: string;
+  /** Le numéro de l'événement pour ce run : 1, 2, 3... Un numéro qui manque chez TaskForce dit un lot perdu. */
+  n?: number;
+  /** `decision` : les faits que les règles ont jugés, pour qu'un tiers rejuge l'action avec le paquet exporté. */
+  facts?: Facts[];
+  /** `decision` : l'empreinte de l'entrée de l'outil, l'action exacte. */
+  input?: string;
+  /** `decision` sur une écriture : ce que le fichier contiendra. */
+  written?: WrittenFile;
+  /** `brief` : le texte entier remis à l'agent. */
+  body?: string;
+  /** `agent` : ce que l'agent dit de lui-même au démarrage. */
+  /**
+   * `agent` : l'agent réellement lancé. `model` : le modèle servi quand les réponses l'ont dit, sinon celui de la
+   * configuration (`configured`) ; `served` : chaque modèle que les réponses ont nommé ; `provider` : lu dans
+   * l'environnement de l'agent (R159, L5).
+   */
+  agent?: {
+    version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string;
+    /** D'où vient `provider` : `launch-configuration`, l'environnement et les réglages que Claude Code lit au lancement (L-c). */
+    providerFrom?: string;
+    /** Ce que le runner ne lit pas pour `provider` : le registre ou le profil géré du système, les réglages du serveur (c-a). */
+    providerUnread?: string[];
+  };
+  /** `test` : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière gardée sur ce poste. */
+  test?: {
+    command: string; ran: boolean; passed: boolean; passedCount?: number; total?: number; output?: string; outputBytes?: number;
+    /** Faux : le projet n'a pas de commande de test, rien n'a tourné. */
+    configured?: boolean;
+    /**
+     * Les fichiers de la branche qui disent comment les tests tournent (scripts, configuration), ou que la commande
+     * nomme : le résultat ne dit alors que ce que donne la version des tests de l'agent (R159, M5).
+     */
+    definitionChanged?: string[];
+    /**
+     * Ceux que le runner a trouvés dans le dépôt, changés ou non : la liste qu'il a regardée, qui ne prouve pas que les
+     * tests sont les mêmes (R159, second tour, L-b).
+     */
+    definitions?: string[];
+  };
 }
 
 /** Qui pose une demande : l'agent, ou le runner lui-même (sortie, tests du projet, départ d'une mission). */
@@ -171,6 +243,10 @@ export interface Ruling {
    * peut accorder ce qu'une règle de l'entreprise demande (R98), et refuser ce que le socle refuse.
    */
   facts?: Facts[];
+  /** L'empreinte de l'entrée de l'outil : l'action exacte que la personne accorde (TF-J2-7). */
+  input?: string;
+  /** Pour une écriture de fichier : ce que le fichier contiendra si la personne accorde. */
+  written?: WrittenFile;
 }
 
 export class ApiError extends Error {
@@ -221,9 +297,14 @@ export class TaskforceApi {
     await this.send("POST", `/delivery/runner/runs/${runId}/result`, result);
   }
 
-  /** Ajoute des événements à la chronologie du run (suivi en direct dans l'app). */
-  async events(runId: number, events: RunnerEvent[]): Promise<void> {
-    await this.send("POST", `/delivery/runner/runs/${runId}/events`, { events });
+  /**
+   * Ajoute des événements à la chronologie du run (suivi en direct dans l'app). La réponse dit quand le dossier a atteint
+   * son plafond : TaskForce arrête alors la mission, et le runner avec elle (R159 de #551, troisième tour, c-c).
+   */
+  async events(runId: number, events: RunnerEvent[]): Promise<{ stop: boolean }> {
+    const saved = await this.send<{ stop?: unknown } | null>("POST", `/delivery/runner/runs/${runId}/events`,
+      { events: events.map((event) => (event.facts ? { ...event, facts: reportedFacts(event.facts) } : event)) });
+    return { stop: saved?.stop === true };
   }
 
   /**
@@ -231,7 +312,8 @@ export class TaskforceApi {
    * demande, l'agent ou le runner lui-même (décision J4).
    */
   requestApproval(runId: number, tool: string, summary: string, askedBy: AskedBy = "agent", ruling: Ruling = {}): Promise<Approval> {
-    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`, { tool, summary, askedBy, ...ruling });
+    return this.send<Approval>("POST", `/delivery/runner/runs/${runId}/approvals`,
+      { tool, summary, askedBy, ...ruling, ...(ruling.facts ? { facts: reportedFacts(ruling.facts) } : {}) });
   }
 
   approvalStatus(runId: number, approvalId: number): Promise<Approval> {

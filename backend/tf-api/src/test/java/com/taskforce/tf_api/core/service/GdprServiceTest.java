@@ -19,6 +19,7 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.repository.IssueWorklogRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,13 +43,14 @@ class GdprServiceTest {
     @Mock private KeycloakService keycloakService;
     @Mock private AuditService auditService;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private MissionEvidenceService missionEvidence;
 
     private GdprService service;
 
     @BeforeEach
     void setup() {
         service = new GdprService(userRepository, workspaceMemberRepository, issueWorklogRepository,
-            keycloakService, auditService, jdbcTemplate);
+            keycloakService, auditService, jdbcTemplate, missionEvidence);
         ReflectionTestUtils.setField(service, "graceDays", 30);
     }
 
@@ -105,9 +107,19 @@ class GdprServiceTest {
         // ws 10 → héritier 99 ; ws 20 → aucun (solo).
         when(jdbcTemplate.query(anyString(), any(ResultSetExtractor.class), eq(10L), eq(1L))).thenReturn(99L);
         when(jdbcTemplate.query(anyString(), any(ResultSetExtractor.class), eq(20L), eq(1L))).thenReturn(null);
+        // R159 de #551, troisième tour, c-g : les logins GitHub que TaskForce connaît de ce compte.
+        when(jdbcTemplate.queryForList(org.mockito.ArgumentMatchers.contains("FROM integrations"), eq(String.class), eq(1L)))
+            .thenReturn(List.of("ada-gh"));
+        when(missionEvidence.forgetPerson(1L, List.of("ada-gh"))).thenReturn(3);
 
         service.purgeAccount(1L);
 
+        // R159, M6 : ce que les dossiers des missions gardent de la personne s'efface, et l'audit dit combien de dossiers.
+        verify(missionEvidence).forgetPerson(1L, List.of("ada-gh"));
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<java.util.Map<String, Object>> audit = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
+        verify(auditService).record(any(), eq(1L), eq(AuditService.GDPR_DELETE), eq("User"), eq("1"), audit.capture());
+        assertThat(audit.getValue()).containsEntry("missionDossiersErased", 3);
         // Passage de flambeau sur le partagé, suppression du solo.
         verify(jdbcTemplate).update("UPDATE workspaces SET owner_id = ? WHERE id = ?", 99L, 10L);
         verify(jdbcTemplate).update("DELETE FROM workspaces WHERE id = ?", 20L);
@@ -125,6 +137,9 @@ class GdprServiceTest {
         User u = user(1L); // jamais planifié (deletionScheduledAt = null)
         when(userRepository.findById(1L)).thenReturn(Optional.of(u));
         when(jdbcTemplate.queryForList(anyString(), eq(Long.class), any())).thenReturn(List.of()); // aucun workspace possédé
+        // Aucune connexion GitHub faite par ce compte (R159 de #551, troisième tour, c-g).
+        when(jdbcTemplate.queryForList(org.mockito.ArgumentMatchers.contains("FROM integrations"), eq(String.class), eq(1L)))
+            .thenReturn(List.of());
 
         service.deleteMyAccountImmediately(1L);
 
@@ -145,5 +160,7 @@ class GdprServiceTest {
 
         verify(userRepository, never()).save(any());
         verify(keycloakService, never()).deleteUser(anyString());
+        verify(missionEvidence, never()).forgetPerson(anyLong());
+        verify(missionEvidence, never()).forgetPerson(anyLong(), any());
     }
 }

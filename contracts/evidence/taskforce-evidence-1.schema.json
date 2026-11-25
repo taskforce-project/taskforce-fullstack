@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://taskforce-project.fr/contracts/taskforce-evidence-1.schema.json",
   "title": "TaskForce evidence file, version 1",
-  "description": "The chained journal of one mission: who asked, which agent acted, on which sources, under which rules, who decided, what left the sandbox. Each event is chained to the previous one (see contracts/README.md); an exported file is checked without TaskForce by recomputing the hashes.",
+  "description": "The chained journal of one mission: who asked, which agent acted, on which sources, under which rules, who decided, what left the sandbox. Each event is chained to the previous one (see contracts/README.md); the header comes from the chain; an exported file is checked without TaskForce by recomputing the hashes, the header, the texts kept beside the chain, the decisions judged again with the rules bundle, and the seal.",
   "type": "object",
   "additionalProperties": false,
   "required": ["format", "mission", "events", "root"],
@@ -17,7 +17,10 @@
         "workspace": { "type": "string" },
         "project": { "type": ["integer", "null"] },
         "issue": { "type": ["string", "null"], "description": "The issue key, for example WEB-48." },
-        "requestedBy": { "type": "string", "description": "The person who delegated." },
+        "requestedBy": {
+          "type": ["string", "null"],
+          "description": "The person who delegated, by the opaque id the chain names people with (who: and 32 hex digits, one per person and workspace; their email and name are texts kept beside the chain, in a note of kind person). Null in a file opened before 1.18, whose chain does not say."
+        },
         "agent": {
           "type": "object",
           "additionalProperties": false,
@@ -38,14 +41,58 @@
           }
         },
         "runner": { "type": ["string", "null"] },
+        "runnerFacts": {
+          "const": "agent-machine",
+          "description": "Present when a runner took the mission: what it reports (its tests, the agent and its model, the numbers of its events) comes from the computer where the agent works, whatever the custody of the key."
+        },
         "taskforce": { "type": ["string", "null"] }
       }
     },
     "events": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/event" } },
-    "root": { "$ref": "#/$defs/hash" }
+    "root": { "$ref": "#/$defs/hash" },
+    "rules": {
+      "type": "object",
+      "description": "The rules bundle as the mission received it (taskforce-rules/1): its digest is the one mission.started holds, so a third party judges each decision again."
+    },
+    "texts": {
+      "type": "object",
+      "description": "The texts kept beside the chain, by their hash: the chain holds only their sha256 and length. The hash is the SHA-256 of the text's salt followed by the text, so a hash left alone does not confirm a guess. An erased text is absent, with its salt.",
+      "propertyNames": { "pattern": "^sha256:[0-9a-f]{64}$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["salt", "text"],
+        "properties": {
+          "salt": { "type": "string", "pattern": "^[0-9a-f]{32}$", "description": "128 random bits, drawn for this text." },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "seal": { "$ref": "#/$defs/envelope" }
   },
   "$defs": {
     "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "envelope": {
+      "type": "object",
+      "description": "The last seal: a DSSE envelope of an in-toto Statement v1, signed in Ed25519 (contracts/README.md, Seal).",
+      "required": ["payload", "payloadType", "signatures"],
+      "properties": {
+        "payload": { "type": "string", "description": "The canonical JSON of the statement, in base64." },
+        "payloadType": { "const": "application/vnd.in-toto+json" },
+        "signatures": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["keyid", "sig"],
+            "properties": {
+              "keyid": { "$ref": "#/$defs/hash" },
+              "sig": { "type": "string", "description": "The Ed25519 signature of the DSSE pre-authentication encoding, in base64." }
+            }
+          }
+        }
+      }
+    },
     "event": {
       "type": "object",
       "additionalProperties": false,

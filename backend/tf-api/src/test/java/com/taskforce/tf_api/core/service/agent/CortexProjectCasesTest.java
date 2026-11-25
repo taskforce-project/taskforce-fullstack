@@ -36,6 +36,7 @@ import com.taskforce.tf_api.core.service.CycleService;
 import com.taskforce.tf_api.core.service.IssueService;
 import com.taskforce.tf_api.core.service.LlmClient;
 import com.taskforce.tf_api.core.service.ProjectService;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.agent.TurnInput.LastCard;
 import com.taskforce.tf_api.core.service.agent.tools.CreateIssueTool;
 import com.taskforce.tf_api.core.service.agent.tools.ProjectResolver;
@@ -121,7 +122,7 @@ class CortexProjectCasesTest {
         when(tools.get("create_issue")).thenReturn(createIssue);
 
         service = new AgentService(access, search, tools, llm, json, aiUsage, workspaceMcp, authorization,
-            new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json),
+            new CortexGate(new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()), workspaces, projectRepository, issueRepository, json),
             new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), records, undo, screens, material,
             resolver, conversations, targets());
     }

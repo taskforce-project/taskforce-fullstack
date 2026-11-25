@@ -2084,6 +2084,8 @@ export const CONSTANTS_EN = {
       failed: "It stopped before the end: {reason}",
       failedNext: " Delegate the issue again to retry.",
       failedNoReason: "It stopped before the end. Delegate the issue again to retry.",
+      // The mission's record reached its cap (R159, second round, N2): TaskForce stops it rather than let it go on unrecorded.
+      evidenceCap: "TaskForce stopped it: its record reached 10,000 events, the most it keeps for one mission, and the agent can't go on without a record. Delegate the issue again to retry.",
     },
     // A step that did not happen says so in a word.
     skipped: { understand: "Skipped", plan: "Skipped", do: "Nothing changed", check: "No tests", handover: "Nothing handed over" },
@@ -2376,6 +2378,9 @@ export const CONSTANTS_EN = {
       testsFailedApplyOff: "The tests failed, so Apply is off.",
       applyAnyway: "Apply anyway",
       applyAnywayReason: "Why apply although the tests failed? Your reason goes on the issue and stays with the result.",
+      // TF-J2-7: the reason of a gesture goes into the record of the mission, with the gesture.
+      gestureReason: "Why, in one line",
+      gestureReasonHint: "Why (optional): it stays in the mission's record",
       onlyDelegator: "Only the person who delegated this task can apply, discard or try again.",
       howItWasDone: "How it was done",
       howItWasDoneValue: "Rules v{version} · {actions} actions · {asked} requests, {answered} answered",

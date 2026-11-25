@@ -177,10 +177,11 @@ class LocalRunnerServiceTest {
 
         service.claim(RUNNER);
 
-        ArgumentCaptor<java.util.Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
-        verify(evidenceService).append(eq(queued), eq("mission.started"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
-        assertThat(data.getValue()).containsEntry("issue", "WEB-4").containsEntry("requestedBy", OWNER_EMAIL)
-            .containsEntry("rules", java.util.Map.of("version", 3, "digest", RULES.digest())).containsEntry("runner", "tf-runner-pierre");
+        // La demande, l'agent et les règles sont posés par le dossier lui-même (MissionEvidenceServiceTest) : ici, il s'ouvre
+        // avec le paquet remis au runner et le runner qui la porte.
+        ArgumentCaptor<java.util.Map<String, Object>> extras = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
+        verify(evidenceService).open(eq(queued), eq(RULES), eq("tf-runner-pierre"), extras.capture());
+        assertThat(extras.getValue()).isEmpty();
     }
 
     @Test
@@ -214,7 +215,7 @@ class LocalRunnerServiceTest {
         assertThat(followUp.pullRequestUrl()).isEqualTo("https://github.com/acme/website/pull/212");
         assertThat(followUp.comments()).containsExactly(new RunnerClaimResponse.Comment("src/a.ts", 12, "new", "Use the helper"));
         ArgumentCaptor<java.util.Map<String, Object>> data = (ArgumentCaptor) ArgumentCaptor.forClass(java.util.Map.class);
-        verify(evidenceService).append(eq(queued), eq("mission.started"), any(), data.capture());
+        verify(evidenceService).open(eq(queued), eq(RULES), eq("tf-runner-pierre"), data.capture());
         assertThat(data.getValue()).containsEntry("followUpOf", 60L).containsEntry("comments", 1);
     }
 

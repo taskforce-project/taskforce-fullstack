@@ -22,6 +22,7 @@ import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
 import com.taskforce.tf_api.core.service.agent.CortexRecordService;
 import com.taskforce.tf_api.core.service.rules.RuleApprovers;
@@ -71,7 +72,7 @@ class McpActionServiceTest {
         lenient().when(workspaces.findById(1L)).thenReturn(Optional.of(ws));
         lenient().when(records.open(any(), any(), any())).thenReturn(RECORD);
         lenient().when(records.append(any(), any(), any(), any())).thenReturn(Optional.of("hash"));
-        service = new McpActionService(workspaceMcp, new CortexGate(new HarnessRulesService(ruleSets, members), workspaces, projectRepository, issueRepository, json), records,
+        service = new McpActionService(workspaceMcp, new CortexGate(new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()), workspaces, projectRepository, issueRepository, json), records,
             authorization, json, approvers());
     }
 

@@ -635,9 +635,16 @@ function sentenceOf(facts: StepFacts, run: SequencedRun, t: SequenceTexts): stri
   }
 }
 
+/**
+ * L'erreur d'une mission que TaskForce arrête au plafond de son dossier (R159, second tour, N2), telle que le serveur
+ * l'écrit (MissionEvidenceCap.STOPPED) : l'app la dit dans ses propres mots.
+ */
+export const EVIDENCE_CAP = "Evidence cap reached"
+
 /** Un échec dit ce qui s'est passé et quoi faire : la raison telle qu'elle arrive, et la suite quand elle ne la dit pas (R133). */
 function failureWords(error: string | null, t: SequenceTexts): string {
   if (!error) return t.status.failedNoReason
+  if (error.startsWith(EVIDENCE_CAP)) return t.status.evidenceCap
   const reason = /[.!?]$/.test(error.trim()) ? error.trim() : `${error.trim()}.`
   const said = fillText(t.status.failed, { reason })
   return /\bagain\b/i.test(reason) ? said : `${said}${t.status.failedNext}`

@@ -105,8 +105,8 @@
         },
         "owner": {
           "type": "string",
-          "minLength": 1,
-          "description": "The named person who answers for the rule."
+          "pattern": "^(who:([0-9a-f]{32}|unknown)|workspace-owner)$",
+          "description": "The named person who answers for the rule (R2, invariant 8), by their opaque id in the workspace: who: and 32 hex digits, the id the evidence record names them by, never their email. TaskForce's table is answered for by the owner of the workspace, a company rule by the person who added it. who:unknown names no one: a person TaskForce cannot find any more. workspace-owner is the placeholder of default.rules.json, which the server replaces with the id of the workspace's owner."
         },
         "reason": {
           "type": "string",

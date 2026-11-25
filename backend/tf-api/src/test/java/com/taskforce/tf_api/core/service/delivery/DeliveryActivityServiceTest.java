@@ -86,7 +86,7 @@ class DeliveryActivityServiceTest {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
             visibilityGuard, access, notificationService, settings, evidenceService,
-            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members),
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members, com.taskforce.tf_api.core.service.TestPersonIds.inMemory()),
             new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), signatures, members, feed);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada").build();
         teammate = User.builder().id(8L).email("linus@taskforce.dev").build();
@@ -97,6 +97,13 @@ class DeliveryActivityServiceTest {
             .startedBy(delegator).build();
         lenient().when(runRepository.findById(100L)).thenReturn(Optional.of(run));
         lenient().when(approvalRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        // Le dossier reçoit chaque événement neuf (le détail, MissionEvidenceServiceTest) ; un doublon renvoyé n'y entre pas.
+        lenient().when(evidenceService.runnerEvent(any(), any())).thenReturn(true);
+        // Le dossier nomme une personne par son identifiant opaque (R159, M6 ; le détail, MissionEvidenceServiceTest).
+        lenient().when(evidenceService.person(any(), any())).thenAnswer(inv -> {
+            User user = inv.getArgument(1);
+            return new MissionEvidenceService.Actor("person", user == null ? "unknown" : "person:" + user.getId());
+        });
         // Par défaut, la lecture qui trouve une demande échue est la seule : c'est elle qui la clôt.
         lenient().when(approvalRepository.expireIfPending(any(), any(), eq(DeliveryApprovalStatus.PENDING),
             eq(DeliveryApprovalStatus.EXPIRED))).thenReturn(1);
@@ -128,41 +135,64 @@ class DeliveryActivityServiceTest {
         service.appendEvents(run, batch);
 
         verify(eventRepository, org.mockito.Mockito.times(1)).save(any());
-        verify(evidenceService, org.mockito.Mockito.times(5)).append(eq(run), eq("note"), any(), any());
+        verify(evidenceService, org.mockito.Mockito.times(5)).runnerEvent(eq(run), any());
     }
 
     @Test
-    void a_rule_decision_goes_to_the_evidence_only_with_the_rule_as_its_actor() {
+    void a_rule_decision_goes_to_the_evidence_only() {
         when(eventRepository.maxSeq(100L)).thenReturn(0);
+        RunnerEventsRequest.Event decision = new RunnerEventsRequest.Event("decision", "Bash", "git push", "deny", "no-agent-push");
 
-        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("decision", "Bash", "git push", "deny", "no-agent-push")));
+        service.appendEvents(run, List.of(decision));
 
         verify(eventRepository, never()).save(any());
-        ArgumentCaptor<Map<String, Object>> data = mapCaptor();
-        verify(evidenceService).append(eq(run), eq("action.decided"), eq(new MissionEvidenceService.Actor("rule", "no-agent-push")), data.capture());
-        assertThat(data.getValue()).containsEntry("effect", "deny").containsEntry("tool", "Bash");
+        verify(evidenceService).runnerEvent(run, decision);
     }
 
     @Test
-    void the_runner_s_test_run_is_shown_and_kept_as_a_test_result() {
+    void the_brief_and_the_agent_s_start_go_to_the_evidence_only() {
+        when(eventRepository.maxSeq(100L)).thenReturn(0);
+
+        service.appendEvents(run, List.of(
+            new RunnerEventsRequest.Event("brief", null, "The brief", null, null, 1, null, null, null, "You are working on...", null, null),
+            new RunnerEventsRequest.Event("agent", null, "Claude Code 2.1.300", null, null, 2, null, null, null, null,
+                new RunnerEventsRequest.Agent("2.1.300", "claude-sonnet-5", null, "anthropic"), null)));
+
+        verify(eventRepository, never()).save(any());
+        verify(evidenceService, org.mockito.Mockito.times(2)).runnerEvent(eq(run), any());
+    }
+
+    @Test
+    void an_event_the_evidence_already_has_is_not_shown_twice() {
+        when(eventRepository.maxSeq(100L)).thenReturn(0);
+        when(evidenceService.runnerEvent(any(), any())).thenReturn(false);
+
+        service.appendEvents(run, List.of(new RunnerEventsRequest.Event("tool", "Read", "README.md")));
+
+        verify(eventRepository, never()).save(any());
+        verify(feed, never()).step(any(), any());
+    }
+
+    @Test
+    void the_runner_s_test_run_is_shown_and_kept() {
         run.setClaimedBy("tf-runner-ada");
         when(eventRepository.maxSeq(100L)).thenReturn(0);
 
         service.appendEvents(run, List.of(new RunnerEventsRequest.Event("test", "npm test", "passed in 42 s")));
 
         verify(eventRepository).save(any());
-        verify(evidenceService).append(eq(run), eq("test.result"), eq(new MissionEvidenceService.Actor("runner", "tf-runner-ada")), any());
+        verify(evidenceService).runnerEvent(eq(run), any());
     }
 
     @Test
-    void an_exit_is_shown_and_kept_as_the_runner_s_act() {
+    void an_exit_is_shown_and_kept() {
         run.setClaimedBy("tf-runner-ada");
         when(eventRepository.maxSeq(100L)).thenReturn(0);
 
         service.appendEvents(run, List.of(new RunnerEventsRequest.Event("exit", "git push", "allowed by the rule push-agent-branch-private", "allow", null)));
 
         verify(eventRepository).save(any());
-        verify(evidenceService).append(eq(run), eq("exit.result"), eq(new MissionEvidenceService.Actor("runner", "tf-runner-ada")), any());
+        verify(evidenceService).runnerEvent(eq(run), any());
     }
 
     // --------------------------------------------------------------------- validations, côté runner
@@ -201,7 +231,10 @@ class DeliveryActivityServiceTest {
         assertThat(saved.getValue().getRuleReason()).isEqualTo("A web search sends its query out of the machine.");
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
         verify(evidenceService).append(eq(run), eq("action.decided"), eq(MissionEvidenceService.Actor.SERVER), data.capture());
-        assertThat(data.getValue()).containsEntry("action", "web.search").containsEntry("rule", "search-web");
+        assertThat(data.getValue()).containsEntry("action", "web.search").containsEntry("rule", "search-web")
+            // R159, M6 : la personne à qui l'on demande entre par son identifiant, jamais par son courriel.
+            .containsEntry("asked", "person:7");
+        assertThat(data.getValue().toString()).doesNotContain("ada@taskforce.dev");
     }
 
     @Test
@@ -387,7 +420,7 @@ class DeliveryActivityServiceTest {
         assertThat(approval.getDecidedBy()).isEqualTo(delegator);
         assertThat(approval.getDecidedAt()).isNotNull();
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
-        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), data.capture());
         assertThat(data.getValue()).containsEntry("decision", "ALLOWED").containsEntry("approval", 9L).containsEntry("scope", "ONCE");
         assertThat(approval.getScope()).isEqualTo("ONCE");
     }
@@ -402,7 +435,7 @@ class DeliveryActivityServiceTest {
         String scope = service.decide("acme", 100L, 9L, allow, false, "  The build only reads the lock file  ", 7L);
 
         ArgumentCaptor<Map<String, Object>> data = mapCaptor();
-        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "ada@taskforce.dev")), data.capture());
+        verify(evidenceService).append(eq(run), eq("human.decision"), eq(new MissionEvidenceService.Actor("person", "person:7")), data.capture());
         assertThat(data.getValue()).containsEntry("decision", decision).containsEntry("scope", "ONCE")
             .containsEntry("reason", "The build only reads the lock file");
         // Rien d'autre ne change : la même décision, la même portée, la même personne.

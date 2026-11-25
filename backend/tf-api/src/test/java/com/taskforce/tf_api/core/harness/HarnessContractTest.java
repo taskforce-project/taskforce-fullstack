@@ -135,6 +135,35 @@ class HarnessContractTest {
     }
 
     @Test
+    @DisplayName("un paquet tel que le serveur l'émet, chaque propriétaire par son identifiant, a l'empreinte que le runner recalcule")
+    void issuedDigestMatchesReference() {
+        JsonNode issued = contract("rules/cases.json").get("issued");
+        ObjectNode bundle = (ObjectNode) issued.get("bundle");
+        assertThat(RulesDigest.of(bundle)).isEqualTo(issued.get("expected").asText());
+
+        ObjectNode noisy = bundle.deepCopy();
+        noisy.put("digest", "sha256:" + "f".repeat(64));
+        noisy.putNull("issuedAt");
+        noisy.putNull("process");
+        assertThat(RulesDigest.of(noisy)).isEqualTo(issued.get("expected").asText());
+        assertThat(RulesEngine.decide(JSON.convertValue(bundle, RulesBundle.class), Map.of("action", "issue.delete")).effect())
+            .isEqualTo(RulesEngine.DENY);
+    }
+
+    @Test
+    @DisplayName("aucun propriétaire du contrat n'est un courriel : chacun suit le motif du schéma (R159, M6)")
+    void ownersFollowTheSchema() {
+        String pattern = contract("rules/taskforce-rules-1.schema.json").at("/$defs/rule/properties/owner/pattern").asText();
+        assertThat(pattern).isNotBlank();
+        List<JsonNode> rules = new ArrayList<>();
+        contract("rules/default.rules.json").get("rules").forEach(rules::add);
+        contract("rules/cases.json").at("/issued/bundle/rules").forEach(rules::add);
+        contract("rules/layer-cases.json").get("cases").forEach(c -> c.path("rules").forEach(rules::add));
+        assertThat(rules).hasSizeGreaterThan(40).allSatisfy(rule ->
+            assertThat(rule.get("owner").asText()).as(rule.get("id").asText()).matches(pattern).doesNotContain("@"));
+    }
+
+    @Test
     @DisplayName("la table par défaut embarquée dans le serveur est celle du contrat")
     void embeddedDefaultsMatchContract() throws IOException {
         try (var in = getClass().getClassLoader().getResourceAsStream("harness/default.rules.json")) {
