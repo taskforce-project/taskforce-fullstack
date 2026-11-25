@@ -334,6 +334,17 @@ public class HarnessRulesService {
         }
     }
 
+    /**
+     * L'empreinte d'une version telle que le paquet la donne (R159 de #551, quatrième tour, d-d) : celle de ses règles
+     * nommées par leur identifiant. Une version d'avant la 1.18 garde une empreinte calculée avec le courriel de son auteur :
+     * après la purge de son compte, elle confirmerait un courriel deviné, à qui connaît le reste de la version.
+     */
+    public String digestAsNamed(Workspace workspace, HarnessRuleSet set) {
+        List<Map<String, Object>> rules = set.getRules() == null ? List.of() : set.getRules();
+        List<Map<String, Object>> named = new Owners(workspace).name(rules, set.getCreatedAt());
+        return named == rules && set.getDigest() != null ? set.getDigest() : digestOf(named);
+    }
+
     /** La table de TaskForce, dont la personne propriétaire de l'espace répond : {@code owner} est son identifiant. */
     public ArrayNode ownedBy(String owner) {
         ArrayNode rules = defaultRules.deepCopy();

@@ -115,15 +115,16 @@ public class RulesService {
                 continue;
             }
             HarnessRuleSet row = e.getValue();
+            // L'empreinte de la forme nommée, comme le paquet la donne : jamais celle qui contient un courriel (d-d).
             layers.add(new RulesResponse.RuleLayerView(e.getKey().scope().layer(), e.getKey().ref(), context.nameOf(e.getKey()),
-                row.getVersion(), context.nameOf(row.getCreatedBy()), row.getCreatedAt(), row.getDigest(),
+                row.getVersion(), context.nameOf(row.getCreatedBy()), row.getCreatedAt(), rulesService.digestAsNamed(ws, row),
                 context.canEdit(e.getKey()), statements(ws, context, e.getKey(), row.getRules(), state)));
         }
         List<RulesResponse.RuleVersion> versions = rows.stream()
             .filter(row -> context.sees(LayerKey.of(row)))
             .map(row -> new RulesResponse.RuleVersion(row.getVersion(), row.getScope().layer(), LayerKey.of(row).ref(),
-                context.nameOf(LayerKey.of(row)), context.nameOf(row.getCreatedBy()), row.getCreatedAt(), row.getDigest(),
-                row.getRules().size()))
+                context.nameOf(LayerKey.of(row)), context.nameOf(row.getCreatedBy()), row.getCreatedAt(),
+                rulesService.digestAsNamed(ws, row), row.getRules().size()))
             .toList();
         RulesBundle workspaceBundle = rulesService.build(ws, Work.NONE, null, state);
         return new RulesResponse.RulesOverview(workspaceBundle.version(), workspaceBundle.digest(),

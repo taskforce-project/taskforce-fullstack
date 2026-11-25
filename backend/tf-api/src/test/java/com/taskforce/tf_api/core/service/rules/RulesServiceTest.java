@@ -386,4 +386,28 @@ class RulesServiceTest {
         assertThatThrownBy(() -> service.add("acme", ADMIN, new RuleDraftRequest(CEO_RULE, "workspace", null, null, null)))
             .hasMessageContaining("Check the rule first");
     }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, d-d : l'écran sert l'empreinte de la forme nommée, jamais celle qu'une version d'avant la 1.18 calcule avec un courriel")
+    void theScreenServesTheDigestOfTheNamedForm() {
+        // Une version d'avant la 1.18 : sa règle nomme son auteur par son courriel, et l'empreinte gardée en dépend.
+        Map<String, Object> rule = new LinkedHashMap<>();
+        rule.put("id", "ws-no-delete");
+        rule.put("when", Map.of("action", "issue.delete"));
+        rule.put("class", "irreversible");
+        rule.put("effect", "deny");
+        rule.put("owner", "pierre@example.com");
+        rule.put("reason", "Nobody deletes an issue.");
+        rule.put("text", "Nobody deletes an issue.");
+        String withEmail = HarnessRulesService.digestOf(List.of(rule));
+        rows.add(HarnessRuleSet.builder().id(1L).workspace(ws).version(1).scope(RuleScope.WORKSPACE).rules(List.of(rule))
+            .digest(withEmail).createdBy(ws.getOwner()).createdAt(java.time.LocalDateTime.of(2026, 9, 1, 9, 0)).build());
+
+        RulesResponse.RulesOverview overview = service.overview("acme", ADMIN);
+
+        String named = rules.bundleFor(ws).layers().get(0).digest();
+        assertThat(named).isNotEqualTo(withEmail);
+        assertThat(overview.layers()).singleElement().satisfies(layer -> assertThat(layer.digest()).isEqualTo(named));
+        assertThat(overview.versions()).singleElement().satisfies(v -> assertThat(v.digest()).isEqualTo(named));
+    }
 }
