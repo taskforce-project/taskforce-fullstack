@@ -2317,6 +2317,7 @@ export const CONSTANTS_EN = {
       textsOne: "1 text kept beside the chain was changed after it was written; it says so where it shows.",
       unnamed: "A text was added beside the chain after it was written.",
       erased: "{count} texts named by the chain are not in this file: erased, or not exported. The chain keeps their digest.",
+      erasedOne: "1 text named by the chain is not in this file: erased, or not exported. The chain keeps its digest.",
       rules: "The rules bundle in this file is not the one the mission received.",
       rulesDiffer: "Judging the actions again with the rules of the mission does not give the decisions the record shows.",
       notJudged: "{count} recorded decisions were not judged again by this page: {parts}.",

@@ -228,7 +228,10 @@ function verdictOf(page: VerificationPage, t: Texts, desktop: boolean): Line[] {
   }
   if (changed > 0) lines.push({ text: changed === 1 ? v.textsOne : fillText(v.texts, { count: changed }), tone: "warn" })
   if (d.texts.unnamed.length > 0) lines.push({ text: v.unnamed, tone: "warn" })
-  if (d.texts.absent.length > 0) lines.push({ text: fillText(v.erased, { count: d.texts.absent.length }), tone: "muted" })
+  if (d.texts.absent.length > 0) {
+    // Au singulier pour un seul texte (R161 N11 du second tour de #552).
+    lines.push({ text: d.texts.absent.length === 1 ? v.erasedOne : fillText(v.erased, { count: d.texts.absent.length }), tone: "muted" })
+  }
   if (d.rules.present && !d.rules.digestHolds) lines.push({ text: v.rules, tone: "warn" })
   if (d.rules.differ.length > 0) lines.push({ text: v.rulesDiffer, tone: "warn" })
   // Les décisions que la page n'a pas pu rejuger : prises sur un fait que le dossier n'a gardé qu'en partie (second tour de

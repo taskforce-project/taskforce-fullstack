@@ -548,6 +548,20 @@ describe("R161 N1 et R159 V1, second tour de #552 : un dossier changé se voit d
   })
 })
 
+describe("R161 N11 du second tour de #552 : « 1 text », au singulier", () => {
+  it("un texte nommé par la chaîne et absent du fichier se dit au singulier ; deux, au pluriel", async () => {
+    const one = example()
+    const started = one.events[0]?.data as { request: { title: { sha256: string }; description: { sha256: string } } }
+    const texts = one.texts as Record<string, unknown>
+    delete texts[started.request.title.sha256]
+    const verdict = verdictLines(verificationPage(one, await checkRecord(one, [], at)), t).map((l) => l.text)
+    expect(verdict).toContain(t.verdict.erasedOne)
+    expect(verdict.join(" ")).not.toContain("1 texts")
+    delete texts[started.request.description.sha256]
+    expect(verdictLines(verificationPage(one, await checkRecord(one, [], at)), t).map((l) => l.text)).toContain(t.verdict.erased.replace("{count}", "2"))
+  })
+})
+
 describe("v-f du second tour de #552 : les mots de l'agent, tous cités comme les siens", () => {
   it("la page lue, le fichier d'un accord, la raison des tests qui n'ont pas tourné", () => {
     const approvals = (tool: string, summary: string) => [
