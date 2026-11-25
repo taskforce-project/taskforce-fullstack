@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -775,30 +776,46 @@ public class MissionEvidenceService {
         appendTo(runId, "note", Actor.SERVER, data);
     }
 
+    /** Comme {@link #forgetPerson(Long, Collection)}, d'un compte dont TaskForce ne connaît aucun login GitHub. */
+    @Transactional
+    public int forgetPerson(Long userId) {
+        return forgetPerson(userId, List.of());
+    }
+
     /**
      * Le compte d'une personne est purgé (GdprService) : ce que les dossiers gardent d'elle s'efface, son courriel et son
      * nom, avec leur sel ; chaque dossier touché le dit à la suite de sa chaîne et se scelle de nouveau. Ses identifiants
      * opaques, un par espace, restent dans les chaînes, et plus rien ne les relie à elle. Rend le nombre de dossiers touchés.
+     *
+     * <p>{@code gitHubLogins} : les logins GitHub que TaskForce connaît de ce compte (R159 de #551, troisième tour, c-g). Le
+     * texte {@code login} de qui a fusionné une pull request n'est relié à aucun compte : il s'efface quand il porte l'un
+     * d'eux, quelle que soit la casse.</p>
      */
     @Transactional
-    public int forgetPerson(Long userId) {
+    public int forgetPerson(Long userId, Collection<String> gitHubLogins) {
         List<MissionPerson> mappings = userId == null ? List.of() : people.findByUserId(userId);
         Map<Long, List<String>> byDossier = new LinkedHashMap<>();
         Map<Long, String> personOf = new HashMap<>();
         for (MissionPerson mapping : mappings) {
             for (MissionDossierText text : texts.findByPersonAndBodyIsNotNull(mapping.getPerson())) {
-                text.setBody(null);
-                text.setSalt(null);
-                text.setErasedAt(LocalDateTime.now());
-                texts.save(text);
+                erase(text);
                 byDossier.computeIfAbsent(text.getRunId(), id -> new ArrayList<>()).add(text.getHash());
                 personOf.put(text.getRunId(), mapping.getPerson());
+            }
+        }
+        List<String> logins = gitHubLogins == null ? List.of() : gitHubLogins.stream().filter(Objects::nonNull).map(String::strip)
+            .filter(login -> !login.isEmpty()).map(login -> login.toLowerCase(Locale.ROOT)).distinct().toList();
+        for (String login : logins) {
+            for (MissionDossierText text : texts.findByKindAndBodyIgnoreCase("login", login)) {
+                erase(text);
+                byDossier.computeIfAbsent(text.getRunId(), id -> new ArrayList<>()).add(text.getHash());
             }
         }
         byDossier.forEach((runId, hashes) -> {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("kind", "erased");
-            data.put("person", personOf.get(runId));
+            // Un dossier où la personne n'est que le login qui a fusionné ne l'a jamais présentée : pas d'identifiant à dire.
+            if (personOf.containsKey(runId)) data.put("person", personOf.get(runId));
             data.put("texts", hashes);
             data.put("reason", "account-deleted");
             appendToDossier(runId, "note", Actor.SERVER, data);
@@ -807,6 +824,14 @@ public class MissionEvidenceService {
         int legacy = forgetInLegacyChains(userId);
         log.info("Compte {} oublié des dossiers : {} dossier(s) touché(s), dont {} d'avant la 1.18", userId, byDossier.size() + legacy, legacy);
         return byDossier.size() + legacy;
+    }
+
+    /** Efface un texte gardé à côté de la chaîne, avec son sel : son empreinte reste, et ne confirme plus rien. */
+    private void erase(MissionDossierText text) {
+        text.setBody(null);
+        text.setSalt(null);
+        text.setErasedAt(LocalDateTime.now());
+        texts.save(text);
     }
 
     /**

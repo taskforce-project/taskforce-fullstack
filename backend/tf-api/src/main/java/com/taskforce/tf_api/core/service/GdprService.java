@@ -207,8 +207,12 @@ public class GdprService {
         final String keycloakId = u.getKeycloakId();
 
         // Ce que les dossiers des missions gardent de la personne (son courriel, son nom) s'efface, et chaque dossier touché
-        // le dit et se scelle de nouveau ; son identifiant opaque reste dans les chaînes, relié à personne (R159, M6).
-        int dossiers = missionEvidence.forgetPerson(userId);
+        // le dit et se scelle de nouveau ; son identifiant opaque reste dans les chaînes, relié à personne (R159, M6). Le
+        // login GitHub de qui a fusionné aussi, quand TaskForce le connaît : celui des connexions GitHub que ce compte a
+        // faites (R159 de #551, troisième tour, c-g). Lu avant que la purge ne touche aux espaces.
+        List<String> gitHubLogins = jdbcTemplate.queryForList("SELECT DISTINCT meta ->> 'login' FROM integrations "
+            + "WHERE installed_by = ? AND provider = 'GITHUB' AND COALESCE(meta ->> 'login', '') <> ''", String.class, userId);
+        int dossiers = missionEvidence.forgetPerson(userId, gitHubLogins);
 
         int transferred = 0, deleted = 0;
         for (Long wsId : jdbcTemplate.queryForList(

@@ -879,6 +879,48 @@ class MissionEvidenceServiceTest {
             assertThat(service.forgetPerson(7L)).isZero();
             assertThat(service.forgetPerson(null)).isZero();
         }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-g : le login GitHub de qui a fusionné s'efface avec le compte dont TaskForce le connaît, quelle que soit la casse")
+        void the_merge_login_is_erased_with_the_account() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "github"),
+                Map.of("decision", "MERGE", "where", "github", "by", service.text(run, "login", "Ada-GH")));
+            lenient().when(textRepository.findByKindAndBodyIgnoreCase(anyString(), anyString()))
+                .thenAnswer(inv -> texts.stream().filter(t -> t.getKind().equals(inv.getArgument(0)) && t.getBody() != null
+                    && t.getBody().equalsIgnoreCase(inv.getArgument(1))).toList());
+            MissionDossierText login = text("login");
+            assertThat(file().toString()).contains("Ada-GH");
+
+            assertThat(service.forgetPerson(7L, List.of(" ada-gh ", "ADA-GH"))).isEqualTo(1);
+
+            assertThat(login.getBody()).isNull();
+            assertThat(login.getSalt()).isNull();
+            assertThat(login.getErasedAt()).isNotNull();
+            assertThat(file().toString()).doesNotContain("Ada-GH");
+            assertThat(data(stored.size() - 1).get("texts")).extracting(JsonNode::asText).contains(login.getHash());
+        }
+
+        @Test
+        @DisplayName("R159 troisième tour, c-g : un dossier où la personne n'est que le login qui a fusionné : la note ne nomme aucun identifiant")
+        void a_dossier_that_only_knows_the_login_names_no_id() throws Exception {
+            service.open(run, rules(), "tf-runner-ada", Map.of());
+            service.end(run, new DeliveryPoll(DeliveryRunStatus.DONE, "done", null, null));
+            service.appendAfterEnd(run, "human.decision", new MissionEvidenceService.Actor("person", "github"),
+                Map.of("decision", "MERGE", "where", "github", "by", service.text(run, "login", "linus-gh")));
+            lenient().when(textRepository.findByKindAndBodyIgnoreCase(anyString(), anyString()))
+                .thenAnswer(inv -> texts.stream().filter(t -> t.getKind().equals(inv.getArgument(0)) && t.getBody() != null
+                    && t.getBody().equalsIgnoreCase(inv.getArgument(1))).toList());
+
+            // Linus n'a jamais été présenté dans ce dossier : seul son login y est.
+            assertThat(service.forgetPerson(9L, List.of("linus-gh"))).isEqualTo(1);
+
+            JsonNode erased = data(stored.size() - 1);
+            assertThat(erased.get("kind").asText()).isEqualTo("erased");
+            assertThat(erased.has("person")).isFalse();
+            assertThat(erased.get("texts")).extracting(JsonNode::asText).containsExactly(text("login").getHash());
+        }
     }
 
     @Test

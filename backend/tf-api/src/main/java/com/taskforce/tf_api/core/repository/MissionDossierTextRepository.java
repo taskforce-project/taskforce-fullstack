@@ -26,4 +26,10 @@ public interface MissionDossierTextRepository extends JpaRepository<MissionDossi
 
     /** Ce que les dossiers gardent encore d'une personne : son courriel, son nom, à effacer avec son compte. */
     List<MissionDossierText> findByPersonAndBodyIsNotNull(String person);
+
+    /**
+     * Les textes de cette sorte qui portent encore ce texte, sans tenir compte de la casse : le login GitHub de qui a fusionné,
+     * à effacer avec le compte dont TaskForce connaît ce login (R159 de #551, troisième tour, c-g).
+     */
+    List<MissionDossierText> findByKindAndBodyIgnoreCase(String kind, String body);
 }
