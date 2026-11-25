@@ -106,7 +106,8 @@ function lineHtml(line: Line, moreFiles: string): string {
 export function verificationHtml(head: ExportHead, sections: readonly Section[], dossierJson: string | null): string {
   const body = sections.map((section) => [
     `<details class="section" id="${section.id}" open><summary><h2>${escapeHtml(section.title)}</h2></summary>`,
-    section.lines.map((line) => lineHtml(line, head.moreFiles)).join("\n"),
+    // Pas les consignes de l'écran, qui parlent de son bouton : la page exportée a la sienne, à la fin (R161 N5, v-e).
+    section.lines.filter((line) => !line.screenOnly).map((line) => lineHtml(line, head.moreFiles)).join("\n"),
     "</details>",
   ].join("\n")).join("\n")
   const verdict = head.verdict.map((line) => lineHtml(line, head.moreFiles)).join("")

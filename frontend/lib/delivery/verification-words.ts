@@ -45,6 +45,8 @@ export interface Line {
    * vont dans une alerte à part, distincte des réserves que porte tout dossier sain (R161 N1, R159 V1 de #552).
    */
   readonly alert?: boolean
+  /** Une consigne qui ne vaut qu'à l'écran (le bouton de téléchargement) : la page exportée a la sienne (R161 N5, v-e). */
+  readonly screenOnly?: boolean
 }
 
 export interface Section {
@@ -571,6 +573,8 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   // Le sceau tel que la page l'a vérifié, jamais l'enveloppe telle qu'elle se lit (R159 de #552, second tour, V2).
   const s = page.check?.details?.seal ?? null
   const sealHolds = s !== null && (s.state === "trusted" || s.state === "self") && s.seq !== null
+  // La clé de cette instance se publie-t-elle ? Sinon, la consigne ne dit que ce que prouve la clé du commentaire (R161 N5).
+  const publishable = sealHolds && s?.kept !== false && !context.desktop && s?.keyId !== null && s?.keyId !== undefined
   if (r.seal && !page.check?.details) {
     lines.push({ text: rec.sealUnchecked, tone: "warn" })
   } else if (s && s.state === "broken") {
@@ -597,7 +601,7 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     lines.push({ text: fillText(rec.witness, { seq: r.witness.seq ?? "?", root: short(r.witness.chainRoot), url }), ...(linkable(url) ? { link: url } : {}) })
     // La clé du commentaire, datée par GitHub : c'est elle qu'on compare à la clé qu'on vous donne, pas une liste de
     // l'exploitant (N6). Entière : on la compare caractère par caractère.
-    if (r.witness.key) lines.push({ text: fillText(rec.witnessKey, { key: r.witness.key }), tone: "muted" })
+    if (r.witness.key) lines.push({ text: fillText(publishable ? rec.witnessKey : rec.witnessKeyNoPublish, { key: r.witness.key }), tone: "muted" })
     // Ce que le commentaire lie, et pourquoi il ne lie pas cette page (R159 B2 et M1 de #551, R161 B4).
     const leftOut = rec.pageLeftOut as Record<string, string>
     if (r.witness.pageLinked === true) lines.push({ text: rec.pageLinked, tone: "muted" })
@@ -616,13 +620,13 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   } else {
     lines.push({ text: page.running ? rec.noWitnessYet : r.pullRequest ? rec.noWitnessPr : rec.noPullRequest, tone: "warn" })
   }
-  // La consigne de vérification : le bon fichier, et `--key` seulement quand la clé peut se publier (R161 M6).
+  // La consigne de vérification : le bon fichier, et `--key` seulement quand la clé peut se publier (R161 M6). À l'écran
+  // seulement : elle parle du bouton du haut, et la page exportée a sa propre consigne (R161 N5, v-e).
   const id = page.mission.id ?? context.runId
-  const publishable = sealHolds && s?.kept !== false && !context.desktop && s?.keyId !== null && s?.keyId !== undefined
-  lines.push({ text: rec.verifyIntro, tone: "muted" })
-  lines.push({ text: publishable ? fillText(rec.verifyJson, { id, key: s?.keyId ?? "" }) : fillText(rec.verifyNoKey, { id }), tone: "muted" })
-  if (!publishable && sealHolds) lines.push({ text: rec.verifyNoKeyMeans, tone: "muted" })
-  lines.push({ text: rec.verifyOpenSsl, tone: "muted" })
+  lines.push({ text: rec.verifyIntro, tone: "muted", screenOnly: true })
+  lines.push({ text: publishable ? fillText(rec.verifyJson, { id, key: s?.keyId ?? "" }) : fillText(rec.verifyNoKey, { id }), tone: "muted", screenOnly: true })
+  if (!publishable && sealHolds) lines.push({ text: rec.verifyNoKeyMeans, tone: "muted", screenOnly: true })
+  lines.push({ text: rec.verifyOpenSsl, tone: "muted", screenOnly: true })
   return lines
 }
 

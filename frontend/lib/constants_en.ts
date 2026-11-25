@@ -2567,6 +2567,7 @@ export const CONSTANTS_EN = {
       witnessRetrying: "No witness yet: {reason}. TaskForce tries again until {until}.",
       witnessAbandoned: "No witness: TaskForce could not write it in the pull request, and stopped trying on {date}.",
       witnessKey: "The comment also names the key that sealed that head, {key}: compare it with the key you were given for this TaskForce. GitHub dates the comment; the list of keys this TaskForce gives comes from its own database and proves nothing by itself.",
+      witnessKeyNoPublish: "The comment also names the key that sealed that head, {key}: it matches the key of the seal. This TaskForce cannot publish its key, so no one can give it to you: the comment, dated by GitHub, is what anchors it.",
       witnessLater: "Events after {seq}, such as the final decision, came after the witness.",
       pageLinked: "The comment links this page by an id of the record that names neither the workspace nor the mission.",
       pageLeftOut: {
@@ -2582,8 +2583,8 @@ export const CONSTANTS_EN = {
       noWitnessPr: "No witness was written in the pull request: only the operator of TaskForce holds this record.",
       noPullRequest: "No witness: this mission has no pull request, so only the operator of TaskForce holds this record.",
       verifyIntro: "To check it without this app, take the record itself:",
-      verifyJson: "Download the record (JSON) below, then, in taskforce-runner: npm run verify -- evidence-run-{id}.json --key {key}",
-      verifyNoKey: "Download the record (JSON) below, then, in taskforce-runner: npm run verify -- evidence-run-{id}.json",
+      verifyJson: "Download the record (JSON) above, then, in taskforce-runner: npm run verify -- evidence-run-{id}.json --key {key}",
+      verifyNoKey: "Download the record (JSON) above, then, in taskforce-runner: npm run verify -- evidence-run-{id}.json",
       verifyNoKeyMeans: "This TaskForce cannot publish its key: the check shows that the record holds together and was signed by the key it carries, not that this TaskForce signed it.",
       verifyOpenSsl: "Or check the signature with OpenSSL alone, as contracts/README.md describes.",
       download: "Download this page",

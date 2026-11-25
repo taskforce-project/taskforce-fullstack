@@ -101,6 +101,15 @@ describe("la page exportée avec son dossier", () => {
     expect(sound).not.toContain(t.changedRecord.says)
   })
 
+  it("R161 N5 et v-e du second tour de #552 : la page exportée n'a pas les consignes de l'écran, qui parlent de son bouton", async () => {
+    const { html } = await exported()
+    expect(html).not.toContain(escapeHtml(t.record.verifyIntro))
+    expect(html).not.toContain("Download the record (JSON)")
+    expect(html).not.toContain(escapeHtml(t.record.verifyOpenSsl))
+    // La sienne reste, à la fin : sortir le dossier du fichier.
+    expect(html).toContain("The record is inside this file")
+  })
+
   it("N4 du second tour de #551 : la page exportée d'un dossier d'avant la 1.18 ne porte pas ce dossier, ni ses courriels", () => {
     const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [],
       howTo: t.export.howToLegacy.replace("{id}", "3"), moreFiles: t.showAllFiles }, [], null)

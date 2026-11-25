@@ -106,7 +106,9 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     expect(lines).toContain("Events after 23, such as the final decision, came after the witness.")
     // Le témoin nomme la clé qui a scellé sa tête (second tour de #551, N6) : la page la donne entière, à comparer.
     expect(page.record.witness?.key).toBe(exampleKey())
-    expect(lines).toContain(t.record.witnessKey.replace("{key}", exampleKey()))
+    // La clé de l'exemple n'est pas gardée : nul ne peut la donner, la phrase ne dit que ce que prouve celle du commentaire
+    // (R161 N5 du second tour de #552).
+    expect(lines).toContain(t.record.witnessKeyNoPublish.replace("{key}", exampleKey()))
     // R161 B4 : ce que le commentaire lie, ou pourquoi il ne lie pas la page (B2 et M1 de #551).
     expect(lines).toContain(t.record.pageLinked)
     const leftOut = (why: string) => {
@@ -122,11 +124,14 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     // La clé du sceau tel que la page l'a vérifié (R159 de #552, second tour, V2).
     const page = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
     const lines = texts(verificationSections(page, t, context), "record")
-    expect(lines).toContain("Download the record (JSON) below, then, in taskforce-runner: npm run verify -- evidence-run-42.json")
+    // Le bouton est en haut de la page (R161 N5, v-e).
+    expect(lines).toContain("Download the record (JSON) above, then, in taskforce-runner: npm run verify -- evidence-run-42.json")
     expect(lines).toContain(t.record.verifyNoKeyMeans)
     const details = page.check?.details
     const kept = details ? { ...page, check: page.check ? { ...page.check, details: { ...details, seal: { ...details.seal, kept: true } } } : null } : page
     expect(texts(verificationSections(kept, t, context), "record").join(" ")).toMatch(/--key sha256:[0-9a-f]{64}/)
+    // Une clé qui se publie : on compare celle du commentaire à celle qu'on vous donne.
+    expect(texts(verificationSections(kept, t, context), "record")).toContain(t.record.witnessKey.replace("{key}", exampleKey()))
     expect(texts(verificationSections(kept, t, { runId: 42, desktop: true }), "record").join(" ")).not.toContain("--key")
     const noId = verificationPage(chained([{ type: "mission.started", data: {} }]))
     expect(texts(verificationSections(noId, t, { runId: 77, desktop: false }), "record").join(" ")).toContain("evidence-run-77.json")
