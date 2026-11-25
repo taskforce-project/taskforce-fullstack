@@ -48,6 +48,7 @@ import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.service.NotificationService;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.core.service.rules.RuleApprovers;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -86,7 +87,7 @@ class R159Round3ObligationProbeTest {
     void setUp() {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
-            visibilityGuard, access, notificationService, settings, evidenceService, new HarnessRulesService(ruleSets, members),
+            visibilityGuard, access, notificationService, settings, evidenceService, new HarnessRulesService(ruleSets, members, TestPersonIds.inMemory()),
             new RuleApprovers(members, projectMembers), signatures, members, feed);
         delegator = User.builder().id(7L).email("ada@example.com").displayName("Ada").build();
         dba = User.builder().id(42L).email("marie@example.com").displayName("Marie Martin").build();

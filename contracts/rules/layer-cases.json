@@ -4,7 +4,7 @@
     {
       "name": "the workspace layer asks for what TaskForce allows",
       "rules": [
-        { "id": "ws-ask-comments", "layer": "workspace", "when": { "action": "comment.create" }, "class": "reversible-exit", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Comments wait for a person here.", "review": "2027-05-11" }
+        { "id": "ws-ask-comments", "layer": "workspace", "when": { "action": "comment.create" }, "class": "reversible-exit", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Comments wait for a person here.", "review": "2027-05-11" }
       ],
       "facts": { "action": "comment.create" },
       "expect": { "effect": "ask", "rule": "ws-ask-comments", "require": null }
@@ -12,7 +12,7 @@
     {
       "name": "the project layer refuses what TaskForce asks",
       "rules": [
-        { "id": "prj-no-delete", "layer": "project", "when": { "action": "issue.delete" }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "lead@example.com", "reason": "Nothing is deleted in this project.", "review": "2027-05-11" }
+        { "id": "prj-no-delete", "layer": "project", "when": { "action": "issue.delete" }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "who:7c2e4a6b8d0f1e3a5c7b9d2f4a6c8e0b", "reason": "Nothing is deleted in this project.", "review": "2027-05-11" }
       ],
       "facts": { "action": "issue.delete" },
       "expect": { "effect": "deny", "rule": "prj-no-delete", "require": null }
@@ -20,7 +20,7 @@
     {
       "name": "the process layer asks for an issue change",
       "rules": [
-        { "id": "process-review-changes", "layer": "process", "when": { "action": "issue.update" }, "class": "reversible-exit", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "In review, changes wait for the reviewer.", "review": "2027-05-11" }
+        { "id": "process-review-changes", "layer": "process", "when": { "action": "issue.update" }, "class": "reversible-exit", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "In review, changes wait for the reviewer.", "review": "2027-05-11" }
       ],
       "facts": { "action": "issue.update" },
       "expect": { "effect": "ask", "rule": "process-review-changes", "require": null }
@@ -28,7 +28,7 @@
     {
       "name": "the role layer refuses a new project",
       "rules": [
-        { "id": "members-no-projects", "layer": "role", "when": { "action": "project.create" }, "class": "reversible-exit", "effect": "deny", "inverse": null, "owner": "admin@example.com", "reason": "Members don't create projects through an agent.", "review": "2027-05-11" }
+        { "id": "members-no-projects", "layer": "role", "when": { "action": "project.create" }, "class": "reversible-exit", "effect": "deny", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Members don't create projects through an agent.", "review": "2027-05-11" }
       ],
       "facts": { "action": "project.create" },
       "expect": { "effect": "deny", "rule": "members-no-projects", "require": null }
@@ -36,7 +36,7 @@
     {
       "name": "the person layer asks before a mission starts",
       "rules": [
-        { "id": "ask-before-missions", "layer": "person", "when": { "action": "mission.start" }, "class": "sandbox-write", "effect": "ask", "inverse": null, "owner": "dev@example.com", "reason": "I want to see each mission start.", "review": "2027-05-11" }
+        { "id": "ask-before-missions", "layer": "person", "when": { "action": "mission.start" }, "class": "sandbox-write", "effect": "ask", "inverse": null, "owner": "who:b5d7f9a1c3e2b4d6f8a0c1e3b5d7f9a2", "reason": "I want to see each mission start.", "review": "2027-05-11" }
       ],
       "facts": { "action": "mission.start", "repoVisibility": "private" },
       "expect": { "effect": "ask", "rule": "ask-before-missions", "require": null }
@@ -44,7 +44,7 @@
     {
       "name": "a company layer's allow never loosens what TaskForce asks",
       "rules": [
-        { "id": "ws-allow-fetch", "layer": "workspace", "when": { "action": "web.fetch" }, "class": "read", "effect": "allow", "inverse": null, "owner": "admin@example.com", "reason": "Let the agent read the web.", "review": "2027-05-11" }
+        { "id": "ws-allow-fetch", "layer": "workspace", "when": { "action": "web.fetch" }, "class": "read", "effect": "allow", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Let the agent read the web.", "review": "2027-05-11" }
       ],
       "facts": { "action": "web.fetch" },
       "expect": { "effect": "ask", "rule": "fetch-web", "require": null }
@@ -52,7 +52,7 @@
     {
       "name": "a company layer's allow never turns an unknown action into an allowed one",
       "rules": [
-        { "id": "prj-allow-rm", "layer": "project", "when": { "action": "shell", "command": "rm **" }, "class": "sandbox-write", "effect": "allow", "inverse": null, "owner": "lead@example.com", "reason": "Cleaning is fine.", "review": "2027-05-11" }
+        { "id": "prj-allow-rm", "layer": "project", "when": { "action": "shell", "command": "rm **" }, "class": "sandbox-write", "effect": "allow", "inverse": null, "owner": "who:7c2e4a6b8d0f1e3a5c7b9d2f4a6c8e0b", "reason": "Cleaning is fine.", "review": "2027-05-11" }
       ],
       "facts": { "action": "shell", "command": "rm -rf build" },
       "expect": { "effect": "ask", "rule": null, "require": null }
@@ -60,7 +60,7 @@
     {
       "name": "contradictory: a company rule that allows an irreversible action without a person loses at evaluation",
       "rules": [
-        { "id": "ws-delete-freely", "layer": "workspace", "when": { "action": "issue.delete" }, "class": "reversible-exit", "effect": "allow", "inverse": "restore-issue", "owner": "admin@example.com", "reason": "Agents may delete issues.", "review": "2027-05-11" }
+        { "id": "ws-delete-freely", "layer": "workspace", "when": { "action": "issue.delete" }, "class": "reversible-exit", "effect": "allow", "inverse": "restore-issue", "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Agents may delete issues.", "review": "2027-05-11" }
       ],
       "facts": { "action": "issue.delete" },
       "expect": { "effect": "ask", "rule": "delete-issue", "require": null }
@@ -69,7 +69,7 @@
       "name": "contradictory: a stored table that allows an irreversible action still asks, by the floor",
       "replace": true,
       "rules": [
-        { "id": "legacy-delete", "when": { "action": "issue.delete" }, "class": "irreversible", "effect": "allow", "inverse": null, "owner": "admin@example.com", "reason": "Agents may delete issues.", "review": "2027-05-11" }
+        { "id": "legacy-delete", "when": { "action": "issue.delete" }, "class": "irreversible", "effect": "allow", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Agents may delete issues.", "review": "2027-05-11" }
       ],
       "facts": { "action": "issue.delete" },
       "expect": { "effect": "ask", "rule": "floor-irreversible", "require": null }
@@ -78,7 +78,7 @@
       "name": "the class of the action is TaskForce's: a rule that calls a web fetch a read still asks",
       "replace": true,
       "rules": [
-        { "id": "legacy-fetch", "when": { "action": "web.fetch" }, "class": "read", "effect": "allow", "inverse": null, "owner": "admin@example.com", "reason": "Reading the web.", "review": "2027-05-11" }
+        { "id": "legacy-fetch", "when": { "action": "web.fetch" }, "class": "read", "effect": "allow", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Reading the web.", "review": "2027-05-11" }
       ],
       "facts": { "action": "web.fetch" },
       "expect": { "effect": "ask", "rule": "floor-irreversible", "require": null }
@@ -87,7 +87,7 @@
       "name": "a reversible exit without an inverse is not reversible: it asks",
       "replace": true,
       "rules": [
-        { "id": "legacy-comment", "when": { "action": "comment.create" }, "class": "reversible-exit", "effect": "allow", "inverse": null, "owner": "admin@example.com", "reason": "Comments.", "review": "2027-05-11" }
+        { "id": "legacy-comment", "when": { "action": "comment.create" }, "class": "reversible-exit", "effect": "allow", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Comments.", "review": "2027-05-11" }
       ],
       "facts": { "action": "comment.create" },
       "expect": { "effect": "ask", "rule": "floor-irreversible", "require": null }
@@ -96,7 +96,7 @@
       "name": "a stored table that lets an agent change the rules is refused by the floor",
       "replace": true,
       "rules": [
-        { "id": "legacy-rules", "when": { "action": "harness.change" }, "class": "sandbox-write", "effect": "allow", "inverse": null, "owner": "admin@example.com", "reason": "Agents tune the rules.", "review": "2027-05-11" }
+        { "id": "legacy-rules", "when": { "action": "harness.change" }, "class": "sandbox-write", "effect": "allow", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Agents tune the rules.", "review": "2027-05-11" }
       ],
       "facts": { "action": "harness.change", "actor": "agent" },
       "expect": { "effect": "deny", "rule": "floor-no-agent-rules", "require": null }
@@ -104,8 +104,8 @@
     {
       "name": "a company layer never decides harness.change, the action TaskForce owns: its own table does",
       "rules": [
-        { "id": "ws-ask-people", "layer": "workspace", "when": { "actor": "person" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Every gesture of a person waits for an admin.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } },
-        { "id": "prj-no-rule-changes", "layer": "project", "when": { "action": "harness.change" }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "lead@example.com", "reason": "Nobody changes the rules here.", "review": "2027-05-11" }
+        { "id": "ws-ask-people", "layer": "workspace", "when": { "actor": "person" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Every gesture of a person waits for an admin.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } },
+        { "id": "prj-no-rule-changes", "layer": "project", "when": { "action": "harness.change" }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "who:7c2e4a6b8d0f1e3a5c7b9d2f4a6c8e0b", "reason": "Nobody changes the rules here.", "review": "2027-05-11" }
       ],
       "facts": { "action": "harness.change", "actor": "person" },
       "expect": { "effect": "allow", "rule": "change-rules", "require": null }
@@ -173,7 +173,7 @@
     {
       "name": "the CEO's rule: a change in the accounting module asks the finance lead",
       "rules": [
-        { "id": "accounting-needs-finance-lead", "layer": "workspace", "text": "No change in the accounting module without the approval of the finance lead", "when": { "action": "file.write", "path": "**/accounting/**" }, "class": "sandbox-write", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "No change in the accounting module without the approval of the finance lead", "review": "2027-05-11", "require": { "approvers": ["person:42"] } }
+        { "id": "accounting-needs-finance-lead", "layer": "workspace", "text": "No change in the accounting module without the approval of the finance lead", "when": { "action": "file.write", "path": "**/accounting/**" }, "class": "sandbox-write", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "No change in the accounting module without the approval of the finance lead", "review": "2027-05-11", "require": { "approvers": ["person:42"] } }
       ],
       "facts": { "action": "file.write", "tool": "Edit", "path": "src/accounting/ledger.ts" },
       "expect": { "effect": "ask", "rule": "accounting-needs-finance-lead", "require": { "approvers": [["person:42"]], "signatures": 1, "separate": false } }
@@ -181,7 +181,7 @@
     {
       "name": "the CEO's rule: a change elsewhere is allowed",
       "rules": [
-        { "id": "accounting-needs-finance-lead", "layer": "workspace", "text": "No change in the accounting module without the approval of the finance lead", "when": { "action": "file.write", "path": "**/accounting/**" }, "class": "sandbox-write", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "No change in the accounting module without the approval of the finance lead", "review": "2027-05-11", "require": { "approvers": ["person:42"] } }
+        { "id": "accounting-needs-finance-lead", "layer": "workspace", "text": "No change in the accounting module without the approval of the finance lead", "when": { "action": "file.write", "path": "**/accounting/**" }, "class": "sandbox-write", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "No change in the accounting module without the approval of the finance lead", "review": "2027-05-11", "require": { "approvers": ["person:42"] } }
       ],
       "facts": { "action": "file.write", "tool": "Edit", "path": "src/billing/invoice.ts" },
       "expect": { "effect": "allow", "rule": "write-sandbox-files", "require": null }
@@ -189,8 +189,8 @@
     {
       "name": "two layers that ask add up: an approver, two signatures and the separation of roles",
       "rules": [
-        { "id": "prj-two-signatures", "layer": "project", "when": { "action": "mcp.write" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "lead@example.com", "reason": "Two people sign a change in a company tool, never the one who prepared it.", "review": "2027-05-11", "require": { "signatures": 2, "separate": true } },
-        { "id": "ws-admin-for-stripe", "layer": "workspace", "when": { "action": "mcp.write", "server": "stripe" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "An admin approves anything in Stripe.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } }
+        { "id": "prj-two-signatures", "layer": "project", "when": { "action": "mcp.write" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:7c2e4a6b8d0f1e3a5c7b9d2f4a6c8e0b", "reason": "Two people sign a change in a company tool, never the one who prepared it.", "review": "2027-05-11", "require": { "signatures": 2, "separate": true } },
+        { "id": "ws-admin-for-stripe", "layer": "workspace", "when": { "action": "mcp.write", "server": "stripe" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "An admin approves anything in Stripe.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } }
       ],
       "facts": { "action": "mcp.write", "server": "stripe", "tool": "create_refund" },
       "expect": { "effect": "ask", "rule": "prj-two-signatures", "require": { "approvers": [["role:admin"]], "signatures": 2, "separate": true } }
@@ -198,7 +198,7 @@
     {
       "name": "a threshold on a field: above it, the owner signs and the preparer can't",
       "rules": [
-        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
+        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
       ],
       "facts": { "action": "mcp.write", "server": "invoices", "arg.amount": "7200.50" },
       "expect": { "effect": "ask", "rule": "quotes-over-5000", "require": { "approvers": [["role:owner"]], "signatures": 1, "separate": true } }
@@ -206,7 +206,7 @@
     {
       "name": "a threshold on a field: at the threshold, TaskForce's own rule asks, with no obligation",
       "rules": [
-        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
+        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
       ],
       "facts": { "action": "mcp.write", "server": "invoices", "arg.amount": "5000" },
       "expect": { "effect": "ask", "rule": "write-company-tools", "require": null }
@@ -214,7 +214,7 @@
     {
       "name": "a threshold on a field: a value that isn't a number counts as exceeded",
       "rules": [
-        { "id": "no-big-refunds", "layer": "workspace", "when": { "action": "mcp.write", "over": { "fact": "arg.amount", "value": 100000 } }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "admin@example.com", "reason": "No refund above 100,000 through an agent.", "review": "2027-05-11" }
+        { "id": "no-big-refunds", "layer": "workspace", "when": { "action": "mcp.write", "over": { "fact": "arg.amount", "value": 100000 } }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "No refund above 100,000 through an agent.", "review": "2027-05-11" }
       ],
       "facts": { "action": "mcp.write", "server": "stripe", "arg.amount": "250 000" },
       "expect": { "effect": "deny", "rule": "no-big-refunds", "require": null }
@@ -222,7 +222,7 @@
     {
       "name": "a threshold on a field: a missing value counts as exceeded when the rule's other conditions match",
       "rules": [
-        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
+        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
       ],
       "facts": { "action": "mcp.write", "server": "invoices" },
       "expect": { "effect": "ask", "rule": "quotes-over-5000", "require": { "approvers": [["role:owner"]], "signatures": 1, "separate": true } }
@@ -230,7 +230,7 @@
     {
       "name": "a threshold on a field: a missing value doesn't make the rule apply when its other conditions don't match",
       "rules": [
-        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
+        { "id": "quotes-over-5000", "layer": "workspace", "when": { "action": "mcp.write", "server": "invoices", "over": { "fact": "arg.amount", "value": 5000 } }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Any quote above 5,000 needs the owner's signature, and whoever prepared it can't give it.", "review": "2027-05-11", "require": { "approvers": ["role:owner"], "separate": true } }
       ],
       "facts": { "action": "mcp.write", "server": "crm" },
       "expect": { "effect": "ask", "rule": "write-company-tools", "require": null }
@@ -238,8 +238,8 @@
     {
       "name": "refusing beats an obligation: the decision is a refusal, with nothing to sign",
       "rules": [
-        { "id": "no-big-refunds", "layer": "workspace", "when": { "action": "mcp.write", "over": { "fact": "arg.amount", "value": 100000 } }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "admin@example.com", "reason": "No refund above 100,000 through an agent.", "review": "2027-05-11" },
-        { "id": "ws-admin-for-stripe", "layer": "workspace", "when": { "action": "mcp.write", "server": "stripe" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "An admin approves anything in Stripe.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } }
+        { "id": "no-big-refunds", "layer": "workspace", "when": { "action": "mcp.write", "over": { "fact": "arg.amount", "value": 100000 } }, "class": "irreversible", "effect": "deny", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "No refund above 100,000 through an agent.", "review": "2027-05-11" },
+        { "id": "ws-admin-for-stripe", "layer": "workspace", "when": { "action": "mcp.write", "server": "stripe" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "An admin approves anything in Stripe.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } }
       ],
       "facts": { "action": "mcp.write", "server": "stripe", "arg.amount": "250000" },
       "expect": { "effect": "deny", "rule": "no-big-refunds", "require": null }
@@ -247,8 +247,8 @@
     {
       "name": "a compound command: the obligations of each asking part add up",
       "rules": [
-        { "id": "ask-lead-for-docker", "layer": "project", "when": { "action": "shell", "command": "docker **" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "lead@example.com", "reason": "The lead approves Docker.", "review": "2027-05-11", "require": { "approvers": ["project-lead"] } },
-        { "id": "ask-admin-for-make", "layer": "workspace", "when": { "action": "shell", "command": "make **" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "An admin approves make.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } }
+        { "id": "ask-lead-for-docker", "layer": "project", "when": { "action": "shell", "command": "docker **" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:7c2e4a6b8d0f1e3a5c7b9d2f4a6c8e0b", "reason": "The lead approves Docker.", "review": "2027-05-11", "require": { "approvers": ["project-lead"] } },
+        { "id": "ask-admin-for-make", "layer": "workspace", "when": { "action": "shell", "command": "make **" }, "class": "irreversible", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "An admin approves make.", "review": "2027-05-11", "require": { "approvers": ["role:admin"] } }
       ],
       "factsList": [
         { "action": "shell", "command": "docker build ." },
@@ -259,7 +259,7 @@
     {
       "name": "an actor condition: a rule for agents doesn't touch a person's own gesture",
       "rules": [
-        { "id": "agents-ask-issues", "layer": "workspace", "when": { "action": "issue.create", "actor": "agent" }, "class": "reversible-exit", "effect": "ask", "inverse": null, "owner": "admin@example.com", "reason": "Agents ask before creating issues.", "review": "2027-05-11" }
+        { "id": "agents-ask-issues", "layer": "workspace", "when": { "action": "issue.create", "actor": "agent" }, "class": "reversible-exit", "effect": "ask", "inverse": null, "owner": "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", "reason": "Agents ask before creating issues.", "review": "2027-05-11" }
       ],
       "facts": { "action": "issue.create", "actor": "person" },
       "expect": { "effect": "allow", "rule": "create-issue", "require": null }

@@ -34,6 +34,7 @@ import com.taskforce.tf_api.core.repository.McpOAuthStateRepository;
 import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceRepository;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 import com.taskforce.tf_api.core.service.agent.AgentContext;
 import com.taskforce.tf_api.core.service.agent.AgentTool;
 import com.taskforce.tf_api.core.service.agent.CortexGate;
@@ -91,7 +92,7 @@ class McpConnectContractTest {
         HarnessRuleSetRepository ruleSets = Mockito.mock(HarnessRuleSetRepository.class);
         WorkspaceRepository workspaces = workspaceRepository();
         gate = new CortexGate(
-            new HarnessRulesService(ruleSets, Mockito.mock(com.taskforce.tf_api.core.repository.WorkspaceMemberRepository.class)),
+            new HarnessRulesService(ruleSets, Mockito.mock(com.taskforce.tf_api.core.repository.WorkspaceMemberRepository.class), TestPersonIds.inMemory()),
             workspaces, Mockito.mock(com.taskforce.tf_api.core.repository.ProjectRepository.class),
             Mockito.mock(com.taskforce.tf_api.core.repository.IssueRepository.class), om);
     }

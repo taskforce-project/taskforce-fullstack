@@ -126,7 +126,7 @@ describe("la porte du poste devant les règles de l'entreprise", () => {
   const accounting: Rule = {
     id: "ws-accounting", layer: "workspace", text: "No change in the accounting module without the approval of the finance lead",
     when: { action: "file.write", path: "**/accounting/**" }, class: "sandbox-write", effect: "ask", inverse: null,
-    owner: "admin@example.com", reason: "No change in the accounting module without the approval of the finance lead",
+    owner: "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", reason: "No change in the accounting module without the approval of the finance lead",
     review: "2027-05-11", require: { approvers: ["person:42"] },
   };
   const rules: RulesBundle = { ...defaults, rules: [accounting, ...defaults.rules] };
@@ -203,7 +203,7 @@ describe("la porte du poste devant les règles de l'entreprise", () => {
     const docker: Rule = {
       id: "ws-ask-docker", layer: "workspace", text: "Docker commands wait for a person",
       when: { action: "shell", command: "docker **" }, class: "irreversible", effect: "ask", inverse: null,
-      owner: "admin@example.com", reason: "Docker commands wait for a person", review: "2027-05-11",
+      owner: "who:3f9a1c7e5b2d4f6a8c0e1b3d5f7a9c2e", reason: "Docker commands wait for a person", review: "2027-05-11",
     };
     const { api: fake, asked } = api();
     const server = new ApprovalServer(fake, 42, WORK, { waitMs: 200, pollMs: 5,

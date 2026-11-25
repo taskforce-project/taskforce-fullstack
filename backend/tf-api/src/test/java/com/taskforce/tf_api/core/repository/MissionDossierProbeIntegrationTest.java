@@ -26,6 +26,7 @@ import com.taskforce.tf_api.core.model.IssueStatus;
 import com.taskforce.tf_api.core.model.Project;
 import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.core.service.delivery.MissionEvidenceService;
 import com.taskforce.tf_api.util.AbstractIntegrationTest;
 
@@ -35,7 +36,7 @@ import com.taskforce.tf_api.util.AbstractIntegrationTest;
  * à jamais ; l'empreinte d'un titre court confirmait une supposition une fois le texte effacé ; et rien ne disait que les
  * faits du runner viennent du poste de l'agent.
  */
-@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class})
+@Import({MissionEvidenceService.class, EvidenceSigner.class, HarnessRulesService.class, PersonIds.class})
 @DisplayName("Le dossier, sondes M5 et M6 de la relecture R159 (intégration Postgres)")
 class MissionDossierProbeIntegrationTest extends AbstractIntegrationTest {
 

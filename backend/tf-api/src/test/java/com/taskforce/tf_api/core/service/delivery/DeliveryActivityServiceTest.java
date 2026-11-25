@@ -86,7 +86,7 @@ class DeliveryActivityServiceTest {
         LocalRunnerSettings settings = new LocalRunnerSettings(true, "delivery-runner", "tf-runner-", "tf_runner_owner", 120, 10, 15, 10);
         service = new DeliveryActivityService(runRepository, eventRepository, approvalRepository, userRepository,
             visibilityGuard, access, notificationService, settings, evidenceService,
-            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members),
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSets, members, com.taskforce.tf_api.core.service.TestPersonIds.inMemory()),
             new com.taskforce.tf_api.core.service.rules.RuleApprovers(members, projectMembers), signatures, members, feed);
         delegator = User.builder().id(7L).email("ada@taskforce.dev").displayName("Ada").build();
         teammate = User.builder().id(8L).email("linus@taskforce.dev").build();

@@ -49,6 +49,7 @@ import com.taskforce.tf_api.core.repository.ProjectRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
 import com.taskforce.tf_api.core.service.AuditService;
 import com.taskforce.tf_api.core.service.AuthorizationService;
+import com.taskforce.tf_api.core.service.PersonIds;
 import com.taskforce.tf_api.core.service.ProjectVisibilityGuard;
 import com.taskforce.tf_api.core.service.brain.BrainAccessGuard;
 import com.taskforce.tf_api.shared.exception.BusinessException;
@@ -90,6 +91,8 @@ public class RulesService {
     private final ConnectorConnectionRepository connections;
     private final RuleDraftService drafts;
     private final AuditService audit;
+    /** Qui répond d'une règle : la personne qui l'écrit, par son identifiant dans l'espace, jamais son courriel. */
+    private final PersonIds personIds;
 
     /** Ce qui empêche une règle d'entrer, ou ce qu'elle devient : la réponse de {@link #add} dit lequel. */
     public record Saved(RulesResponse.RuleDraft draft, boolean saved) {
@@ -262,6 +265,9 @@ public class RulesService {
                 List.of(), List.of(), problems, approverNeeded, unclear, false), List.of());
         }
         String group = ruleId(key, text, 0, clean.size());
+        // La personne qui écrit la règle en répond, nommée comme le paquet et le dossier la nomment (R159, M6) : la
+        // version de la couche ne change jamais, et un courriel y resterait après la purge de son compte.
+        String owner = personIds.of(ws.getId(), context.userId());
         List<Map<String, Object>> stored = new ArrayList<>();
         for (int i = 0; i < clean.size(); i++) {
             Map<String, Object> rule = clean.get(i);
@@ -272,7 +278,7 @@ public class RulesService {
             full.put("class", classOf(rule));
             full.put("effect", rule.get("effect"));
             full.put("inverse", null);
-            full.put("owner", context.email());
+            full.put("owner", owner);
             full.put("reason", text);
             full.put("review", LocalDate.now().plusMonths(REVIEW_MONTHS).toString());
             full.put("text", text);
@@ -697,10 +703,6 @@ public class RulesService {
     /** Ce que la personne voit de l'espace, et ce qu'elle peut y écrire. */
     private record Context(Long userId, User me, Map<Long, WorkspaceMember> members, Map<Long, Project> projects,
                            boolean manager, Set<Long> leads) {
-
-        String email() {
-            return me.getEmail();
-        }
 
         Set<Long> memberIds() {
             return members.keySet();

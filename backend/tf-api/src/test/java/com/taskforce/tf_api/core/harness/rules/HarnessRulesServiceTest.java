@@ -30,26 +30,39 @@ import com.taskforce.tf_api.core.model.User;
 import com.taskforce.tf_api.core.model.Workspace;
 import com.taskforce.tf_api.core.model.WorkspaceMember;
 import com.taskforce.tf_api.core.repository.HarnessRuleSetRepository;
+import com.taskforce.tf_api.core.repository.UserRepository;
 import com.taskforce.tf_api.core.repository.WorkspaceMemberRepository;
+import com.taskforce.tf_api.core.service.PersonIds;
+import com.taskforce.tf_api.core.service.TestPersonIds;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Règles du harnais remises au runner : la table, puis les couches de l'entreprise")
 class HarnessRulesServiceTest {
 
+    /** Ce que le contrat permet à {@code owner} (contracts/rules/taskforce-rules-1.schema.json) : jamais un courriel. */
+    static final String OWNER = "^(who:([0-9a-f]{32}|unknown)|workspace-owner)$";
+
     @Mock private HarnessRuleSetRepository repository;
     @Mock private WorkspaceMemberRepository members;
+    @Mock private UserRepository users;
 
     private HarnessRulesService service;
+    private PersonIds personIds;
     private Workspace workspace;
+    private User pierre;
     private final List<HarnessRuleSet> rows = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
-        service = new HarnessRulesService(repository, members);
-        workspace = Workspace.builder().id(9L).slug("acme").owner(User.builder().id(7L).email("pierre@acme.dev").build()).build();
+        personIds = TestPersonIds.inMemory(users);
+        service = new HarnessRulesService(repository, members, personIds);
+        pierre = User.builder().id(7L).email("pierre@acme.dev").build();
+        workspace = Workspace.builder().id(9L).slug("acme").owner(pierre).build();
         lenient().when(repository.findByWorkspaceIdOrderByVersionDesc(9L)).thenAnswer(inv -> rows.stream()
             .sorted((a, b) -> Integer.compare(b.getVersion(), a.getVersion())).toList());
         lenient().when(members.findByWorkspaceIdAndUserId(eq(9L), anyLong())).thenReturn(Optional.empty());
+        // Une version écrite avant la 1.18 nomme son auteur par son courriel ; le compte le porte encore.
+        lenient().when(users.findByEmail("pierre@acme.dev")).thenReturn(Optional.of(pierre));
     }
 
     private static Map<String, Object> rule(String id, String action, String effect) {
@@ -78,7 +91,7 @@ class HarnessRulesServiceTest {
     }
 
     @Test
-    @DisplayName("sans règles écrites : la table par défaut, dont la personne propriétaire de l'espace répond")
+    @DisplayName("sans règles écrites : la table par défaut, dont la personne propriétaire de l'espace répond, par son identifiant")
     void defaultsOwnedByTheWorkspaceOwner() {
         RulesBundle bundle = service.bundleFor(workspace);
 
@@ -86,10 +99,13 @@ class HarnessRulesServiceTest {
         assertThat(bundle.workspace()).isEqualTo("acme");
         assertThat(bundle.version()).isEqualTo(1);
         assertThat(bundle.layers()).isNull();
+        String owner = personIds.of(9L, 7L);
+        assertThat(owner).matches("who:[0-9a-f]{32}");
         assertThat(bundle.rules()).isNotEmpty().allSatisfy(r -> {
-            assertThat(r.owner()).isEqualTo("pierre@acme.dev");
+            assertThat(r.owner()).isEqualTo(owner);
             assertThat(r.layer()).isNull();
         });
+        assertThat(new ObjectMapper().valueToTree(bundle).toString()).doesNotContain("@");
         assertThat(bundle.rules()).extracting(RulesBundle.Rule::id).contains("change-rules", "no-harness-change")
             .doesNotContain("pay", "deploy");
     }
@@ -230,5 +246,65 @@ class HarnessRulesServiceTest {
 
         assertThat(decision.effect()).isEqualTo("ask");
         assertThat(decision.require().approvers()).containsExactly(List.of("person:42"));
+    }
+
+    @Test
+    @DisplayName("une version d'avant la 1.18 nomme son auteur par son courriel : le paquet le nomme par son identifiant, "
+        + "et l'empreinte de la couche, calculée sur ses règles nommées ainsi, ne confirme pas le courriel")
+    void anOlderLayerNamesItsAuthorById() {
+        List<Map<String, Object>> stored = List.of(rule("ws-ask-comments", "comment.create", "ask"));
+        add(row(RuleScope.WORKSPACE, 2, stored));
+
+        RulesBundle bundle = service.bundleFor(workspace);
+
+        String pierreId = personIds.of(9L, 7L);
+        assertThat(bundle.rules().get(0).owner()).isEqualTo(pierreId);
+        Map<String, Object> named = new LinkedHashMap<>(stored.get(0));
+        named.put("owner", pierreId);
+        assertThat(bundle.layers()).singleElement().satisfies(l -> {
+            assertThat(l.digest()).isEqualTo(HarnessRulesService.digestOf(List.of(named)));
+            assertThat(l.digest()).isNotEqualTo(rows.get(0).getDigest());
+        });
+        assertThat(new ObjectMapper().valueToTree(bundle).toString()).doesNotContain("@");
+        // La version gardée ne change pas : elle ne change jamais (V125).
+        assertThat(rows.get(0).getRules().get(0).get("owner")).isEqualTo("pierre@acme.dev");
+    }
+
+    @Test
+    @DisplayName("une version écrite depuis la 1.18 nomme déjà son auteur par son identifiant : le paquet porte son empreinte")
+    void aNewerLayerKeepsItsDigest() {
+        Map<String, Object> rule = rule("ws-ask-comments", "comment.create", "ask");
+        rule.put("owner", personIds.of(9L, 7L));
+        add(row(RuleScope.WORKSPACE, 2, List.of(rule)));
+
+        RulesBundle bundle = service.bundleFor(workspace);
+
+        assertThat(bundle.rules().get(0).owner()).isEqualTo(personIds.of(9L, 7L));
+        assertThat(bundle.layers()).singleElement().satisfies(l -> assertThat(l.digest()).isEqualTo(rows.get(0).getDigest()));
+    }
+
+    @Test
+    @DisplayName("un propriétaire que TaskForce ne retrouve pas, un courriel sans compte ou un nom tapé, ne nomme personne")
+    void anOwnerNoOneHasIsUnknown() {
+        Map<String, Object> gone = rule("ws-ask-comments", "comment.create", "ask");
+        gone.put("owner", "someone-gone@acme.dev");
+        Map<String, Object> typed = rule("ws-no-delete", "issue.delete", "deny");
+        typed.put("owner", "Pierre Michel");
+        add(row(RuleScope.WORKSPACE, 2, List.of(gone, typed)));
+
+        RulesBundle bundle = service.bundleFor(workspace);
+
+        assertThat(bundle.rules()).filteredOn(r -> r.layer() != null).extracting(RulesBundle.Rule::owner)
+            .containsExactly(PersonIds.UNKNOWN, PersonIds.UNKNOWN);
+        assertThat(bundle.rules()).allSatisfy(r -> assertThat(r.owner()).matches(OWNER));
+        assertThat(new ObjectMapper().valueToTree(bundle).toString()).doesNotContain("@").doesNotContain("Pierre Michel");
+    }
+
+    @Test
+    @DisplayName("un espace sans propriétaire garde le repère du contrat : le paquet n'invente personne")
+    void aWorkspaceWithoutOwnerKeepsThePlaceholder() {
+        Workspace orphan = Workspace.builder().id(9L).slug("acme").build();
+
+        assertThat(service.bundleFor(orphan).rules()).allSatisfy(r -> assertThat(r.owner()).isEqualTo("workspace-owner"));
     }
 }

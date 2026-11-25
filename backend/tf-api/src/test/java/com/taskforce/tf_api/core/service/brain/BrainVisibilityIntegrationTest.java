@@ -237,7 +237,7 @@ class BrainVisibilityIntegrationTest extends AbstractIntegrationTest {
             mock(SmartAssignService.class), search, mock(AnalyticsService.class), cortex, gestures,
             mock(com.taskforce.tf_api.core.service.mcpserver.ProjectGestures.class));
         mcp = new McpServerService(tools, mapper, userRepository, new JwtIdentityResolver(environment),
-            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSetRepository, workspaceMemberRepository),
+            new com.taskforce.tf_api.core.harness.rules.HarnessRulesService(ruleSetRepository, workspaceMemberRepository, com.taskforce.tf_api.core.service.TestPersonIds.inMemory()),
             workspaceRepository, mock(com.taskforce.tf_api.core.service.AuditService.class));
     }
 
