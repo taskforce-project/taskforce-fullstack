@@ -83,8 +83,9 @@ function blocksHtml(blocks: readonly Block[]): string {
 
 function lineHtml(line: Line, moreFiles: string): string {
   const cls = line.tone && line.tone !== "agent" ? ` class="${line.tone}"` : ""
-  // Un long texte du dossier (la description, le brief) se replie sous sa ligne.
-  if (line.body) return `<details><summary${cls}>${lineText(line)}</summary><pre>${escapeHtml(line.body)}</pre></details>`
+  // Un long texte du dossier (la description, le brief) se replie sous sa ligne, ouvert : la copie imprimée, celle qu'un
+  // auditeur classe, le garde (R161 N4 du second tour de #552).
+  if (line.body) return `<details open><summary${cls}>${lineText(line)}</summary><pre>${escapeHtml(line.body)}</pre></details>`
   const parts = [`<p${cls}>${lineText(line)}</p>`]
   if (line.blocks) parts.push(`<div class="agent" data-agent="true">${blocksHtml(line.blocks)}</div>`)
   if (line.list) {
@@ -92,7 +93,7 @@ function lineHtml(line: Line, moreFiles: string): string {
     const rest = line.list.lines.slice(FOLD)
     if (rest.length > 0) {
       const label = escapeHtml(moreFiles.replace("{count}", String(line.list.lines.length)))
-      parts.push(`<details><summary class="muted">${label}</summary>${rest.map((l) => lineHtml(l, moreFiles)).join("")}</details>`)
+      parts.push(`<details open><summary class="muted">${label}</summary>${rest.map((l) => lineHtml(l, moreFiles)).join("")}</details>`)
     }
   }
   return parts.join("")

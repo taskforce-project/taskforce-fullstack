@@ -66,7 +66,10 @@ describe("la page exportée avec son dossier", () => {
     expect(html).toContain("<a href=\"https://github.com/acme/website/pull/212\">https://github.com/acme/website/pull/212</a>")
     expect(html).toContain("<div class=\"agent\" data-agent=\"true\"><h3>What I did</h3>")
     expect(html).toContain("<code>src/components/footer.tsx</code>")
-    expect(html).toContain("<details><summary class=\"muted\">The brief given to the agent")
+    // R161 N4 du second tour de #552 : ouverts, pour que la copie imprimée garde la description, le brief et les fichiers.
+    expect(html).toContain("<details open><summary class=\"muted\">The brief given to the agent")
+    expect(html).toContain("<details open><summary>Description</summary><pre>")
+    expect(html).not.toMatch(/<details>/)
     expect(html).toContain("overflow-wrap:anywhere")
   })
 
@@ -110,7 +113,7 @@ describe("la page exportée avec son dossier", () => {
     const sections: Section[] = [{ id: "changed", title: "2. What changed", lines: [{ text: "12 files changed", list: { lines: files, fold: FOLD } }] }]
     const html = verificationHtml({ title: "x", assembled: "", verdict: [], proves: "", sentence: "", notes: [], howTo: "", moreFiles: t.showAllFiles },
       sections, "{}")
-    expect(html).toContain("<p>file-9.ts</p><details><summary class=\"muted\">Show all 12 files</summary><p>file-10.ts</p><p>file-11.ts</p></details>")
+    expect(html).toContain("<p>file-9.ts</p><details open><summary class=\"muted\">Show all 12 files</summary><p>file-10.ts</p><p>file-11.ts</p></details>")
   })
 
   it("R159 P7 : rien de ce que le dossier porte ne devient du code ni un lien ailleurs que GitHub", () => {
