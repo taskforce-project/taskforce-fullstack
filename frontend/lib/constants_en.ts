@@ -2333,6 +2333,8 @@ export const CONSTANTS_EN = {
       notJudgedCutOne: "1 on a fact longer than the record keeps (cut at {max} characters)",
       notJudgedNoFacts: "{count} without their facts",
       notJudgedNoFactsOne: "1 without its facts",
+      notJudgedRunner: "{count} made by the runner itself, which no rule judges",
+      notJudgedRunnerOne: "1 made by the runner itself, which no rule judges",
       trusted: "Its seal is signed by a key this TaskForce lists as its own. That list comes from its own database: what anchors the key is the comment in the pull request.",
       witnessBroken: "The witness in the pull request names event {seq} with {root}, which is not in this record: it was rewritten after its head was written there.",
       trustedSameMachine: "Signed with a key the agent could read: the seal does not prove that the record is unchanged.",

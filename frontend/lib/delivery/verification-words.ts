@@ -250,13 +250,15 @@ function verdictOf(page: VerificationPage, t: Texts, desktop: boolean): Line[] {
   if (d.rules.present && !d.rules.digestHolds) lines.push({ text: v.rules, tone: "warn" })
   if (d.rules.differ.length > 0) lines.push({ text: v.rulesDiffer, tone: "warn" })
   // Les décisions que la page n'a pas pu rejuger : prises sur un fait que le dossier n'a gardé qu'en partie (second tour de
-  // #551, N2), ou sans leurs faits (troisième tour, c-b). La première ligne du vérificateur les compte, la page aussi.
-  const notJudged = d.rules.cut + d.rules.noFacts
+  // #551, N2), ou sans leurs faits (troisième tour, c-b) ; et celles que le runner prend lui-même, qu'aucune règle du paquet
+  // ne juge (quatrième tour, d-f). La première ligne du vérificateur les compte, la page aussi.
+  const notJudged = d.rules.cut + d.rules.noFacts + d.rules.runner
   if (notJudged > 0) {
     const max = MAX_FACT.toLocaleString("en-US")
     const parts = [
       d.rules.cut > 0 ? fillText(d.rules.cut === 1 ? v.notJudgedCutOne : v.notJudgedCut, { count: d.rules.cut, max }) : null,
       d.rules.noFacts > 0 ? fillText(d.rules.noFacts === 1 ? v.notJudgedNoFactsOne : v.notJudgedNoFacts, { count: d.rules.noFacts }) : null,
+      d.rules.runner > 0 ? fillText(d.rules.runner === 1 ? v.notJudgedRunnerOne : v.notJudgedRunner, { count: d.rules.runner }) : null,
     ].filter((part): part is string => part !== null).join(", ")
     lines.push({ text: fillText(notJudged === 1 ? v.notJudgedOne : v.notJudged, { count: notJudged, parts }), tone: "muted" })
   }

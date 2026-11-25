@@ -500,6 +500,27 @@ describe("le reste du dossier, dit en clair", () => {
     expect(verdictLines(page, t).map((l) => l.text)).toContain("1 recorded decision was not judged again by this page: 1 without its facts.")
   })
 
+  it("d-f du quatrième tour de #551 : le refus du runner se compte ; un « cap: » qu'il n'émet pas se rejuge", async () => {
+    const decidedBy = async (rule: string, effect: string) => {
+      const file = example()
+      const events = file.events.filter((e) => !(e.type === "note" && (e.data as { kind?: unknown } | null)?.kind === "witness")).map((e) => {
+        const d = (e.data ?? {}) as Record<string, unknown>
+        return e.seq === 7 ? { ...e, actor: { ...e.actor, id: rule }, data: { ...d, effect } } : e
+      })
+      const record = rechained(file, events)
+      return verificationPage(record, await checkRecord(record, [], at))
+    }
+    const refused = await decidedBy("cap:fact-length", "deny")
+    expect(refused.check?.details?.rules).toMatchObject({ runner: 1, differ: [] })
+    expect(verdictLines(refused, t).map((l) => l.text))
+      .toContain("1 recorded decision was not judged again by this page: 1 made by the runner itself, which no rule judges.")
+    // Un « cap: » inventé se rejuge : décidé à l'inverse des règles, la page le dit.
+    const made = await decidedBy("cap:anything", "deny")
+    expect(made.check?.details?.rules.runner).toBe(0)
+    expect(made.check?.details?.rules.differ).toHaveLength(1)
+    expect(verdictLines(made, t).map((l) => l.text)).toContain(t.verdict.rulesDiffer)
+  })
+
   it("C1 du troisième tour de #551 : une action trop longue pour être accordée se lit dans les décisions, en mots simples", () => {
     const command = `psql -v pad=${"a".repeat(30)}`
     const page = verificationPage(chained([

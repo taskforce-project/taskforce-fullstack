@@ -123,9 +123,10 @@ export interface Reading {
   lateOn: string | null;
   /**
    * Les décisions que le vérificateur n'a pas pu rejuger (R159, troisième tour, c-b) : prises sur un fait coupé pour tenir
-   * au dossier, ou sans leurs faits. La première ligne les compte.
+   * au dossier, ou sans leurs faits ; et celles que le runner prend lui-même, hors du paquet (quatrième tour, d-f). La
+   * première ligne les compte.
    */
-  notJudged: { cut: number; noFacts: number };
+  notJudged: { cut: number; noFacts: number; runner: number };
 }
 
 export interface SealReading {
@@ -181,8 +182,14 @@ export async function openSeal(envelope: unknown): Promise<SealReading> {
     : { valid: false, statement, keyId: id, reason: "the signature does not hold: the statement was changed after it was sealed" };
 }
 
-/** Les règles que le runner applique lui-même, et qu'un paquet ne rejuge pas : le plafond, un accord pour la mission. */
-const RUNNER_GATES = /^(cap:|allowed for this mission)/;
+/**
+ * Les décisions que le runner prend lui-même, hors du paquet (approvals.ts) : une action trop longue pour être accordée, le
+ * plafond des changements. Un paquet ne les rejuge pas, et la première ligne les compte. Tout autre {@code cap:} se rejuge :
+ * un runner ne soustrait plus une décision au rejugement en la nommant ainsi (R159 de #551, quatrième tour, d-f).
+ */
+const RUNNER_CAPS = new Set(["cap:fact-length", "cap:taskforce-changes"]);
+/** Un accord qu'une personne a donné pour toute la mission : il ne vient pas du paquet non plus. */
+const MISSION_ALLOWANCE = /^allowed for this mission/;
 
 /** Ce que le dossier garde d'un fait jugé ; au-delà, le runner le coupe et le dit (R159, L4 ; second tour, N2). */
 export const MAX_FACT = 4000;
@@ -258,6 +265,8 @@ export interface RulesCheck {
   readonly cut: number;
   /** Les décisions des règles qui ne gardent pas leurs faits : elles ne se rejugent pas non plus (troisième tour, c-b). */
   readonly noFacts: number;
+  /** Les décisions que le runner prend lui-même ({@link RUNNER_CAPS}) : hors du paquet, comptées (quatrième tour, d-f). */
+  readonly runner: number;
   readonly differ: ReadonlyArray<{ readonly seq: number; readonly effect: string; readonly rule: string; readonly recorded: string; readonly recordedRule: string }>;
 }
 
@@ -371,6 +380,7 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
   let judged = 0;
   let cut = 0;
   let noFacts = 0;
+  let runner = 0;
   const differ: Array<{ seq: number; effect: string; rule: string; recorded: string; recordedRule: string }> = [];
   if (rules) {
     let digest: string | null = null;
@@ -385,7 +395,11 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
         const data = dataOf(event);
         if (event.type !== "action.decided" || data?.kind !== "decision") continue;
         const ruleId = event.actor?.id ?? "none";
-        if (RUNNER_GATES.test(ruleId)) continue;
+        if (RUNNER_CAPS.has(ruleId)) {
+          runner++;
+          continue;
+        }
+        if (MISSION_ALLOWANCE.test(ruleId)) continue;
         // Une décision sans ses faits ne se rejuge pas : la première ligne la compte (R159, troisième tour, c-b).
         if (!Array.isArray(data.facts) || data.facts.length === 0) {
           if (event.actor?.kind === "rule") noFacts++;
@@ -444,7 +458,7 @@ export async function checkDossier(file: Obj, options: CheckOptions = {}): Promi
   return {
     header: { covered, differs, missing: missingFields, uncovered },
     texts: { referenced: referenced.size, matches, changed, unnamed, absent },
-    rules: { present: rules !== null, digestHolds, judged, cut, noFacts, differ },
+    rules: { present: rules !== null, digestHolds, judged, cut, noFacts, runner, differ },
     gaps,
     runnerFacts: header.runnerFacts === "agent-machine",
     definitionChanged,
@@ -651,7 +665,7 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
   }
   const state = s.kind === "noSeal" || s.kind === "unreadableKey" || s.kind === "key" ? sealStateOf(s) : s.state;
   return { lines, seal: state, lateOn: s.late && (state === "trusted" || state === "self") ? s.sealedAt : null,
-    notJudged: { cut: check.rules.cut, noFacts: check.rules.noFacts } };
+    notJudged: { cut: check.rules.cut, noFacts: check.rules.noFacts, runner: check.rules.runner } };
 }
 
 /** Ce que la première ligne dit d'un sceau qui ne tient pas pour la clé donnée. */
