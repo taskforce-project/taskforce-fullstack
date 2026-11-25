@@ -9,6 +9,11 @@ const TEST_DEFINITIONS = [
   /(^|\/)package\.json$/,
   /(^|\/)(jest|vitest|vite|karma|playwright|cypress|ava|babel|nyc|c8)\.config\.([cm]?[jt]s|json)$/,
   /(^|\/)(vitest\.workspace|jest\.setup|vitest\.setup)\.[cm]?[jt]s$/,
+  // Les noms d'usage de Karma, de Cypress avant sa version 10 et de Jasmine, et l'environnement des tests (R159, troisième
+  // tour, c-i). Pas les fichiers de verrou ni tsconfig.json : ils changent trop souvent pour autre chose.
+  /(^|\/)karma\.conf\.([cm]?[jt]s|coffee)$/,
+  /(^|\/)(cypress|jasmine)\.json$/,
+  /(^|\/)\.env\.test(\.[^/]+)?$/,
   /(^|\/)\.(mocharc|nycrc|babelrc|c8rc)(\.[a-z]+)?$/,
   /(^|\/)(deno\.jsonc?|bunfig\.toml|turbo\.json|nx\.json|project\.json)$/,
   /(^|\/)pom\.xml$/,
