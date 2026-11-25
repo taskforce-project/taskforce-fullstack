@@ -47,6 +47,12 @@ public final class TestPersonIds {
             byKey.put(person.getWorkspaceId() + ":" + person.getUserId(), person);
             return person;
         });
+        // Comme INSERT ... ON CONFLICT DO NOTHING : un identifiant déjà tiré reste (R159 de #551, quatrième tour, d-b).
+        lenient().when(people.drawIfAbsent(anyLong(), anyLong(), anyString(), any())).thenAnswer(inv -> {
+            MissionPerson drawn = MissionPerson.builder().workspaceId(inv.getArgument(0)).userId(inv.getArgument(1))
+                .person(inv.getArgument(2)).createdAt(inv.getArgument(3)).build();
+            return byKey.putIfAbsent(drawn.getWorkspaceId() + ":" + drawn.getUserId(), drawn) == null ? 1 : 0;
+        });
         return new PersonIds(people, users, mock(PlatformTransactionManager.class));
     }
 }

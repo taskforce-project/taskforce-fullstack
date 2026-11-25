@@ -44,7 +44,13 @@ public class PersonIds {
             return known.get();
         }
         if (!TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
-            return people.saveAndFlush(MissionPerson.draw(workspaceId, userId)).getPerson();
+            // Deux transactions en écriture qui le tirent en même temps (deux prises de mission, une prise et une demande
+            // d'accord) : la seconde attend la première, n'écrit rien, puis relit celui qui est resté (R159 de #551,
+            // quatrième tour, d-b). Avant, elle échouait sur l'index unique.
+            MissionPerson drawn = MissionPerson.draw(workspaceId, userId);
+            people.drawIfAbsent(workspaceId, userId, drawn.getPerson(), drawn.getCreatedAt());
+            return known(workspaceId, userId)
+                .orElseThrow(() -> new IllegalStateException("The id of a person could not be drawn in workspace " + workspaceId));
         }
         // Un paquet se construit aussi dans une transaction de lecture (l'écran des règles, l'essai d'une règle, un outil de
         // Cortex) : l'identifiant se tire alors dans la sienne. Deux tirages à la fois : le second relit celui qui est resté.

@@ -166,6 +166,10 @@ class MissionEvidenceServiceTest {
             persons.put(person.getUserId(), person);
             return person;
         });
+        // Comme INSERT ... ON CONFLICT DO NOTHING : un identifiant déjà tiré reste (R159 de #551, quatrième tour, d-b).
+        lenient().when(people.drawIfAbsent(anyLong(), anyLong(), anyString(), any())).thenAnswer(inv -> persons.putIfAbsent(
+            inv.getArgument(1), MissionPerson.builder().workspaceId(inv.getArgument(0)).userId(inv.getArgument(1))
+                .person(inv.getArgument(2)).createdAt(inv.getArgument(3)).build()) == null ? 1 : 0);
         lenient().doAnswer(inv -> {
             inv.<List<MissionPerson>>getArgument(0).forEach(p -> persons.remove(p.getUserId()));
             return null;

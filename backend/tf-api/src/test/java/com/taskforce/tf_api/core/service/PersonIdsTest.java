@@ -3,6 +3,7 @@ package com.taskforce.tf_api.core.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -60,12 +62,27 @@ class PersonIdsTest {
     @Test
     @DisplayName("la première fois, l'identifiant se tire dans la transaction en cours : 128 bits, jamais le courriel")
     void theFirstTimeItIsDrawn() {
-        when(people.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        ArgumentCaptor<String> drawn = ArgumentCaptor.forClass(String.class);
+        when(people.drawIfAbsent(eq(3L), eq(7L), drawn.capture(), any())).thenReturn(1);
+        when(people.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty())
+            .thenAnswer(inv -> Optional.of(person(3L, 7L, drawn.getValue())));
 
         String id = ids.of(3L, 7L);
 
-        assertThat(id).matches("who:[0-9a-f]{32}");
+        assertThat(id).matches("who:[0-9a-f]{32}").isEqualTo(drawn.getValue());
         verify(transactions, never()).getTransaction(any());
+        verify(people, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("R159 de #551, quatrième tour, d-b : une autre transaction en écriture l'a tiré en même temps ; rien n'échoue, celui qui est resté revient")
+    void aRaceBetweenTwoWritersKeepsTheFirstId() {
+        when(people.drawIfAbsent(eq(3L), eq(7L), any(), any())).thenReturn(0);
+        when(people.findByWorkspaceIdAndUserId(3L, 7L)).thenReturn(Optional.empty(),
+            Optional.of(person(3L, 7L, "who:" + "5".repeat(32))));
+
+        assertThat(ids.of(3L, 7L)).isEqualTo("who:" + "5".repeat(32));
+        verify(people, never()).saveAndFlush(any());
     }
 
     @Test

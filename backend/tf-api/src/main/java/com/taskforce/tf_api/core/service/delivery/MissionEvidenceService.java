@@ -736,8 +736,17 @@ public class MissionEvidenceService {
         if (user == null || user.getId() == null || workspaceId == null) {
             return null;
         }
+        Optional<String> known = people.findByWorkspaceIdAndUserId(workspaceId, user.getId()).map(MissionPerson::getPerson);
+        if (known.isPresent()) {
+            return known.get();
+        }
+        // Deux prises de mission, ou une prise et une demande d'accord, qui tirent l'identifiant en même temps : la seconde
+        // attend la première sur l'index unique, n'écrit rien, puis relit celui qui est resté (R159 de #551, quatrième tour,
+        // d-b). Avant, elle échouait.
+        MissionPerson drawn = MissionPerson.draw(workspaceId, user.getId());
+        people.drawIfAbsent(workspaceId, user.getId(), drawn.getPerson(), drawn.getCreatedAt());
         return people.findByWorkspaceIdAndUserId(workspaceId, user.getId()).map(MissionPerson::getPerson)
-            .orElseGet(() -> people.saveAndFlush(MissionPerson.draw(workspaceId, user.getId())).getPerson());
+            .orElseThrow(() -> new IllegalStateException("The id of a person could not be drawn in workspace " + workspaceId));
     }
 
     /** L'espace d'un dossier : celui dont ses personnes portent l'identifiant. */
