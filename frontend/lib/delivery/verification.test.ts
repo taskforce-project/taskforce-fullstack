@@ -285,6 +285,23 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
     expect(exportHowTo(today, t, context)).toBe(t.export.howTo.replaceAll("{id}", "42").replace("{key}", ""))
   })
 
+  it("v-j du second tour de #552 : un courriel aux lettres non ASCII, dans la partie locale comme dans le domaine, se masque aussi", async () => {
+    const file = chained([
+      { type: "mission.started", data: { issue: "WEB-12", requestedBy: "zoé@exemple.fr", agent: { kind: "claude-code", model: null } } },
+      { type: "human.decision", actor: { kind: "person", id: "ada@bücher.example" }, data: { decision: "STOP", reason: "Asked by zoé@exemple.fr." } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Stopped by ada@bücher.example, then by 名前@例え.jp." } },
+    ], { mission: { id: 3, workspace: "acme", issue: "WEB-12", requestedBy: "zoé@exemple.fr" } })
+    const page = verificationPage(file, await checkRecord(file, [], at))
+    expect(page.legacy).toBe(true)
+    expect(page.request.delegatedBy).toEqual({ kind: "hidden" })
+    const sections = verificationSections(page, t, context)
+    const shown = JSON.stringify(sections) + summarySentence(page, t) + JSON.stringify(verdictLines(page, t)) + pageTitle(page, t)
+    expect(shown).not.toMatch(/zoé|bücher|名前/)
+    expect(texts(sections, "changed"))
+      .toContain("The mission did not finish. Its error, as it was reported: “Stopped by (email hidden), then by (email hidden).”")
+    expect(summarySentence(page, t)).toMatch(/^A person \(email hidden\) gave WEB-12 to the agent\./)
+  })
+
   it("N2 du second tour de #551 : au plafond du dossier, TaskForce a arrêté la mission, et la page le dit dans ses mots", () => {
     const page = verificationPage(chained([
       { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: `who:${"1".repeat(32)}` } },

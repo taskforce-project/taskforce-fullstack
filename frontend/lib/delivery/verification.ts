@@ -303,8 +303,11 @@ const data = (e: MissionEvidenceEvent): Obj => (isObj(e.data) ? e.data : {})
 /** L'identifiant opaque d'une personne dans le dossier : `who:` depuis le second tour de R159, `person:` au premier. */
 const OPAQUE_PERSON = /^(who|person):[0-9a-f]{32}$/
 
-/** Un courriel, où qu'il soit dans un texte : le motif du serveur (`MissionEvidenceService.EMAIL`). */
-export const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+/
+/**
+ * Un courriel, où qu'il soit dans un texte : le motif du serveur (`MissionEvidenceService.EMAIL`), les lettres de toutes les
+ * langues comprises, dans la partie locale comme dans le domaine (R159 de #552, second tour, v-j).
+ */
+export const EMAIL = /[\p{L}\p{M}\p{N}._%+-]+@[\p{L}\p{M}\p{N}-]+(\.[\p{L}\p{M}\p{N}-]+)+/u
 
 /** Le refus du runner d'une action trop longue pour être accordée (`approvals.ts`, troisième tour de #551, C1). */
 const TOO_LONG_TO_ASK = "cap:fact-length"

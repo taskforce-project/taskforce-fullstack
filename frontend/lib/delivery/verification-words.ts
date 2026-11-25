@@ -103,7 +103,7 @@ function upperFirst(text: string): string {
 
 /** Chaque courriel d'un texte, masqué comme l'export Markdown le masque (R159, second tour, N4). */
 export function hideEmails(text: string, t: Texts): string {
-  return text.replace(new RegExp(EMAIL.source, "g"), t.emailHidden)
+  return text.replace(new RegExp(EMAIL.source, "gu"), t.emailHidden)
 }
 
 /** Les lignes d'un dossier d'avant la 1.18 : aucun courriel, où qu'il soit, le résumé de l'agent et les listes compris. */
