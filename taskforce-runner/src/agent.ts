@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -272,11 +272,25 @@ export function providerOf(env: NodeJS.ProcessEnv): string {
   return "anthropic";
 }
 
-/** Les réglages gérés par l'organisation, que Claude Code lit toujours, selon le système. */
-function managedSettingsPath(platform: NodeJS.Platform = process.platform): string {
-  if (platform === "win32") return join(process.env.ProgramData ?? "C:\\ProgramData", "ClaudeCode", "managed-settings.json");
-  if (platform === "darwin") return "/Library/Application Support/ClaudeCode/managed-settings.json";
-  return "/etc/claude-code/managed-settings.json";
+/**
+ * Le dossier des réglages gérés par l'organisation, que Claude Code lit toujours, selon le système (R159 de #551,
+ * troisième tour, c-a), d'après https://code.claude.com/docs/en/managed-settings : `managed-settings.json` et les
+ * `*.json` de `managed-settings.d/` à côté. Sous Windows, Claude Code ne lit plus l'ancien chemin sous `ProgramData`.
+ */
+export function managedSettingsDir(platform: NodeJS.Platform = process.platform): string {
+  if (platform === "win32") return "C:\\Program Files\\ClaudeCode";
+  if (platform === "darwin") return "/Library/Application Support/ClaudeCode";
+  return "/etc/claude-code";
+}
+
+/**
+ * Ce que le runner ne lit pas des réglages gérés, et que le dossier dit (c-a) : les réglages poussés par le serveur
+ * d'Anthropic, et ceux du système, le registre de Windows ou le profil géré de macOS.
+ */
+export function providerUnread(platform: NodeJS.Platform = process.platform): string[] {
+  if (platform === "win32") return ["windows-registry", "server-managed-settings"];
+  if (platform === "darwin") return ["macos-managed-preferences", "server-managed-settings"];
+  return ["server-managed-settings"];
 }
 
 /** L'`env` d'un fichier de réglages de Claude Code ; vide s'il manque ou ne se lit pas. */
@@ -291,15 +305,30 @@ function settingsEnv(path: string): Record<string, string> {
 }
 
 /**
+ * L'`env` des réglages gérés, comme Claude Code le fusionne : `managed-settings.json` d'abord, puis chaque `*.json` de
+ * `managed-settings.d/` par ordre alphabétique, les fichiers cachés écartés ; variable par variable, le dernier l'emporte.
+ */
+function managedEnv(dir: string): Record<string, string> {
+  let dropIns: string[] = [];
+  try {
+    dropIns = readdirSync(join(dir, "managed-settings.d")).filter((name) => name.endsWith(".json") && !name.startsWith(".")).sort();
+  } catch {
+    dropIns = [];
+  }
+  return Object.assign({}, settingsEnv(join(dir, "managed-settings.json")),
+    ...dropIns.map((name) => settingsEnv(join(dir, "managed-settings.d", name))));
+}
+
+/**
  * L'environnement qui choisit le fournisseur au lancement de Claude Code (R159, second tour, L-c) : celui que le runner
  * lui passe, puis l'`env` des réglages qu'il charge, dans l'ordre où ils l'emportent : ceux de l'utilisateur
  * (`CLAUDE_CONFIG_DIR`, sinon `~/.claude`), puis ceux de l'organisation. Ceux du dépôt n'y sont pas : le runner lance
  * Claude Code avec `--setting-sources user` (voir {@link agentArgs}), qui ne les lit pas. Un script de l'agent peut récrire
  * les réglages de l'utilisateur pour les missions suivantes : le dossier dit que c'est la configuration du lancement.
  */
-export function launchEnv(env: NodeJS.ProcessEnv, home: string = homedir(), managed: string = managedSettingsPath()): NodeJS.ProcessEnv {
+export function launchEnv(env: NodeJS.ProcessEnv, home: string = homedir(), managed: string = managedSettingsDir()): NodeJS.ProcessEnv {
   const configDir = env.CLAUDE_CONFIG_DIR?.trim() || join(home, ".claude");
-  return { ...env, ...settingsEnv(join(configDir, "settings.json")), ...settingsEnv(managed) };
+  return { ...env, ...settingsEnv(join(configDir, "settings.json")), ...managedEnv(managed) };
 }
 
 /** Le modèle qui a réellement répondu, tel qu'une réponse de l'agent le nomme ; null pour les autres lignes. */
@@ -327,8 +356,10 @@ export function agentEvent(info: { version?: string; model?: string; session?: s
       served: [...served],
       ...(info.session ? { session: info.session } : {}),
       provider,
-      // Le fournisseur tel que la configuration le disait au lancement (R159, second tour, L-c).
+      // Le fournisseur tel que la configuration le disait au lancement (R159, second tour, L-c), et ce qui n'en est pas
+      // lu : le registre ou le profil géré du système, les réglages du serveur (troisième tour, c-a).
       providerFrom: "launch-configuration",
+      providerUnread: providerUnread(),
     },
   };
 }

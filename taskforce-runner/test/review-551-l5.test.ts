@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { agentEvent, providerOf, servedModel } from "../src/agent.js";
+import { agentEvent, providerOf, providerUnread, servedModel } from "../src/agent.js";
 
 /**
  * R159 de #551, L5 : le fournisseur était écrit en dur (`anthropic`), même avec Bedrock ou une autre adresse d'API, et le
@@ -28,7 +28,7 @@ describe("L5. le fournisseur de la configuration réelle, et le modèle réellem
     const event = agentEvent({ version: "2.1.300", model: "sonnet", session: "s-1" }, ["claude-sonnet-5-20261001", "claude-haiku-4-5"], "amazon-bedrock");
     assert.deepEqual(event.agent, { version: "2.1.300", model: "claude-sonnet-5-20261001", configured: "sonnet",
       served: ["claude-sonnet-5-20261001", "claude-haiku-4-5"], session: "s-1", provider: "amazon-bedrock",
-      providerFrom: "launch-configuration" });
+      providerFrom: "launch-configuration", providerUnread: providerUnread() });
     assert.match(event.text, /claude-sonnet-5-20261001/);
     const unknown = agentEvent({ version: "2.1.300", model: "sonnet" }, [], "anthropic");
     assert.equal(unknown.agent?.model, "sonnet");

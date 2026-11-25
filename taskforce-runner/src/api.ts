@@ -198,6 +198,8 @@ export interface RunnerEvent {
     version?: string; model?: string; configured?: string; served?: string[]; session?: string; provider?: string;
     /** D'où vient `provider` : `launch-configuration`, l'environnement et les réglages que Claude Code lit au lancement (L-c). */
     providerFrom?: string;
+    /** Ce que le runner ne lit pas pour `provider` : le registre ou le profil géré du système, les réglages du serveur (c-a). */
+    providerUnread?: string[];
   };
   /** `test` : ce que le runner a lancé, ce qu'il en a lu, et l'empreinte de la sortie entière gardée sur ce poste. */
   test?: {
