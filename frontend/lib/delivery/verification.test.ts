@@ -509,6 +509,16 @@ describe("le reste du dossier, dit en clair", () => {
     expect(inlineParts("**bold** __too__")).toEqual([{ code: false, text: "bold too" }])
   })
 
+  it("v-i du second tour de #552 : un titre qui porte U+2028 reste un titre ; une adresse à parenthèses ne laisse rien après le lien", () => {
+    expect(summaryBlocks("## What I did\u2028Then a line\u2029- one")).toEqual([
+      { kind: "heading", parts: [{ code: false, text: "What I did" }] },
+      { kind: "paragraph", parts: [{ code: false, text: "Then a line" }] },
+      { kind: "item", parts: [{ code: false, text: "one" }] },
+    ])
+    expect(inlineParts("see [click](https://en.wikipedia.org/wiki/Footer_(page)) and ![img](https://x.y/a_(b).png) now"))
+      .toEqual([{ code: false, text: "see click and img now" }])
+  })
+
   it("R159 P7 : un lien seulement vers GitHub ; R161 F4, des empreintes sans points de suspension", () => {
     expect(linkable("https://github.com/acme/website/pull/212")).toBe(true)
     expect(linkable("javascript:alert(1)")).toBe(false)

@@ -126,7 +126,8 @@ export function summaryBlocks(text: string): Block[] {
     if (paragraph.length > 0) blocks.push({ kind: "paragraph", parts: inlineParts(paragraph.join(" ")) })
     paragraph = []
   }
-  for (const raw of text.replace(/\r\n/g, "\n").split("\n")) {
+  // Toute fin de ligne, U+2028 et U+2029 comprises : un titre qui en porte une reste un titre (R159 de #552, second tour, v-i).
+  for (const raw of text.split(/\r\n|[\n\r\u2028\u2029]/)) {
     const line = raw.trimEnd()
     if (/^\s*```/.test(line)) {
       flush()
@@ -157,9 +158,10 @@ export function summaryBlocks(text: string): Block[] {
 
 /** Une ligne de Markdown en morceaux : le code entre accents graves à part ; liens et images réduits à leur texte. */
 export function inlineParts(text: string): Part[] {
+  // Une adresse peut porter ses parenthèses, un niveau : rien n'en reste après le texte du lien (v-i).
   const plain = text
-    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/!\[([^\]]*)\]\((?:[^()]|\([^()]*\))*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\((?:[^()]|\([^()]*\))*\)/g, "$1")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/__([^_]+)__/g, "$1")
   const parts: Part[] = []
