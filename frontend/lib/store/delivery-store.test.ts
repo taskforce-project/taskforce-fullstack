@@ -17,6 +17,8 @@ vi.mock('../api/delivery-service', () => ({
   decideApproval: vi.fn(),
   downloadEvidence: vi.fn(),
   getEvidence: vi.fn(),
+  getEvidenceKeys: vi.fn(),
+  getEvidenceLink: vi.fn(),
   applyRun: vi.fn(),
   discardRun: vi.fn(),
   markRunDone: vi.fn(),
@@ -389,6 +391,66 @@ describe('delivery-store', () => {
     await act(async () => { read = await useDeliveryStore.getState().fetchEvidence('acme', 100); });
     expect(useDeliveryStore.getState().evidence[100]).toBeNull();
     expect(svc.getEvidence).toHaveBeenCalledWith('acme', 100);
+  });
+
+  // La page de vérification (R159 P2) : qui ne peut pas lire le dossier lit le même message que s'il n'existait pas.
+  it('fetchEvidence reads a 403 like a 404: no record to show, and nothing that says which', async () => {
+    const denied = new AxiosError('Forbidden', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 403, data: {}, headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidence).mockRejectedValueOnce(denied);
+    act(() => useDeliveryStore.setState({ evidence: {} }));
+
+    await act(async () => { await useDeliveryStore.getState().fetchEvidence('acme', 101); });
+
+    expect(useDeliveryStore.getState().evidence[101]).toBeNull();
+    expect(useDeliveryStore.getState().evidenceLegacy[101]).toBe(false);
+  });
+
+  // Un dossier d'avant la 1.18 (R159, second tour de #551, N4) : la personne peut le lire, pas en JSON ; la page le dit.
+  it('fetchEvidence marks the refusal of the JSON of a record from before 1.18, which the person can read', async () => {
+    const legacy = new AxiosError('Forbidden', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 403, data: { message: 'This record was written before TaskForce 1.18 and names people by their email: only an owner or admin of the workspace can export it as JSON.' },
+        headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidence).mockRejectedValueOnce(legacy);
+    act(() => useDeliveryStore.setState({ evidence: {}, evidenceLegacy: {} }));
+
+    await act(async () => { await useDeliveryStore.getState().fetchEvidence('acme', 102); });
+
+    expect(useDeliveryStore.getState().evidence[102]).toBeNull();
+    expect(useDeliveryStore.getState().evidenceLegacy[102]).toBe(true);
+  });
+
+  // Le lien du témoin, `/verify/<id>` (R159, second tour de #551, M-b) : où il mène, ou à rien que la personne puisse lire.
+  it('fetchEvidenceLink keeps where a link leads, null for a link to nothing readable, nothing on another error', async () => {
+    const missing = new AxiosError('Not found', 'ERR_BAD_REQUEST', {} as InternalAxiosRequestConfig, undefined,
+      { status: 404, data: {}, headers: {}, statusText: '', config: {} } as AxiosResponse);
+    vi.mocked(svc.getEvidenceLink)
+      .mockResolvedValueOnce({ workspace: 'acme', runId: 42 })
+      .mockRejectedValueOnce(missing)
+      .mockRejectedValueOnce(new Error('offline'));
+    act(() => useDeliveryStore.setState({ evidenceLinks: {} }));
+
+    await expect(useDeliveryStore.getState().fetchEvidenceLink('a'.repeat(32))).resolves.toEqual({ workspace: 'acme', runId: 42 });
+    expect(useDeliveryStore.getState().evidenceLinks['a'.repeat(32)]).toEqual({ workspace: 'acme', runId: 42 });
+    await expect(useDeliveryStore.getState().fetchEvidenceLink('b'.repeat(32))).resolves.toBeNull();
+    expect(useDeliveryStore.getState().evidenceLinks['b'.repeat(32)]).toBeNull();
+    await expect(useDeliveryStore.getState().fetchEvidenceLink('c'.repeat(32))).resolves.toBeNull();
+    expect(useDeliveryStore.getState().evidenceLinks).not.toHaveProperty('c'.repeat(32));
+    expect(svc.getEvidenceLink).toHaveBeenCalledWith('a'.repeat(32));
+  });
+
+  // La page vérifie le sceau face aux clés de l'instance (R161 B1) : la clé du moment et celles qui ont servi.
+  it('fetchEvidenceKeys keeps the ids of the keys of the instance, null when it cannot read them', async () => {
+    vi.mocked(svc.getEvidenceKeys)
+      .mockResolvedValueOnce({ current: { id: 'sha256:aa', custody: 'same-machine', kept: false, publicKey: 'k' }, used: [{ id: 'sha256:bb' }] } as Awaited<ReturnType<typeof svc.getEvidenceKeys>>)
+      .mockRejectedValueOnce(new Error('offline'));
+    act(() => useDeliveryStore.setState({ evidenceKeys: {} }));
+
+    await expect(useDeliveryStore.getState().fetchEvidenceKeys('acme')).resolves.toEqual(['sha256:aa', 'sha256:bb']);
+    expect(useDeliveryStore.getState().evidenceKeys.acme).toEqual(['sha256:aa', 'sha256:bb']);
+    await expect(useDeliveryStore.getState().fetchEvidenceKeys('acme')).resolves.toBeNull();
+    expect(useDeliveryStore.getState().evidenceKeys.acme).toBeNull();
+    expect(svc.getEvidenceKeys).toHaveBeenCalledWith('acme');
   });
 
   it('decideApproval returns false when the server refuses', async () => {

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { DeliveryRunEvent, MissionEvidence, MissionEvidenceEvent } from "@/lib/api/delivery-service"
-import { diffAnchor, documentChanges, fileChanges, proofOf } from "./work-view"
+import { CONSTANTS_EN } from "@/lib/constants_en"
+import { diffAnchor, documentChanges, fileChanges, proofLine, proofOf } from "./work-view"
 
 let seq = 0
 const event = (kind: DeliveryRunEvent["kind"], tool: string | null, text: string): DeliveryRunEvent =>
@@ -73,16 +74,36 @@ describe("diffAnchor : un fichier dans l'onglet Files changed de la pull request
 })
 
 describe("proofOf : la preuve telle qu'elle se construit", () => {
+  const seal = (predicate: unknown) => ({ payload: btoa(JSON.stringify({ predicate })) })
+
   it("counts the record's events, and says when the mission ended", () => {
     const building: MissionEvidence = { format: "taskforce-evidence/1", events: [1, 2, 3].map((n) => proofEvent(n, "action.requested")), root: "h3" }
-    expect(proofOf(building)).toEqual({ count: 3, sealed: false })
+    expect(proofOf(building)).toEqual({ count: 3, ended: false })
 
-    const sealed: MissionEvidence = { ...building, events: [...building.events, proofEvent(4, "mission.ended")], root: "h4" }
-    expect(proofOf(sealed)).toEqual({ count: 4, sealed: true })
+    const ended: MissionEvidence = { ...building, events: [...building.events, proofEvent(4, "mission.ended")], root: "h4" }
+    expect(proofOf(ended)).toEqual({ count: 4, ended: true })
   })
 
   it("is empty before the first event, or for a run without a record", () => {
-    expect(proofOf(null)).toEqual({ count: 0, sealed: false })
-    expect(proofOf(undefined)).toEqual({ count: 0, sealed: false })
+    expect(proofOf(null)).toEqual({ count: 0, ended: false })
+    expect(proofOf(undefined)).toEqual({ count: 0, ended: false })
+  })
+
+  // v-g du second tour de #552 : rien ici ne vérifie le sceau, la preuve ne le lit donc pas.
+  it("does not read the seal, which nothing here checks", () => {
+    const ended: MissionEvidence = { format: "taskforce-evidence/1", events: [proofEvent(1, "mission.ended")], root: "h1" }
+    expect(proofOf({ ...ended, seal: seal({ key: { custody: "separate-machine" } }) })).toEqual({ count: 1, ended: true })
+  })
+})
+
+describe("proofLine : la ligne de la preuve, les mots de la page", () => {
+  const t = CONSTANTS_EN.missionSequence.proof
+  const line = (proof: Parameters<typeof proofLine>[0]) => proofLine(proof, t)
+
+  it("says what it knows, a record that ended or is still being written, and never signed nor sealed without checking", () => {
+    expect(line({ count: 0, ended: false })).toBe("No record yet")
+    expect(line({ count: 1, ended: false })).toBe("A record of 1 event so far: the verification page checks it")
+    expect(line({ count: 3, ended: true })).toBe("A record of 3 events, the mission ended: the verification page checks it")
+    expect(Object.values(t).join(" ")).not.toMatch(/sealed|signed/)
   })
 })

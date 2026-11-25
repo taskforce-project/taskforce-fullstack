@@ -11,6 +11,8 @@ import {
   decideApproval,
   downloadEvidence,
   getEvidence,
+  getEvidenceKeys,
+  getEvidenceLink,
   applyRun,
   discardRun,
   markRunDone,
@@ -243,6 +245,23 @@ describe('delivery-service', () => {
     await expect(getEvidence(SLUG, 100)).resolves.toEqual(evidence);
 
     expect(apiClient.get).toHaveBeenCalledWith(DELIVERY_ROUTES.EVIDENCE(SLUG, 100), { params: { format: 'json' }, silentError: true });
+  });
+
+  it('GET les clés qui scellent les dossiers de l\'instance, pour vérifier un sceau dans l\'app (R161 B1)', async () => {
+    const keys = { current: { id: 'sha256:aa' }, used: [] };
+    vi.mocked(apiClient.get).mockResolvedValue(envelope(keys));
+
+    await expect(getEvidenceKeys(SLUG)).resolves.toEqual(keys);
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/workspaces/acme/delivery/evidence/key', { silentError: true });
+  });
+
+  it('GET où mène le lien du témoin, qui ne nomme ni l\'espace ni la mission (R159, second tour de #551, M-b)', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue(envelope({ workspace: 'acme', runId: 42 }));
+
+    await expect(getEvidenceLink('0123456789abcdef0123456789abcdef')).resolves.toEqual({ workspace: 'acme', runId: 42 });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/api/evidence/links/0123456789abcdef0123456789abcdef', { silentError: true });
   });
 
   it('GET les agents pour un projet donné', async () => {

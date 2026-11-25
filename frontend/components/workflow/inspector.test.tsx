@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event"
 
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
+// La page de vérification s'ouvre dans le volet (R161 M8) : le routeur de Next.js, le même d'un rendu à l'autre.
+const nav = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
+vi.mock("next/navigation", () => ({ useRouter: () => nav, useParams: () => ({ workspace: "acme" }) }))
 
 import { Inspector, type InspectorMode } from "./inspector"
 import type { NodeGestures } from "./node-gestures"
@@ -163,7 +166,9 @@ describe("Inspector", () => {
 
   it("Evidence: the rule and its version, the requests, the files, the tests and the proof", async () => {
     useDeliveryStore.setState({
-      evidence: { 1: { format: "taskforce-evidence/1", events: [{ seq: 1 }, { seq: 2 }] as never, root: "x" } },
+      // Un dossier fini et scellé par une clé sur le poste de l'agent : la ligne de la preuve le dit, comme la page (R161 M5).
+      evidence: { 1: { format: "taskforce-evidence/1", events: [{ seq: 1, type: "mission.started" }, { seq: 2, type: "mission.ended" }] as never, root: "x",
+        seal: { payload: btoa(JSON.stringify({ predicate: { key: { custody: "same-machine" } } })) } } },
       missionChanges: { 1: { mode: "repo", live: false, added: 12, removed: 1, more: 0, canRevert: false, canComment: false, canCorrect: false, blockedReason: null, correction: null,
         files: [{ path: "src/export.ts", status: "modified", added: 12, removed: 1, binary: false, truncated: false, withheld: false, revision: "r", reverting: false, error: null, updatedAt: null }] } },
     })
@@ -183,10 +188,17 @@ describe("Inspector", () => {
     expect(screen.getByText("Rules version 12")).toBeInTheDocument()
     expect(screen.getByText("Tests passed: 12 of 12")).toBeInTheDocument()
     // Le libellé de la ligne dit « Proof » : la valeur ne le répète pas (R161, L5).
-    expect(screen.getByText("2 events, sealed")).toBeInTheDocument()
+    // Jamais « signed » sans avoir vérifié : la ligne mène à la page qui vérifie (v-g du second tour de #552).
+    expect(screen.getByText("A record of 2 events, the mission ended: the verification page checks it")).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/signed with a key/)
     expect(screen.queryByText(/^Proof: /)).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /export\.ts/ }))
     expect(onOpenMission).toHaveBeenCalledWith(1)
+    // La page de vérification, à côté du dossier brut (R208, R161 M8).
+    const page = screen.getByRole("link", { name: "Verification page" })
+    expect(page).toHaveAttribute("href", "/acme/missions/1/verification")
+    fireEvent.click(page)
+    expect(nav.push).toHaveBeenCalledWith("/acme/missions/1/verification", { scroll: false })
     fireEvent.click(screen.getByRole("button", { name: "Download the record" }))
     await waitFor(() => expect(useDeliveryStore.getState().downloadEvidence).toHaveBeenCalledWith("acme", 1, "json"))
   })

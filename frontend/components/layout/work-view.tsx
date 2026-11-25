@@ -29,8 +29,9 @@ import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
 import { elapsedMinutes, isActiveRun, isMine, runState } from "@/lib/window/missions"
+import { verificationPath } from "@/lib/window/address"
 import { issuePath } from "@/lib/window/pane"
-import { proofOf } from "@/lib/window/work-view"
+import { proofLine, proofOf, type Proof } from "@/lib/window/work-view"
 
 /** Le rythme des relectures pendant que la mission tourne : son état et sa chronologie, puis son dossier. */
 const RUN_MS = 2_000
@@ -120,13 +121,18 @@ function ApprovalsRow({ run, approvals, you, showCommands }: Readonly<{
   )
 }
 
-/** La preuve, repliée en une ligne (R138) : le nombre d'événements, scellés, et le téléchargement du dossier. */
-function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId: number; count: number; sealed: boolean }>) {
+/**
+ * La preuve, repliée en une ligne (R138) : le nombre d'événements du dossier, la page de vérification de la mission (R212),
+ * qui le vérifie, et le téléchargement du dossier.
+ */
+function ProofRow({ slug, runId, proof }: Readonly<{ slug: string; runId: number; proof: Proof }>) {
   const t = usePreferencesStore((s) => s.t.missionSequence.proof)
+  const page = usePreferencesStore((s) => s.t.verification)
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
-  const said = count === 0 ? t.none
-    : sealed ? (count === 1 ? t.sealedOne : fillText(t.sealed, { count }))
-    : (count === 1 ? t.buildingOne : fillText(t.building, { count }))
+  const { openVerification } = usePaneNavigation()
+  const count = proof.count
+  // Ce que la ligne sait, un dossier fini ou en cours, jamais « signed » sans vérifier : la page vérifie (v-g de #552).
+  const said = proofLine(proof, t)
 
   async function download(format: "json" | "md") {
     if (!(await downloadEvidence(slug, runId, format))) toast.error(t.failed)
@@ -138,6 +144,12 @@ function ProofRow({ slug, runId, count, sealed }: Readonly<{ slug: string; runId
         <FileCheck2 className="size-4" aria-hidden="true" />
       </span>
       <span className="tabular-nums text-foreground">{said}</span>
+      {count > 0 && (
+        <PaneLink href={verificationPath(slug, runId)} open={() => openVerification(runId)} title={page.openHint}
+          className="text-foreground underline underline-offset-2">
+          {page.open}
+        </PaneLink>
+      )}
       {count > 0 && (
         <span className="ml-auto flex items-center gap-1.5">
           {t.download}
@@ -323,7 +335,7 @@ export function WorkView({ runId }: Readonly<{ runId: number }>) {
 
       <div className="flex flex-col divide-y divide-border border-y border-border">
         {answered.length > 0 && <ApprovalsRow run={run} approvals={answered} you={you} showCommands={showCommands} />}
-        <ProofRow slug={slug} runId={runId} count={proof.count} sealed={proof.sealed} />
+        <ProofRow slug={slug} runId={runId} proof={proof} />
       </div>
     </div>
   )

@@ -15,6 +15,8 @@ import {
   stopRun as stopRunApi,
   downloadEvidence as downloadEvidenceApi,
   getEvidence,
+  getEvidenceKeys,
+  getEvidenceLink,
   provisionRunner as provisionRunnerApi,
   getMissionChanges,
   getMissionFileDiff,
@@ -29,6 +31,7 @@ import {
   type DeliveryRunActivity,
   type MissionChanges,
   type MissionEvidence,
+  type EvidenceLink,
   type MissionFileDiff,
   type OpenApproval,
   type ProjectRun,
@@ -71,8 +74,27 @@ interface DeliveryState {
   activity: Record<number, DeliveryRunActivity>;
   /** Par runId : pourquoi le dernier geste sur la carte de résultat n'a pas abouti (GitHub refuse, conflits...). */
   resultErrors: Record<number, string>;
-  /** Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier. */
+  /**
+   * Le dossier de preuve par runId, tel que la vue du travail l'a lu ; `null` : pas (encore) de dossier, ou un dossier
+   * que la personne ne peut pas lire (la page de vérification le dit d'un seul message, R159 P2).
+   */
   evidence: Record<number, MissionEvidence | null>;
+  /**
+   * Par runId : le dossier est d'avant la 1.18 et la personne, qui peut le lire, n'est pas responsable de l'espace : le
+   * serveur ne lui en donne pas le JSON, qui nomme les personnes par leur courriel (R159, second tour, N4). La page le dit,
+   * au lieu du message neutre d'un dossier qu'on ne peut pas lire.
+   */
+  evidenceLegacy: Record<number, boolean>;
+  /**
+   * Par espace : les identifiants des clés qui scellent les dossiers de l'instance (celle d'aujourd'hui, puis celles qui ont
+   * déjà scellé) ; `null` : la route ne s'est pas lue, et la page ne compare un sceau à aucune clé.
+   */
+  evidenceKeys: Record<string, string[] | null>;
+  /**
+   * Par identifiant de lien du témoin (`/verify/<id>`) : où il mène ; `null` : à rien que la personne puisse lire (le
+   * serveur ne dit pas lequel). Absent : pas encore lu, ou la lecture a échoué (R159, second tour de #551, M-b).
+   */
+  evidenceLinks: Record<string, EvidenceLink | null>;
   /** Par runId : les fichiers changés et ce que la personne peut en faire (R139). */
   missionChanges: Record<number, MissionChanges>;
   /** Par runId puis par fichier : le diff lu ; `null` : il n'a pas pu se lire. */
@@ -131,6 +153,10 @@ interface DeliveryState {
    * encore, run de la v1) ou en cas d'erreur, où le dossier lu d'avant reste.
    */
   fetchEvidence: (slug: string, runId: number) => Promise<MissionEvidence | null>;
+  /** Lit les clés de l'instance pour cet espace ; `null` en cas d'échec, gardé tel quel. */
+  fetchEvidenceKeys: (slug: string) => Promise<string[] | null>;
+  /** Où mène le lien du témoin d'un dossier ; null quand il ne mène à rien de lisible, ou que la lecture échoue. */
+  fetchEvidenceLink: (id: string) => Promise<EvidenceLink | null>;
   /**
    * Les gestes de la carte de résultat (R78) ; `false` (ou `null`) en cas d'échec, la raison dans `resultErrors`. `reason` :
    * pourquoi, si la personne le dit ; elle entre au dossier de la mission avec le geste (TF-J2-7).
@@ -175,6 +201,13 @@ export const PROJECT_RUN_PAGE_SIZE = 50;
 export const PROJECT_RUN_PAGES_MAX = 40;
 /** Les pages lues en même temps, au plus. */
 const PROJECT_RUN_CONCURRENCY = 3;
+
+/**
+ * Le début du refus que le serveur oppose au JSON d'un dossier d'avant la 1.18, pour une personne qui peut lire le dossier
+ * sans être responsable de l'espace (`MissionDossierAccess.LEGACY`, R159, second tour, N4) : sa chaîne nomme les
+ * personnes par leur courriel, et seul l'export Markdown les masque.
+ */
+export const LEGACY_REFUSAL = "This record was written before TaskForce 1.18";
 
 /** Les lignes d'une page ajoutées à celles déjà lues, une fois chacune (une mission a pu glisser d'une page à l'autre). */
 /**
@@ -263,6 +296,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   activity: {},
   resultErrors: {},
   evidence: {},
+  evidenceLegacy: {},
+  evidenceKeys: {},
+  evidenceLinks: {},
   missionChanges: {},
   fileDiffs: {},
   changeComments: {},
@@ -574,8 +610,41 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
       set((state) => ({ evidence: { ...state.evidence, [runId]: evidence } }));
       return evidence;
     } catch (e) {
-      // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1). Une autre erreur garde la lecture d'avant.
-      if (getErrorStatus(e) === 404) set((state) => ({ evidence: { ...state.evidence, [runId]: null } }));
+      // 404 : la mission n'a pas encore de dossier (ou n'en aura pas, run de la v1) ; 403 : la personne ne peut pas le lire.
+      // Les deux se disent d'un seul message, qui ne dit pas lequel (R159 P2). Une autre erreur garde la lecture d'avant.
+      const status = getErrorStatus(e);
+      // Le JSON d'un dossier d'avant la 1.18, refusé à qui peut le lire sans être responsable de l'espace (N4) : la page le
+      // dit, cette personne sachant déjà que le dossier existe.
+      const legacy = status === 403 && getErrorMessage(e).startsWith(LEGACY_REFUSAL);
+      if (status === 404 || status === 403) {
+        set((state) => ({ evidence: { ...state.evidence, [runId]: null }, evidenceLegacy: { ...state.evidenceLegacy, [runId]: legacy } }));
+      }
+      return null;
+    }
+  },
+
+  fetchEvidenceLink: async (id) => {
+    try {
+      const link = await getEvidenceLink(id);
+      set((state) => ({ evidenceLinks: { ...state.evidenceLinks, [id]: link } }));
+      return link;
+    } catch (e) {
+      // 404 : un lien qui ne mène à rien, ou à un dossier que la personne ne peut pas lire ; une autre erreur ne dit rien
+      // du lien, et la page propose de réessayer.
+      const status = getErrorStatus(e);
+      if (status === 404 || status === 403 || status === 400) set((state) => ({ evidenceLinks: { ...state.evidenceLinks, [id]: null } }));
+      return null;
+    }
+  },
+
+  fetchEvidenceKeys: async (slug) => {
+    try {
+      const keys = await getEvidenceKeys(slug);
+      const ids = [keys.current.id, ...keys.used.map((key) => key.id)].filter((id): id is string => typeof id === "string");
+      set((state) => ({ evidenceKeys: { ...state.evidenceKeys, [slug]: ids } }));
+      return ids;
+    } catch {
+      set((state) => ({ evidenceKeys: { ...state.evidenceKeys, [slug]: null } }));
       return null;
     }
   },

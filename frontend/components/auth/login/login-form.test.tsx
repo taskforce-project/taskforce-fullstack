@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginForm } from './login-form';
+import { clearReturnPath, rememberReturnPath } from '@/lib/auth/return-path';
 
 // Mock next/navigation
 const mockPush = vi.fn();
@@ -407,6 +408,25 @@ describe('LoginForm Component', () => {
       await waitFor(() => {
         expect(mockLogin).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  // R161 N12 de #552 : venue du lien d'une pull request, la personne lit quelle page la connexion ouvrira.
+  describe('A verification page waiting for the sign-in', () => {
+    afterEach(() => clearReturnPath());
+
+    it('says, above the form, that the sign-in opens the verification page that was followed', () => {
+      rememberReturnPath(`/verify/${'a'.repeat(32)}`);
+      render(<LoginForm />);
+
+      const line = screen.getByText('Sign in to open the verification page you followed.');
+      expect(line.compareDocumentPosition(screen.getByLabelText(/email/i)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('says nothing of it on an ordinary sign-in', () => {
+      render(<LoginForm />);
+
+      expect(screen.queryByText(/verification page you followed/)).toBeNull();
     });
   });
 

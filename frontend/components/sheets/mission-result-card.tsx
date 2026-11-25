@@ -1,16 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { ExternalLink, FileCheck2, Loader2 } from "lucide-react"
+import { ExternalLink, FileCheck2, Loader2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 
+import { PaneLink } from "@/components/layout/pane-link"
 import { Button } from "@/components/ui/button"
 import { Markdown } from "@/components/ui/lightweight-markdown"
 import { agentWords, fillText, missionAgentName, resultCard } from "@/lib/delivery/result-card"
+import { usePaneNavigation } from "@/lib/hooks/use-pane-navigation"
 import { useDeliveryStore } from "@/lib/store/delivery-store"
 import { usePreferencesStore } from "@/lib/store/preferences-store"
 import { useUserStore } from "@/lib/store/user-store"
 import { cn } from "@/lib/utils"
+import { verificationPath } from "@/lib/window/address"
 
 /**
  * « Relire » (R78, séance n°13 ; J3, R50 ; R138, séance n°20) : la carte de résultat d'une mission finie. Elle se lit de
@@ -32,6 +35,8 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
   embedded?: boolean
 }>) {
   const t = usePreferencesStore((s) => s.t.missions)
+  const page = usePreferencesStore((s) => s.t.verification)
+  const { openVerification } = usePaneNavigation()
   const run = useDeliveryStore((s) => s.runs[issueId])
   const activity = useDeliveryStore((s) => (run ? s.activity[run.id] : undefined))
   const error = useDeliveryStore((s) => (run ? s.resultErrors[run.id] : undefined))
@@ -118,6 +123,11 @@ export function MissionResultCard({ slug, issueId, issueKey, issueTitle, respons
             </li>
           ))}
         </ul>
+        {/* La page de vérification, là où l'on juge (R208, R161 M8) : ce qui a été demandé, jugé, vérifié et décidé. */}
+        <PaneLink href={verificationPath(slug, run.id)} open={() => openVerification(run.id)} title={page.openHint}
+          className="mt-1 inline-flex w-fit items-center gap-1 text-foreground underline underline-offset-2">
+          <ShieldCheck className="size-3" aria-hidden="true" /> {page.open}
+        </PaneLink>
       </Zone>
 
       {card.changes.length > 0 && (
