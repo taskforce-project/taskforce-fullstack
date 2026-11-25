@@ -9,6 +9,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +34,7 @@ import com.taskforce.tf_api.core.service.GitHubPullRequests;
 import com.taskforce.tf_api.shared.exception.BusinessException;
 import com.taskforce.tf_api.shared.util.LogSafe;
 
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -68,6 +74,14 @@ public class MissionWitness {
     private final String frontendUrl;
     private final boolean linkAllowed;
     private final List<Duration> retries;
+    /**
+     * Le fil du passage régulier, à lui seul (R159 de #551, quatrième tour, D1) : le planificateur du serveur n'a qu'un fil,
+     * que partagent les webhooks, les purges du RGPD, la rétention, les alertes et l'index du Brain ; aucun n'attend GitHub.
+     * Tiré au premier passage.
+     */
+    private ExecutorService sweeper;
+    /** Un passage à la fois : celui qui tourne encore finit avant qu'un autre parte. */
+    private final AtomicBoolean sweeping = new AtomicBoolean();
 
     /** Le témoin comme avant la relecture R159 : un lien permis là où le dépôt est privé, les attentes par défaut. */
     public MissionWitness(DeliveryRunRepository runRepository, GitHubPullRequests pullRequests, MissionEvidenceService evidence,
@@ -110,13 +124,57 @@ public class MissionWitness {
     }
 
     /**
-     * Le passage régulier (R159, L7 ; troisième tour, c-d). Il reprend le témoin des missions scellées des sept derniers
-     * jours qui n'en ont pas : le serveur a redémarré avant de l'écrire, ou GitHub l'a empêché ; il cherche toujours
-     * d'abord. Ses sept jours passés, il cherche une dernière fois, puis le dossier dit qu'il abandonne.
+     * Le passage régulier (R159, L7 ; troisième tour, c-d), lancé sur le fil du témoin (quatrième tour, D1) : le planificateur
+     * du serveur rend la main tout de suite, et ses autres tâches ne l'attendent jamais, même quand GitHub ne répond plus.
      */
     @Scheduled(fixedDelayString = "${delivery.evidence.witness-sweep-ms:900000}",
         initialDelayString = "${delivery.evidence.witness-sweep-initial-ms:120000}")
     public void sweep() {
+        start();
+    }
+
+    /** Lance un passage sur le fil du témoin, sauf s'il en tourne déjà un ; rend sa fin, ou rien. */
+    synchronized Optional<Future<?>> start() {
+        if (evidenceRepository == null || sealRepository == null || !sweeping.compareAndSet(false, true)) {
+            return Optional.empty();
+        }
+        try {
+            if (sweeper == null) {
+                sweeper = Executors.newSingleThreadExecutor(work -> {
+                    Thread thread = new Thread(work, "mission-witness");
+                    thread.setDaemon(true);
+                    return thread;
+                });
+            }
+            return Optional.of(sweeper.submit(() -> {
+                try {
+                    pass();
+                } catch (RuntimeException e) {
+                    log.warn("Le passage du témoin s'est arrêté : {}", LogSafe.of(e.getMessage()));
+                } finally {
+                    sweeping.set(false);
+                }
+            }));
+        } catch (RejectedExecutionException e) {
+            // Le serveur s'arrête : le passage suivant, à son redémarrage, reprendra.
+            sweeping.set(false);
+            return Optional.empty();
+        }
+    }
+
+    @PreDestroy
+    synchronized void stop() {
+        if (sweeper != null) sweeper.shutdownNow();
+    }
+
+    /**
+     * Un passage. Il reprend le témoin des missions scellées des sept derniers jours qui n'en ont pas : le serveur a
+     * redémarré avant de l'écrire, ou GitHub l'a empêché ; il cherche toujours d'abord. Ses sept jours passés, il cherche une
+     * dernière fois, puis le dossier dit qu'il abandonne. Un seul essai par mission, sans pause ; le premier appel que GitHub
+     * laisse sans réponse (un délai passé, une erreur de son côté) arrête le passage : GitHub ne répond pas, le passage
+     * suivant reprendra, au lieu d'attendre GitHub mission après mission (D1).
+     */
+    void pass() {
         if (evidenceRepository == null || sealRepository == null) {
             return;
         }
@@ -124,11 +182,13 @@ public class MissionWitness {
         LocalDateTime since = now.minus(SWEEP_WINDOW);
         List<Long> overdue = tx.execute(status -> evidenceRepository.findWitnessOverdue(since));
         for (Long runId : overdue == null ? List.<Long>of() : overdue) {
-            lastSeal(runId).ifPresent(sealed -> write(sealed, true));
+            Optional<MissionSealed> sealed = lastSeal(runId);
+            if (sealed.isPresent() && !write(sealed.get(), true, false)) return;
         }
         List<Long> runs = tx.execute(status -> evidenceRepository.findUnwitnessed(since, now.minus(SWEEP_GRACE)));
         for (Long runId : runs == null ? List.<Long>of() : runs) {
-            lastSeal(runId).ifPresent(sealed -> write(sealed, false));
+            Optional<MissionSealed> sealed = lastSeal(runId);
+            if (sealed.isPresent() && !write(sealed.get(), false, false)) return;
         }
     }
 
@@ -144,9 +204,9 @@ public class MissionWitness {
     static final String GAVE_UP = "TaskForce could not write it in the pull request within the seven days after the mission "
         + "ended, and stopped trying";
 
-    /** Le témoin à la fin de la mission, ou au passage régulier dans ses sept jours. */
+    /** Le témoin à la fin de la mission : ses essais et leurs pauses. */
     void write(MissionSealed sealed) {
-        write(sealed, false);
+        write(sealed, false, true);
     }
 
     /**
@@ -156,12 +216,14 @@ public class MissionWitness {
      * poste pas sur un doute. Quand GitHub ne dit pas s'il a écrit (un délai passé, une erreur de son côté), il ne reposte
      * pas : le passage régulier cherchera d'abord, plus tard, quand la liste de GitHub le montrera. Un témoin que GitHub
      * empêche se reprend ainsi pendant sept jours ; le dossier en garde au plus deux notes : le premier échec, puis l'issue,
-     * écrit ou abandonné. {@code last} : les sept jours sont passés, il ne fait plus que chercher.
+     * écrit ou abandonné. {@code last} : les sept jours sont passés, il ne fait plus que chercher. {@code retry} : à la fin
+     * de la mission, il réessaie après une pause ; au passage régulier, un seul essai (D1). Rend faux quand GitHub a laissé
+     * un appel sans réponse.
      */
-    void write(MissionSealed sealed, boolean last) {
+    boolean write(MissionSealed sealed, boolean last, boolean retry) {
         Optional<Optional<Target>> found = tx.execute(status -> runRepository.findById(sealed.runId()).map(MissionWitness::target));
         if (found == null || found.isEmpty()) {
-            return;
+            return true;
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("kind", "witness");
@@ -171,7 +233,7 @@ public class MissionWitness {
             data.put("written", false);
             data.put("reason", "This mission has no pull request.");
             keep(sealed.runId(), data);
-            return;
+            return true;
         }
         data.put("where", "github-pull-request");
         data.put("pullRequest", target.pullRequest());
@@ -185,11 +247,15 @@ public class MissionWitness {
         List<String> roots = roots(sealed);
         String reason = null;
         String login = null;
-        for (int attempt = 0; attempt <= retries.size(); attempt++) {
+        // GitHub a-t-il laissé le dernier appel sans réponse ? Le passage régulier s'arrête alors (D1).
+        boolean unanswered = false;
+        int pauses = retry ? retries.size() : 0;
+        for (int attempt = 0; attempt <= pauses; attempt++) {
             try {
                 // Le compte du jeton, lu une fois : seuls ses commentaires comptent.
                 if (login == null) login = pullRequests.login(target.workspaceId());
                 Optional<String> existing = pullRequests.findComment(target.workspaceId(), target.repo(), target.number(), roots, login);
+                unanswered = false;
                 if (existing.isPresent()) {
                     data.put("written", true);
                     data.put("comment", existing.get());
@@ -203,7 +269,8 @@ public class MissionWitness {
                 }
             } catch (BusinessException | IllegalStateException e) {
                 reason = last ? GAVE_UP + ": " + e.getMessage() : e.getMessage();
-                if (attempt < retries.size() && !pause(retries.get(attempt))) break;
+                unanswered = e instanceof GitHubPullRequests.Unanswered;
+                if (attempt < pauses && !pause(retries.get(attempt))) break;
                 continue;
             }
             try {
@@ -217,15 +284,16 @@ public class MissionWitness {
             } catch (GitHubPullRequests.Unanswered e) {
                 // Le commentaire a pu s'écrire : rien de plus maintenant, le passage régulier le cherchera d'abord.
                 reason = UNANSWERED;
+                unanswered = true;
                 break;
             } catch (BusinessException | IllegalStateException e) {
                 reason = e.getMessage();
-                if (attempt < retries.size() && !pause(retries.get(attempt))) break;
+                if (attempt < pauses && !pause(retries.get(attempt))) break;
             }
         }
         if (reason == null) {
             keep(sealed.runId(), data);
-            return;
+            return true;
         }
         data.put("written", false);
         data.put("reason", reason);
@@ -237,6 +305,7 @@ public class MissionWitness {
             data.put("retrying", true);
             tryLater(sealed.runId(), data);
         }
+        return !unanswered;
     }
 
     /** Les têtes scellées de ce dossier : un commentaire qui porte l'une d'elles est son témoin, écrit à un essai d'avant. */
