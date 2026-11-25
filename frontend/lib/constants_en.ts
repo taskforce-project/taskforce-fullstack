@@ -2333,6 +2333,7 @@ export const CONSTANTS_EN = {
       selfNoKeys: "Its seal is signed by a key the file carries itself; this page could not read this TaskForce's keys to compare them.",
       notSealedRunning: "It is not sealed yet: the mission is still running.",
       notSealedEnded: "It is not sealed: the mission finished before TaskForce sealed its records.",
+      notSealed: "It carries no seal: no signature shows that this record is the one TaskForce wrote, so a change to it would not show here.",
       broken: "Its seal does not hold: it was not made over this record as it is.",
       late: "It was sealed late, on {date}, after its mission had ended: the seal proves the record as it was on that date, not what happened before.",
       unchecked: "This browser cannot check a seal (Ed25519): the seal was not checked.",

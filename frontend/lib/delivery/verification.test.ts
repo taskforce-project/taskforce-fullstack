@@ -215,6 +215,15 @@ describe("R161 B3, R159 P1 et P9 : les états ne disent que ce que le dossier mo
     expect(summarySentence(page, t)).toContain(t.summary.working)
   })
 
+  it("v-a du second tour de #552 : un dossier d'aujourd'hui sans sceau dit qu'il n'en a pas, sans prêter de cause", async () => {
+    const file = example()
+    delete (file as { seal?: unknown }).seal
+    const page = verificationPage(file, await checkRecord(file, [exampleKey()], at))
+    const verdict = verdictLines(page, t).map((l) => l.text)
+    expect(verdict).toContain(t.verdict.notSealed)
+    expect(verdict).not.toContain(t.verdict.notSealedEnded)
+  })
+
   it("une mission d'avant la 1.18 finie en échec : finie avant le sceau, plus ancienne que ces faits, une seule phrase vraie", async () => {
     const file = olderFailed()
     const page = verificationPage(file, await checkRecord(file, [], at))

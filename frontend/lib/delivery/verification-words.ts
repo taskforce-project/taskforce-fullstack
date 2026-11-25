@@ -242,7 +242,9 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
   switch (d.seal.state) {
     case "trusted": lines.push(sameMachine ? { text: v.trustedSameMachine, tone: "warn" } : { text: v.trusted, tone: "ok" }); break
     case "self": lines.push({ text: c.keysKnown ? v.self : v.selfNoKeys, tone: "warn" }); break
-    case "none": lines.push({ text: page.running ? v.notSealedRunning : v.notSealedEnded, tone: "warn" }); break
+    // « Fini avant que TaskForce ne scelle » ne vaut que pour un dossier d'avant ce format : un dossier d'aujourd'hui sans
+    // sceau dit qu'il n'en a pas, et ce que cela veut dire (R159 de #552, second tour, v-a).
+    case "none": lines.push({ text: page.running ? v.notSealedRunning : page.legacy ? v.notSealedEnded : v.notSealed, tone: "warn" }); break
     case "broken": lines.push({ text: v.broken, tone: "warn", alert: true }); break
     case "unchecked": lines.push({ text: v.unchecked, tone: "warn" }); break
   }
