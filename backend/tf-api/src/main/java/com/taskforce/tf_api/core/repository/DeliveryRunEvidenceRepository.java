@@ -49,15 +49,29 @@ public interface DeliveryRunEvidenceRepository extends JpaRepository<DeliveryRun
     boolean existsByRunIdAndTypeAndActorKind(Long runId, String type, String actorKind);
 
     /**
-     * Les missions finies et scellées entre ces deux instants dont le dossier n'a pas encore de témoin (R159, L7) : le
-     * témoin s'écrit après la fin, hors de sa transaction, et un redémarrage du serveur peut le perdre.
+     * Les missions finies et scellées entre ces deux instants dont le témoin n'a pas fini (R159, L7 ; troisième tour, c-d) :
+     * un redémarrage du serveur l'a perdu, ou GitHub l'a empêché. Celles qu'il n'a pas encore essayées d'abord, puis celles
+     * essayées il y a le plus longtemps : une pull request que GitHub refuse sans fin ne retient pas les autres.
      */
-    @Query(value = "SELECT r.id FROM delivery_runs r "
-        + "WHERE r.evidence_root IS NOT NULL AND r.ended_at BETWEEN :since AND :before "
+    @Query(value = "SELECT r.id FROM mission_dossiers d JOIN delivery_runs r ON r.id = d.run_id "
+        + "WHERE d.witnessed_at IS NULL AND r.evidence_root IS NOT NULL AND r.ended_at BETWEEN :since AND :before "
         + "AND EXISTS (SELECT 1 FROM mission_dossier_seals s WHERE s.run_id = r.id AND NOT s.late) "
-        + "AND NOT EXISTS (SELECT 1 FROM mission_dossiers d WHERE d.run_id = r.id AND d.witnessed_at IS NOT NULL) "
-        + "AND NOT EXISTS (SELECT 1 FROM delivery_run_evidence e WHERE e.run_id = r.id AND e.type = 'note' "
-        + "AND CAST(e.data AS jsonb) ->> 'kind' = 'witness') ORDER BY r.ended_at LIMIT 50", nativeQuery = true)
+        + "ORDER BY d.witness_tried_at NULLS FIRST, r.ended_at LIMIT 50", nativeQuery = true)
     List<Long> findUnwitnessed(@Param("since") LocalDateTime since,
                                @Param("before") LocalDateTime before);
+
+    /**
+     * Les missions scellées finies avant cet instant dont le témoin n'a toujours pas fini : ses sept jours passés, il cherche
+     * une dernière fois, puis le dossier dit qu'il abandonne (R159, troisième tour, c-d).
+     */
+    @Query(value = "SELECT r.id FROM mission_dossiers d JOIN delivery_runs r ON r.id = d.run_id "
+        + "WHERE d.witnessed_at IS NULL AND r.evidence_root IS NOT NULL AND r.ended_at < :before "
+        + "AND EXISTS (SELECT 1 FROM mission_dossier_seals s WHERE s.run_id = r.id AND NOT s.late) "
+        + "ORDER BY r.ended_at LIMIT 50", nativeQuery = true)
+    List<Long> findWitnessOverdue(@Param("before") LocalDateTime before);
+
+    /** Le dossier a-t-il déjà une note du témoin ? Il en garde au plus deux : le premier échec, puis l'issue (c-d). */
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM delivery_run_evidence e WHERE e.run_id = :runId AND e.type = 'note' "
+        + "AND e.actor_kind = 'server' AND CAST(e.data AS jsonb) ->> 'kind' = 'witness')", nativeQuery = true)
+    boolean existsWitnessNote(@Param("runId") Long runId);
 }

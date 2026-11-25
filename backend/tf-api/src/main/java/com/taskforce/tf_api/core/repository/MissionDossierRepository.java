@@ -54,4 +54,13 @@ public interface MissionDossierRepository extends JpaRepository<MissionDossier, 
     @Query(value = "UPDATE mission_dossiers SET witnessed_at = now() WHERE run_id = :runId AND witnessed_at IS NULL",
         nativeQuery = true)
     int markWitnessed(@Param("runId") Long runId);
+
+    /**
+     * GitHub a empêché le témoin de ce dossier, qui réessaiera (R159, troisième tour, c-d) : le passage régulier prend
+     * d'abord ceux qu'il n'a pas encore essayés.
+     */
+    @Modifying
+    @Query(value = "UPDATE mission_dossiers SET witness_tried_at = now() WHERE run_id = :runId AND witnessed_at IS NULL",
+        nativeQuery = true)
+    int markWitnessTried(@Param("runId") Long runId);
 }

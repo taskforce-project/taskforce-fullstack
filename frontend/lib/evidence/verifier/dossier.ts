@@ -424,12 +424,20 @@ export async function readDossier(file: Obj, options: { key?: string } = {}): Pr
     }
   }
 
-  // Le témoin : la tête écrite là où l'exploitant n'est pas seul à écrire.
+  // Le témoin : la tête écrite là où l'exploitant n'est pas seul à écrire. Au plus deux notes (R159, troisième tour,
+  // c-d) : un premier échec, que TaskForce reprend pendant sept jours, puis l'issue.
   const witnesses = events.filter((e) => e.type === "note" && isObj(e.data) && (e.data as Obj).kind === "witness");
-  for (const witness of witnesses) {
+  for (const [i, witness] of witnesses.entries()) {
     const data = witness.data as Obj;
     if (data.written !== true) {
-      lines.push({ level: "warn", text: `No witness: ${String(data.reason ?? "it was not written")}.` });
+      const reason = typeof data.reason === "string" ? data.reason.replace(/\.$/, "") : "it was not written";
+      if (data.retrying === true && i < witnesses.length - 1) {
+        lines.push({ level: "info", text: `The witness was not written at first: ${reason}. TaskForce tried again.` });
+      } else if (data.retrying === true) {
+        lines.push({ level: "warn", text: `No witness yet: ${reason}. TaskForce tries again during the seven days after the mission ended.` });
+      } else {
+        lines.push({ level: "warn", text: `No witness: ${reason}.` });
+      }
       continue;
     }
     const seq = typeof data.seq === "number" ? data.seq : -1;

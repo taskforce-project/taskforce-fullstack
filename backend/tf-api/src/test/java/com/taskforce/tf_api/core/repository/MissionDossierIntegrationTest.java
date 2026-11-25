@@ -496,20 +496,59 @@ class MissionDossierIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("R159, L7 : une mission scellée sans témoin se retrouve, jusqu'à ce que son témoin, ou la raison de son absence, s'écrive")
-    void an_unwitnessed_mission_is_found_until_its_witness_is_written() {
+    @DisplayName("R159, L7 et troisième tour, c-d : une mission scellée sans témoin se retrouve sept jours, même après un premier échec noté ; puis elle est en retard")
+    void an_unwitnessed_mission_is_found_until_its_witness_is_done() {
         mission();
         LocalDateTime now = LocalDateTime.now();
         jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(1), run.getId());
 
         assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).contains(run.getId());
         assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusHours(2))).doesNotContain(run.getId());
+        assertThat(evidenceRepository.existsWitnessNote(run.getId())).isFalse();
 
+        // GitHub l'a empêché : le premier échec entre au dossier, et le passage régulier le reprendra.
         evidence.appendToDossier(run.getId(), "note", MissionEvidenceService.Actor.SERVER,
-            Map.of("kind", "witness", "written", false, "reason", "GitHub can't be reached."));
+            Map.of("kind", "witness", "written", false, "retrying", true, "reason", "GitHub can't be reached."));
+        evidence.witnessTried(run.getId());
         em.flush();
 
+        assertThat(evidenceRepository.existsWitnessNote(run.getId())).isTrue();
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).contains(run.getId());
+        assertThat(jdbc.queryForObject("SELECT witness_tried_at IS NOT NULL FROM mission_dossiers WHERE run_id = ?", Boolean.class,
+            run.getId())).isTrue();
+        // Le commentaire d'un essai d'avant porte l'une des têtes scellées du dossier, celle d'avant un geste comprise.
+        assertThat(seals.findRootsByRunId(run.getId())).containsExactlyElementsOf(jdbc.queryForList(
+            "SELECT root FROM mission_dossier_seals WHERE run_id = ? ORDER BY seq", String.class, run.getId())).hasSizeGreaterThan(1);
+
+        // Ses sept jours passés : il n'est plus repris, il est en retard, jusqu'à ce que le témoin ait fini.
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusDays(8), run.getId());
         assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).doesNotContain(run.getId());
+        assertThat(evidenceRepository.findWitnessOverdue(now.minusDays(7))).contains(run.getId());
+        evidence.witnessed(run.getId());
+        em.flush();
+        assertThat(evidenceRepository.findWitnessOverdue(now.minusDays(7))).doesNotContain(run.getId());
+    }
+
+    @Test
+    @DisplayName("R159 troisième tour, c-d : le passage régulier prend d'abord la mission pas encore essayée, puis celle essayée il y a le plus longtemps")
+    void the_sweep_takes_untried_missions_first() {
+        mission();
+        DeliveryRun other = runRepository.saveAndFlush(DeliveryRun.builder().issue(issue).providerKey("claude-code").model("sonnet")
+            .status(DeliveryRunStatus.RUNNING).startedBy(ada).claimedBy("tf-runner-ada").origin("app").build());
+        RulesBundle bundle = rules.bundleFor(workspace, new HarnessRulesService.Work(issue.getProject().getId(), null, ada.getId()));
+        evidence.open(other, bundle, "tf-runner-ada", Map.of());
+        evidence.end(other, new DeliveryPoll(DeliveryRunStatus.DONE, "## What I did\nAgain.", null, null));
+        em.flush();
+        LocalDateTime now = LocalDateTime.now();
+        // La première finie le plus tôt : sans essai, elle passerait d'abord.
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(3), run.getId());
+        jdbc.update("UPDATE delivery_runs SET ended_at = ? WHERE id = ?", now.minusHours(1), other.getId());
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).containsSubsequence(run.getId(), other.getId());
+
+        evidence.witnessTried(run.getId());
+        em.flush();
+
+        assertThat(evidenceRepository.findUnwitnessed(now.minusDays(7), now.minusMinutes(5))).containsSubsequence(other.getId(), run.getId());
     }
 
     @Test

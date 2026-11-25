@@ -222,11 +222,16 @@ verification page only when GitHub says the repository is private, never from th
 itself: the link is `<the instance's address>/verify/<id>`, where `id` is an opaque, random id of the record (128
 bits), and the page asks for a sign-in and checks access as any other. `pageLinked`, and `pageLeftOut` (`desktop-app`,
 `turned-off` when the operator sets `witness-link: false`, `local-address`, `visibility-unknown`, `public-repository`,
-`internal-repository`). Before posting, and before each new attempt, the server looks for the head among the comments
-of the pull request: a reply from GitHub lost after the comment was written never makes a second one, and a comment is
-never edited. Once it has tried, written or not, a regular pass no longer tries again, even when its note could not be
-kept; that pass only writes the witness of a sealed mission the server restarted before. A mission without a pull
-request gets a `witness` note with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
+`internal-repository`). Before posting, and before each new attempt, the server looks for any sealed head of the record
+among the comments that the account of its token wrote (`user.login`, read once): someone who quotes the head does not
+count, and a comment is never edited. A list it cannot read whole (an answer it cannot read, more than 1,000 comments)
+is a failure, and it does not post. When GitHub does not say whether it wrote the comment (no answer in time, an error
+on its side), the server does not post again at once: a regular pass looks for it later, so a reply lost after the
+comment was written should not make a second one. A witness that GitHub prevents is tried again by that pass during the
+seven days after the end, looking first each time; then the pass looks once more, and gives up. The record keeps at most
+two `witness` notes: the first failure (`written: false`, `retrying: true` and the `reason`), then the outcome, written
+or given up (`written: false`, `abandoned: true`). A note that cannot be kept ends the attempts. A mission without a pull
+request gets one `witness` note, with `written: false` and the reason. `example-mission.json` is the export of a whole mission, sealed by a key
 drawn for it; both sides check it.
 
 ## Mission steps: two codes, one set of cases

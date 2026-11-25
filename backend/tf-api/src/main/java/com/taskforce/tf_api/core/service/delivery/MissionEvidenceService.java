@@ -996,6 +996,21 @@ public class MissionEvidenceService {
         dossiers.markWitnessed(runId);
     }
 
+    /**
+     * GitHub a empêché le témoin, qui réessaiera (R159, troisième tour, c-d) : le passage régulier prend d'abord les
+     * dossiers qu'il n'a pas encore essayés.
+     */
+    @Transactional
+    public void witnessTried(Long runId) {
+        dossiers.markWitnessTried(runId);
+    }
+
+    /** Le dossier a-t-il déjà une note du témoin ? Il en garde au plus deux : le premier échec, puis l'issue (c-d). */
+    @Transactional(readOnly = true)
+    public boolean witnessNoted(Long runId) {
+        return repository.existsWitnessNote(runId);
+    }
+
     /** La sorte de la note d'un sceau tardif (R159, second tour, N5). */
     static final String LATE_SEAL = "late-seal";
 
