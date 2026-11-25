@@ -122,8 +122,8 @@ function ApprovalsRow({ run, approvals, you, showCommands }: Readonly<{
 }
 
 /**
- * La preuve, repliée en une ligne (R138) : le nombre d'événements, scellés, la page de vérification de la mission (R212),
- * et le téléchargement du dossier.
+ * La preuve, repliée en une ligne (R138) : le nombre d'événements du dossier, la page de vérification de la mission (R212),
+ * qui le vérifie, et le téléchargement du dossier.
  */
 function ProofRow({ slug, runId, proof }: Readonly<{ slug: string; runId: number; proof: Proof }>) {
   const t = usePreferencesStore((s) => s.t.missionSequence.proof)
@@ -131,7 +131,7 @@ function ProofRow({ slug, runId, proof }: Readonly<{ slug: string; runId: number
   const downloadEvidence = useDeliveryStore((s) => s.downloadEvidence)
   const { openVerification } = usePaneNavigation()
   const count = proof.count
-  // Les mots de la page : finir ne scelle pas, et une clé que l'agent pouvait lire se dit avant tout (R161 M5).
+  // Ce que la ligne sait, un dossier fini ou en cours, jamais « signed » sans vérifier : la page vérifie (v-g de #552).
   const said = proofLine(proof, t)
 
   async function download(format: "json" | "md") {

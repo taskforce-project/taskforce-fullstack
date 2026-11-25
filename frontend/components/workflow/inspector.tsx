@@ -471,7 +471,7 @@ function Evidence({ slug, node, onOpenMission, now }: Readonly<{
   const rules = [...new Set(approvals.map((approval) => approval.reason?.trim()).filter((reason): reason is string => Boolean(reason)))]
   const pr = node.run?.links.pullRequestUrl ?? null
   const tests = run.tests
-  // La ligne de la preuve de la vue du travail : finir ne scelle pas, et une clé que l'agent lisait se dit (R161 M5).
+  // La ligne de la preuve de la vue du travail : ce qu'elle sait, jamais « signed » sans vérifier (v-g de #552).
   const proof = proofLine(proofOf(evidence), sequenceTexts.proof)
 
   async function download() {

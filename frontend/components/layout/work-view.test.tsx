@@ -306,14 +306,13 @@ describe("WorkView", () => {
 
   describe("the proof", () => {
     it.each([
-      ["while it builds", EVIDENCE, "2 events so far"],
-      // Finir ne scelle pas : sans sceau, la mission a fini, sans plus (R161 M5).
-      ["ended", SEALED, "3 events, ended"],
-      ["one event", { ...EVIDENCE, events: EVIDENCE.events.slice(0, 1) }, "1 event so far"],
-      ["one event, ended", { ...EVIDENCE, events: [SEALED.events[2]] }, "1 event, ended"],
-      // Un sceau dont la clé est sur le poste de l'agent : la réserve d'abord, comme sur la page.
-      ["signed on the agent's computer", { ...SEALED, seal: seal("same-machine") }, "3 events, signed with a key the agent could read"],
-      ["signed away from it", { ...SEALED, seal: seal("separate-machine") }, "3 events, signed: the verification page checks it"],
+      ["while it builds", EVIDENCE, "A record of 2 events so far: the verification page checks it"],
+      ["ended", SEALED, "A record of 3 events, the mission ended: the verification page checks it"],
+      ["one event", { ...EVIDENCE, events: EVIDENCE.events.slice(0, 1) }, "A record of 1 event so far: the verification page checks it"],
+      ["one event, ended", { ...EVIDENCE, events: [SEALED.events[2]] }, "A record of 1 event, the mission ended: the verification page checks it"],
+      // Un sceau : rien ici ne le vérifie, la ligne ne dit pas « signed » et mène à la page (v-g du second tour de #552).
+      ["sealed on the agent's computer", { ...SEALED, seal: seal("same-machine") }, "A record of 3 events, the mission ended: the verification page checks it"],
+      ["sealed away from it", { ...SEALED, seal: seal("separate-machine") }, "A record of 3 events, the mission ended: the verification page checks it"],
     ])("folds into one line: %s", (_label, evidence, line) => {
       useDeliveryStore.setState({ evidence: { 100: evidence } })
       render(<WorkView runId={100} />)

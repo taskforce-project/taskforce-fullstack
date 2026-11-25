@@ -188,7 +188,9 @@ describe("Inspector", () => {
     expect(screen.getByText("Rules version 12")).toBeInTheDocument()
     expect(screen.getByText("Tests passed: 12 of 12")).toBeInTheDocument()
     // Le libellé de la ligne dit « Proof » : la valeur ne le répète pas (R161, L5).
-    expect(screen.getByText("2 events, signed with a key the agent could read")).toBeInTheDocument()
+    // Jamais « signed » sans avoir vérifié : la ligne mène à la page qui vérifie (v-g du second tour de #552).
+    expect(screen.getByText("A record of 2 events, the mission ended: the verification page checks it")).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/signed with a key/)
     expect(screen.queryByText(/^Proof: /)).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: /export\.ts/ }))
     expect(onOpenMission).toHaveBeenCalledWith(1)
