@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { render, screen } from "@testing-library/react"
+import Link from "next/link"
 
 import { RecordUnavailable } from "./record-unavailable"
 import { CONSTANTS_EN } from "@/lib/constants_en"
@@ -12,7 +13,7 @@ const t = CONSTANTS_EN.verification
 
 describe("RecordUnavailable", () => {
   it("un titre qui nomme la page, ce qui s'est passé, quoi faire, et le chemin du retour", () => {
-    render(<RecordUnavailable title={t.title} message={t.denied} hint={t.deniedHint} back={<a href="/acme/missions/42">{t.back}</a>} />)
+    render(<RecordUnavailable title={t.title} message={t.denied} hint={t.deniedHint} back={<Link href="/acme/missions/42">{t.back}</Link>} />)
 
     const article = screen.getByRole("article", { name: t.title })
     expect(screen.getByRole("heading", { name: t.title })).toBeInTheDocument()
@@ -25,7 +26,7 @@ describe("RecordUnavailable", () => {
 
   it("une panne propose son action, entre le conseil et le retour", () => {
     render(<RecordUnavailable title={t.title} message={t.failed} hint={t.failedHint}
-      action={<button type="button">{t.tryAgain}</button>} back={<a href="/acme/missions/42">{t.back}</a>} />)
+      action={<button type="button">{t.tryAgain}</button>} back={<Link href="/acme/missions/42">{t.back}</Link>} />)
 
     const action = screen.getByRole("button", { name: t.tryAgain })
     const back = screen.getByRole("link", { name: t.back })
