@@ -522,6 +522,34 @@ describe("R161 N1 et R159 V1, second tour de #552 : un dossier changé se voit d
   })
 })
 
+describe("R161 N3 du second tour de #552 : les décisions qui n'existent pas", () => {
+  it("une mission d'avant la 1.18 : le dossier ne dit pas si quelqu'un a tranché", () => {
+    const page = verificationPage(olderFailed())
+    expect(summarySentence(page, t)).toContain(t.decisions.undecidedOlder)
+    expect(summarySentence(page, t)).not.toContain(t.summary.undecided)
+    expect(texts(verificationSections(page, t, context), "decisions")[0]).toBe(t.decisions.undecidedOlder)
+  })
+
+  it("une mission arrêtée au plafond, ou qui a échoué : pas de résultat à trancher", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: `who:${"1".repeat(32)}` } },
+      { type: "limit.reached", data: { max: 10000, stopped: true } },
+      { type: "mission.ended", data: { status: "FAILED", error: "Evidence cap reached: TaskForce stopped the mission." } },
+    ]))
+    expect(summarySentence(page, t)).toContain(t.decisions.noResult)
+    expect(texts(verificationSections(page, t, context), "decisions")[0]).toBe(t.decisions.noResult)
+  })
+
+  it("une mission finie sans geste de fin : le résultat attend, et seulement alors", () => {
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", accountable: `who:${"1".repeat(32)}` } },
+      { type: "mission.ended", data: { status: "DONE" } },
+    ]))
+    expect(summarySentence(page, t)).toContain(t.summary.undecided)
+    expect(texts(verificationSections(page, t, context), "decisions")[0]).toBe(t.decisions.undecided)
+  })
+})
+
 describe("R159 de #552, second tour : la ligne du sceau et la première ligne suivent ce qui a été vérifié (V2, V3)", () => {
   const recordOf = async (file: ReturnType<typeof example>) =>
     texts(verificationSections(verificationPage(file, await checkRecord(file, [exampleKey()], at)), t, context), "record")

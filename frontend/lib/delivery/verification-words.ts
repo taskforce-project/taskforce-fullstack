@@ -266,6 +266,16 @@ export function alertLines(verdict: readonly Line[]): Line[] {
   return verdict.filter((line) => line.alert === true)
 }
 
+/**
+ * Pas de décision de fin : ce que le dossier en dit vraiment (R161 N3 du second tour de #552). Avant la 1.18, TaskForce ne
+ * gardait pas ces décisions ; une mission qui n'a pas fini n'avait pas de résultat à trancher ; sinon, il attend.
+ */
+function noDecision(page: VerificationPage, t: Texts): string {
+  if (page.older) return t.decisions.undecidedOlder
+  if (page.changes.status && page.changes.status !== "DONE") return t.decisions.noResult
+  return t.summary.undecided
+}
+
 /** La phrase d'abord (R161 M1) : qui a demandé quoi, ce qui a changé, ce qui a été vérifié, qui a tranché. */
 export function summarySentence(page: VerificationPage, t: Texts): string {
   const s = t.summary
@@ -295,7 +305,7 @@ export function summarySentence(page: VerificationPage, t: Texts): string {
   else if (page.notChecked.some((n) => n.kind === "noTests")) parts.push(s.noTests)
   else if (!page.running && page.notChecked.some((n) => n.kind === "noTestRecord")) parts.push(s.testsUnknown)
   if (page.end) parts.push(fillText(s.decided, { decision: decisionWords(page.end, t), date: when(page.end.at) }))
-  else if (!page.running) parts.push(s.undecided)
+  else if (!page.running) parts.push(noDecision(page, t))
   const sentence = parts.map(upperFirst).join(" ")
   return page.legacy ? hideEmails(sentence, t) : sentence
 }
@@ -501,8 +511,10 @@ function decisions(page: VerificationPage, t: Texts): Line[] {
       lines.push(d.reason ? { text: fillText(t.decisions.reason, { reason: d.reason }), tone: "muted" } : { text: t.decisions.noReason, tone: "muted" })
     }
   }
+  const none = noDecision(page, t)
   lines.unshift(page.end ? { text: fillText(t.decisions.final, { decision: decisionWords(page.end, t) }) }
-    : { text: t.decisions.undecided, tone: page.running ? "muted" : "warn" })
+    : page.running || none === t.summary.undecided ? { text: t.decisions.undecided, tone: page.running ? "muted" : "warn" }
+    : { text: none, tone: "muted" })
   if (page.decisions.every((d) => d.kind !== "approval" && d.kind !== "signature" && d.kind !== "expired")) {
     lines.splice(1, 0, { text: t.decisions.none, tone: "muted" })
   }

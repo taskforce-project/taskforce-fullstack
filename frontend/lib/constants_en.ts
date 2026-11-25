@@ -2519,6 +2519,8 @@ export const CONSTANTS_EN = {
       noReason: "No reason given.",
       final: "Final decision: {decision}.",
       undecided: "No final decision yet: the result waits for the person who answers for the mission.",
+      undecidedOlder: "The record does not say whether anyone decided: TaskForce did not keep these decisions before 1.18.",
+      noResult: "The mission did not finish: there was no result to decide on.",
       none: "No action waited for a person.",
     },
     model: {
