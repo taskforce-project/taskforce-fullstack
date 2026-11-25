@@ -190,13 +190,16 @@ function textLine(text: DossierText, kind: string, t: Texts): Line | null {
   return null
 }
 
-/** Les premières lignes : ce que la page a vérifié du dossier, dans cette app, et quand (R161 B1, R159 P5). */
-export function verdictLines(page: VerificationPage, t: Texts): Line[] {
-  const lines = verdictOf(page, t)
+/**
+ * Les premières lignes : ce que la page a vérifié du dossier, dans cette app, et quand (R161 B1, R159 P5). `desktop` : la
+ * page s'affiche dans l'app de bureau, où la clé est sur le poste de l'agent ; ailleurs, elle peut l'être (R161 N8).
+ */
+export function verdictLines(page: VerificationPage, t: Texts, context: { readonly desktop: boolean } = { desktop: false }): Line[] {
+  const lines = verdictOf(page, t, context.desktop)
   return page.legacy ? hiddenLines(lines, t) : lines
 }
 
-function verdictOf(page: VerificationPage, t: Texts): Line[] {
+function verdictOf(page: VerificationPage, t: Texts, desktop: boolean): Line[] {
   const c = page.check
   if (!c) return [{ text: t.checking, tone: "muted" }]
   const v = t.verdict
@@ -237,10 +240,12 @@ function verdictOf(page: VerificationPage, t: Texts): Line[] {
     ].filter((part): part is string => part !== null).join(", ")
     lines.push({ text: fillText(notJudged === 1 ? v.notJudgedOne : v.notJudged, { count: notJudged, parts }), tone: "muted" })
   }
-  // La réserve d'abord : une clé que l'agent pouvait lire ne prouve rien du dossier (R198, R161 M5).
+  // La réserve d'abord, avant tout mot sur le sceau, en une ligne : une clé que l'agent pouvait lire ne prouve rien du
+  // dossier (R198, R161 M5) ; hors de l'app de bureau, la garde `same-machine` ne dit que « peut-être » (R161 N8, v-b).
   const sameMachine = d.seal.custody !== "separate-machine"
   switch (d.seal.state) {
-    case "trusted": lines.push(sameMachine ? { text: v.trustedSameMachine, tone: "warn" } : { text: v.trusted, tone: "ok" }); break
+    case "trusted": lines.push(sameMachine ? { text: desktop ? v.trustedSameMachine : v.trustedMaybeSameMachine, tone: "warn" }
+      : { text: v.trusted, tone: "ok" }); break
     case "self": lines.push({ text: c.keysKnown ? v.self : v.selfNoKeys, tone: "warn" }); break
     // « Fini avant que TaskForce ne scelle » ne vaut que pour un dossier d'avant ce format : un dossier d'aujourd'hui sans
     // sceau dit qu'il n'en a pas, et ce que cela veut dire (R159 de #552, second tour, v-a).
@@ -557,6 +562,8 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
   }
   // Le plafond : ce que le dossier n'a plus gardé ensuite (N2).
   if (r.cap) lines.push({ text: fillText(rec.cap, { seq: r.cap.seq, max: r.cap.max.toLocaleString("en-US") }), tone: "warn" })
+  // Ce que le runner rapporte, en détail : le verdict n'en garde qu'une ligne (R161 N8).
+  if (r.runnerFacts) lines.push({ text: rec.runnerFacts, tone: "warn" })
   // La purge d'un compte qu'une chaîne d'avant la 1.18 nomme par son courriel : ce qui reste, et pourquoi (N4).
   for (const erasure of r.legacyErasures) {
     lines.push({ text: fillText(rec.legacyErased, { date: when(erasure.at), events: erasure.events.join(", ") || "?" }), tone: "muted" })
@@ -570,8 +577,10 @@ function record(page: VerificationPage, t: Texts, context: WordsContext): Line[]
     lines.push({ text: rec.sealBroken, tone: "warn" })
   } else if (s && sealHolds) {
     const custody = s.custody === "separate-machine" ? "separate-machine" : "same-machine"
-    // La garde de la clé d'abord : « scellé » n'est pas une garantie quand l'agent pouvait lire la clé (R161 M5).
-    lines.push({ text: rec.custody[custody], tone: custody === "same-machine" ? "warn" : "muted" })
+    // La garde de la clé d'abord : « scellé » n'est pas une garantie quand l'agent pouvait lire la clé (R161 M5). Le détail
+    // ici, une ligne au verdict ; hors de l'app de bureau, « peut-être » (R161 N8).
+    lines.push({ text: custody === "same-machine" && !context.desktop ? rec.custodyMaybe : rec.custody[custody],
+      tone: custody === "same-machine" ? "warn" : "muted" })
     lines.push({ text: fillText(s.late ? rec.sealedLate : rec.sealedAt, { seq: s.seq ?? "?", date: when(s.sealedAt), key: short(s.keyId) }),
       tone: s.late ? "warn" : "muted" })
     // Seulement des événements venus après le sceau, jamais « 26 à 24 » d'un sceau qui nomme un événement disparu.

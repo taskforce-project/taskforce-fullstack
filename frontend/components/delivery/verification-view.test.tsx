@@ -52,7 +52,8 @@ describe("VerificationView", () => {
     expect(screen.getByText(t.checking)).toBeInTheDocument()
     expect(await screen.findByText(/^Checked in this app on .+: every digest of the chain holds \(25 events\)/)).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Verification of WEB-48: Fix the footer links" })).toBeInTheDocument()
-    expect(screen.getByText(t.verdict.trustedSameMachine)).toBeInTheDocument()
+    // Hors de l'app de bureau, la garde `same-machine` ne dit que « peut-être » (R161 N8).
+    expect(screen.getByText(t.verdict.trustedMaybeSameMachine)).toBeInTheDocument()
     expect(screen.getByText(t.verdict.runnerFacts)).toBeInTheDocument()
     expect(screen.queryByText(t.checking)).not.toBeInTheDocument()
   })

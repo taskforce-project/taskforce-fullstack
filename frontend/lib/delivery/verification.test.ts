@@ -98,7 +98,7 @@ describe("la page, depuis l'exemple d'une mission entière", () => {
     // Le témoin ne se montre comme tenant qu'une fois vérifié (R159 de #552, second tour, V1).
     const page = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
     const lines = texts(verificationSections(page, t, context), "record")
-    const custody = lines.indexOf(t.record.custody["same-machine"])
+    const custody = lines.indexOf(t.record.custodyMaybe)
     expect(custody).toBeGreaterThan(0)
     expect(lines[custody + 1]).toMatch(/^The seal covers the record up to event \d+/)
     expect(lines).toContain("The runner's event 9 never arrived (noted at event 15 of the record).")
@@ -154,7 +154,16 @@ describe("R161 B1, R159 P5 : la page dit ce qu'elle a vérifié, où et quand", 
     const page = verificationPage(example(), await checkRecord(example(), [exampleKey()], at))
     const lines = verdictLines(page, t)
     expect(lines[0]?.text).toMatch(/^Checked in this app on 2026-11-24 09:00 UTC: every digest of the chain holds \(25 events\), the header comes from the chain, and the \d+ texts kept beside it match their digests\.$/)
-    expect(lines.map((l) => l.text)).toEqual(expect.arrayContaining([t.verdict.trustedSameMachine, t.verdict.runnerFacts]))
+    // R161 N8 et v-b du second tour de #552 : une ligne par réserve, la réserve avant tout mot sur le sceau, et « may »
+    // hors de l'app de bureau ; le détail va dans « The record itself ».
+    expect(lines.map((l) => l.text)).toEqual(expect.arrayContaining([t.verdict.trustedMaybeSameMachine, t.verdict.runnerFacts]))
+    expect(t.verdict.trustedMaybeSameMachine.indexOf("may")).toBeLessThan(t.verdict.trustedMaybeSameMachine.indexOf("seal"))
+    expect(verdictLines(page, t, { desktop: true }).map((l) => l.text)).toContain(t.verdict.trustedSameMachine)
+    expect(t.verdict.runnerFacts).toBe("The tests, the model and the event numbers come from the agent's computer.")
+    const record = texts(verificationSections(page, t, context), "record")
+    expect(record).toContain(t.record.runnerFacts)
+    expect(record).toContain(t.record.custodyMaybe)
+    expect(texts(verificationSections(page, t, { runId: 42, desktop: true }), "record")).toContain(t.record.custody["same-machine"])
     expect(lines.map((l) => l.text).join(" ")).not.toMatch(/intact|chained|Sealed at/)
   })
 
@@ -183,7 +192,7 @@ describe("R161 B1, R159 P5 : la page dit ce qu'elle a vérifié, où et quand", 
     const page = verificationPage(file, await checkRecord(file, [key], at))
     expect(page.record.seal?.late).toBe(true)
     const verdict = verdictLines(page, t).map((l) => l.text)
-    expect(verdict).toContain(t.verdict.trustedSameMachine)
+    expect(verdict).toContain(t.verdict.trustedMaybeSameMachine)
     expect(verdict).toContain("It was sealed late, on 2026-11-25 08:00 UTC, after its mission had ended: the seal proves the record as it was on that date, not what happened before.")
     expect(texts(verificationSections(page, t, context), "record")
       .some((l) => l.startsWith("The seal covers the record up to event 23, signed late, on 2026-11-25 08:00 UTC, with the key sha256:"))).toBe(true)

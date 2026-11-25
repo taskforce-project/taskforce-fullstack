@@ -2328,7 +2328,8 @@ export const CONSTANTS_EN = {
       notJudgedNoFactsOne: "1 without its facts",
       trusted: "Its seal is signed by a key this TaskForce lists as its own. That list comes from its own database: what anchors the key is the comment in the pull request.",
       witnessBroken: "The witness in the pull request names event {seq} with {root}, which is not in this record: it was rewritten after its head was written there.",
-      trustedSameMachine: "Its seal is signed by a key of this TaskForce, but that key is on the computer where the agent works: the agent could have read it, so the seal does not prove that the record was not changed during the mission.",
+      trustedSameMachine: "Signed with a key the agent could read: the seal does not prove that the record is unchanged.",
+      trustedMaybeSameMachine: "Signed with a key an agent may be able to read: the seal does not prove that the record is unchanged.",
       self: "Its seal is signed by a key the file carries itself, which this TaskForce does not know: anyone can make such a seal.",
       selfNoKeys: "Its seal is signed by a key the file carries itself; this page could not read this TaskForce's keys to compare them.",
       notSealedRunning: "It is not sealed yet: the mission is still running.",
@@ -2337,7 +2338,7 @@ export const CONSTANTS_EN = {
       broken: "Its seal does not hold: it was not made over this record as it is.",
       late: "It was sealed late, on {date}, after its mission had ended: the seal proves the record as it was on that date, not what happened before.",
       unchecked: "This browser cannot check a seal (Ed25519): the seal was not checked.",
-      runnerFacts: "What the runner reports (its tests, the agent and its model, the numbers of its events) comes from the computer where the agent works: it is worth what that computer is worth, whatever the seal says.",
+      runnerFacts: "The tests, the model and the event numbers come from the agent's computer.",
     },
     // The sentence first (R133): who asked for what, what changed, what was checked, who decided.
     summary: {
@@ -2557,6 +2558,8 @@ export const CONSTANTS_EN = {
         "same-machine": "The signing key is on the same computer as the agent: the agent could have read it, so the seal does not prove that the record was not changed during the mission.",
         "separate-machine": "The operator declares that the signing key is kept on a computer where no agent runs. TaskForce cannot check this.",
       },
+      custodyMaybe: "The signing key may be on a computer where an agent runs: that agent could then have read it, so the seal does not prove that the record was not changed during the mission.",
+      runnerFacts: "What the runner reports (its tests, the agent and its model, the numbers of its events) comes from the computer where the agent works: it is worth what that computer is worth, whatever the seal says.",
       notKept: "The key was drawn when the server started and is not kept: the operator cannot publish it.",
       witness: "Witness: the head of the record at event {seq} ({root}), when it was sealed, was written in the pull request on GitHub, where others can see it: {url}",
       witnessBroken: "The witness names event {seq} with {root}, which is not in this record: the record was rewritten after its head was written in the pull request.",

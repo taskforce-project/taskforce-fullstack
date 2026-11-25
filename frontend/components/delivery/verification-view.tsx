@@ -256,7 +256,7 @@ export function VerificationView({ runId }: Readonly<{ runId: number }>) {
   }
 
   const heading = pageTitle(page, t)
-  const verdict = verdictLines(page, t)
+  const verdict = verdictLines(page, t, context)
   // Un dossier changé après coup se voit d'un coup d'œil, à part des réserves de tout dossier sain (R161 N1, R159 V1).
   const alert = alertLines(verdict)
   const sentence = summarySentence(page, t)
