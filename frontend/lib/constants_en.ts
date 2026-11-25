@@ -2262,8 +2262,8 @@ export const CONSTANTS_EN = {
     },
     people: {
       unnamed: "someone the record does not name",
-      erased: "a person whose details were erased",
-      erasedOn: "a person whose details were erased on {date}",
+      erased: "a person whose details were erased (person {n})",
+      erasedOn: "a person whose details were erased (person {n}, on {date})",
       hidden: "a person (email hidden)",
       github: "a GitHub account",
     },

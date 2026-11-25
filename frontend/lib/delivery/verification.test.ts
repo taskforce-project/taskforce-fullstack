@@ -358,9 +358,37 @@ describe("le reste du dossier, dit en clair", () => {
       { type: "mission.started", data: { mission: 7, workspace: "acme", requestedBy: `who:${"2".repeat(32)}` } },
       { type: "note", data: { kind: "person", person: `who:${"2".repeat(32)}`, email: { sha256: `sha256:${"d".repeat(64)}`, chars: 9 } } },
     ]))
-    expect(page.request.delegatedBy).toEqual({ kind: "erased" })
-    expect(whoWords(page.request.delegatedBy, t)).toBe(t.people.erased)
+    expect(page.request.delegatedBy).toEqual({ kind: "erased", n: 1 })
+    expect(whoWords(page.request.delegatedBy, t)).toBe("a person whose details were erased (person 1)")
     expect(whoWords({ kind: "unnamed" }, t)).toBe(t.people.unnamed)
+  })
+
+  it("R161 N6 : l'effacement va entre parenthèses, et deux personnes effacées restent deux, sans montrer leur identifiant", () => {
+    const asker = `who:${"4".repeat(32)}`
+    const decider = `who:${"5".repeat(32)}`
+    const page = verificationPage(chained([
+      { type: "mission.started", data: { mission: 7, workspace: "acme", requestedBy: asker, accountable: asker } },
+      { type: "note", data: { kind: "person", person: asker, email: { sha256: `sha256:${"a".repeat(64)}`, chars: 9 } } },
+      { type: "note", data: { kind: "person", person: decider, email: { sha256: `sha256:${"b".repeat(64)}`, chars: 9 } } },
+      { type: "human.decision", at: "2026-11-24T13:32:00.000Z", actor: { kind: "person", id: decider },
+        data: { decision: "APPLY", where: "taskforce" } },
+      { type: "mission.ended", data: { status: "DONE" } },
+      { type: "note", at: "2026-11-25T09:00:00.000Z", data: { kind: "erased", person: decider, texts: [`sha256:${"b".repeat(64)}`],
+        reason: "account-deleted" } },
+    ]))
+    // La même personne garde son numéro ; une autre a le sien, dans l'ordre où le dossier les présente.
+    expect(page.request.delegatedBy).toEqual({ kind: "erased", n: 1 })
+    expect(page.request.accountable).toEqual({ kind: "erased", n: 1 })
+    expect(page.decisions.map((d) => d.who)).toContainEqual({ kind: "erased", n: 2, on: "2026-11-25T09:00:00.000Z" })
+    const sections = verificationSections(page, t, context)
+    expect(summarySentence(page, t))
+      .toContain("Applied by a person whose details were erased (person 2, on 2026-11-25 09:00 UTC) on 2026-11-24 13:32 UTC.")
+    expect(texts(sections, "decisions").join(" ")).toContain("Applied by a person whose details were erased (person 2, on 2026-11-25 09:00 UTC)")
+    const shown = JSON.stringify(sections) + summarySentence(page, t)
+    expect(shown).toContain("a person whose details were erased (person 1)")
+    // Deux dates ne se suivent plus, et aucun identifiant opaque ne se montre.
+    expect(shown).not.toMatch(/UTC on \d{4}/)
+    expect(shown).not.toMatch(/4{32}|5{32}/)
   })
 
   it("R210, second tour de #551 (N3) : la règle d'une personne dont le compte a été purgé dit quand son nom a été effacé", () => {
@@ -372,9 +400,9 @@ describe("le reste du dossier, dit en clair", () => {
       { type: "mission.ended", data: { status: "DONE" } },
       { type: "note", at: "2026-11-23T11:00:00.000Z", data: { kind: "erased", person: owner, texts: [`sha256:${"b".repeat(64)}`], reason: "account-deleted" } },
     ], { rules: { rules: [{ id: "push", class: "reversible-exit", owner, reason: "Push the agent's branch." }] } }))
-    expect(page.classOf.heaviest?.rule.owner).toEqual({ kind: "erased", on: "2026-11-23T11:00:00.000Z" })
+    expect(page.classOf.heaviest?.rule.owner).toEqual({ kind: "erased", n: 1, on: "2026-11-23T11:00:00.000Z" })
     expect(texts(verificationSections(page, t, context), "classification"))
-      .toContain("Answered for by a person whose details were erased on 2026-11-23 11:00 UTC.")
+      .toContain("Answered for by a person whose details were erased (person 1, on 2026-11-23 11:00 UTC).")
   })
 
   it("M5 de #551 : des tests dont la branche a changé la définition ne comptent pas comme une vérification", () => {

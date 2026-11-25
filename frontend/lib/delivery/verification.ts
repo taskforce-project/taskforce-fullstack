@@ -14,11 +14,12 @@ import type { RecordCheck } from "./verification-check"
 
 /**
  * Une personne telle que le dossier la nomme : par son nom ou son courriel, gardés à côté de la chaîne ; effacés avec son
- * compte, et le dossier dit quand (`on`, la note de la purge, R210) ; ou pas du tout.
+ * compte, et le dossier dit quand (`on`, la note de la purge, R210) ; ou pas du tout. Une personne effacée a son numéro dans
+ * le dossier (`n`, à partir de 1, dans l'ordre où le dossier la présente) : deux personnes effacées restent deux (R161 N6).
  */
 export type Who =
   | { readonly kind: "named"; readonly name: string }
-  | { readonly kind: "erased"; readonly on?: string }
+  | { readonly kind: "erased"; readonly n: number; readonly on?: string }
   | { readonly kind: "unnamed" }
   /** Une chaîne d'avant la 1.18 la nomme par son courriel, que la page ne montre pas (R159, second tour, N4). */
   | { readonly kind: "hidden" }
@@ -381,17 +382,28 @@ export function verificationPage(file: DossierFile, check: RecordCheck | null = 
   }
   const refText = (ref: unknown): string | null => (isObj(ref) && typeof ref.sha256 === "string" && !changedTexts.has(ref.sha256)
     ? keptText(texts[ref.sha256]) : null)
+  // Chaque personne que le dossier présente, une fois. Les personnes effacées prennent un numéro dans l'ordre de leur note,
+  // celui où elles apparaissent : la page ne montre pas leur identifiant, mais deux personnes effacées restent deux, et la
+  // séparation des rôles se lit encore (R161 N6).
+  const people = new Map<string, Who>()
+  let erasedPeople = 0
+  for (const [id, person] of persons) {
+    if (!OPAQUE_PERSON.test(id)) continue
+    const name = refText(person.name) ?? refText(person.email)
+    if (name) {
+      people.set(id, { kind: "named", name })
+      continue
+    }
+    erasedPeople += 1
+    const on = purged.get(id)
+    people.set(id, on ? { kind: "erased", n: erasedPeople, on } : { kind: "erased", n: erasedPeople })
+  }
   const who = (id: unknown): Who | null => {
     if (typeof id !== "string" || id.length === 0) return null
     if (legacy && EMAIL.test(id)) return { kind: "hidden" }
     // `who:unknown` : une personne que TaskForce ne trouve plus, que le paquet de règles nomme ainsi (troisième tour de #551).
     if (!OPAQUE_PERSON.test(id)) return id === "unknown" || id === "who:unknown" ? { kind: "unnamed" } : { kind: "named", name: id }
-    const person = persons.get(id)
-    if (!person) return { kind: "unnamed" }
-    const name = refText(person.name) ?? refText(person.email)
-    if (name) return { kind: "named", name }
-    const on = purged.get(id)
-    return on ? { kind: "erased", on } : { kind: "erased" }
+    return people.get(id) ?? { kind: "unnamed" }
   }
   const actor = (e: MissionEvidenceEvent): Who | null => (e.actor.kind === "person" ? who(e.actor.id) : null)
 

@@ -88,11 +88,16 @@ export function linkable(url: string | null | undefined): url is string {
   return typeof url === "string" && /^https:\/\/github\.com\/[^\s"'<>]+$/.test(url)
 }
 
-/** Une personne telle que le dossier la nomme ; effacée, le dossier dit quand quand il le sait (R210). */
+/**
+ * Une personne telle que le dossier la nomme ; effacée, son numéro dans le dossier, et quand quand il le sait (R210), entre
+ * parenthèses : la date d'une décision qui suit ne s'y mêle pas (R161 N6).
+ */
 export function whoWords(who: Who | null | undefined, t: Texts): string {
   if (!who || who.kind === "unnamed") return t.people.unnamed
   if (who.kind === "hidden") return t.people.hidden
-  if (who.kind === "erased") return who.on ? fillText(t.people.erasedOn, { date: when(who.on) }) : t.people.erased
+  if (who.kind === "erased") {
+    return who.on ? fillText(t.people.erasedOn, { n: who.n, date: when(who.on) }) : fillText(t.people.erased, { n: who.n })
+  }
   return who.name
 }
 
